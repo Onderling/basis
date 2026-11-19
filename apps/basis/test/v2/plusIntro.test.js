@@ -42,7 +42,7 @@ describe('the first open: three lines, examples from what the person has', () =>
       const { examples } = plusIntro({ ...has, t: tL, lang });
       const d = createPlusDoor({
         llm: null, t: tL, lang, threads: createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() }), threadId: 'own:me',
-        circles: async () => has.circles, ownListsOf: async () => has.ownLists, runInCircle: async () => ({ done: 'ok' }), readAs: () => async () => ({ ok: true, items: [] }),
+        circles: async () => has.circles, ownListsOf: async () => has.ownLists, runInCircle: async () => ({ done: 'ok' }), readAs: () => async () => ({ ok: true, items: [] }), ceilingOf: async () => 3,
       });
       const readsNothing = (r) => r?.error === tL('circle.vandaag.plus_line_unread') || String(r?.done ?? '').startsWith(tL('circle.vandaag.plus_no_model', { path: '' }).slice(0, 25));
       // the probe can tell: a line nobody reads is caught by it

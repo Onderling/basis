@@ -131,7 +131,18 @@ describe('the box that booted unenrolled first enrols into the same data dir, cl
     const ghostLines = box.out.split('\n').filter((l) =>
       l.includes(throwaway.webid.slice(0, 12)) || l.includes(throwaway.pubKey.slice(0, 12)) || (throwaway.personKey?.pubKey && l.includes(throwaway.personKey.pubKey.slice(0, 12))));
     expect(ghostLines, `the box still speaks to or about its throwaway self:\n${ghostLines.join('\n')}`).toEqual([]);
-    expect(box.out, 'no "unreachable — holding message" for anyone: the only other device is the phone, and it is online').not.toMatch(/unreachable — holding message/);
+    // A send held at boot is the designed hold-and-deliver, not a ghost: under load this box (faster to boot since it
+    // signs natively) greets the phone before the phone has put that address on the relay again, holds the line, and
+    // delivers it on the phone's presence moments later (L1077). What must never happen: a held line that is not
+    // delivered (nobody is there: a ghost peer), or one to the throwaway self (the ghost check above). So every held
+    // peer is delivered to before the end, and is not the throwaway.
+    const lines = box.out.split('\n');
+    const heldPeers = [...new Set(lines.map((l) => (/peer (\S+)… unreachable — holding message/.exec(l) ?? [])[1]).filter(Boolean))];
+    await until(async () => (heldPeers.every((p) => box.out.split('\n').some((l) => /delivered \d+ held/.test(l) && l.includes(p))) ? true : null), { timeout: 20_000, step: 500 });
+    for (const p of heldPeers) {
+      expect(throwaway.pubKey.startsWith(p) || throwaway.webid.startsWith(p), `a line was held for the THROWAWAY self (${p})`).toBe(false);
+      expect(box.out.split('\n').some((l) => /delivered \d+ held/.test(l) && l.includes(p)), `a line held for ${p} was never delivered: nobody is there:\n${lines.filter((l) => l.includes(p)).slice(0, 10).join('\n')}`).toBe(true);
+    }
 
     // (3) Nothing at rest is sealed to a key this device no longer has.
     expect(box.out, 'a file from the first boot could not be opened after the ceremony').not.toMatch(/\[at-rest\].*not openable/);

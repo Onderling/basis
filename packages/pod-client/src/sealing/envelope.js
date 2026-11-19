@@ -27,6 +27,7 @@
 //     resource). grant = one wrap; rotate = a new group key version.
 
 import nacl from 'tweetnacl';
+import { secretboxSeal, secretboxOpen } from '@onderling/core';   // secretbox behind the port a shell may speed up (L619)
 import ed2curve from 'ed2curve';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -132,10 +133,10 @@ export function isSealed(text) { return typeof text === 'string' && text.startsW
 // ── v2 symmetric primitive: XSalsa20-Poly1305 (tweetnacl secretbox) ─────────────────────────────────
 function sbSeal(keyU8, plaintextU8) {
   const n = nacl.randomBytes(nacl.secretbox.nonceLength);
-  return { n: b64u(n), c: b64u(nacl.secretbox(plaintextU8, n, keyU8)) };
+  return { n: b64u(n), c: b64u(secretboxSeal(plaintextU8, n, keyU8)) };
 }
 function sbOpen(keyU8, slot) {
-  const out = nacl.secretbox.open(unb64u(slot.c), unb64u(slot.n), keyU8);
+  const out = secretboxOpen(unb64u(slot.c), unb64u(slot.n), keyU8);
   if (!out) throw new Error('sealing: secretbox open failed (wrong key or corrupt envelope)');
   return out;
 }

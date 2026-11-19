@@ -748,11 +748,13 @@ async useSignatureEquation(eq)
 
 A FASTER EQUATION, installed once by the shell (node:crypto on the box, WebCrypto's batch on the web; a native module
 on the phone later), BEHIND the byte rule. Taken only if, with the rule in front, it gives the platform's answer on
-the twelve edge-case vectors, accepts an honest signature and refuses that signature tampered; otherwise the current
-equation stays and the answer says why. `null` goes back to tweetnacl. The rule itself is never replaceable. An
-equation that brings only `verifyBatch` (an async check) keeps tweetnacl for the synchronous path. A `verifyBatch`
-is vetted HERE too, through the batch itself (the vectors with the rule in front, an honest and a tampered
-signature): the one place the rule "nothing faster without agreeing" lives, for every shell. Async for that reason.
+the twelve edge-case vectors, accepts the fixed honest signature and refuses the three fixed negative ones; otherwise
+the current equation stays and the answer says why. `null` goes back to tweetnacl. The rule itself is never
+replaceable. An equation that brings only `verifyBatch` (an async check) keeps tweetnacl for the synchronous path —
+which is the reference and is not vetted against itself. A `verifyBatch` is vetted HERE too, through the batch itself
+(the vectors with the rule in front, the honest and the negative signatures): the one place the rule "nothing faster
+without agreeing" lives, for every shell. Async for that reason. No tweetnacl runs at an install: every expected
+answer is fixed bytes.
 
 **Parameters**
 
@@ -779,6 +781,85 @@ signatureEquationName()
 ```
 
 Which equation answers now ('tweetnacl' until a shell installs one). For diagnostics.
+
+## `src/crypto/secretbox.js`
+
+### `secretboxSeal`
+
+**Kind:** function · **Import:** `secretboxSeal` from `'@onderling/core'`
+
+```js
+secretboxSeal(msg, nonce, key)
+```
+
+Seal `msg` under `key` with `nonce` (NaCl secretbox: authenticator ‖ ciphertext).
+
+**Parameters**
+
+- `msg` `Uint8Array`
+- `nonce` `Uint8Array` — 24 bytes, chosen by the caller
+- `key` `Uint8Array` — 32 bytes
+
+**Returns:** `Uint8Array`
+
+### `secretboxOpen`
+
+**Kind:** function · **Import:** `secretboxOpen` from `'@onderling/core'`
+
+```js
+secretboxOpen(box, nonce, key)
+```
+
+Open a secretbox; `null` when it does not authenticate under `key` and `nonce` (whichever implementation ran).
+An installed implementation that refuses (by `null` or by throwing, as libsodium does) is asked of tweetnacl again:
+a box that really does not open stays `null`, and one tweetnacl opens is the installed implementation failing — said
+once. So a failed open costs one tweetnacl open more; an opened one costs nothing more.
+
+**Parameters**
+
+- `box` `Uint8Array`
+- `nonce` `Uint8Array`
+- `key` `Uint8Array`
+
+**Returns:** `Uint8Array|null`
+
+### `secretboxName`
+
+**Kind:** function · **Import:** `secretboxName` from `'@onderling/core'`
+
+```js
+secretboxName()
+```
+
+Which implementation answers now ('tweetnacl' until a shell installs one). For diagnostics.
+
+### `SECRETBOX_VECTORS`
+
+**Kind:** constant · **Import:** `SECRETBOX_VECTORS` from `'@onderling/core'`
+
+The fixed vectors: one key and nonce, three messages (empty, short, 300 bytes: past a Salsa20 block and a Poly1305
+chunk), with tweetnacl's boxes written down as BYTES, so vetting an implementation at a start runs no tweetnacl at
+all. A test pins that tweetnacl still gives exactly these.
+
+### `useSecretbox`
+
+**Kind:** function · **Import:** `useSecretbox` from `'@onderling/core'`
+
+```js
+useSecretbox(eq)
+```
+
+A FASTER IMPLEMENTATION, installed once by the shell. Taken only if, on the fixed vectors, it seals to tweetnacl's
+exact bytes, opens each back to its message, and refuses a box with one ciphertext byte flipped, one with the
+authenticator flipped, and the right box under a wrong key — and does the same for one LARGE message (768 KiB,
+`SECRETBOX_LARGE`); otherwise the current one stays and the answer says why.
+`null` goes back to tweetnacl.
+
+**Parameters**
+
+- `eq` `{name: string, seal: (msg: Uint8Array, nonce: Uint8Array, key: Uint8Array) => Uint8Array, open: (box: Uint8Array, nonce: Uint8Array, key: Uint8Array) => (Uint8Array|null)}|null`
+
+**Returns:** `{ok: boolean, name: string, reason?: string}`
 
 ## `src/discovery/GossipProtocol.js`
 

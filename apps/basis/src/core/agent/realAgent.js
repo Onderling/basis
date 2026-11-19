@@ -197,6 +197,7 @@ import {
   effectiveProperties,
   profileFactsOf, withProfileFacts, factsDiffer, nextFactsAt, stampChangedFacts,
   firstMessagesOf, FIRST_MESSAGE_POLICIES, FIRST_MESSAGES_KEY, CIRCLE_MEMBERS_KEY, circleMembersMayWriteOf,
+  PLUS_CEILING_KEY, isPlusCeiling, plusCeilingFor,
 } from '@onderling/agent-registry';
 // REQUESTABLE BRIDGE (host-wiring seam J6) — the recipient's per-circle task
 // surface (`createTaskStore`) + the convergence handler (`requestableSkillHandler`)
@@ -340,15 +341,8 @@ import { makeIsKnownPeer, rosterRowNaming } from '../../v2/knownPeer.js';
 import { parseUntrustedJson } from '@onderling/core';
 import { createTimeSlice } from '@onderling/core';
 import { createInProcessSenderAuthorizer } from '@onderling/core';
+import { seedDemoHousehold, sweepDemoSeedOnce } from './demoHouseholdSeed.js';
 
-// Deterministic seed for the real household store.  Three open items across
-// list types so `/list shopping` + the brief demo are non-empty out of the
-// box.  Added oldest-first (the store preserves insertion order).
-const SEED_HOUSEHOLD_ITEMS = [
-  { type: 'shopping', text: 'Milk'                },
-  { type: 'errand',   text: 'Post a parcel'       },
-  { type: 'task',     text: 'Vacuum living room'  },
-];
 
 /**
  * Boot two in-process Agents on a shared InternalBus:
@@ -1954,6 +1948,20 @@ export async function createRealHouseholdAgent(opts = {}) {
         return { ok: true };
       },
       getProperties: async ({ profileId }) => (await agentsRegistry.lookup(profileId))?.properties ?? {},
+      // How far the person's own "+" goes for a persona (`_plus.ceiling`): a reserved key, so it has its own writer;
+      // the read resolves it as any property (own, else the general persona's), 3 when nothing is said
+      setPlusCeiling: async ({ profileId, ceiling }) => {
+        if (!isPlusCeiling(ceiling)) return { ok: false, reason: 'invalid-ceiling' };
+        const cur = await agentsRegistry.lookup(profileId);
+        if (!cur) return { ok: false, reason: 'no-such-profile' };
+        await agentsRegistry.register({ ...cur, properties: setOwn(cur.properties ?? {}, PLUS_CEILING_KEY, ceiling) });
+        return { ok: true };
+      },
+      plusCeilingOf: async ({ profileId }) => {
+        const [self, dflt] = await Promise.all([agentsRegistry.lookup(profileId), profileId === 'default' ? null : agentsRegistry.lookup('default')]);
+        const byId = { ...(self ? { [profileId]: self } : {}), ...(dflt ? { default: dflt } : {}) };
+        return plusCeilingFor((id) => byId[id] ?? null, profileId, { defaultProfileId: 'default' });
+      },
       // Drivers (#3) — set an OWN personal driver property: build+validate the { kind, text, tags[] } value
       // (createDriver throws on an empty driver → the core reports invalid-driver), then store it like any
       // property (setOwn merge + re-register the full entry). getDrivers filters the map to driver values.
@@ -4088,6 +4096,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         ...(expiresIn ? { expiresIn } : {}),
         // the person the screen acts as, when this agent answers for several (a household bot); else its own
         ...(typeof d.actingAs === 'string' && d.actingAs ? { actingAs: d.actingAs } : {}),
+        // a toolbox's page: the toolbox its useTool is for (L1049)
+        ...(typeof d.toolbox === 'string' && d.toolbox ? { toolbox: d.toolbox } : {}),
       });
       // The lane reconciler runs on the grant hook; surface its honest state: a read grant with
       // the mirror OFF (or no backend) yields no lane until the mirror runs.
@@ -5960,19 +5970,15 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   adoptInProcess(hostAgent);
 
-  // Seed a few household items so `/list shopping` + `/brief` are non-empty
-  // out of the box.  Deterministic order (added oldest-first); skip via
-  // opts.seedHousehold:false (clean-slate fixtures).
-  if (opts.seedHousehold !== false) {
-    const seedStore = householdService.stores.getStore(homeCircleId);
-    for (const seed of SEED_HOUSEHOLD_ITEMS) {
-      try {
-        await householdApp.addItem(seedStore, { type: seed.type, text: seed.text }, { by: 'webid:local-demo-user' });
-      } catch (err) {
-        if (typeof console !== 'undefined') {
-          console.warn('[realAgent] seed household item failed:', err?.message ?? err);
-        }
-      }
+  // The household's demo items are DEMO data (ledger L1069): written only when a demo boot asks (`seedDemoData`;
+  // `seedHousehold: false` still opts a demo fixture out). A real start writes none — and removes, once per device,
+  // the copies earlier starts left behind (only the demo author's items with a demo text; `demoHouseholdSeed.js`).
+  {
+    const homeStore = householdService.stores.getStore(homeCircleId);
+    if (seedDemoData) {
+      if (opts.seedHousehold !== false) await seedDemoHousehold(homeStore, householdApp.addItem);
+    } else {
+      await sweepDemoSeedOnce({ store: homeStore, markerVault: ownerRootVault });
     }
   }
 
@@ -9867,19 +9873,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     // override store are both available.
     setAfterClaimHook(fn) { claimRouterRef.hook = typeof fn === 'function' ? fn : null; },
     // L3 — reset/state operate on the wired per-circle CircleItemStore (the live household data).
-    // `reset()` wipes every open item + reseeds the demo items; `state()` returns the current open items.
+    // `reset()` wipes every open item + reseeds the demo items on a demo boot; `state()` returns the current open items.
     async reset() {
       const store = householdService.stores.getStore(homeCircleId);
       const open = await householdApp.listOpen(store, {});
       for (const it of open) {
         try { await store.delete(it.id); } catch { /* defensive */ }
       }
-      if (opts.seedHousehold !== false) {
-        for (const seed of SEED_HOUSEHOLD_ITEMS) {
-          try { await householdApp.addItem(store, { type: seed.type, text: seed.text }, { by: 'webid:local-demo-user' }); }
-          catch { /* defensive */ }
-        }
-      }
+      if (seedDemoData && opts.seedHousehold !== false) await seedDemoHousehold(store, householdApp.addItem);
     },
     async state() {
       try { return await householdApp.listOpen(householdService.stores.getStore(homeCircleId), {}); }

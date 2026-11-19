@@ -15,9 +15,10 @@ import { FACTS_AT_KEY, FACTS_KEYS_KEY } from './profileFacts.js';
 import { MODEL_CONSENT_KEY } from './modelConsent.js';
 import { HANDLE_KEY } from './personaHandle.js';
 import { FIRST_MESSAGES_KEY, CIRCLE_MEMBERS_KEY } from './firstMessages.js';
+import { PLUS_CEILING_KEY } from './plusCeiling.js';
 
 /** The registry's machine keys on a profile — refused by the person-facing property ops. */
-export const RESERVED_PROPERTY_KEYS = Object.freeze([DEVICE_DELEGATIONS_KEY, CIRCLE_MEMBERSHIPS_KEY, OWNED_NODES_KEY, FACTS_AT_KEY, FACTS_KEYS_KEY]);
+export const RESERVED_PROPERTY_KEYS = Object.freeze([DEVICE_DELEGATIONS_KEY, CIRCLE_MEMBERSHIPS_KEY, OWNED_NODES_KEY, FACTS_AT_KEY, FACTS_KEYS_KEY, PLUS_CEILING_KEY]);
 /** The registry's marker namespace (`_inherit.offering`, …): every key under it is the registry's. */
 export const RESERVED_PROPERTY_PREFIXES = Object.freeze(['_inherit.']);
 /** The keys a person may set through the property ops although this package defines them (their picture, their word on a model, their handle, who may write to them first). */

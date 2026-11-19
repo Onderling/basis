@@ -21,6 +21,12 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /** How long one tool call may take before it is given up (a filtered search fetches details first). */
 export const TOOL_CALL_TIMEOUT = param({ key: 'tools.callTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });
+/** A toolbox picture the box hands on: at most this many bytes (a sealed reply rides the relay). */
+export const THUMB_MAX_BYTES = param({ key: 'tools.thumbMaxBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15_360 });
+/** …at most this many pictures per reply. */
+export const THUMB_MAX_COUNT = param({ key: 'tools.thumbMaxCount', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 });
+/** …each fetched within this time, or left out. */
+export const THUMB_TIMEOUT = param({ key: 'tools.thumbTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3_000 });
 
 const CARD_PATH = '/.well-known/agent-card.json';
 const trimSlash = (s) => String(s ?? '').replace(/\/+$/, '');
@@ -82,7 +88,8 @@ export async function callTool({ endpoint, key, tool, input = {}, fetch = global
   if (json?.error) return { ok: false, code: json.error?.data?.code === 'unauthorized' ? 'toolbox-unauthorized' : 'toolbox-error' };
   const data = json?.result?.message?.parts?.[0]?.data;
   if (!data || typeof data !== 'object') return { ok: false, code: 'toolbox-bad-answer' };
-  if (data.error && typeof data.error === 'object') return { ok: false, code: 'tool-error', toolCode: String(data.error.code ?? 'unknown') };
+  // the tool's own error, its code AND params as the toolbox gave them (a page words them; `toolCode` for the door's log)
+  if (data.error && typeof data.error === 'object') return { ok: false, code: 'tool-error', toolCode: String(data.error.code ?? 'unknown'), toolError: { code: String(data.error.code ?? 'unknown'), params: data.error.params && typeof data.error.params === 'object' ? data.error.params : {} } };
   if (!('output' in data)) return { ok: false, code: 'toolbox-bad-answer' };
   return { ok: true, output: data.output };
 }
@@ -129,3 +136,48 @@ export function priceCents(price) {
   if (!m) return null;
   return Number(m[1]) * 100 + Number((m[2] ?? '').padEnd(2, '0'));
 }
+
+/** The picture types a box hands on, by their first bytes (never by a header or a name; never svg). */
+function imageMime(bytes) {
+  const b = bytes;
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 && b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a) return 'image/png';
+  if (b.length >= 12 && String.fromCharCode(...b.slice(0, 4)) === 'RIFF' && String.fromCharCode(...b.slice(8, 12)) === 'WEBP') return 'image/webp';
+  return null;
+}
+
+/**
+ * A toolbox's pictures, fetched BY THE BOX and put on the rows as bytes (`thumb: {mime, data}` base64), so no door ever
+ * fetches a shop's picture itself (that would tell the shop the person's address). Only an image on the toolbox's own
+ * placed host (the same origin as its endpoint, with its key: the egress stays one host per toolbox), only jpeg, png or
+ * webp by the first bytes, at most THUMB_MAX_BYTES each and THUMB_MAX_COUNT per reply, each within THUMB_TIMEOUT.
+ * Anything else is left out and the row stays. The URL never travels on (`image: null`).
+ * @param {Array<{image?: string|null}>} items @param {{endpoint: string, key?: string|null, fetch?: Function, timeoutMs?: number}} o
+ */
+export async function fetchThumbs(items, { endpoint, key = null, fetch = globalThis.fetch, timeoutMs = THUMB_TIMEOUT } = {}) {
+  let origin = null;
+  try { origin = new URL(endpoint).origin; } catch { origin = null; }
+  let left = THUMB_MAX_COUNT;
+  const one = async (url) => {
+    // `within` answers {value} · {error} · {timedOut}: only a value goes on
+    const got = await within(timeoutMs, Promise.resolve().then(() => fetch(url, { method: 'GET', redirect: 'error', headers: { Accept: 'image/jpeg, image/png, image/webp', ...(key ? { authorization: `Bearer ${key}` } : {}) } })));
+    const r = got?.value;
+    if (!r?.ok) return null;
+    const body = await within(timeoutMs, Promise.resolve().then(() => r.arrayBuffer()));
+    if (!body?.value) return null;
+    const bytes = new Uint8Array(body.value);
+    if (bytes.length === 0 || bytes.length > THUMB_MAX_BYTES) return null;
+    const mime = imageMime(bytes);
+    return mime ? { mime, data: Buffer.from(bytes).toString('base64') } : null;
+  };
+  return Promise.all((Array.isArray(items) ? items : []).map(async (x) => {
+    const url = typeof x?.image === 'string' ? x.image : null;
+    let same = false;
+    try { same = Boolean(url && origin && new URL(url).origin === origin); } catch { same = false; }
+    if (!same || left <= 0) return { ...x, image: null };
+    left -= 1;
+    const thumb = await one(url).catch(() => null);
+    return { ...x, image: null, ...(thumb ? { thumb } : {}) };
+  }));
+}
+

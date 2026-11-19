@@ -9,13 +9,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
 
-const counts = vi.hoisted(() => ({ address: 0, personKey: 0 }));
+const counts = vi.hoisted(() => ({ address: 0, personKey: 0, commitment: 0 }));
 vi.mock('@onderling/core', async (importOriginal) => {
   const real = await importOriginal();
   return {
     ...real,
     deriveCircleAddress: (...a) => { counts.address += 1; return real.deriveCircleAddress(...a); },
     personKeyPubKeyB64: (...a) => { counts.personKey += 1; return real.personKeyPubKeyB64(...a); },
+    ceremonyCommitment: (...a) => { counts.commitment += 1; return real.ceremonyCommitment(...a); },
   };
 });
 
@@ -25,7 +26,7 @@ const { createPersonaRuntime } = await import('../src/core/agent/personaRuntime.
 const runtime = (root, profileId = 'default') =>
   createPersonaRuntime({ profileId, ownerRoot: root, custody: { mode: 'root' }, chatVault: new VaultMemory() });
 
-beforeEach(() => { counts.address = 0; counts.personKey = 0; });
+beforeEach(() => { counts.address = 0; counts.personKey = 0; counts.commitment = 0; });
 
 describe('the persona runtime memoises its own derivations', () => {
   it('a circle address is derived once per circle, and equals the uncached derivation', async () => {
@@ -60,5 +61,16 @@ describe('the persona runtime memoises its own derivations', () => {
     expect(pub2).not.toBe(pub1);
     expect(pub2).toBe(core.personKeyPubKeyB64(v2.seed));
     expect(p.personKeyPubOf(null)).toBe(null);
+  });
+
+  it('the ceremony commitment is computed once per circle (its inputs, the persona authority and the circle id, never change on a runtime)', async () => {
+    const p = await runtime(core.Bootstrap.create().bootstrap);
+    counts.commitment = 0;
+    const first = p.ceremonyCommitmentFor('c-1');
+    expect(first).toBe(core.ceremonyCommitment(p.authorityPubKeyB64, 'c-1'));
+    counts.commitment = 0;
+    for (let i = 0; i < 20; i += 1) expect(p.ceremonyCommitmentFor('c-1')).toBe(first);
+    expect(p.ceremonyCommitmentFor('c-2')).not.toBe(first);
+    expect(counts.commitment).toBe(1);   // c-2 only; c-1 came from the memo
   });
 });

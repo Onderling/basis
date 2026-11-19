@@ -1329,6 +1329,10 @@
       "text": "Showing items shared with this circle.",
       "doc": "SP-5b Option A — non-dismissible caption under a list title when the list is audience-scoped (buildScreenModel.audienceScope set). Generic (no circle name): a visibility scope, not a user filter, so no clear/close control."
     },
+    "audience_scope_named": {
+      "text": "Showing items shared with {{name}}.",
+      "doc": "The caption over a list shared with named circles (one or more, comma-joined): which circle it is shared with (ledger L747)."
+    },
     "open_generic": {
       "text": "Open overview →",
       "doc": "S6.B — generic label for a chat-triggered screen panel."
@@ -1590,6 +1594,18 @@
     "pin_bookmark": {
       "text": "{{name}}: {{op}}",
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
+    },
+    "plus_ceiling_off": {
+      "text": "The + is off for this persona.",
+      "doc": "The persona the + speaks as has it switched off (the ceiling per persona, 0): nothing is read and nothing reaches a model."
+    },
+    "plus_ceiling_unread": {
+      "text": "The + cannot read what it may do for this persona right now. Try again in a moment.",
+      "doc": "The ceiling of the persona the + speaks as could not be read (the read failed): this turn runs nothing and reaches no model; a later turn reads it again."
+    },
+    "plus_ceiling_refused": {
+      "text": "The + may not do that for this persona. Do it yourself, or change what the + may do on your persona's page.",
+      "doc": "A line asked for something heavier than this persona lets the + do (its ceiling): refused, whichever way it came in."
     },
     "plus_line_unread": {
       "text": "I could not read that. Type \"help\" to see what I can do, or fill in the fields below.",
@@ -5962,6 +5978,9 @@
     "value_hide": "hide",
     "value_delete": "delete",
     "value_own": "their own",
+    "screen_confirm_toolbox": "{{label}} wants to connect for the toolbox {{toolbox}}.",
+    "screen_toolbox_not_on": "The toolbox {{toolbox}} is not on in this household, so its page cannot connect. Ask the admin to switch it on (/toolbox).",
+    "toolbox_not_yours": "This page may only use its own toolbox, not {{toolbox}}.",
     "screen_confirm_question": "A screen wants to connect as you. Which code does that screen show? Tap that code. If you do not see it, or did not do this yourself: tap \"None of these\".",
     "screen_confirm_replaced": "An earlier request to connect has lapsed.",
     "screen_confirm_remembered": "I asked you whether a screen may connect.",
@@ -6296,6 +6315,10 @@
     "toolbox_word_taken": {
       "text": "I already use the word '{{word}}' of {{title}} for something else. Choose another word in the file on the box.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_more_gone": {
+      "text": "That list is gone; search again.",
+      "doc": "A \"meer\" tapped after its list of things was replaced or went old: nothing to page; search again (ledger L1035)."
     },
     "toolbox_found_row": {
       "text": "{{label}} \u00b7 {{more}}",
@@ -8479,6 +8502,30 @@
       "text": "filters + exceptions on the general one",
       "doc": "mij#personas — section 2 tagline: personas are filters/exceptions on the truth layer."
     },
+    "plus_ceiling": {
+      "text": "What the + may do for me",
+      "doc": "mij#personas \u2014 a persona card: heading of how far the person's own + goes for this persona (the ceiling, _plus.ceiling)."
+    },
+    "plus_ceiling_0": {
+      "text": "Nothing. The + is off for this persona.",
+      "doc": "the ceiling 0: the + is off for this persona; nothing of it reaches a model."
+    },
+    "plus_ceiling_1": {
+      "text": "Only look things up",
+      "doc": "the ceiling 1: the + only reads (looks things up)."
+    },
+    "plus_ceiling_2": {
+      "text": "Also make and change my own things",
+      "doc": "the ceiling 2: the + also makes and changes the person's own things (after their save)."
+    },
+    "plus_ceiling_3": {
+      "text": "Also things in my circles, when I approve them myself",
+      "doc": "the ceiling 3 (the default): the + also does things in the person's circles, after their yes on a card."
+    },
+    "plus_ceiling_hint": {
+      "text": "Who may join a circle and how a circle is set up, you arrange yourself. That never goes through the +.",
+      "doc": "under the row: what the + never does, whatever the ceiling (a circle's members and settings)."
+    },
     "first_messages": {
       "text": "Who may write to this persona first",
       "doc": "mij#personas — a persona card: heading of the choice who may send it a first private message (the firstMessages property)."
@@ -9950,6 +9997,14 @@
     "empty_list": {
       "text": "Nothing here yet.",
       "doc": "Telegram runner: a list reply with no items."
+    },
+    "more_of": {
+      "text": "More from {{shop}} ({{n}})",
+      "doc": "Telegram: the one button under a shop's photo cards that shows the rest of that shop's things (ledger L1035)."
+    },
+    "more_of_line": {
+      "text": "{{n}} more from this shop:",
+      "doc": "Telegram: the line the more_of button stands under."
     },
     "refresh": {
       "text": "Refresh",

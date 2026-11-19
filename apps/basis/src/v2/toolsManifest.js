@@ -48,6 +48,14 @@ export const toolsManifest = Object.freeze({
       },
     },
     {
+      // "Meer van <winkel>" (ledger L1035): the rest of one shop's things from the thread's KEPT list, each with its own
+      // number. Reached by the button under a shop's cards (its line '/meer <tag> <shop> <from>'), never a model's pick
+      // (no chat surface); a read of what was already fetched, so nothing leaves the box.
+      id: 'moreThings', visibility: 'authenticated', verb: 'list',
+      params: [{ name: 'spec', kind: 'string', required: false }],
+      surfaces: { slash: { command: '/meer', body: 'argline' } },
+    },
+    {
       id: 'listTools', visibility: 'authenticated', verb: 'list',
       // a member sees what is on; the admin's `/toolbox` lists every placed one with its on/off (`all`)
       params: [{ name: 'all', kind: 'boolean', required: false }],
@@ -61,7 +69,9 @@ export const toolsManifest = Object.freeze({
       // (the admin's private chat) switches it on. A placed toolbox is off until then.
       id: 'addToolbox', visibility: 'trusted', verb: 'add-toolbox',
       stepUp: 'private-door',
-      writes: { scope: 'device', what: 'control' },
+      // a CIRCLE's control (5): a toolbox decides where the circle's questions go; scope is the widest place an op
+      // affects, not where its record is kept (the box's vault)
+      writes: { scope: 'circle', what: 'control' },
       params: [
         { name: 'name',    kind: 'string',  required: true, schema: { minLength: 1 } },
         { name: 'confirm', kind: 'boolean', required: false },
@@ -71,7 +81,9 @@ export const toolsManifest = Object.freeze({
     {
       id: 'removeToolbox', visibility: 'trusted', verb: 'remove-toolbox',
       stepUp: 'private-door',
-      writes: { scope: 'device', what: 'control' },
+      // a CIRCLE's control (5): a toolbox decides where the circle's questions go; scope is the widest place an op
+      // affects, not where its record is kept (the box's vault)
+      writes: { scope: 'circle', what: 'control' },
       params: [{ name: 'name', kind: 'string', required: true, schema: { minLength: 1 } }],
       surfaces: {},
     },

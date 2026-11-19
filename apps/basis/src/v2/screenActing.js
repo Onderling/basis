@@ -10,6 +10,7 @@
  */
 
 import { renderA2A } from '@onderling/app-manifest';
+import { MAX_ENVELOPE_BYTES } from '@onderling/core';
 import { scopeCatalogueToRole } from './botOpMap.js';
 import { synthesizeGenericOps } from '../genericOpSynth.js';
 
@@ -39,10 +40,33 @@ export const BOT_SCREEN_NEVER = Object.freeze([
   'assistant.assistant-hello',
   // a reminder a person set is said by the host's runner, as them, at its moment — not a button
   'assistant.sayReminder',
-  // a toolbox is used by its word in the chat (`zoek melk`), which names the tool and its input; a button with fields for a
-  // toolbox, a tool and an input object means nothing to a person
+  // "meer" pages the list a chat thread was shown (the keeper is per thread): a screen has no such thread, so it never
+  // holds the op and its management screen paints no button that could only answer "that list is gone"
+  'tools.moreThings',
+]);
+
+/**
+ * Ops a screen HOLDS and may call, but the management screen paints NO button for: a toolbox's tool (`useTool`) is
+ * called by a toolbox's own page (L1035) and by its word in the chat; a button with fields for a toolbox, a tool
+ * and an input object means nothing to a person. Not the same as `BOT_SCREEN_NEVER` (not callable by a screen at all).
+ */
+export const SCREEN_NO_BUTTON = Object.freeze([
   'tools.useTool',
 ]);
+
+/**
+ * A screen's answer as it may travel: one relay envelope holds `MAX_ENVELOPE_BYTES` AFTER sealing (the JSON grows ~4/3 in
+ * base64, plus the envelope around it), so an answer above ~70% of it is refused with a clear code, never cut: the page
+ * asks for less (fewer things, details in smaller groups). Everything else passes unchanged.
+ * @param {object} result
+ * @returns {object}
+ */
+export function screenAnswerFits(result) {
+  let bytes = 0;
+  try { bytes = new TextEncoder().encode(JSON.stringify(result ?? null)).length; } catch { return result; }
+  const limit = Math.floor(MAX_ENVELOPE_BYTES * 0.7);
+  return bytes > limit ? { ok: false, code: 'answer-too-large', error: 'answer-too-large', bytes, limit } : result;
+}
 
 /**
  * The admin's own assistant ops a screen may have: the reads, the household's settings and an export. What admits
@@ -103,8 +127,22 @@ export function screenActsAs(users, { activeEntry } = {}) {
     if (!entry || entry.actingAs !== actingAs || entry.viewPubKey !== token?.subject) return null;
     const row = ((await users.list()) ?? []).find((u) => u?.id === actingAs && !u.hidden);
     // marked as a screen's, with its key and name: an op that needs the private chat's yes is held, and the screen told
-    return row ? { caller: actingAs, threadId: actingAs, via: 'screen', viewPubKey: entry.viewPubKey, screenLabel: entry.label ?? null } : null;
+    return row ? { caller: actingAs, threadId: actingAs, via: 'screen', viewPubKey: entry.viewPubKey, screenLabel: entry.label ?? null, toolbox: entry.toolbox ?? null } : null;
   };
+}
+
+/**
+ * A screen's `tools.useTool` runs only for the toolbox its grant names (ledger L1049): a toolbox's page reads its own
+ * toolbox, never another one placed beside it, though it acts as the same housemate. Null when the call may go on (its
+ * own toolbox, or not a screen at all); else the refusal with its code.
+ * @param {{via?: string, toolbox?: string|null}} ctx  the acting ctx (`screenActsAs`)
+ * @param {{toolbox?: string}} args  useTool's arguments
+ * @returns {null|{ok: false, code: 'toolbox-not-yours', error: string}}
+ */
+export function screenToolboxRefusal(ctx, args) {
+  if (ctx?.via !== 'screen') return null;
+  const own = typeof ctx.toolbox === 'string' && ctx.toolbox ? ctx.toolbox : null;
+  return own && String(args?.toolbox ?? '') === own ? null : { ok: false, code: 'toolbox-not-yours', error: 'toolbox-not-yours' };
 }
 
 /**
@@ -124,7 +162,9 @@ export function exposeDoorToScreens({ agent, catalogue, manifests, doorCall, use
   // the generic ops a noun's declaration brings ("declare a noun → get CRUD free") are ops of the manifest too: the same
   // synthesis the catalogue merges, so a screen reaches a mapped generic op (household's notes) like any other
   const withGeneric = manifests.map((m) => ({ ...m, operations: [...(m.operations ?? []), ...synthesizeGenericOps(m)] }));
-  const defs = renderA2A(withGeneric, { callSkill: doorCall }, {
+  // every answer to a screen fits one envelope, or is refused in a clear code (never cut, never a silent timeout)
+  const screenCall = async (...a) => screenAnswerFits(await doorCall(...a));
+  const defs = renderA2A(withGeneric, { callSkill: screenCall }, {
     ctxFor: screenActsAs(users, { activeEntry: (id) => agent.surfaceTokenEntry(id) }), never: BOT_SCREEN_NEVER,
   }).filter((d) => mapped.has(d.id));
   return agent.exposeToPeers(defs);

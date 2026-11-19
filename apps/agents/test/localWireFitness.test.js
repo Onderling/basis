@@ -249,6 +249,8 @@ function buildWireDefs(registry, tokens = null, versionStoreFor = null, catalogu
     wire('viewAgent'),
     wire('createProfile'),
     wire('setProfileProperty'),
+    wire('setPlusCeiling'),
+    wire('getPlusCeiling'),
     wire('getProfileProperties'),
     wire('setProfileDriver'),
     wire('getProfileDrivers'),

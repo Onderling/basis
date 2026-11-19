@@ -87,7 +87,7 @@ import { createHouseholdInApp } from '../src/v2/householdInApp.js';
 import { createScreenStepUp, SCREEN_STEP_UP_SUBTYPE } from '../src/v2/screenStepUp.js';
 import { SCREEN_OFFER_SUBTYPE, SCREEN_REFUSED_SUBTYPE, SCREEN_WAITING_SUBTYPE } from '../src/v2/screenView.js';
 import { SURFACE_GRANT_TTL_MS } from '../src/v2/surfaceGrants.js';
-import { screenColumnFor, exposeDoorToScreens } from '../src/v2/screenActing.js';
+import { screenColumnFor, exposeDoorToScreens, screenToolboxRefusal } from '../src/v2/screenActing.js';
 import { parsePairingOffer } from '../src/v2/connectionPairing.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
 import { createHostTick } from '../src/v2/hostTick.js';
@@ -119,7 +119,7 @@ import { ensureHouseholdLists, householdBotApps, templateLists, loadListItems, e
 import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
-import { makeToolboxOps, toolboxListLine, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords, makeChoiceKeeper, toolChoicesReply, makePickThing, toolChoiceGateRule } from '../src/v2/toolboxes.js';
+import { makeToolboxOps, toolboxListLine, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords, makeChoiceKeeper, toolChoicesReply, makePickThing, makeMoreThings, toolChoiceGateRule } from '../src/v2/toolboxes.js';
 import { wrapCallSkillWithEgressGate, isExternalEgressOp } from '../src/core/agent/egressGate.js';   // what leaves for a toolbox, and its record   // a circle's toolboxes (L1035): the key from the operator's config
 import { toolsManifest } from '../src/v2/toolsManifest.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -295,6 +295,8 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
   // honest and a tampered signature; else tweetnacl stays). Before any store is read, so every check of this run is the fast one.
   { const eq = await installBoxSignatureEquation(nodeCrypto); console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`); }
   { const sg = installBoxSigning(nodeCrypto); console.info(`[security] signing: ${sg.ok ? sg.name : `tweetnacl (${sg.reason})`}`); }
+  // Secretbox stays tweetnacl here: node:crypto offers no XSalsa20-Poly1305 (core `useSecretbox`; the phone installs libsodium).
+  console.info('[security] secretbox: tweetnacl (node:crypto has no XSalsa20-Poly1305)');
   try {
     const forgot = await runPendingForget({
       markerVault: vault,
@@ -994,6 +996,8 @@ const hostTick = createHostTick({ onError: (e) => walkLog({ kind: 'tick-error', 
 
 // ── The assistant: its doors (Telegram, the bot's inbox), ONE engine behind them ─────────────────────────────
 let tgRunner = null;
+// the door bridge (Telegram + the in-app inbox), set when the runner is built: a tool call asks it whether its chat shows pictures
+let doorBridge = null;
 if (tgToken || inboxDoor.bridge) {
   const { TelegramBridge } = tgToken ? await import('@onderling/chat-agent/bridges/telegram') : {};
   // Who gets in without a code: the admin named at start and a configured allow-list (the bootstrap). Everyone else
@@ -1235,10 +1239,12 @@ if (tgToken || inboxDoor.bridge) {
     launchLabel: (person) => t('circle.bot.screen_label_telegram', {}, threads.langOf(person) ?? undefined),
     // the offer's question, in the person's own language, with the code their screen shows; Ja / Nee buttons send
     // `/koppelen`, which counts only from this private door
-    ask: (person, { codes, replaced }) => {
+    ask: (person, { codes, replaced, label = null, toolbox = null }) => {
       const lang = threads.langOf(person) ?? undefined;
       const tp = (k, p) => t(k, p, lang);
-      const text = [tp('circle.bot.screen_confirm_question'), ...(replaced ? [tp('circle.bot.screen_confirm_replaced')] : [])].join('\n');
+      // a toolbox's page says which toolbox it pairs for: '<label> wil koppelen voor toolbox <naam>' (L1049)
+      const who = toolbox ? [tp('circle.bot.screen_confirm_toolbox', { label: label ?? 'scherm', toolbox })] : [];
+      const text = [...who, tp('circle.bot.screen_confirm_question'), ...(replaced ? [tp('circle.bot.screen_confirm_replaced')] : [])].join('\n');
       // the person PICKS the code their screen shows; "none of these" when it is not there (or they did not ask)
       return reach.sendToPerson(person, {
         text, rememberAs: tp('circle.bot.screen_confirm_remembered'),
@@ -1249,8 +1255,10 @@ if (tgToken || inboxDoor.bridge) {
     tellRefused: (viewPubKey) => agent.sendPeerMessage(viewPubKey, { subtype: SCREEN_REFUSED_SUBTYPE }),
     expectRefusal: (viewPubKey) => agent.inviteExchange?.expectScreenRefusal?.(viewPubKey),
     columnOf: async (person) => screenColumnFor(doorCatalogue.catalogue(), (await botUsers.list()).find((u) => u.id === person)?.role ?? null, rolesPreset()),
+    // a toolbox's page pairs only for a toolbox that is ON here (the toolboxes are made further down; asked at pairing time)
+    toolboxOn: async (name) => ((await toolboxes?.listTools?.({}))?.toolboxes ?? []).some((b) => b.name === name),
     grant: async (g) => {
-      const r = await agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce });
+      const r = await agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce, ...(g.toolbox ? { toolbox: g.toolbox } : {}) });
       // whether the grant reached the screen, or is held until it next speaks (the screen's address, its first characters)
       walkLog({ kind: 'screen-grant', screen: String(g.viewPubKey).slice(0, 8), ok: r?.ok !== false, delivery: r?.delivery ?? null });
       return r;
@@ -1416,7 +1424,12 @@ if (tgToken || inboxDoor.bridge) {
   agent.mountAppOps('tools', {
     // a refusal or an empty answer told in the person's own language (`ctx.lang`): the sentence, never the key or an address
     useTool: async (args, ctx) => {
-      const r = await toolboxes.useTool(args);
+      // pictures only for a door that shows them (Telegram); the in-app thread paints words, so nothing is fetched for it
+      // a screen (a toolbox's own page) calls only ITS toolbox, the one its grant names (L1049)
+      const notYours = screenToolboxRefusal(ctx, args);
+      if (notYours) return { ...notYours, error: { code: notYours.code, message: t('circle.bot.toolbox_not_yours', { toolbox: String(args?.toolbox ?? '') }, ctx?.lang ?? undefined) } };
+      // a screen (a toolbox's own page) gets the toolbox's raw output too; a chat door only the rows
+      const r = await toolboxes.useTool(args, { pictures: doorBridge?.canSendPhoto?.(ctx?.chatId) === true, forScreen: ctx?.via === 'screen' });
       const tp = (k, p) => t(k, p, ctx?.lang ?? undefined);
       if (!r.ok) return { ...r, error: { code: r.code, message: toolboxRefusalText(r, tp) } };
       if (Array.isArray(r.items) && !r.items.length) return { ...r, message: tp('circle.bot.toolbox_none_found', { title: r.title ?? r.name }) };
@@ -1424,6 +1437,8 @@ if (tgToken || inboxDoor.bridge) {
     },
     // the answer to "which one" after a list of things (the row's button, `/kies <n>`), in the person's own language
     pickThing: (args, ctx) => pickThing(args, ctx, (k, p) => t(k, p, ctx?.lang ?? undefined)),
+    // "meer" under a shop's cards: the rest of that shop from the kept list, in the person's own language
+    moreThings: (args, ctx) => makeMoreThings({ keeper: toolChoices, t: (k, p) => t(k, p, ctx?.lang ?? undefined) })(args, ctx),
     // which toolboxes are on, in words wherever it is painted (a screen too, never a bare tick): `/toolbox`'s own wording
     listTools: async (args, ctx) => {
       const r = await toolboxes.listTools(args);
@@ -1567,7 +1582,7 @@ if (tgToken || inboxDoor.bridge) {
     }, (err) => walkLog({ kind: 'surface-grants', ready: false, error: String(err?.message ?? err).slice(0, 120) }));
   }
   tgRunner = createTelegramRunner({
-    bridge: multiplexBridges([tgBridge, inboxDoor.bridge]),
+    bridge: (doorBridge = multiplexBridges([tgBridge, inboxDoor.bridge])),
     catalogue: doorCatalogue.catalogue,
     manifestsByOrigin: doorCatalogue.manifestsByOrigin,
     // The door's own ops — a person's memory mode and language, the admin's app list, status and users — are

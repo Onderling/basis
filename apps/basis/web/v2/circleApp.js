@@ -7097,6 +7097,8 @@ async function openCircleScreenPanel(screenId, { highlightRef, context } = {}) {
       renderListBlock(body, {
         block: { items, categoryField, labelField, searchFields, defaultAudience: section.audience, manifestsByOrigin: circleManifestsByOrigin, appOrigin, title: title.textContent },
         t, capabilityMatrix,
+        // a shared list says which circle it is shared with: the name from the circles this app holds (ledger L747)
+        circleNameOf: (id) => (circlesCache ?? []).find((c) => c?.id === id)?.name ?? null,
         onRowAction: ({ opId, itemId }) => { try { overlay.remove(); } catch { /* */ } circleDispatchReady?.({ opId, args: { id: itemId } }); },
         onRowOpen,
       });
@@ -7242,6 +7244,8 @@ async function openAboutMePanel(personaId) {
       },
       // a persona's own setting (who may write to it first): through the waist, on THAT persona, then the model again
       onSetPersonaProperty: async (personaId, key, value) => { try { await rawCallSkill('agents', 'setProfileProperty', { id: personaId, key, value }); } catch { /* the model shows what holds */ } await draw(); },
+      // a persona row's own write (the "+" ceiling: `row.write` names the op), through the waist
+      onPersonaWrite: async (w) => { try { await rawCallSkill(w.app, w.opId, w.args); } catch { /* the model shows what holds */ } await draw(); },
       onCreatePersona: async (name, answers) => {
         try { await rawCallSkill('agents', 'createProfile', newPersonaArgs(name, answers)); } catch { /* */ }
         await draw();

@@ -134,4 +134,5 @@ export { OFFERINGS_INHERIT_KEY } from './src/profileProperties.js';
 export { RESERVED_PROPERTY_KEYS, RESERVED_PROPERTY_PREFIXES, PERSON_SETTABLE_KEYS, isReservedPropertyKey } from './src/reservedProperties.js';
 export { FACTS_AT_KEY, FACTS_KEYS_KEY, profileFactsOf, withProfileFacts, factsDiffer, factsStamp, nextFactsAt, stampChangedFacts, mergeProfileFacts } from './src/profileFacts.js';
 export { MODEL_CONSENT_KEY, modelConsentFor, consentedJudge } from './src/modelConsent.js';
+export { PLUS_CEILING_KEY, PLUS_CEILINGS, PLUS_CEILING_DEFAULT, isPlusCeiling, plusCeilingFor } from './src/plusCeiling.js';   // how far the person's own "+" goes for a persona
 export { HANDLE_KEY, isPresentedAttributeKey } from './src/personaHandle.js';

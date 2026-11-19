@@ -17,13 +17,14 @@ const CARD = { name: 'Boodschappen', supportedInterfaces: [{ url: 'http://boodsc
 const LIST = { '@type': 'ItemList', itemListElement: [{ '@type': 'ListItem', position: 1, item: { '@type': 'Product', identifier: 'ah:33693', name: 'Halfvolle melk 1 L', offers: { price: '1.19' } } }] };
 const PLACED = { name: 'boodschappen', url: 'http://boodschappen:3000', words: [{ word: 'zoek', tool: 'products.choices', field: 'query' }] };
 
-function harness({ keys = { boodschappen: KEY }, placed = [PLACED], answer = { operation: 'products.choices', output: LIST } } = {}) {
+function harness({ keys = { boodschappen: KEY }, placed = [PLACED], answer = { operation: 'products.choices', output: LIST }, images = {} } = {}) {
   const vault = new Map();
   const store = { get: async (k) => vault.get(k) ?? null, set: async (k, v) => { vault.set(k, v); } };
   const calls = []; const logs = [];
   const fetch = async (url, init = {}) => {
     calls.push({ url, init });
     if (url.endsWith('/.well-known/agent-card.json')) return { ok: true, status: 200, json: async () => CARD };
+    if (images[url]) return { ok: true, status: 200, arrayBuffer: async () => Uint8Array.from(images[url]).buffer };
     return { ok: true, status: 200, json: async () => ({ jsonrpc: '2.0', id: 1, result: { message: { parts: [{ data: answer }] } } }) };
   };
   const ops = makeToolboxOps({ store, placedOf: async () => placed, keyOf: async (name) => keys[name] ?? null, fetch, log: (...a) => logs.push(JSON.stringify(a)) });
@@ -71,6 +72,26 @@ describe('a placed toolbox, switched on by the admin', () => {
     expect(all(r, h.logs, await h.ops.listTools({ all: true }))).not.toContain(KEY);
   });
 
+  it('a picture on the toolbox\'s own host comes back as bytes on the row; a shop\'s own URL is never fetched', async () => {
+    const item = (id, image) => ({ '@type': 'ListItem', item: { '@type': 'Product', identifier: id, name: id, image, offers: { price: '1.00' } } });
+    const answer = { operation: 'products.choices', output: { '@type': 'ItemList', itemListElement: [item('a', 'http://boodschappen:3000/img/a.jpg'), item('b', 'https://shop.example/b.jpg')] } };
+    const h = harness({ answer, images: { 'http://boodschappen:3000/img/a.jpg': [0xff, 0xd8, 0xff, 0xe0, 1, 2] } }); await on(h);
+    const r = await h.ops.useTool({ toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'x' } });
+    expect(r.items[0].thumb?.mime).toBe('image/jpeg');
+    expect(r.items[1].thumb).toBeUndefined();
+    expect(r.items.map((x) => x.image)).toEqual([null, null]);
+    expect(h.calls.some((c) => String(c.url).startsWith('https://shop.example'))).toBe(false);
+  });
+
+  it('for a door that shows no pictures (the in-app thread) the box fetches none: no bytes ride the relay (Fable on the pictures PR)', async () => {
+    const item = (id, image) => ({ '@type': 'ListItem', item: { '@type': 'Product', identifier: id, name: id, image, offers: { price: '1.00' } } });
+    const answer = { operation: 'products.choices', output: { '@type': 'ItemList', itemListElement: [item('a', 'http://boodschappen:3000/img/a.jpg')] } };
+    const h = harness({ answer, images: { 'http://boodschappen:3000/img/a.jpg': [0xff, 0xd8, 0xff, 0xe0, 1, 2] } }); await on(h);
+    const r = await h.ops.useTool({ toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'x' } }, { pictures: false });
+    expect(r.items[0].thumb).toBeUndefined();
+    expect(h.calls.some((c) => String(c.url).endsWith('/img/a.jpg'))).toBe(false);
+  });
+
   it('a toolbox whose key is gone is refused BEFORE any call leaves; a tool it does not offer likewise', async () => {
     const h = harness(); await on(h);
     const before = h.calls.length;
@@ -83,7 +104,7 @@ describe('a placed toolbox, switched on by the admin', () => {
   it('a tool\'s own error comes back as its code; the key is in none of it', async () => {
     const h = harness({ answer: { operation: 'products.choices', error: { code: 'invalid_input', params: {} } } }); await on(h);
     const r = await h.ops.useTool({ toolbox: 'boodschappen', tool: 'products.choices', input: {} });
-    expect(r).toEqual({ ok: false, code: 'tool-error', toolCode: 'invalid_input', name: 'boodschappen' });
+    expect(r).toMatchObject({ ok: false, code: 'tool-error', toolCode: 'invalid_input', toolError: { code: 'invalid_input' }, name: 'boodschappen' });
     expect(all(r, h.logs)).not.toContain(KEY);
   });
 

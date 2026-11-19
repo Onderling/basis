@@ -362,7 +362,8 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
       const ref = String(args?.list ?? '').trim();
       const target = ref ? await findList(circleId, ref) : null;
-      if (!target) return { ok: false, error: t('circle.lists.no_such_list', { name: ref }) };
+      // a fixed code beside the words: a toolbox's page (and any caller) tells "no such list" from other refusals
+      if (!target) return { ok: false, code: 'not-found', error: t('circle.lists.no_such_list', { name: ref }) };
       // What goes: the list, and every item under it that has no parent left once it is gone (children of children
       // too). An item on another list as well is detached from this one and stays there.
       const store = svc.storeFor(circleId);

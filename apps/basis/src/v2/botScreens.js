@@ -140,7 +140,7 @@ export function parseScreenLaunchLink(link) {
  * @param {(person: string) => string} [a.launchLabel]  what `/schermen` calls a Telegram-launched screen
  * @param {() => number} [a.now]
  */
-export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeView, listGrants, notify = null, ask = null, tellRefused = null, expectRefusal = null, sendPrivately, where, verifyLaunch = null, personOfTelegram = null, launchButton = null, launchLabel = () => 'Telegram', now = Date.now, rand = Math.random }) {
+export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeView, listGrants, notify = null, ask = null, tellRefused = null, expectRefusal = null, sendPrivately, where, verifyLaunch = null, personOfTelegram = null, launchButton = null, launchLabel = () => 'Telegram', toolboxOn = null, now = Date.now, rand = Math.random }) {
   const mine = async (person) => ((await listGrants()) ?? []).filter((g) => g?.actingAs === person);
   // when each person last connected a screen: a code tapped again within the offer's window says "connected"
   const connectedAt = new Map();
@@ -161,10 +161,12 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
   const buttonsFor = (person) => { const b = typeof launchButton === 'function' ? launchButton(person) : null; return b ? [b] : null; };
 
   /** The grant, for an offer the person vouched for (the code they picked, or a launch Telegram signed): their role's column, as them. */
-  async function grantTo(person, { viewPubKey, label, nonce }) {
-    const ops = await columnOf(person);
+  async function grantTo(person, { viewPubKey, label, nonce, toolbox = null }) {
+    // a toolbox's page holds useTool for ITS toolbox (the grant records it; the door checks each call); a screen with no
+    // toolbox (Basis's own) does not hold useTool at all (ledger L1049)
+    const ops = (await columnOf(person)).filter((op) => op !== 'tools.useTool' || Boolean(toolbox));
     if (!ops.length) return { ok: false, reason: 'nothing-to-grant' };
-    const r = await grant({ viewPubKey, ops, actingAs: person, label, nonce });
+    const r = await grant({ viewPubKey, ops, actingAs: person, label, nonce, ...(toolbox ? { toolbox } : {}) });
     if (r?.ok === false) return { ok: false, reason: r.error ?? 'grant-failed' };
     try { await notify?.(person, 'circle.bot.screen_connected', { n: ops.length }); } catch { /* the grant stands; /schermen shows it */ }
     return { ok: true, person, ops };
@@ -179,16 +181,19 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
   };
 
   /** The question, for an offer from either route: the code to pick from three, in the person's private door. */
-  async function askAbout(person, { viewPubKey, nonce, label }) {
+  async function askAbout(person, { viewPubKey, nonce, label, toolbox = null }) {
     if (typeof ask !== 'function') return { ok: false, reason: 'no-private-door' };
+    // a page that names a toolbox pairs only for one that is ON here; refused in words before anything is asked
+    if (toolbox && !(typeof toolboxOn === 'function' && await toolboxOn(String(toolbox)))) return { ok: false, reason: 'toolbox-not-on', toolbox: String(toolbox) };
     // the door keeps it as the person's one pending offer: a second offer drops the first, and its screen is told —
     // unless it IS this screen (a reload, a second /scherm on the same browser): the screen asking now must not be the
     // one told it was refused, or it gives up on the offer it just made
-    const asked0 = await door.ask(person, { viewPubKey, nonce, label: screenLabel(label) ?? 'scherm' });
+    const asked0 = await door.ask(person, { viewPubKey, nonce, label: screenLabel(label) ?? 'scherm', ...(toolbox ? { toolbox } : {}) });
     if (!asked0.ok) return asked0;
     const previous = asked0.previous;
     if (previous && previous.viewPubKey !== viewPubKey) refuseSoon(previous.viewPubKey);
-    const asked = await ask(person, { codes: asked0.codes, replaced: Boolean(previous) });
+    // the question names what asks and, for a toolbox's page, for which toolbox ('<label> wil koppelen voor toolbox <naam>')
+    const asked = await ask(person, { codes: asked0.codes, replaced: Boolean(previous), label: screenLabel(label) ?? 'scherm', ...(toolbox ? { toolbox: String(toolbox) } : {}) });
     if (!asked?.ok) { door.drop(person); return { ok: false, reason: asked?.reason ?? 'not-reachable' }; }
     return { ok: true, pending: true, person };
   }
@@ -229,17 +234,17 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
      * pasted it; a pasted offer can be planted ("paste this into your bot") as a link can be stolen — so nothing is
      * granted here either: the same question, the code to pick from three.
      */
-    async pasted(person, { viewPubKey, nonce, label = null }) {
+    async pasted(person, { viewPubKey, nonce, label = null, toolbox = null }) {
       if (typeof viewPubKey !== 'string' || !viewPubKey || typeof nonce !== 'string' || !nonce) return { ok: false, reason: 'not-an-offer' };
       if (typeof isAdmitted !== 'function' || !(await isAdmitted(person))) return { ok: false, reason: 'not-admitted' };
-      return askAbout(person, { viewPubKey, nonce, label });
+      return askAbout(person, { viewPubKey, nonce, label, toolbox });
     },
 
     /**
      * A screen's offer arrived (over the relay, from `from`): the nonce names the person; one use, in time; the key
      * that sends the offer is the key it names. NOTHING is granted yet: the person is asked, privately, with the code.
      */
-    async offer({ from, viewPubKey, nonce, label = null }) {
+    async offer({ from, viewPubKey, nonce, label = null, toolbox = null }) {
       if (typeof viewPubKey !== 'string' || !viewPubKey || viewPubKey !== from) return { ok: false, reason: 'wrong-sender' };
       if (typeof nonce !== 'string' || !nonce) return { ok: false, reason: 'no-nonce' };
       const hash = await sha256Hex(nonce);
@@ -249,7 +254,7 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       threads.setScreenNonce(person, null);   // one use, whatever happens next
       if (!pending || pending.until < now()) return { ok: false, reason: 'expired' };
       if (typeof isAdmitted !== 'function' || !(await isAdmitted(person))) return { ok: false, reason: 'not-admitted' };
-      return askAbout(person, { viewPubKey, nonce, label });
+      return askAbout(person, { viewPubKey, nonce, label, toolbox });
     },
 
     /**
@@ -272,7 +277,7 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
         return picked.reason === 'pairing-expired' ? { ok: false, reason: 'expired' } : { ok: true, declined: true };
       }
       if (typeof isAdmitted !== 'function' || !(await isAdmitted(person))) return { ok: false, reason: 'not-admitted' };
-      const r = await grantTo(person, { viewPubKey: offer.viewPubKey, label: offer.label, nonce: offer.nonce });
+      const r = await grantTo(person, { viewPubKey: offer.viewPubKey, label: offer.label, nonce: offer.nonce, toolbox: offer.toolbox ?? null });
       if (r.ok) connectedAt.set(person, now());
       return r.ok ? { ...r, reopen: this.reopenLink() } : r;
     },

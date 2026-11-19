@@ -13,6 +13,12 @@
       "spec": "which thing, and which list"
     }
   },
+  "moreThings": {
+    "what": "Show more of one shop's things from the list just shown: the button under its cards.",
+    "params": {
+      "spec": "which list, which shop, from where"
+    }
+  },
   "listTools": {
     "what": "Show which toolboxes are on, and the word that uses each.",
     "params": {

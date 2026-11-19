@@ -11,7 +11,7 @@
  *
  * TODO(C3-followup): ACL re-establishment.
  */
-import nacl from 'tweetnacl';
+import { secretboxOpen } from '@onderling/core';   // secretbox behind the port a shell may speed up (L619)
 
 import { Bootstrap } from '@onderling/core';
 import { __archive } from './PodExporter.js';
@@ -75,7 +75,7 @@ export class PodImporter {
       const salt  = base64ToBytes(enc.salt);
       const nonce = base64ToBytes(enc.nonce);
       const key   = this.#bootstrap.deriveResourceKey(ENC_INFO, salt);
-      const open  = nacl.secretbox.open(body, nonce, key);
+      const open  = secretboxOpen(body, nonce, key);
       if (!open) {
         throw new Error('PodImporter.import: decryption failed (wrong bootstrap or tampered archive)');
       }

@@ -19,6 +19,14 @@
     "what": "Maak een nieuwe persona, te herstellen met je herstelzin.",
     "params": {"name": "de naam", "id": "een vast kenmerk", "properties": "wat ze van je overneemt"}
   },
+  "setPlusCeiling": {
+    "what": "Kies wat de + voor een persona mag doen.",
+    "params": {"id": "welke persona", "ceiling": "hoe ver: 0 tot 3"}
+  },
+  "getPlusCeiling": {
+    "what": "Toon wat de + voor een persona mag doen.",
+    "params": {"id": "welke persona"}
+  },
   "setProfileProperty": {
     "what": "Leg iets over een persona vast, zoals waar je woont.",
     "params": {"id": "welke persona", "key": "wat", "value": "de waarde"}

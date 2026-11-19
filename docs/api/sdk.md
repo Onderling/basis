@@ -255,6 +255,10 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `sealToPersonKey` | function | [`core.md`](core.md#sealtopersonkey) |
 | `sealTunnelOW` | function | [`core.md`](core.md#sealtunnelow) |
 | `SEC` | constant | [`core.md`](core.md#sec) |
+| `SECRETBOX_VECTORS` | constant | [`core.md`](core.md#secretbox_vectors) |
+| `secretboxName` | function | [`core.md`](core.md#secretboxname) |
+| `secretboxOpen` | function | [`core.md`](core.md#secretboxopen) |
+| `secretboxSeal` | function | [`core.md`](core.md#secretboxseal) |
 | `SecurityError` | class | [`core.md`](core.md#securityerror) |
 | `SecurityLayer` | class | [`core.md`](core.md#securitylayer) |
 | `seedToMnemonic` | function | [`core.md`](core.md#seedtomnemonic) |
@@ -322,6 +326,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `unregisterRoleBundle` | function | [`core.md`](core.md#unregisterrolebundle) |
 | `UNSAFE_JSON_KEYS` | constant | [`core.md`](core.md#unsafe_json_keys) |
 | `unsubscribe` | function | [`core.md`](core.md#unsubscribe) |
+| `useSecretbox` | function | [`core.md`](core.md#usesecretbox) |
 | `useSignatureEquation` | function | [`core.md`](core.md#usesignatureequation) |
 | `useSigningEquation` | function | [`core.md`](core.md#usesigningequation) |
 | `validateMnemonic` | function | [`core.md`](core.md#validatemnemonic) |

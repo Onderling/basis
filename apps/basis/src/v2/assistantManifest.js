@@ -335,7 +335,9 @@ export const assistantManifest = {
       verb:   'toolbox',
       visibility: 'trusted',
       stepUp: 'private-door',
-      writes: { scope: 'device', what: 'control' },
+      // a CIRCLE's control (5): a toolbox decides where the circle's questions go; scope is the widest place an op
+      // affects, not where its record is kept (the box's vault)
+      writes: { scope: 'circle', what: 'control' },
       params: [{ name: 'spec', kind: 'string', required: false }],
       surfaces: { slash: { command: '/toolbox', body: 'argline' } },
     },
@@ -383,6 +385,9 @@ export const assistantManifest = {
       // them alone. Whoever holds the link in that time can connect a screen as them — one use, the notice in their
       // chat and `/schermen` are the mitigation. Slash only: the model never hands out a link.
       id:     'assistant-screen',
+      // beyond the role's weight at the bot, on purpose (D.3c): only from the person's own private chat, only on their
+      // own typed command or button, never a model's pick (no chat surface); the closed list is pinned (botTableByWeight)
+      botException: "a person connects their OWN screen to the bot (their control, 4), from their private chat, by their own command",
       verb:   'connect-screen',
       visibility: 'authenticated',
       writes: { scope: 'device', what: 'control' },
@@ -394,6 +399,9 @@ export const assistantManifest = {
       // A screen's own connect code, pasted by the person into their own chat. Nothing is granted on the paste: the
       // same question follows (the code to pick from three).
       id:     'assistant-screen-paste',
+      // beyond the role's weight at the bot, on purpose (D.3c): only from the person's own private chat, only on their
+      // own typed command or button, never a model's pick (no chat surface); the closed list is pinned (botTableByWeight)
+      botException: "a person connects their OWN screen by its code (their control, 4), from their private chat, by their own command",
       verb:   'paste-screen',
       visibility: 'authenticated',
       writes: { scope: 'device', what: 'control' },
@@ -404,6 +412,9 @@ export const assistantManifest = {
       // The person's answer to "a screen wants to connect as you — code 4F7K, is that the one you see?": counted only
       // from their PRIVATE door (never a group). The buttons of that question send it; it can be typed too.
       id:     'assistant-screen-confirm',
+      // beyond the role's weight at the bot, on purpose (D.3c): only from the person's own private chat, only on their
+      // own typed command or button, never a model's pick (no chat surface); the closed list is pinned (botTableByWeight)
+      botException: "a person picks the code of their OWN screen that asks to connect (their control, 4), in their private chat",
       verb:   'confirm-screen',
       visibility: 'authenticated',
       writes: { scope: 'device', what: 'control' },
@@ -437,6 +448,9 @@ export const assistantManifest = {
       // A person's Basis identity, linked to their row (`/koppel`): alone, the link their app opens; with the app's
       // offer, the question in the private chat. Identity only: a turn signed by that key is this person.
       id:     'assistant-link',
+      // beyond the role's weight at the bot, on purpose (D.3c): only from the person's own private chat, only on their
+      // own typed command or button, never a model's pick (no chat surface); the closed list is pinned (botTableByWeight)
+      botException: "a person links their OWN Basis identity to their row (keys, 6), from their private chat, by their own command",
       verb:   'link-identity',
       visibility: 'authenticated',
       writes: { scope: 'person', what: 'keys' },
@@ -446,6 +460,9 @@ export const assistantManifest = {
     {
       // The code the person's app shows, picked from three — from the private chat only (`/koppel-code`).
       id:     'assistant-link-confirm',
+      // beyond the role's weight at the bot, on purpose (D.3c): only from the person's own private chat, only on their
+      // own typed command or button, never a model's pick (no chat surface); the closed list is pinned (botTableByWeight)
+      botException: "a person picks the code their OWN Basis app shows (keys, 6), in their private chat",
       verb:   'confirm-link',
       visibility: 'authenticated',
       writes: { scope: 'person', what: 'keys' },
@@ -456,6 +473,9 @@ export const assistantManifest = {
       // The household in your own app (`/inapp ja|nee`): asked after `/koppel` where the admin turned it on; a yes is an
       // invite into the household's circle bound to the linked key, sent to the private chat only.
       id:     'assistant-inapp',
+      // beyond the role's weight at the bot, on purpose (D.3c): only from the person's own private chat, only on their
+      // own typed command or button, never a model's pick (no chat surface); the closed list is pinned (botTableByWeight)
+      botException: "a person puts the household in their OWN app (a circle's control, 5, in doubt the heavier), from their private chat",
       verb:   'invite-to-app',
       visibility: 'authenticated',
       writes: { scope: 'circle', what: 'control' },
@@ -465,6 +485,9 @@ export const assistantManifest = {
     {
       // Undo the link (`/ontkoppel`): the root goes, and every screen grant minted to the person's chat identity.
       id:     'assistant-unlink',
+      // beyond the role's weight at the bot, on purpose (D.3c): only from the person's own private chat, only on their
+      // own typed command or button, never a model's pick (no chat surface); the closed list is pinned (botTableByWeight)
+      botException: "a person unlinks their OWN Basis identity (keys, 6), from their private chat, by their own command",
       verb:   'unlink-identity',
       visibility: 'authenticated',
       writes: { scope: 'person', what: 'keys' },
@@ -496,6 +519,9 @@ export const assistantManifest = {
     {
       // The person's own screens, and dropping one (`/schermen los 2`).
       id:     'assistant-screens',
+      // beyond the role's weight at the bot, on purpose (D.3c): only from the person's own private chat, only on their
+      // own typed command or button, never a model's pick (no chat surface); the closed list is pinned (botTableByWeight)
+      botException: "a person lists or disconnects their OWN screens (their control, 4), from their private chat, by their own command",
       verb:   'manage-screens',
       visibility: 'authenticated',
       writes: { scope: 'device', what: 'control' },

@@ -11,28 +11,11 @@
  */
 
 import { createScreenBlocksCache } from '../../../basis/src/v2/screenBlocksCache.js';
+import { sealedScreenBlocksCacheIo } from '../../../basis/src/v2/screenBlocksCacheStorage.js';
 
-const KEY_PREFIX = 'cc.screenBlocksCache.';
-
+/** The same SEALED IO as the web's (ledger L1081: the kept blocks are a page's content), over AsyncStorage. */
 export function asyncStorageScreenBlocksCacheIo(storage) {
-  return {
-    load: async (screenId) => {
-      try {
-        const raw = await storage?.getItem?.(KEY_PREFIX + screenId);
-        return raw ? JSON.parse(raw) : null;
-      } catch { return null; }
-    },
-    save: async (screenId, blocks) => {
-      try {
-        await storage?.setItem?.(KEY_PREFIX + screenId, JSON.stringify(blocks));
-      } catch { /* ignore */ }
-    },
-    remove: async (screenId) => {
-      try {
-        await storage?.removeItem?.(KEY_PREFIX + screenId);
-      } catch { /* ignore */ }
-    },
-  };
+  return sealedScreenBlocksCacheIo(storage);
 }
 
 export function makeScreenBlocksCacheRN(storage) {

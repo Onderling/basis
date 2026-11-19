@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 84
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 85
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -77,6 +77,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `screen-pairing-door` | — | a shell reaches a screen's grant only through the shared pairing, never by itself |
 | `screen-sections` | — | a hand-painted screen whose sections are DECLARED (`apps/basis/src/v2/screenSections.js`) is |
 | `sealed-at-rest` | — | every local store a shell builds is sealed on the way to disk |
+| `sealed-key-value` | — | the KEY-VALUE writes of the shells, the sibling of lint-sealed-at-rest (ledger L1081) |
 | `searchable-sources` | — | every source file must be findable by search |
 | `sheet-cap` | — | A PHONE SHEET IS CAPPED IN WINDOW PIXELS, NEVER A PERCENTAGE. A card capped with `maxHeight: '85%'` did not… |
 | `shell-reaches-waist` | — | a shell may COMPOSE the substrate, never CALL it |

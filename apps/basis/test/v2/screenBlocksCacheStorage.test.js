@@ -5,7 +5,9 @@
  * round-trip, and the missing-key / clear semantics.  Uses a vi-mock
  * `storage` rather than jsdom so the test is fast + node-portable.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { groupKeyStrategy } from '@onderling/pod-client';
+import { setShellContentSeal } from '../../src/v2/localStoreSeal.js';
 import {
   localStorageScreenBlocksCacheIo,
   createScreenBlocksCacheLocal,
@@ -21,13 +23,18 @@ function memStorage() {
   };
 }
 
+// the cache seals its values (ledger L1081): these tests run with a content key published, as after a boot
+const seal = groupKeyStrategy({ groupKey: Buffer.from(new Uint8Array(32).fill(8)).toString('base64url') });
+beforeEach(() => setShellContentSeal(seal));
+afterEach(() => setShellContentSeal(null));
+
 describe('localStorageScreenBlocksCacheIo · δ.1', () => {
-  it('writes to cc.screenBlocksCache.<id> as JSON', async () => {
+  it('writes to cc.screenBlocksCache.<id>, sealed (the JSON opens with the content key)', async () => {
     const s = memStorage();
     const io = localStorageScreenBlocksCacheIo(s);
     const blocks = [{ blockId: 'b1', type: 'noticeboard', status: 'ok' }];
     await io.save('s1', blocks);
-    expect(s._backing.get('cc.screenBlocksCache.s1')).toBe(JSON.stringify(blocks));
+    expect(seal.open(s._backing.get('cc.screenBlocksCache.s1'))).toBe(JSON.stringify(blocks));
   });
 
   it('reads back the same shape', async () => {

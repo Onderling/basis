@@ -7097,6 +7097,8 @@ async function openCircleScreenPanel(screenId, { highlightRef, context } = {}) {
       renderListBlock(body, {
         block: { items, categoryField, labelField, searchFields, defaultAudience: section.audience, manifestsByOrigin: circleManifestsByOrigin, appOrigin, title: title.textContent },
         t, capabilityMatrix,
+        // a shared list says which circle it is shared with: the name from the circles this app holds (ledger L747)
+        circleNameOf: (id) => (circlesCache ?? []).find((c) => c?.id === id)?.name ?? null,
         onRowAction: ({ opId, itemId }) => { try { overlay.remove(); } catch { /* */ } circleDispatchReady?.({ opId, args: { id: itemId } }); },
         onRowOpen,
       });

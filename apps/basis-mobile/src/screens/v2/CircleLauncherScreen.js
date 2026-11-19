@@ -5142,6 +5142,7 @@ function CircleDetail({
                 searchFields={listScreenData.searchFields}
                 labelField={listScreenData.labelField}
                 defaultAudience={listScreenData.defaultAudience}
+                circleNameOf={(id) => circles.find((c) => c?.id === id)?.name ?? null}
                 manifestsByOrigin={manifestsByOrigin}
                 appOrigin={listScreenData.appOrigin}
                 capabilityMatrix={listScreenData.capabilityMatrix}

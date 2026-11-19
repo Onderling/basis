@@ -9,7 +9,7 @@ import { InMemoryBridge } from '@onderling/chat-agent';
 import { mergeManifests } from '../../src/manifestMerge.js';
 import { toolsManifest } from '../../src/v2/toolsManifest.js';
 import { createTelegramRunner } from '../../src/telegram/runner.js';
-import { toolboxGateRule, toolChoicesReply, makeChoiceKeeper, makeMoreThings } from '../../src/v2/toolboxes.js';
+import { toolboxGateRule, toolChoicesReply, makeChoiceKeeper, makeMoreThings, makePickThing, toolChoiceGateRule, choiceThreadOf } from '../../src/v2/toolboxes.js';
 
 const t = (k, v) => (k === 'circle.bot.toolbox_found_row' ? `${v.label} · ${v.more}` : (v ? `${k} ${JSON.stringify(v)}` : k));
 const THUMB = { mime: 'image/jpeg', data: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1]).toString('base64') };
@@ -133,4 +133,29 @@ describe('a toolbox\'s things: cards where a door shows pictures, words where it
     expect(line, 'the first thing in words').toBeTruthy();
     expect((line.buttons ?? []).length).toBe(1);
   });
+
+  it('the in-app thread: a typed "2" picks the second thing, so the gate rule and the op key the kept list the same way', async () => {
+    const bridge = new InMemoryBridge({ id: 'app' });
+    const keeper = makeChoiceKeeper();
+    const put = [];
+    const pickThing = makePickThing({ keeper, callSkill: async (_a, op, args) => { put.push({ op, args }); return op === 'listLists' ? { ok: true, items: [{ id: 'L1', type: 'list', label: 'Boodschappen' }] } : { ok: true }; }, shoppingList: () => 'Boodschappen' });
+    const callSkill = async (_app, op, args, ctx) => {
+      if (op === 'useTool') return toolChoicesReply({ ok: true, title: 'Boodschappen', items: [{ label: 'Melk A', seller: 'AH', ref: { type: 'Product', ref: 'a' } }, { label: 'Melk B', seller: 'AH', ref: { type: 'Product', ref: 'b' } }] }, { threadId: choiceThreadOf(ctx), keeper, t });
+      if (op === 'pickThing') return pickThing(args, ctx, t);
+      return { ok: false };
+    };
+    const gateRules = [toolboxGateRule(() => [{ word: 'zoek', toolbox: 'boodschappen', tool: 'products.choices', field: 'query' }]), toolChoiceGateRule(keeper)];
+    const r = createTelegramRunner({ bridge, t, collectMs: 0, catalogue: mergeManifests([{ manifest: toolsManifest }]), manifestsByOrigin: { tools: toolsManifest }, callSkill, gateRules });
+    await r.start();
+    await bridge.simulateIncoming({ chatId: '9', text: 'zoek melk', sender: { bridgeUid: '9' } }); await r.idle();
+    await bridge.simulateIncoming({ chatId: '9', text: '2', sender: { bridgeUid: '9' } }); await r.idle();
+    expect(put.find((p) => p.op === 'addToList')?.args, 'the second thing went on the list').toMatchObject({ list: 'Boodschappen', text: 'Melk B' });
+  });
+  it('choiceThreadOf: one key for the gate (ctx.id) and the op (ctx.threadId) of the same thread', () => {
+    expect(choiceThreadOf({ threadId: 'tg:9', caller: 'telegram:9' })).toBe('tg:9');
+    expect(choiceThreadOf({ id: 'tg:9' })).toBe('tg:9');
+    expect(choiceThreadOf({ caller: 'telegram:9' })).toBe('telegram:9');
+    expect(choiceThreadOf(null)).toBeNull();
+  });
 });
+

@@ -167,7 +167,7 @@ describe('the tap: the answer to "which one"', () => {
     expect(d.calls.some((c) => c.op === 'addToList')).toBe(false);
     expect(ask.message).toContain('circle.bot.toolbox_pick_which_list');
     const painted = renderReply({ shape: 'text', payload: ask }, { t });
-    expect(painted.quickReplies.map((q) => q.slash)).toEqual(['/kies 3 1', '/kies 3 2']);
+    expect(painted.quickReplies.map((q) => q.slash)).toEqual(['/kies 3 L7', '/kies 3 L8']);
     for (const q of painted.quickReplies) expect(Buffer.byteLength(q.slash)).toBeLessThanOrEqual(64);
     await d.pick('3 2');
     expect(d.calls.find((c) => c.op === 'addToList').args).toMatchObject({ list: 'Feest', text: 'Biologische melk' });
@@ -183,3 +183,24 @@ describe('the tap: the answer to "which one"', () => {
     expect(d.calls.some((c) => c.op === 'addToList')).toBe(false);
   });
 });
+
+describe('"which list?" carries the list itself, not its place (Fable on #1423)', () => {
+  it('a quick reply names the list by id; a list added in between does not move the thing to another list', async () => {
+    const keeper = makeChoiceKeeper();
+    toolChoicesReply({ ok: true, items: [{ label: 'Pindakaas', seller: null, ref: { type: 'Product', ref: 'p1' } }] }, { threadId: 'tg:1', keeper, t });
+    let lists = [{ id: 'L-feest', type: 'list', label: 'Feest' }, { id: 'L-week', type: 'list', label: 'Weekmenu' }];
+    const added = [];
+    const pick = makePickThing({ keeper, callSkill: async (_a, op, args) => { if (op === 'listLists') return { ok: true, items: lists }; added.push(args); return { ok: true }; }, shoppingList: () => null });
+    const ask = await pick({ spec: '1' }, { threadId: 'tg:1' }, t);
+    const weekReply = ask.quickReplies.find((q) => q.label === 'Weekmenu');
+    expect(weekReply.slash).toBe('/kies 1 L-week');
+    // someone adds a list before it, then the tap comes in
+    lists = [{ id: 'L-nieuw', type: 'list', label: 'Nieuw' }, ...lists];
+    await pick({ spec: weekReply.slash.replace('/kies ', '') }, { threadId: 'tg:1' }, t);
+    expect(added.at(-1)).toMatchObject({ list: 'Weekmenu', text: 'Pindakaas' });
+    // a typed number still means the place the person sees
+    await pick({ spec: '1 1' }, { threadId: 'tg:1' }, t);
+    expect(added.at(-1)).toMatchObject({ list: 'Nieuw' });
+  });
+});
+

@@ -8340,6 +8340,30 @@
       "text": "filters + uitzonderingen op de algemene",
       "doc": "mij#personas — sectie 2 tagline: persona's zijn filters/uitzonderingen op de waarheidslaag."
     },
+    "plus_ceiling": {
+      "text": "Wat de + voor me mag doen",
+      "doc": "mij#personas \u2014 a persona card: heading of how far the person's own + goes for this persona (the ceiling, _plus.ceiling)."
+    },
+    "plus_ceiling_0": {
+      "text": "Niets. De + staat uit voor deze persona.",
+      "doc": "the ceiling 0: the + is off for this persona; nothing of it reaches a model."
+    },
+    "plus_ceiling_1": {
+      "text": "Alleen opzoeken",
+      "doc": "the ceiling 1: the + only reads (looks things up)."
+    },
+    "plus_ceiling_2": {
+      "text": "Ook mijn eigen dingen maken en wijzigen",
+      "doc": "the ceiling 2: the + also makes and changes the person's own things (after their save)."
+    },
+    "plus_ceiling_3": {
+      "text": "Ook dingen in mijn kringen, als ik ze zelf goedkeur",
+      "doc": "the ceiling 3 (the default): the + also does things in the person's circles, after their yes on a card."
+    },
+    "plus_ceiling_hint": {
+      "text": "Wie er in een kring bij mag en hoe een kring is ingesteld, regel je zelf. Dat gaat nooit via de +.",
+      "doc": "under the row: what the + never does, whatever the ceiling (a circle's members and settings)."
+    },
     "first_messages": {
       "text": "Wie mag deze persona als eerste schrijven",
       "doc": "mij#personas — persona-kaart: kop van de keuze wie een eerste privébericht mag sturen (eigenschap firstMessages)."

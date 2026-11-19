@@ -57,6 +57,7 @@ export function renderMij(container, {
   onRemoveDriver,
   onCreatePersona,
   onSetPersonaProperty,
+  onPersonaWrite,
   onToggleDisclosure,
   onShareToCircle,
   onSetPicture,
@@ -78,7 +79,7 @@ export function renderMij(container, {
   }
 
   container.appendChild(renderGeneral(tr, model, { onSetProperty, onSaveDriver, onRemoveDriver, onSetPicture, resolvePicture, currentPicture, lang }));
-  container.appendChild(renderPersonas(tr, model, { onCreatePersona, onSetPersonaProperty }));
+  container.appendChild(renderPersonas(tr, model, { onCreatePersona, onSetPersonaProperty, onPersonaWrite }));
   container.appendChild(renderCircles(tr, model, { onToggleDisclosure, onShareToCircle, canCarryMedia }));
   return container;
 }
@@ -271,7 +272,7 @@ function renderGeneral(tr, model, { onSetProperty, onSaveDriver, onRemoveDriver,
 }
 
 // ── 2 · PERSONA'S — filters + uitzonderingen op de algemene ────────────────
-function renderPersonas(tr, model, { onCreatePersona, onSetPersonaProperty }) {
+function renderPersonas(tr, model, { onCreatePersona, onSetPersonaProperty, onPersonaWrite }) {
   const sec = section(tr, 'circle.mij.personas_eyebrow', 'circle.mij.personas_tagline');
   const grid = el('div', 'cc-mij__grid');
 
@@ -318,6 +319,26 @@ function renderPersonas(tr, model, { onCreatePersona, onSetPersonaProperty }) {
         else b.disabled = !on;
         box.appendChild(b);
       }
+      card.appendChild(box);
+    }
+    // how far the person's own "+" goes for this persona (plusCeilingRow.js): its four choices, the one in force marked;
+    // a tap writes what the row says (its own op), for THIS persona
+    if (p.plusCeiling) {
+      const row = p.plusCeiling;
+      const box = el('div', 'cc-mij__first-contact cc-mij__plus-ceiling');
+      box.dataset.key = row.key;
+      box.appendChild(el('span', 'cc-mij__entry-key', tr(row.labelKey)));
+      for (const choice of row.choices) {
+        const on = choice.value === row.value;
+        const b = el('button', on ? 'cc-mij__choice cc-mij__choice--on' : 'cc-mij__choice', tr(choice.labelKey));
+        b.type = 'button';
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.dataset.testid = `mij-plus-ceiling-${p.id}-${choice.value}`;
+        if (typeof onPersonaWrite === 'function' && !on) b.addEventListener('click', () => onPersonaWrite(row.write(choice.value)));
+        else b.disabled = !on;
+        box.appendChild(b);
+      }
+      box.appendChild(el('span', 'cc-mij__hint', tr(row.hintKey)));
       card.appendChild(box);
     }
     grid.appendChild(card);

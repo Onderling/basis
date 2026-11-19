@@ -8343,6 +8343,30 @@
       "text": "filters + exceptions on the general one",
       "doc": "mij#personas — section 2 tagline: personas are filters/exceptions on the truth layer."
     },
+    "plus_ceiling": {
+      "text": "What the + may do for me",
+      "doc": "mij#personas \u2014 a persona card: heading of how far the person's own + goes for this persona (the ceiling, _plus.ceiling)."
+    },
+    "plus_ceiling_0": {
+      "text": "Nothing. The + is off for this persona.",
+      "doc": "the ceiling 0: the + is off for this persona; nothing of it reaches a model."
+    },
+    "plus_ceiling_1": {
+      "text": "Only look things up",
+      "doc": "the ceiling 1: the + only reads (looks things up)."
+    },
+    "plus_ceiling_2": {
+      "text": "Also make and change my own things",
+      "doc": "the ceiling 2: the + also makes and changes the person's own things (after their save)."
+    },
+    "plus_ceiling_3": {
+      "text": "Also things in my circles, when I approve them myself",
+      "doc": "the ceiling 3 (the default): the + also does things in the person's circles, after their yes on a card."
+    },
+    "plus_ceiling_hint": {
+      "text": "Who may join a circle and how a circle is set up, you arrange yourself. That never goes through the +.",
+      "doc": "under the row: what the + never does, whatever the ceiling (a circle's members and settings)."
+    },
     "first_messages": {
       "text": "Who may write to this persona first",
       "doc": "mij#personas — a persona card: heading of the choice who may send it a first private message (the firstMessages property)."

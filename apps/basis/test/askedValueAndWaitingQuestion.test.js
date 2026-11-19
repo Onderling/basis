@@ -18,8 +18,8 @@ import nl from '../src/locales/circle.nl.json' with { type: 'json' };
 
 const tr = (k, p) => { const v = k.split('.').slice(1).reduce((o, x) => o?.[x], nl); const s = typeof v === 'string' ? v : (v?.text ?? k); return s.replace(/\{\{(\w+)\}\}/g, (_, n) => String(p?.[n] ?? '')); };
 const ANN = 'telegram:42';
-// an op with a required enum, as any app may declare one
-const demo = { app: 'demo', itemTypes: [], operations: [{ id: 'pick', verb: 'set', params: [{ name: 'color', kind: 'enum', of: ['red', 'blue'], required: true }], surfaces: { slash: { command: '/kies', body: 'argline' }, chat: { hint: 'pick a color' } } }] };
+// an op with a required enum, as any app may declare one (not '/kies': the toolboxes' pick of a thing owns it, first mount wins)
+const demo = { app: 'demo', itemTypes: [], operations: [{ id: 'pick', verb: 'set', params: [{ name: 'color', kind: 'enum', of: ['red', 'blue'], required: true }], surfaces: { slash: { command: '/kleur', body: 'argline' }, chat: { hint: 'pick a color' } } }] };
 
 function bot() {
   const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
@@ -58,7 +58,7 @@ describe('a value asked for, and a question left waiting', () => {
 
   it('a question for a missing enum value: buttons in words; an unrelated line drops it and goes on as usual', async () => {
     const { say, calls } = bot();
-    const q = await say('/kies');
+    const q = await say('/kleur');
     expect((q.buttons ?? []).map((b) => b.label)).toEqual(['red', 'blue']);
     const r = await say('Halloo 🥬🍅🥑🥒');
     expect(calls.find((c) => c.op === 'pick'), 'the greeting is not taken as the answer').toBeUndefined();
@@ -67,7 +67,7 @@ describe('a value asked for, and a question left waiting', () => {
     await say('blue');
     expect(calls.find((c) => c.op === 'pick'), 'the dropped question answers nothing').toBeUndefined();
     // and a real answer still answers
-    await say('/kies');
+    await say('/kleur');
     await say('blue');
     expect(calls.find((c) => c.op === 'pick')?.args).toMatchObject({ color: 'blue' });
   });

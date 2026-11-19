@@ -169,6 +169,9 @@ export const SEAMS = Object.freeze([
   // A hosted bot keeps its household's export file (the one format kept readable across versions) on its own disk,
   // one a night, so a snapshot carries it off and /import can read it back. A person's device keeps no such shelf.
   { id: 'household-export-shelf', pattern: /createExportShelf\(/, shells: ['box'], why: 'a hosted bot\'s household survives a wipe, a lost disk and a new version' },
+  // THE EGRESS GATE (L1035): what leaves for a toolbox passes one gate at the box's waist. Web and phone hold no
+  // toolboxes (the tools app is a door manifest of the box): a screen reaches a tool through the box's door.
+  { id: 'egress-gate', pattern: /wrapCallSkillWithEgressGate\(/, shells: ['box'], why: 'exactly a toolbox\'s tool and its input leave, an off toolbox is refused before the call, and every call is recorded' },
   { id: 'bot-inbox-door', pattern: /createInboxDoor\(/, shells: ['box'], why: 'a function profile\'s contact inbox is answered by its assistant; a person\'s never is' },
   // A household bot WRITES FIRST (reminders of what people dated): only a shell that hosts a bot runs the tick. Web and
   // mobile are a person's devices and write first to nobody.
@@ -379,6 +382,10 @@ export const SEAMS = Object.freeze([
   // `useSignatureEquation`): node:crypto on the box, WebCrypto's batch on the web. A shell that does not checks every
   // signature in pure JS (~10 ms on a laptop, ~61 ms on a mid-range phone, against ~0.15 ms).
   { id: 'signature-equation', pattern: /install\w*SignatureEquation\(/, why: 'a shell that installs no fast equation checks every signature in pure JS: seconds of a start on a phone' },
+  // …and SIGNING + key derivation (core `useSigningEquation`, L619): libsodium over JSI on the phone, node:crypto on the
+  // box, taken only on tweetnacl's exact bytes. NOT the web: WebCrypto's Ed25519 is asynchronous and every signing path
+  // is synchronous, so the web signs with tweetnacl (a laptop signs fast enough; the phone is where it cost seconds).
+  { id: 'signing-equation', pattern: /install\w*Signing\(/, shells: ['mobile', 'box'], why: 'a phone that signs and derives keys in pure JS spends part of its start on it (its identities, circle addresses and every greeting it signs)' },
   // NEARBY'S CONVERSATION STREAM AND TAB COUNTS: what the Conversation tab holds in what order (chat lines, question and
   // circle cards by arrival) and how much is new on each tab are decided by shared functions; a painter that sorts or
   // counts by itself drifts from the other shell. Both are painted by Nearby's painter, so the web set includes it.

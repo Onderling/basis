@@ -143,7 +143,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     return ops;
   }
 
-  async function paint(chatId, rendered) {
+  async function paint(chatId, rendered, { readAgain = false } = {}) {
     if (!rendered) return;
     const offered = offeredOps(chatId);
     const onMap = (b) => !offered || offered.has(String(b?.callbackData ?? '').split(':')[0]);
@@ -156,11 +156,19 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       // "Ververs": the same read again, as a new message — a list message goes stale the moment someone ticks a line
       // elsewhere (asked for by a household member). A quick reply: the read's own slash line, decided by the gate like
       // a typed one. Telegram carries a button's data in 64 bytes; a list whose name does not fit simply has none.
-      const refreshLine = rendered.title && (!offered || offered.has('listEntries')) ? `/list-entries ${rendered.title}` : null;
+      // Only a lists read is read again by it (`readAgain`): another app's titled list (a toolbox's things) is no list of
+      // the household's, and its title would read the household's list of that name.
+      const refreshLine = readAgain && rendered.title && (!offered || offered.has('listEntries')) ? `/list-entries ${rendered.title}` : null;
       const refresh = refreshLine && new TextEncoder().encode(refreshLine).length <= 64
         ? [{ id: refreshLine, label: tc(chatId)('circle.telegram.refresh') }] : [];
       if (!items.length) { await say(chatId, [...head, rendered.text ?? tc(chatId)('circle.telegram.empty_list')].join('\n'), refresh.length ? refresh : undefined); return; }
-      const lines = [...head, ...items.map((it, i) => `${i + 1}. ${it.label}`)];
+      // a list the op groups (`rendered.groups`, a toolbox's things per shop): a head line where the group changes; the
+      // numbers run on across the heads (they are what a tap or a typed '2' picks)
+      const lines = [...head];
+      items.forEach((it, i) => {
+        if (rendered.groups && it.group && it.group !== items[i - 1]?.group) lines.push(`${it.group}:`);
+        lines.push(`${i + 1}. ${it.label}`);
+      });
       const buttons = [];
       // A button names the ITEM, not its row number ("Done: melk", not "Done 1") — read from a phone, the
       // number was a puzzle (walk 2). Long labels are cut; the row number stays as a tiebreaker.
@@ -211,14 +219,14 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     if (reply?.payload?.greeting === true && turns.get(chatId)?.welcomed) { note(chatId, { welcomedOnce: true }); return; }
     // a rule that may fall back to the model, whose words named nothing: not said — the line goes to the model
     if (tryRule && (reply?.error?.reason === 'not-found' || (reply?.ok === false && reply?.code === 'not-found'))) { note(chatId, { fellBack: ready.opId }); return { notFound: true }; }
-    const rendered = renderReply(reply, { t: tc(chatId), appOrigin: ready.appOrigin, manifestsByOrigin: manifestsOf() });
+    const rendered = renderReply(reply, { t: tc(chatId), appOrigin: ready.appOrigin, opId: ready.opId, manifestsByOrigin: manifestsOf() });
     // An op of the families a person reads one line for (`replyLine`): that line, the same for the gate's pick and the
     // model's. A line that folds waits for the rest of its turn.
     // The people reads ("wie doet de lamp") are worded the same way: their line in place of the list they would paint.
     const fact = !reply?.error && (rendered.kind === 'text' || isReadFamily(ready.opId)) ? replyFact(reply?.payload, { opId: ready.opId, args: ready.args }) : null;
     if (fact?.fold && turns.has(chatId)) { (turns.get(chatId).lines ??= []).push(fact); return; }
     const line = fact ? replyLines([fact], { t: tc(chatId) })[0] : null;
-    await paint(chatId, line ? { ...rendered, kind: 'text', text: line } : rendered);
+    await paint(chatId, line ? { ...rendered, kind: 'text', text: line } : rendered, { readAgain: ready.opId === 'listEntries' });
   }
 
   /** `/help` (and the `help` op): the commands this bot answers to, with their hints — from the catalogue as scoped to

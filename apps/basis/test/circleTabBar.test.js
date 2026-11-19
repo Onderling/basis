@@ -8,10 +8,18 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { renderCircleTabBar } from '../web/v2/circleTabBar.js';
-import { circleTabs } from '../src/v2/tabProjection.js';
+import { circleTabs, circleTabsMobile } from '../src/v2/tabProjection.js';
 import { basisManifest } from '../src/index.js';
 
 const t = (k) => k;
+
+describe('the tab order with Nearby (Frits, ledger L1051)', () => {
+  it('Today · Circles · Contacts · Nearby · Me, the same on both shells', () => {
+    const order = ['screens', 'circles', 'contacten', 'nearby', 'mij'];
+    expect(circleTabs(basisManifest, undefined, { hasMesh: true }).map((tab) => tab.id)).toEqual(order);
+    expect(circleTabsMobile(basisManifest, { hasMesh: true }).map((tab) => tab.id)).toEqual(order);
+  });
+});
 
 describe('renderCircleTabBar', () => {
   it('renders the alpha tabs in order — Circles, Contacten, Mij (Schermen and Nearby are hidden, not removed)', () => {

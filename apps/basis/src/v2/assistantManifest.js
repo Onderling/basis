@@ -36,7 +36,7 @@ export const assistantManifest = {
       group:  'settings',
       verb:   'set-memory',
       // The thread row lives on the door's own device.
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [{ name: 'mode', kind: 'enum', of: [...MEMORY_MODES], required: false }],
       surfaces: {
         slash: { command: '/geheugen', body: 'argline' },
@@ -51,7 +51,7 @@ export const assistantManifest = {
       // the person's own "+" thread is a door too: its memory, forgetting it and its language are these ops (own place)
       scopes: ['own'],
       verb:   'forget-conversation',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'content' },
       params: [],
       surfaces: { slash: { command: '/vergeet', body: 'none' } },
     },    {
@@ -110,7 +110,7 @@ export const assistantManifest = {
       verb:   'set-reminders',
       // a person's own reminders: on or off, or WHEN — their own default over the household's (`60`, `ochtend`,
       // `ook avond`, `geen`, `huis` = as the household); on the thread row
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       // one argument, so a button's `/herinneringen aan` and a typed `/herinneringen ook avond` land in the same place
       params: [{ name: 'mode', kind: 'string', required: false }],
       surfaces: {
@@ -125,7 +125,7 @@ export const assistantManifest = {
       // rules "19:45" — a household row the host runs, said to everyone at its moment (it names nobody)
       id:     'remindMe', visibility: 'authenticated',
       verb:   'remind-me',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'content' },
       params: [{ name: 'item', kind: 'string', required: true }, { name: 'rules', kind: 'string', required: true }, { name: 'who', kind: 'string', required: false }],
       surfaces: {
         chat:  { reply: 'text', hint: 'A reminder. For this person\'s own reminder of one EXISTING appointment or chore: item = words of its title; rules in words: "60" (minutes before), "ochtend", "avond" (the evening before), "7:30", "ook …" to add to the usual ones, "gewoon" to drop their own for it. For a reminder of their own about ANYTHING at a time (no appointment or chore needed) — "remind me in 10 minutes to call mum": who: me, item = what to say, rules = the time ("over 10 minuten", "20:00", "morgen om 8:00"). With who: everyone, a reminder for EVERYONE in the household at a time: item = what to say, rules = the time — for "remind everyone at 19:45: dinner". Never for someone else.' },
@@ -143,7 +143,7 @@ export const assistantManifest = {
       // one of a person's own reminders away (`/schrap 1`, `/schrap gootsteen`): by its number in `/gepland`, or its words
       id:     'cancelReminder', visibility: 'authenticated',
       verb:   'cancel-reminder',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'content' },
       params: [{ name: 'which', kind: 'string', required: false }],
       surfaces: {
         slash: { command: '/schrap', body: 'argline' },
@@ -155,7 +155,7 @@ export const assistantManifest = {
       id:     'assistant-quiet', visibility: 'authenticated',
       group:  'settings',
       verb:   'set-quiet',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [{ name: 'hours', kind: 'string', required: false }],
       surfaces: { slash: { command: '/stil', body: 'argline' } },
     },
@@ -165,7 +165,7 @@ export const assistantManifest = {
       group:  'settings',
       verb:   'set-overview',
       // a person's own switch for the weekly overview (off until they switch it on); on the thread row
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [{ name: 'mode', kind: 'enum', of: ['on', 'off'], required: false }],
       surfaces: {
         slash: { command: '/overzicht', body: 'argline' },
@@ -180,7 +180,7 @@ export const assistantManifest = {
       // a setting: `/instellingen` paints a row for it (the menu is derived from this group)
       group:  'settings',
       verb:   'set-language',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [{ name: 'lang', kind: 'enum', of: [...THREAD_LANGS, 'auto'], required: false }],
       surfaces: {
         slash: { command: '/taal', body: 'argline' },
@@ -192,7 +192,7 @@ export const assistantManifest = {
       verb:   'set-apps',
       visibility: 'trusted',
       // The app list is a parameter of the door's own device.
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       // `on <app>` · `off <app>` · nothing (the list as it stands)
       params: [{ name: 'change', kind: 'string', required: false }],
       surfaces: { slash: { command: '/apps', body: 'argline' } },
@@ -204,7 +204,7 @@ export const assistantManifest = {
       verb:   'set-settings',
       visibility: 'trusted',
       // The bot's own settings are parameters of the door's device (who may give a chore to whom).
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       // `assign self|anyone|role` · `roles admin,member` · nothing (the settings as they stand)
       params: [{ name: 'change', kind: 'string', required: false }],
       // Two changes ask first on a screen (they take something from everyone at once); the rest are shown at once
@@ -218,7 +218,7 @@ export const assistantManifest = {
       // from a screen: only after a yes in the admin's own private chat (who is in, and what they may do)
       stepUp: 'private-door',
       // A person's role on the bot is on their contact row (the bot's people), the same words as a circle's roster.
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       // `/role <who> coordinator|member|observer` — who from the bot's people (the one read), the role a choice
       params: [
         { name: 'who', kind: 'string', required: true, pickerSource: { listOp: 'assistant-users', appOrigin: 'assistant' } },
@@ -280,7 +280,7 @@ export const assistantManifest = {
       visibility: 'trusted',
       // from a screen: only after a yes in the admin's own private chat (who is in, and what they may do)
       stepUp: 'private-door',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       // `<people> <days>` — a new cohort; the one before stops admitting
       params: [{ name: 'spec', kind: 'string', required: false }],
       surfaces: { slash: { command: '/cohort', body: 'argline' } },
@@ -292,7 +292,7 @@ export const assistantManifest = {
       // from a screen: only after a yes in the admin's own private chat (who is in, and what they may do)
       stepUp: 'private-door',
       // a code is minted, not stored — but the cohort's state is this device's
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       // the role the invited person gets (inside the code); none: a member
       params: [{ name: 'role', kind: 'enum', of: [...BOT_ROLES], required: false }],
       surfaces: { slash: { command: '/invite', body: 'argline' } },
@@ -303,7 +303,7 @@ export const assistantManifest = {
       visibility: 'trusted',
       // from a screen: only after a yes in the admin's own private chat (who is in, and what they may do)
       stepUp: 'private-door',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [],
       surfaces: { slash: { command: '/rotate', body: 'none' } },
     },
@@ -315,7 +315,7 @@ export const assistantManifest = {
       visibility: 'trusted',
       // from a screen: only after a yes in the admin's own private chat (what the bot holds, and whom it answers)
       stepUp: 'private-door',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [{ name: 'spec', kind: 'string', required: true }],
       surfaces: { slash: { command: '/kring', body: 'argline' } },
     },
@@ -346,7 +346,7 @@ export const assistantManifest = {
       // from a screen: only after a yes in the admin's own private chat (who is in, and what they may do)
       stepUp: 'private-door',
       // the person's contact row is hidden, which the book carries to the person's other devices
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       params: [{ name: 'who', kind: 'string', required: true, pickerSource: { listOp: 'assistant-users', appOrigin: 'assistant' } }],
       surfaces: { slash: { command: '/revoke', body: 'argline' } },
     },
@@ -365,7 +365,7 @@ export const assistantManifest = {
       verb:   'set-view',
       visibility: 'authenticated',
       group:  'settings',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [{ name: 'mode', kind: 'string', required: false }],
       surfaces: { slash: { command: '/weergave', body: 'argline' } },
     },
@@ -374,7 +374,7 @@ export const assistantManifest = {
       id:     'assistant-agenda-link',
       verb:   'agenda-link',
       visibility: 'authenticated',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [],
       surfaces: { slash: { command: '/agenda-link', body: 'none' } },
     },
@@ -385,7 +385,7 @@ export const assistantManifest = {
       id:     'assistant-screen',
       verb:   'connect-screen',
       visibility: 'authenticated',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       // the admin's default is the paste route (no secret in the chat); `/scherm link` asks for the one-time link
       params: [{ name: 'how', kind: 'string', required: false }],
       surfaces: { slash: { command: '/scherm', body: 'argline' } },
@@ -396,7 +396,7 @@ export const assistantManifest = {
       id:     'assistant-screen-paste',
       verb:   'paste-screen',
       visibility: 'authenticated',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [{ name: 'offer', kind: 'string', required: true }],
       surfaces: { slash: { command: '/koppel-scherm', body: 'argline' } },
     },
@@ -406,7 +406,7 @@ export const assistantManifest = {
       id:     'assistant-screen-confirm',
       verb:   'confirm-screen',
       visibility: 'authenticated',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [{ name: 'answer', kind: 'string', required: true }],
       surfaces: { slash: { command: '/koppelen', body: 'argline' } },
     },
@@ -417,7 +417,7 @@ export const assistantManifest = {
       id:     'assistant-export-key-set',
       verb:   'set-export-key',
       visibility: 'trusted',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'keys' },
       stepUp: 'private-door',
       // twice, as the box's script asks it: compared at the op, before any question
       params: [{ name: 'passphrase', kind: 'secret', required: true }, { name: 'passphraseAgain', kind: 'secret', required: true }],
@@ -428,7 +428,7 @@ export const assistantManifest = {
       id:     'assistant-export-key-unlock',
       verb:   'unlock-export-key',
       visibility: 'trusted',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'keys' },
       stepUp: 'private-door',
       params: [{ name: 'passphrase', kind: 'secret', required: true }],
       surfaces: {},
@@ -439,7 +439,7 @@ export const assistantManifest = {
       id:     'assistant-link',
       verb:   'link-identity',
       visibility: 'authenticated',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'keys' },
       params: [{ name: 'offer', kind: 'string', required: false }],
       surfaces: { slash: { command: '/koppel', body: 'argline' } },
     },
@@ -448,7 +448,7 @@ export const assistantManifest = {
       id:     'assistant-link-confirm',
       verb:   'confirm-link',
       visibility: 'authenticated',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'keys' },
       params: [{ name: 'answer', kind: 'string', required: true }],
       surfaces: { slash: { command: '/koppel-code', body: 'argline' } },
     },
@@ -458,7 +458,7 @@ export const assistantManifest = {
       id:     'assistant-inapp',
       verb:   'invite-to-app',
       visibility: 'authenticated',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params: [{ name: 'answer', kind: 'string', required: true }],
       surfaces: { slash: { command: '/inapp', body: 'argline' } },
     },
@@ -467,7 +467,7 @@ export const assistantManifest = {
       id:     'assistant-unlink',
       verb:   'unlink-identity',
       visibility: 'authenticated',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'keys' },
       params: [],
       surfaces: { slash: { command: '/ontkoppel', body: 'none' } },
     },
@@ -479,7 +479,7 @@ export const assistantManifest = {
       id:     'assistant-companion',
       verb:   'set-companion',
       visibility: 'trusted',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [{ name: 'card', kind: 'string', required: true }],
       surfaces: {},
     },
@@ -489,7 +489,7 @@ export const assistantManifest = {
       verb:   'approve-screen',
       visibility: 'trusted',
       // the held request is this device's; what the yes runs writes as its own op declares
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [{ name: 'answer', kind: 'string', required: true }],
       surfaces: { slash: { command: '/bevestig', body: 'argline' } },
     },
@@ -498,7 +498,7 @@ export const assistantManifest = {
       id:     'assistant-screens',
       verb:   'manage-screens',
       visibility: 'authenticated',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [{ name: 'change', kind: 'string', required: false }],
       surfaces: { slash: { command: '/schermen', body: 'argline' } },
     },
@@ -516,7 +516,7 @@ export const assistantManifest = {
       verb:   'export-household',
       visibility: 'trusted',
       // one export now, onto the box's shelf (before an upgrade: export, upgrade, import) — sealed when a key is set
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [],
       surfaces: { slash: { command: '/export', body: 'none' } },
     },
@@ -525,7 +525,7 @@ export const assistantManifest = {
       verb:   'import-household',
       visibility: 'trusted',
       // the household's lists, chores, appointments and people, written back through their own ops
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'keys' },
       params: [{ name: 'file', kind: 'string', required: true }],
       surfaces: {
         slash: { command: '/import', body: 'argline' },

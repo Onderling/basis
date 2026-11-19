@@ -785,13 +785,15 @@ export async function bindCircleAddresses(nodes, ...circleIds) {
  * The single-admin creator step, split out so ONE circle can then take MULTIPLE joiners (the sealed-circle
  * three-member case) instead of `pairCircle` minting a fresh circle per pair.
  */
-export async function createCircle(admin, { groupId = 'peer-circle', name = 'Peer Circle', purpose = 'node pairing test', handle = null, kind = 'household', storage = null, groupPodUri = null } = {}) {
+export async function createCircle(admin, { groupId = 'peer-circle', name = 'Peer Circle', purpose = 'node pairing test', handle = null, kind = 'household', storage = null, groupPodUri = null, inviteMaxRedemptions = null } = {}) {
   const adminCallSkill = (app, op, args) => admin.agent.callSkill(app, op, args);
   // the kind, picked as the wizard's first step asks it (a new circle has none until someone picks one)
   let state = createGroupChooseKind(createGroupInitialState(), kind, null);
   state.groupId = groupId;
   state.name = name;
   state.purpose = purpose;
+  // how many people one invite may admit, as the wizard's ceiling field sets it (the kind's template fills it otherwise)
+  if (Number.isInteger(inviteMaxRedemptions) && inviteMaxRedemptions >= 1) state.inviteMaxRedemptions = inviteMaxRedemptions;
   // the storage radio (a pod choice: 'shared' is the one shared circle pod), as the wizard's storage step sets it
   if (typeof storage === 'string' && storage) state = createGroupSetStorage(state, storage);
   // …and the pod address the person types beside a shared choice (the wizard's pod field)

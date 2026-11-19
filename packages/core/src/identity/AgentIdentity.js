@@ -31,7 +31,28 @@ import { verifyEd25519Strict } from '../crypto/ed25519Strict.js';
 import { mnemonicToSeed, seedToMnemonic } from './Mnemonic.js';
 import { ed25519KeyPairFromSeed, ed25519Sign } from '../crypto/ed25519Sign.js';   // signing + derivation behind the port a shell may speed up (L619)
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
+
 const { convertPublicKey, convertKeyPair } = ed2curve;
+
+// THE BOX KEYS, REMEMBERED (ledger L619: a phone start's greeting burst spent ~2.9 s converting the same peer keys and
+// deriving the same shared keys again in pure JS, at every send). Both memos are in memory only, bounded, never written
+// anywhere and never logged; a key that changes (a peer's rotation) is a different key and simply misses.
+/** How many peers' Curve25519 public keys are kept converted (public data, shared by every identity in the process). */
+const CURVE_KEY_MEMO_MAX = param({ key: 'identity.curveKeyMemoMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 512 });
+/** How many peers' shared (box.before) keys ONE identity keeps; past it the oldest is derived again on next use. */
+const SHARED_KEY_MEMO_MAX = param({ key: 'identity.sharedKeyMemoMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 256 });
+/** Ed25519 public key (base64url, the full key) → its Curve25519 image. A public key's image is public too. */
+const curveKeys = new Map();
+function curvePublicKeyOf(pubKeyB64) {
+  const hit = curveKeys.get(pubKeyB64);
+  if (hit) return hit;
+  const curve = convertPublicKey(b64decode(pubKeyB64));
+  if (!curve) return null;   // an invalid key is never remembered: it fails again, the same way
+  if (curveKeys.size >= Number(CURVE_KEY_MEMO_MAX)) curveKeys.delete(curveKeys.keys().next().value);
+  curveKeys.set(pubKeyB64, curve);
+  return curve;
+}
 
 /** Vault key for the per-agent stableId (Pinboard V1 Phase 11). */
 const STABLE_ID_KEY = 'agent-stable-id';
@@ -127,7 +148,9 @@ export class AgentIdentity {
   /** @type {{ publicKey: Uint8Array, secretKey: Uint8Array }} */
   #signKP;
   /** @type {{ publicKey: Uint8Array, secretKey: Uint8Array }} */
-  #boxKP;
+  #boxKP = null;
+  /** peer Ed25519 public key (base64url, the full key) → the shared key with THIS identity's box secret. In memory only. */
+  #sharedKeys = new Map();
   #vault;
   /** @type {string | null} — the stable opaque user id (Pinboard V1 Phase 11). */
   #stableId = null;
@@ -137,8 +160,7 @@ export class AgentIdentity {
   constructor({ seed, vault, stableId = null, deviceId = null }) {
     this.#vault  = vault;
     this.#signKP = ed25519KeyPairFromSeed(seed);
-    this.#boxKP  = convertKeyPair(this.#signKP);
-    if (!this.#boxKP) throw new Error('Failed to derive Curve25519 keypair from seed');
+    // the Curve25519 pair is derived on first use: an identity that only signs (most of a start's) never pays for it
     this.#stableId = stableId;
     this.#deviceId = deviceId;
   }
@@ -262,7 +284,32 @@ export class AgentIdentity {
 
   /** Curve25519 public key bytes (derived from Ed25519 for nacl.box). */
   get boxPubKeyBytes() {
-    return this.#boxKP.publicKey;
+    return this.#box().publicKey;
+  }
+
+  /** This identity's Curve25519 key pair, derived once, on first use. */
+  #box() {
+    if (!this.#boxKP) {
+      const kp = convertKeyPair(this.#signKP);
+      if (!kp) throw new Error('Failed to derive Curve25519 keypair from seed');
+      this.#boxKP = kp;
+    }
+    return this.#boxKP;
+  }
+
+  /**
+   * The shared key with a peer (`nacl.box.before`), remembered on this identity by the peer's full public key. Exactly
+   * the key `box`/`unbox` derived at every call before, so the bytes on the wire are unchanged.
+   */
+  #sharedKeyWith(peerPubKeyB64, role) {
+    const hit = this.#sharedKeys.get(peerPubKeyB64);
+    if (hit) return hit;
+    const curve = curvePublicKeyOf(peerPubKeyB64);
+    if (!curve) throw new Error(`Invalid ${role} Ed25519 public key`);
+    const key = nacl.box.before(curve, this.#box().secretKey);
+    if (this.#sharedKeys.size >= Number(SHARED_KEY_MEMO_MAX)) this.#sharedKeys.delete(this.#sharedKeys.keys().next().value);
+    this.#sharedKeys.set(peerPubKeyB64, key);
+    return key;
   }
 
   /** Return the BIP39 mnemonic for the current seed (reads from vault). */
@@ -310,10 +357,8 @@ export class AgentIdentity {
    * @returns {{ nonce: Uint8Array, ciphertext: Uint8Array }}
    */
   box(plaintext, recipientPubKeyB64) {
-    const recipientCurve = convertPublicKey(b64decode(recipientPubKeyB64));
-    if (!recipientCurve) throw new Error('Invalid recipient Ed25519 public key');
+    const sessionKey = this.#sharedKeyWith(recipientPubKeyB64, 'recipient');
     const nonce      = nacl.randomBytes(nacl.box.nonceLength); // 24 bytes
-    const sessionKey = nacl.box.before(recipientCurve, this.#boxKP.secretKey);
     const ciphertext = nacl.box.after(plaintext, nonce, sessionKey);
     return { nonce, ciphertext };
   }
@@ -327,9 +372,7 @@ export class AgentIdentity {
    * @returns {Uint8Array|null}  null if authentication fails
    */
   unbox(ciphertext, nonce, senderPubKeyB64) {
-    const senderCurve = convertPublicKey(b64decode(senderPubKeyB64));
-    if (!senderCurve) throw new Error('Invalid sender Ed25519 public key');
-    const sessionKey = nacl.box.before(senderCurve, this.#boxKP.secretKey);
+    const sessionKey = this.#sharedKeyWith(senderPubKeyB64, 'sender');
     return nacl.box.open.after(ciphertext, nonce, sessionKey);
   }
 
@@ -342,9 +385,8 @@ export class AgentIdentity {
    * @returns {Uint8Array} 32-byte session key
    */
   deriveSessionKey(peerPubKeyB64) {
-    const peerCurve = convertPublicKey(b64decode(peerPubKeyB64));
-    if (!peerCurve) throw new Error('Invalid peer Ed25519 public key');
-    return nacl.box.before(peerCurve, this.#boxKP.secretKey);
+    // a copy: the caller may hold or wipe its key; the remembered one is never handed out
+    return Uint8Array.from(this.#sharedKeyWith(peerPubKeyB64, 'peer'));
   }
 
   // ── Sealed shared-copy opener (SILENT out-of-circle delivery) ────────────────

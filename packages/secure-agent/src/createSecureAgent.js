@@ -1132,7 +1132,7 @@ export async function createSecureAgent(opts = {}) {
    * Bounded (see the note on `pendingHold`): expired entries are swept first, then the per-peer and
    * across-peers caps are enforced by dropping the OLDEST — reported, never silently.
    */
-  function enqueueHold(addr, payload, sendOpts, reason = 'unreachable') {
+  function enqueueHold(addr, payload, sendOpts, reason = 'unreachable', { firstAttemptInFlight = false } = {}) {
     const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
     sweepExpiredHolds();
     let q = pendingHold.get(addr);
@@ -1163,7 +1163,9 @@ export async function createSecureAgent(opts = {}) {
       for (const entry of oldestQueue.values()) dropHeld(oldestAddr, entry, 'peer-evicted');
     }
     if (typeof console !== 'undefined') {
-      console.info(`[secure-agent] peer ${String(addr).slice(0, 16)}… unreachable — holding message (${q.size} queued)`);
+      // a send that joins the first attempt still in flight says so: that peer is not known to be unreachable
+      const why = firstAttemptInFlight ? 'awaiting its first answer' : 'unreachable';
+      console.info(`[secure-agent] peer ${String(addr).slice(0, 16)}… ${why} — holding message (${q.size} queued)`);
     }
     persistHolds();     // durable: a restart must not lose what the caller was told is held
     // Sent AS one of our addresses that is still young: the receiver may simply not have folded its introduction yet,
@@ -2638,7 +2640,7 @@ export async function createSecureAgent(opts = {}) {
         return enqueueHold(addr, payload, opts, scopedOut ? 'no-eligible-route' : 'unreachable');
       }
       // not yet seen alive and attempted within the interval: join the hold, no wire attempt (`notYetWaits`)
-      if (notYetWaits(addr)) return enqueueHold(addr, payload, opts);
+      if (notYetWaits(addr)) return enqueueHold(addr, payload, opts, 'unreachable', { firstAttemptInFlight: true });
       try {
         const result = notDeliveredThrows(await _sendWithHandshakeRetry(addr, payload, opts));
         const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;

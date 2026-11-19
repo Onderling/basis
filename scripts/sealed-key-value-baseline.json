@@ -17,7 +17,7 @@
   },
   "apps/basis-mobile/src/core/mappingsStoreRN.js": {
     "count": 1,
-    "note": "sealed by its caller: asyncStorageMappingsStore wraps its storage in sealedKeyValue (strict) before writing"
+    "note": "not sealable: read before a key exists — bootAgentBundle loads the extension mappings at its start (apps/basis-mobile/src/core/agentBundle.js:198), before createRealHouseholdAgent publishes the content key (agentBundle.js:312); the web's are sealed (read after its boot)"
   },
   "apps/basis-mobile/src/core/nativeCalendar.js": {
     "count": 1,

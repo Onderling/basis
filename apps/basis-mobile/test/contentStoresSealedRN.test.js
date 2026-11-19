@@ -1,6 +1,8 @@
 /**
  * The phone's content stores are sealed at rest (ledger L1083 b) — the same shared ios as the web, over AsyncStorage.
- * Per store: what lands in AsyncStorage is not readable, and it opens with the key through the store's own read.
+ * Per store: what lands in AsyncStorage is not readable, and it opens with the key through the store's own read. The
+ * phone's extension mappings are NOT here: they are read at the start of the boot, before the key exists (the guard's
+ * baseline says where).
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { groupKeyStrategy } from '@onderling/pod-client';
@@ -12,7 +14,6 @@ import { circleOfferingDraftIo } from '../../basis/src/v2/circleOfferingDraft.js
 import { makeMemberOverrideStoreRN, makeAvailabilityStoreRN, makeSharedWithMeStoreRN, makeUserScreenStoreRN } from '../src/core/circleStoresRN.js';
 import { makeCircleRecipePendingStoreRN } from '../src/core/circleRecipePendingStorageRN.js';
 import { makeCircleRulesPendingStoreRN } from '../src/core/circleRulesPendingStorageRN.js';
-import { asyncStorageMappingsStore } from '../src/core/mappingsStoreRN.js';
 
 const MARK = 'Oma-Truus-verjaardag';
 afterEach(() => setShellContentSeal(null));
@@ -40,7 +41,6 @@ const STORES = [
   ['cc.contactNames', (s) => { const n = sealedContactNameStore(s); return { write: () => n.remember([{ contactId: 'k1', name: MARK }]), read: async () => (await n.read()).k1?.name }; }],
   ['cc.actionFrequency', (s) => { const io = actionFrequencyIo(s); return { write: () => io.save({ [MARK]: { add: 3 } }), read: async () => Object.keys((await io.load()) ?? {})[0] }; }],
   ['cc.circleSkill.*', (s) => { const io = circleOfferingDraftIo(s); return { write: () => io.save('c1', { offers: [MARK] }), read: async () => (await io.load('c1'))?.offers?.[0] }; }],
-  ['onderling.mappings:*', (s) => { const m = asyncStorageMappingsStore(s); return { write: () => m.write('pod://x/a', { label: MARK }), read: async () => (await m.read('pod://x/a'))?.bytes?.label }; }],
 ];
 
 describe.each(STORES)('%s on the phone', (_n, make) => {

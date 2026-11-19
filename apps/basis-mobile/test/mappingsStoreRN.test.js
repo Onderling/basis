@@ -5,10 +5,6 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { groupKeyStrategy } from '@onderling/pod-client';
-import { setShellContentSeal } from '../../basis/src/v2/localStoreSeal.js';
-// the store seals at rest (ledger L1083): a content key is published, as after a boot
-setShellContentSeal(groupKeyStrategy({ groupKey: Buffer.from(new Uint8Array(32).fill(7)).toString('base64url') }));
 import { asyncStorageMappingsStore, MAPPINGS_DEVICE } from '../src/core/mappingsStoreRN.js';
 
 /** Minimal async AsyncStorage fake (getItem/setItem/removeItem/getAllKeys). */

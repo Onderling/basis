@@ -8,6 +8,7 @@
 import { botOpLevel } from './botOpMap.js';
 import { reminderRuleLine } from './botReminders.js';
 import { HOUSEHOLD_RULES_DEFAULT } from './botSettings.js';
+import { opWhat } from './opDescriptions.js';   // an op with no help phrase is said in its description's words
 
 const SECTION_OF = { lists: 'lists', tasks: 'chores', calendar: 'agenda', assistant: 'you' };
 const ORDER = ['lists', 'chores', 'agenda', 'you', 'admin'];
@@ -41,7 +42,7 @@ export const botHelpOrder = (commandMenu, opsById) => botHelpGroups(commandMenu,
  *        who has `/herinneringen` reads when the bot reminds (the welcome's own line) under their own commands
  * @returns {string[]} the lines, sections with their heading
  */
-export function botHelpLines({ commandMenu, opsById, isAdmin = isAdminOp, t, reminders = null }) {
+export function botHelpLines({ commandMenu, opsById, isAdmin = isAdminOp, t, reminders = null, lang = undefined, extraLines = [] }) {
   const out = [];
   const remindable = reminders && (commandMenu ?? []).some((e) => opsById?.get?.(e.opId)?.op?.id === 'assistant-reminders');
   const remindLine = !remindable ? null
@@ -53,9 +54,14 @@ export function botHelpLines({ commandMenu, opsById, isAdmin = isAdminOp, t, rem
       const entry = opsById.get(e.opId);
       const key = `circle.bot.help.ops.${entry.appOrigin}.${entry.op.id}`;
       const line = t(key);
-      return line && line !== key ? `${e.command} — ${line}` : e.command;
+      if (line && line !== key) return `${e.command} — ${line}`;
+      // no help phrase (the phrases are frozen until they move into the descriptions, L1033): the op's description
+      const what = opWhat(entry.appOrigin, entry.op.id, lang);
+      return what ? `${e.command} — ${what}` : e.command;
     }));
     if (s === 'you' && remindLine) out.push(remindLine);
   }
+  // lines a door adds that no command carries (the words of the toolboxes that are on: 'zoek <iets>: …')
+  if (Array.isArray(extraLines) && extraLines.length) out.push('', ...extraLines);
   return out;
 }

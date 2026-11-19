@@ -5,6 +5,7 @@
  * map is red here until someone words it for a person — the manifest's hint is for the model, not for `/help`.
  */
 import { describe, it, expect } from 'vitest';
+import { opWhat } from '../../src/v2/opDescriptions.js';
 import { composeAssistantCatalogue } from '../../src/assistant/assistantCatalogue.js';
 import { scopeCatalogueToRole } from '../../src/v2/botOpMap.js';
 import { screenColumnFor } from '../../src/v2/screenActing.js';
@@ -24,7 +25,9 @@ describe('FITNESS: the bot\'s /help lines', () => {
     it(`${lang}: one line per offered command, none for a command the bot does not offer`, () => {
       const ops = bundle.bot.help.ops;
       const have = Object.entries(ops).flatMap(([app, byOp]) => Object.keys(byOp).map((op) => `${app}.${op}`)).sort();
-      expect(offered.filter((id) => !have.includes(id)), `${lang} lacks`).toEqual([]);
+      // an offered command has its help phrase, or (the phrases are frozen, L1033) its description's words
+      const said = (id) => have.includes(id) || Boolean(opWhat(id.slice(0, id.indexOf('.')), id.slice(id.indexOf('.') + 1), lang));
+      expect(offered.filter((id) => !said(id)), `${lang} lacks`).toEqual([]);
       expect(have.filter((id) => !offered.includes(id)), `${lang} words a command the bot does not offer`).toEqual([]);
       for (const s of ['lists', 'chores', 'agenda', 'you', 'admin']) expect(typeof bundle.bot.help.sections[s]).toBe('string');
     });

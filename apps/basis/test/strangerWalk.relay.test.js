@@ -90,7 +90,17 @@ describe('a stranger on the wire', () => {
     const reached = {};
     // the linked-companion call is public on purpose: a card with a statement nobody signed must meet its statement gate
     const argsFor = (id) => (id === 'identity-link.companion' ? { card: 'onderling-contact://AAAA', auth: { statement: 'forged' } } : {});
-    for (const id of ids) reached[id] = await attempt(stranger, card.peerAddr, id, {}, argsFor(id));
+    // the box's peer limiter (a token bucket per caller) is a refusal of its own, not the one this walk judges: a probe
+    // refused for the rate waits for the bucket to refill and asks again, so each skill is judged on ITS refusal (the
+    // walk outgrew one bucket when the box's door gained the toolbox ops)
+    for (const id of ids) {
+      let r = await attempt(stranger, card.peerAddr, id, {}, argsFor(id));
+      for (let tries = 0; r.reason === 'rate-limited' && tries < 10; tries += 1) {
+        await new Promise((ok) => { setTimeout(ok, 1500); });
+        r = await attempt(stranger, card.peerAddr, id, {}, argsFor(id));
+      }
+      reached[id] = r;
+    }
     console.info(`[stranger walk] what a stranger reached on the bot box: ${JSON.stringify(reached, null, 1)}`);
     for (const [id, r] of Object.entries(reached)) {
       expect(r.outcome, `${id}: ${JSON.stringify(r)}`).toBe('refused');

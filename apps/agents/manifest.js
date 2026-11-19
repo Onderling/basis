@@ -53,6 +53,10 @@ export const agentsManifest = {
   // RECOVERY (`data-version`, app-local like `agent`): `list`
   // (listDataVersions) + `update` (restoreDataVersion — writes a prior
   // state back to the live resource).
+  // the one verb that is no atom: reading the ceiling of the "+" for a persona (an atom `get` on `agent` would need a
+  // capability row the gate keys circles on; this read is the person's own, never a circle's)
+  domainVerbs: { 'read-plus-ceiling': 'read' },
+
   nouns: {
     // INSTALL adds `add` (installAgent — adds a catalogue/override card
     // to your agents, default-deny).
@@ -205,6 +209,31 @@ export const agentsManifest = {
         { name: 'id', kind: 'string', required: true, schema: { minLength: 1 } },
       ],
       surfaces: { chat: { reply: 'record', hint: 'Read a profile\'s properties (own/inherit).' } },
+    },
+    /* How far the person's own "+" goes for a persona (`_plus.ceiling`, @onderling/agent-registry plusCeiling.js):
+     * 0 hidden, 1 looks things up, 2 also the person's own things, 3 also a circle's after their yes on a card. Set on the
+     * persona screen only: no chat surface, and it weighs as the person's control (4), so the "+" never offers it (it
+     * never changes its own reach). The read gives the ceiling as it holds (own, else the default persona's, else 3). */
+    {
+      id:        'setPlusCeiling', visibility: 'authenticated', group: 'compose',
+      verb:      'update',
+      writes: { scope: 'person', what: 'control' },
+      resolves:  [{ field: '_plus.ceiling', policy: 'content' }],   // the newer word wins between the person's devices
+      appliesTo: { type: 'agent' },
+      params: [
+        { name: 'id',      kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'ceiling', kind: 'number', required: true, schema: { enum: [0, 1, 2, 3] } },
+      ],
+      surfaces: {},
+    },
+    {
+      id:        'getPlusCeiling', visibility: 'authenticated', group: 'data',
+      verb:      'read-plus-ceiling',
+      appliesTo: { type: 'agent' },
+      params: [
+        { name: 'id', kind: 'string', required: true, schema: { minLength: 1 } },
+      ],
+      surfaces: {},
     },
 
     /* Drivers (#3) — an OPEN personal-driver property { kind, text, tags[] } (goals/hobbies/…), not a coarse

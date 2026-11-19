@@ -73,6 +73,9 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
   'agents.restoreDataVersion',
   'agents.getProfileProperties', 'agents.getProfileDisclosure', 'agents.getProfileDrivers', 'agents.getPersonaView',
   'agents.getAgentSkillExposure', 'agents.getPersonaRelease',
+  // how far the person's own "+" goes per persona: the person's reach over their own things, set on their own page;
+  // a connection that could read or raise it could steer the person's own assistant
+  'agents.getPlusCeiling', 'agents.setPlusCeiling',
   // The pod session (2026-09-01). Signing in navigates a browser to an identity provider and signing out
   // ends the session every other grant is read under — neither is a thing to do TO someone from
   // somewhere else. Withheld here rather than merely omitted from the connection manifest list, because

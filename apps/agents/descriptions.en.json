@@ -19,6 +19,14 @@
     "what": "Make a new persona, recoverable with your recovery phrase.",
     "params": {"name": "the name", "id": "a fixed label", "properties": "what it takes over from you"}
   },
+  "setPlusCeiling": {
+    "what": "Choose how far the + goes for a persona.",
+    "params": {"id": "which persona", "ceiling": "how far: 0 to 3"}
+  },
+  "getPlusCeiling": {
+    "what": "Show how far the + goes for a persona.",
+    "params": {"id": "which persona"}
+  },
   "setProfileProperty": {
     "what": "Record something about a persona, such as where you live.",
     "params": {"id": "which persona", "key": "what", "value": "the value"}

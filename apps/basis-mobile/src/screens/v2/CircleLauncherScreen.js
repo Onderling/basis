@@ -22,7 +22,15 @@ import { ensureVandaagBook, expandedPage, customiseModel, customiseOp, vandaagLa
 import { createScreenHead } from '../../../../basis/src/v2/screenHead.js';
 import { createReadMarks } from '../../../../basis/src/v2/readMarks.js';
 import { watchCircleChanges } from '../../../../basis/src/v2/headCircleWatch.js';
-import { startTabFor, startScreenStillApplies, LAST_TAB_STORAGE_KEY } from '../../../../basis/src/v2/startScreen.js';
+import { startTabFor, startScreenStillApplies, firstFrameTab, LAST_TAB_STORAGE_KEY } from '../../../../basis/src/v2/startScreen.js';
+import { meshCapable } from '@onderling/react-native/meshCapable';
+
+// This device kind has a mesh (the native mDNS module is built in): known at the first frame, so the Nearby tab shows
+// from it; the screen says it is starting until mDNS is up, or unavailable if it never comes (ledger L1051).
+const HAS_MESH = meshCapable();
+// The view the first frame paints, before the agent is there: the default start (Vandaag). A person's other start
+// moves it once, only while this view stands (startScreenStillApplies' `first`).
+const FIRST_VIEW = firstFrameTab() === 'screens' ? 'screens' : 'list';
 import { TRANSPORT_MODES } from '../../../../basis/src/v2/circleSettingsControls.js';   // the one list of transport modes
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { chunkBubble } from '../../../../basis/src/v2/chunkBubble.js';
@@ -572,6 +580,8 @@ export default function CircleLauncherScreen({
   // Whether the list has had a real answer: "No circles yet." is said only then, never in "not known yet" (see
   // `launcherListPaint`).
   const [launcherSettled, setLauncherSettled] = useState(false);
+  const launcherSettledRef = useRef(false);
+  launcherSettledRef.current = launcherSettled;
   // The developer switch (`app.developer`, a register param, off by default in every build): the Advanced screen — raw
   // parameter keys and values, a developer tool — is offered only when it is on. Read each time Me opens.
   const [developerOn, setDeveloperOn] = useState(false);
@@ -588,7 +598,7 @@ export default function CircleLauncherScreen({
   // detail/settings/override.
   // Boot lands on CIRCLES ('list') for now (Frits, 2026-08-31) — the social front door, not the
   // screen manager. The landing choice is to become a SETTING later, "last used" among its options.
-  const [view, setView] = useState('list');
+  const [view, setView] = useState(FIRST_VIEW);
   // does this device know a relay at all (the relay question's own predicate)? true until read, so no false warning;
   // re-read on every view change (a relay added on the connection points comes back to a composer that knows it)
   const [relayKnown, setRelayKnown] = useState(true);
@@ -798,6 +808,8 @@ export default function CircleLauncherScreen({
   const [incomingRecipe, setIncomingRecipe] = useState(null);
   // Vandaag (the screens tab): the book and the painted blocks live here, so a page change does not refetch.
   const [screensBook, setScreensBook] = useState({ screens: [], activeId: null });
+  // the book has been read at least once: before that, no page is "not loaded yet", not "the admin set up nothing"
+  const [screensBookLoaded, setScreensBookLoaded] = useState(false);
   // Vandaag: a block of the page opened whole ("meer"), or null; the customise sheet open or not
   const [expandedBlockId, setExpandedBlockId] = useState(null);
   const [customiseOpen, setCustomiseOpen] = useState(false);
@@ -1278,6 +1290,7 @@ export default function CircleLauncherScreen({
     // First run: the one Vandaag page (the coming week, my tasks, the circles with news), seeded once — shared with web
     try { book = await ensureVandaagBook({ store: userScreenStore, t }); } catch { /* the book as read stands */ }
     setScreensBook(book);
+    setScreensBookLoaded(true);
   }, [userScreenStore]);
   // AFTER AN OWN ACT that changes what Today shows without writing a store (a device flag: the intro seen, the key card
   // put away): the head is told, as screenHead.js asks, and repaints the shown page (web twin: _showVandaag, which
@@ -1306,7 +1319,8 @@ export default function CircleLauncherScreen({
   const vandaagKey = useMemo(() => vandaagLandingKey({
     book: screensBook, circles: circlesShown, expandedBlockId,
     selves: [...selvesOn, ...heldSelves.map((p) => `held:${p?.id ?? p}`)],
-  }), [screensBook, circlesShown, expandedBlockId, selvesOn, heldSelves]);
+    circlesKnown: launcherSettled,
+  }), [screensBook, circlesShown, expandedBlockId, selvesOn, heldSelves, launcherSettled]);
   // what Today's blocks, "Nieuw voor jou" and the banner read, as the page stands now (web parity: `forYouHostOps`)
   const forYouHostOpsNow = useCallback(() => {
     const { circles, circlesShown, selvesOn, heldSelves, unreadMyRefs } = vandaagInputs.current;
@@ -1391,7 +1405,9 @@ export default function CircleLauncherScreen({
         // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
         introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags),
         // the reach card: does this device know any relay (the relay question's own predicate, web parity)
-        relayKnown: () => relayQuestion.knows() },
+        relayKnown: () => relayQuestion.knows(),
+        // the circles are known once the list was read: before, the strip says nothing (not "in no circle")
+        circlesKnown: () => launcherSettledRef.current },
     });
   }, [bundle, eventLog, forYouHostOpsNow]);   // eslint-disable-line react-hooks/exhaustive-deps -- onboardingFlags is a stable memo declared further down (read at call time, never during render)
   // VANDAAG'S HEAD (`screenHead.js`, web parity): the blocks as last read for the landing's key, kept current by the
@@ -1447,7 +1463,8 @@ export default function CircleLauncherScreen({
     }
     const { screensBook } = vandaagInputs.current;
     const active = getActiveScreen(screensBook);
-    if (!active) { setScreenViewBlocks([]); setScreenViewRefreshing(false); return; }
+    // no page yet: Loading while the book was never read (the first frame), the empty line only once it was
+    if (!active) { setScreenViewBlocks(screensBookLoaded ? [] : null); setScreenViewRefreshing(false); return; }
     // only the page is cached (not one of its blocks opened whole, "meer")
     const cacheKey = expandedBlockId ? null : active.id;
     const head = vandaagHead.current;
@@ -1495,7 +1512,7 @@ export default function CircleLauncherScreen({
       }
     })();
     return () => { alive = false; };
-  }, [view, vandaagKey, bundle, eventLog, screenBlocksCache]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [view, vandaagKey, bundle, eventLog, screenBlocksCache, screensBookLoaded]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // `resolveSkill`, not `callSkill`: the 2-arg RESOLVING waist. The targeted 3-arg one lives on
   // `bundle.callSkill`; giving them one name is the arity trap (it has now bitten three times).
@@ -1899,7 +1916,7 @@ export default function CircleLauncherScreen({
   // new primary; Stroom is retired (now lives as the seeded "Stream"
   // screen on the Screens tab).
   const onTab = (id) => {
-    if (!isAlphaTab(id, { hasMesh: !!bundle?.mdns })) id = 'circles';   // a hidden surface lands on the circles list (alphaSurface.js)
+    if (!isAlphaTab(id, { hasMesh: HAS_MESH })) id = 'circles';   // a hidden surface lands on the circles list (alphaSurface.js)
     if (id === 'screens') setView('screens');
     else if (id === 'circles') { setActiveCircle(null); setSelected(null); setView('list'); }
     else if (id === 'nearby') { setActiveCircle(null); setSelected(null); setView('nearby'); }
@@ -1924,7 +1941,7 @@ export default function CircleLauncherScreen({
     (async () => {
       let lastTab = null;
       try { lastTab = await AsyncStorage.getItem(LAST_TAB_STORAGE_KEY); } catch { /* none */ }
-      if (!startScreenStillApplies({ tapped: personMovedRef.current, ...placeRef.current })) return;
+      if (!startScreenStillApplies({ tapped: personMovedRef.current, ...placeRef.current, first: FIRST_VIEW })) return;
       onTab(startTabFor(bundle.agent.getParamValue?.('home.startScreen'), lastTab));
     })();
   }, [bundle]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -2378,7 +2395,7 @@ export default function CircleLauncherScreen({
     // when there is more than one; "Pas aan" opens the customise sheet (every control a screen op). Web: circleApp.js.
     const active = getActiveScreen(screensBook);
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="screens" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="screens" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         {/* clear the status bar: the day's header sat under the clock */}
         <View style={{ flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper }}>
           {/* the day this page is about, above everything: a day, not a list (web twin: circle-vandaag__day) */}
@@ -2462,7 +2479,7 @@ export default function CircleLauncherScreen({
   // Mij = identity, the declared screen; its other doors are behind My data.
   if (view === 'profile') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} head={mijHead} landedByTab={mijByTab} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onSettings={() => setView('settingsHome')} onSettingsGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }} onSharedWithMe={() => setView('sharedWithMe')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
         <PersonaPanel
           personaId={myPersona} onClose={() => { setMyPersona(null); refreshHeaderAvatar(); }} styles={styles}
@@ -2475,7 +2492,7 @@ export default function CircleLauncherScreen({
   // its only undo, in a place a person can find without being any circle's admin.
   if (view === 'blocked') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <CircleBlockedScreen callSkill={bundle?.callSkill} circles={circles} onBack={() => setView('contacten')} />
       </WithTabBar>
     );
@@ -2483,7 +2500,7 @@ export default function CircleLauncherScreen({
   // This device's log, to copy — a My data sub-view (web parity: showLogReport); nothing is sent from it.
   if (view === 'logReport') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <LogReportScreen onBack={() => { setSettingsGroupId('my-data'); setView('settingsGroup'); }} />
       </WithTabBar>
     );
@@ -2491,7 +2508,7 @@ export default function CircleLauncherScreen({
   // Share my contact — a Mij sub-view (web parity: showShareMyContact); back returns to profile.
   if (view === 'shareContact') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <ShareMyContactScreen callSkill={bundle?.callSkill} onBack={() => setView('profile')} />
       </WithTabBar>
     );
@@ -2500,7 +2517,7 @@ export default function CircleLauncherScreen({
   // op + the settable params, from the shared projections; back returns to profile.
   if (view === 'advanced') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <CircleAdvancedScreen manifestsByOrigin={buildManifestsByOrigin()} callSkill={bundle?.callSkill} onBack={() => setView('profile')} />
       </WithTabBar>
     );
@@ -2513,7 +2530,7 @@ export default function CircleLauncherScreen({
   // built from the encapsulated identity secret). A null opener makes a row tap a deny-safe no-op.
   if (view === 'sharedWithMe') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <SharedWithMeScreen
           received={sharedWithMeList}
           opener={bundle?.sharedWithMeOpener ?? null}
@@ -2532,7 +2549,7 @@ export default function CircleLauncherScreen({
   // The person's settings behind the gear on Mij (web parity: showSettingsHome / showSettingsCircleChooser).
   if (view === 'settingsHome') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <SettingsHomeScreen onBack={() => setView('profile')}
           onOpenGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }}
           onOpenPerCircle={() => setView('settingsCircles')}
@@ -2552,14 +2569,14 @@ export default function CircleLauncherScreen({
   if (view === 'settingsGroup') {
     const group = settingsGroupFor(basisManifest, settingsGroupId);
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         {myDataScreen({ only: group ? group.sections.map((sec) => sec.id) : [], groupTitle: group ? t(group.labelKey) : null, onBack: () => setView('settingsHome') })}
       </WithTabBar>
     );
   }
   if (view === 'settingsCircles') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <CircleSettingsChooserScreen circles={circles ?? []} onBack={() => setView('settingsHome')}
           onOpenCircle={(c) => { setSelected(c); setView('settings'); }} />
       </WithTabBar>
@@ -2567,7 +2584,7 @@ export default function CircleLauncherScreen({
   }
   if (view === 'availability') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <CircleAvailabilityScreen
           store={availabilityStore}
           onBack={() => { setSettingsGroupId('connection'); setView('settingsGroup'); }}
@@ -2580,7 +2597,7 @@ export default function CircleLauncherScreen({
     if (contactThread) {
       // the 1:1 thread has no "+": its composer is the act, and the button would float over its send button
       return (
-        <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plusSheet={plusSheet} overlay={screenOverlay} active="contacten" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+        <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plusSheet={plusSheet} overlay={screenOverlay} active="contacten" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
           <ContactThreadScreen
             deliveryStateMap={deliveryStateMap}
             bundle={bundle}
@@ -2598,7 +2615,7 @@ export default function CircleLauncherScreen({
       );
     }
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="contacten" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="contacten" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <ContactsScreen bundle={bundle} unread={contactUnread}
           helpAvailable={circles.some((c) => c.id === HELP_CIRCLE_ID)}
           onOpen={(c) => { const target = contactOpenTarget(c); if (target.kind === 'circle') { const hc = circles.find((x) => x.id === target.circleId); if (hc) openCircle(hc); } else openContactThread(c); }}
@@ -2732,7 +2749,7 @@ export default function CircleLauncherScreen({
     // On a device with no discovering transport the surface is honest about it rather than silent:
     // the banner says "unavailable" instead of the screen looking like an empty room.
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="nearby" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="nearby" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <NearbyScreenHost
           bundle={bundle}
           heldSelves={heldSelves}
@@ -2976,7 +2993,7 @@ export default function CircleLauncherScreen({
 
   const listPaint = launcherListPaint({ loading, settled: launcherSettled, count: circles.length, bootError });
   return (
-    <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="circles" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+    <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="circles" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
       <View style={styles.page} testID="circle-launcher">
         {/* no "← chat" button (no chat shell to navigate to). */}
         <Text style={styles.title}>{t('circle.title')}</Text>

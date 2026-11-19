@@ -33,6 +33,7 @@ import {
   seedToMnemonic,
   validateMnemonic,
 } from './Mnemonic.js';
+import { ed25519KeyPairFromSeed } from '../crypto/ed25519Sign.js';   // signing + derivation behind the port a shell may speed up (L619)
 
 const SEED_LEN     = 32;
 // HKDF domain-separation input (hashed, invisible). Clean break pre-launch — see circleAddress.js.
@@ -279,7 +280,7 @@ export class Bootstrap {
    */
   #ensureSignKP() {
     if (!this.#signKP) {
-      this.#signKP = nacl.sign.keyPair.fromSeed(this.#secret);
+      this.#signKP = ed25519KeyPairFromSeed(this.#secret);
     }
     return this.#signKP;
   }

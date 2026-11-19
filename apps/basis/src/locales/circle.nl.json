@@ -1594,6 +1594,18 @@
       "text": "{{name}}: {{op}}",
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
+    "plus_ceiling_off": {
+      "text": "De + staat uit voor deze persona.",
+      "doc": "The persona the + speaks as has it switched off (the ceiling per persona, 0): nothing is read and nothing reaches a model."
+    },
+    "plus_ceiling_unread": {
+      "text": "De + kan nu niet lezen wat hij voor deze persona mag. Probeer het zo nog eens.",
+      "doc": "The ceiling of the persona the + speaks as could not be read (the read failed): this turn runs nothing and reaches no model; a later turn reads it again."
+    },
+    "plus_ceiling_refused": {
+      "text": "Dat mag de + niet voor deze persona. Doe het zelf, of verander bij je persona wat de + mag.",
+      "doc": "A line asked for something heavier than this persona lets the + do (its ceiling): refused, whichever way it came in."
+    },
     "plus_line_unread": {
       "text": "Dat kon ik niet lezen. Typ \"help\" om te zien wat ik kan, of vul de velden hieronder in.",
       "doc": "The free line could not be read: the person fills the fields."
@@ -8479,6 +8491,30 @@
     "personas_tagline": {
       "text": "filters + uitzonderingen op de algemene",
       "doc": "mij#personas — sectie 2 tagline: persona's zijn filters/uitzonderingen op de waarheidslaag."
+    },
+    "plus_ceiling": {
+      "text": "Wat de + voor me mag doen",
+      "doc": "mij#personas \u2014 a persona card: heading of how far the person's own + goes for this persona (the ceiling, _plus.ceiling)."
+    },
+    "plus_ceiling_0": {
+      "text": "Niets. De + staat uit voor deze persona.",
+      "doc": "the ceiling 0: the + is off for this persona; nothing of it reaches a model."
+    },
+    "plus_ceiling_1": {
+      "text": "Alleen opzoeken",
+      "doc": "the ceiling 1: the + only reads (looks things up)."
+    },
+    "plus_ceiling_2": {
+      "text": "Ook mijn eigen dingen maken en wijzigen",
+      "doc": "the ceiling 2: the + also makes and changes the person's own things (after their save)."
+    },
+    "plus_ceiling_3": {
+      "text": "Ook dingen in mijn kringen, als ik ze zelf goedkeur",
+      "doc": "the ceiling 3 (the default): the + also does things in the person's circles, after their yes on a card."
+    },
+    "plus_ceiling_hint": {
+      "text": "Wie er in een kring bij mag en hoe een kring is ingesteld, regel je zelf. Dat gaat nooit via de +.",
+      "doc": "under the row: what the + never does, whatever the ceiling (a circle's members and settings)."
     },
     "first_messages": {
       "text": "Wie mag deze persona als eerste schrijven",

@@ -23,7 +23,8 @@ import { composeAssistantCatalogue } from './assistantCatalogue.js';
 import { catalogueManifests } from '../v2/manifestSources.js';
 import { withAssistantOps } from '../v2/assistantOps.js';
 import { assistantManifest } from '../v2/assistantManifest.js';
-import { opScopes, verbKind, isPeopleWritten } from '@onderling/app-manifest';
+import { opScopes, verbKind, isPeopleWritten, opWeight } from '@onderling/app-manifest';
+import { PLUS_CEILINGS } from '@onderling/agent-registry';
 import { OWN_DEVICES_SCOPE } from '../v2/grantsManifest.js';
 import { makeOpAvailability } from '../v2/opAvailability.js';
 import { ownPlacePolicy } from '../v2/circlePolicy.js';
@@ -119,7 +120,7 @@ export function ownPlaceCatalogue({ householdManifest, apps } = {}) {
   const { catalogue: placed, manifestsByOrigin } = composeAssistantCatalogue({
     apps: apps ?? ownPlaceApps(catalogueManifests({ householdManifest })), householdManifest, place: 'own',
   });
-  const offered = proposable(availableOnly(placed, manifestsByOrigin, ownPlacePolicy(Object.keys(manifestsByOrigin))), manifestsByOrigin);
+  const offered = withinWeight(proposable(availableOnly(placed, manifestsByOrigin, ownPlacePolicy(Object.keys(manifestsByOrigin))), manifestsByOrigin), manifestsByOrigin, PLUS_CEILING, ownPlaceWeight);
   // no app's circle-bot background in the own place: the place's own lines say what it is (`OWN_PLACE_LINES`)
   const out = { catalogue: { ...offered, systemPromptFor: () => null }, manifestsByOrigin };
   byManifest.set(key, out);
@@ -169,6 +170,36 @@ export function proposable(catalogue, manifestsByOrigin = {}) {
 }
 
 /**
+ * How far the "+" goes: the heaviest weight it offers (`opWeight`, ledger L977). 3 = own things and a circle's through
+ * the card, what the "+" did before the weight existed. The ceiling per persona (hidden, 1, 2 or 3) will set it.
+ */
+export const PLUS_CEILING = 3;
+
+/**
+ * An op's weight IN THE OWN PLACE: what the "+" runs there lands in the person's own store (`OWN_DEVICES_SCOPE`), so a
+ * write that declares a circle as its widest place (`addToList`, a noun offered in both places) weighs as the person's
+ * own there: content 2, control 4; keys stay 6. A circle's act reaches the "+" only through a circle's line or card,
+ * which asks for 3 itself.
+ * @param {object} manifest @param {object} op
+ */
+export function ownPlaceWeight(manifest, op) {
+  if (op?.writes?.scope !== 'circle') return opWeight(manifest, op);
+  return opWeight(manifest, { ...op, writes: { ...op.writes, scope: 'person' } });
+}
+
+/**
+ * A catalogue cut to the ops whose weight is at most `ceiling`: a 4 or 5 (who reaches what) is only pointed to on its
+ * settings screen, a 6 (keys) never offered, and an op without a weight (a write that does not say what it writes) not
+ * offered at all. `ceiling` 0 is a hidden persona: nothing.
+ * @param {object} catalogue @param {object} manifestsByOrigin `{app → manifest}` @param {number} [ceiling]
+ */
+export function withinWeight(catalogue, manifestsByOrigin = {}, ceiling = PLUS_CEILING, weigh = opWeight) {
+  if (!catalogue?.opsById) return catalogue;
+  const fits = (e) => { const w = weigh(manifestsByOrigin?.[e?.appOrigin] ?? null, e?.op); return w !== null && w <= ceiling; };
+  return { ...catalogue, opsById: new Map([...catalogue.opsById].filter(([, e]) => fits(e))) };
+}
+
+/**
  * A catalogue cut to the ops `opAvailability` says may happen now (composition, feature, capability).
  * @param {object} catalogue @param {object} manifestsByOrigin @param {object|null} [policy]  the place's policy
  */
@@ -212,6 +243,11 @@ export function createPlusDoor({
   // the line naming the model route that answers (the sheet's header, `plusRouteLine`), for help's last line; a string or
   // a getter; absent/null: no model is set
   routeLine = null,
+  // how far the "+" goes for a self (0 off · 1 reads · 2 own things · 3 a circle's after a yes): by default read as that
+  // self through the shell's own call (`agents.getPlusCeiling`, which answers 3 when nothing is said anywhere). A read
+  // that FAILS (throws, `ok:false`, or no ceiling in the answer) closes the "+" for that turn; only a shell with no way
+  // to read it at all gets 3, the "+" as before
+  ceilingOf = null,
 } = {}) {
   if (typeof t !== 'function') throw new TypeError('createPlusDoor: t required');
   const memory = threads?.memory ?? null;
@@ -231,6 +267,24 @@ export function createPlusDoor({
     return keys.length === 1 ? plusThreadId(keys[0]) : `own-combined:${keys.join('+')}`;
   };
   const { catalogue: cat, manifestsByOrigin } = ownPlaceCatalogue({ householdManifest, apps });
+  // THE CEILING of this turn (the strictest of its selves): what the model is handed, and what any way in may run
+  const ceilingOfSelf = typeof ceilingOf === 'function' ? ceilingOf
+    : (typeof readAs === 'function' ? async (self) => {
+      const r = await readAs(self)('agents', 'getPlusCeiling', { id: self ?? 'default' });
+      return r?.ok === false ? null : r?.ceiling;
+    } : null);
+  /** The strictest ceiling of the set, or `null` when any self's cannot be read (the turn then runs nothing). */
+  const ceilingFor = async (set) => {
+    if (!ceilingOfSelf) return PLUS_CEILING;
+    const each = await Promise.all(set.map((id) => Promise.resolve().then(() => ceilingOfSelf(id)).catch(() => null)));
+    if (!each.every((c) => PLUS_CEILINGS.includes(c))) return null;
+    return Math.min(...each);
+  };
+  let turnCeiling = PLUS_CEILING;
+  const CUTS = new Map();
+  const cutFor = (c) => { if (!CUTS.has(c)) CUTS.set(c, withinWeight(cat, manifestsByOrigin, c, ownPlaceWeight)); return CUTS.get(c); };
+  /** Is this op heavier than the turn allows (in the own place)? An op the door does not offer is not judged here. */
+  const overCeiling = (opId) => { const e = entryOf(opId); const w = e ? ownPlaceWeight(manifestsByOrigin?.[e.appOrigin] ?? null, e.op) : null; return Boolean(e) && (w === null || w > turnCeiling); };
   /** The catalogue entry of a model's pick (by op id: a key may carry its app's prefix). */
   const entryOf = (opId) => cat.opsById.get(opId) ?? [...cat.opsById.values()].find((e) => e?.op?.id === opId) ?? null;
   /** A pick that only READS (the atom catalogue, or the manifest's `domainVerbs`); one nothing classifies is a write. */
@@ -316,6 +370,8 @@ export function createPlusDoor({
   // naming the act and its list, run only on the person's pick as the self.
   const answer = async (input, ctx) => {
     const cmd = typeof input === 'object' && input ? input : null;
+    // above this persona's ceiling: refused, whichever way it came in (a slash line, a phrase, the model's pick)
+    if (cmd && overCeiling(cmd.opId)) { outcome = { error: t('circle.vandaag.plus_ceiling_refused') }; return; }
     // the conversation's own settings (memory mode, language): the door's ops, run at once (they change no thing of
     // the person's, only how this thread talks; forgetting it is slash only and never a model's tool)
     if (cmd && DOOR_OP_IDS.has(cmd.opId)) { outcome = await runDoorOp(cmd.opId, cmd.args ?? {}, ctx?.id ?? threadId); return; }
@@ -352,7 +408,7 @@ export function createPlusDoor({
   const commands = createComposerCommands({ kind: 'own', catalogue: cat });
 
   const engine = createAssistantEngine({
-    catalogue: cat, lang, llm, interpret, collectMs: 0, dispatchSlash: false, gateRules: [], promptLines: [...OWN_PLACE_LINES],
+    catalogue: cat, catalogueFor: () => cutFor(turnCeiling), lang, llm, interpret, collectMs: 0, dispatchSlash: false, gateRules: [], promptLines: [...OWN_PLACE_LINES],
     // a line about one family gets that family's tools (the own note's too); no family is kept regardless here
     // the read of the turn before, if any (one turn only)
     threadHints: (thread) => PLUS_LAST_READS.hintsFor(thread),
@@ -437,6 +493,12 @@ export function createPlusDoor({
     // nothing is read and nothing reaches a model before it
     if (!primary) return { askSelf: true };
     const asSelf = primary;
+    const ceilingRead = await ceilingFor(set);
+    // unreadable: the "+" cannot know what it may do now, so this turn runs nothing and says so (a later turn reads again)
+    if (ceilingRead === null) { turnCeiling = 0; return { error: t('circle.vandaag.plus_ceiling_unread') }; }
+    turnCeiling = ceilingRead;
+    // 0: the "+" is off for this persona; nothing of it reaches a model
+    if (turnCeiling <= 0) return { done: t('circle.vandaag.plus_ceiling_off') };
     const slash = text.startsWith('/') ? commands.parse(text) : null;
     if (slash) {
       lineDoor = 'slash';
@@ -449,10 +511,13 @@ export function createPlusDoor({
     const o = plusLineOutcome(text, { circles: await circles(), own: { lists: await ownListsOf(asSelf) }, lang });
     // a help card's own text for a how-to question; plain "help" says what is offered HERE, generated from this door
     if (o?.kind === 'help') return { done: o.card ? plusHelpAnswer(o, { t }) : await generatedHelp(asSelf) };
+    // a circle's act needs the ceiling that allows a circle's things (3)
+    if (o?.kind === 'circle' && turnCeiling < 3) return { error: t('circle.vandaag.plus_ceiling_refused') };
     // a circle act the plain reading runs at once: what the run says (`{error}` or `{done}`, its reply line)
     if (o?.kind === 'circle' && o.atOnce) return (typeof runInCircle === 'function' ? await runInCircle(o.command, o.circleId, asSelf, 'phrase') : null) ?? unread();
     if (o?.kind === 'circle') return { card: { line: text, to: o.to, command: o.command, door: 'phrase', ...(o.makeList ? { makeList: o.makeList } : {}), ...(o.followUp ? { followUp: o.followUp } : {}) } };
     // an own act's form, filled as the primary self (the form may change it)
+    if (o?.kind === 'own' && o.actId && overCeiling(acts.find((x) => x.id === o.actId)?.opId)) return { error: t('circle.vandaag.plus_ceiling_refused') };
     if (o?.kind === 'own') return o.actId ? { actId: o.actId, values: o.values ?? {}, asSelf } : o;
     // the plain reading did not take it: the person's own model, or no model at all (the line goes nowhere, and the
     // "+" says what works without one and where to set one)

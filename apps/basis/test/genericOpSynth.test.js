@@ -156,3 +156,25 @@ describe('projectors surface the synthetic op', () => {
     expect(byId['__generic__:notes:add:task']).toBeUndefined();
   });
 });
+
+describe('a generic op says what it writes, so it has a weight (L977)', () => {
+  const app = (scopes) => ({ app: 'notes', itemTypes: ['note'], nouns: { note: { atoms: ['add', 'list', 'get', 'remove'], ...(scopes ? { scopes } : {}) } }, operations: [] });
+  const byAtom = (m) => Object.fromEntries(synthesizeGenericOps(m).map((o) => [o.verb, o]));
+  it('a writing atom writes content: in a circle when the noun is offered beyond the own place, else the person\'s', () => {
+    expect(byAtom(app(['circle', 'own'])).add.writes).toEqual({ scope: 'circle', what: 'content' });
+    expect(byAtom(app()).remove.writes).toEqual({ scope: 'circle', what: 'content' });          // a circle by default
+    expect(byAtom(app(['own'])).add.writes).toEqual({ scope: 'person', what: 'content' });
+    expect(byAtom(app(['own', 'contact'])).add.writes).toEqual({ scope: 'circle', what: 'content' });
+  });
+  it('a reading atom writes nothing', () => {
+    const ops = byAtom(app(['circle', 'own']));
+    expect(ops.list.writes).toBeUndefined();
+    expect(ops.get.writes).toBeUndefined();
+  });
+  it('so a generic op weighs like a declared one', async () => {
+    const { opWeight } = await import('@onderling/app-manifest');
+    const m = app(['circle', 'own']);
+    const ops = byAtom(m);
+    expect([opWeight(m, ops.add), opWeight(m, ops.list), opWeight(app(['own']), byAtom(app(['own'])).add)]).toEqual([3, 1, 2]);
+  });
+});

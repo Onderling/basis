@@ -19,11 +19,11 @@
 //
 // The commitment is DECLARED by the member's device and signed with the circle key the address proves
 // (`signCeremonyCommitment`), so a carrier relaying a member's announcement cannot substitute one.
-import nacl from 'tweetnacl';
 import { processSignatureMemo } from '../security/signatureMemo.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
 import { verifyEd25519Strict } from '../crypto/ed25519Strict.js';
+import { ed25519KeyPairFromSeed, ed25519Sign } from '../crypto/ed25519Sign.js';   // signing + derivation behind the port a shell may speed up (L619)
 
 const COMMIT_DOMAIN = 'onderling-ceremony-commitment-v1';
 const REVEAL_DOMAIN = 'onderling-ceremony-reveal-v1';
@@ -40,7 +40,7 @@ export function ceremonyCommitment(authorityPubKeyB64, circleId) {
 
 /** The signer's pubkey in the encoding every commitment and reveal uses — a persona's authority (`deriveProfileAuthority`). */
 export function authorityPubKeyB64Of(authoritySecret) {
-  return b64encode(nacl.sign.keyPair.fromSeed(authoritySecret).publicKey);
+  return b64encode(ed25519KeyPairFromSeed(authoritySecret).publicKey);
 }
 
 /**
@@ -62,9 +62,9 @@ export function ceremonyRevealMessage({ circleId, kind, subject, authorRef, fact
 export function signCeremonyReveal(authoritySecret, { circleId, kind, subject, authorRef, facts = null } = {}) {
   if (!(authoritySecret instanceof Uint8Array) || authoritySecret.length !== 32) throw new Error('signCeremonyReveal: authoritySecret must be a 32-byte Uint8Array');
   if (!circleId || !kind || !subject || !authorRef) throw new Error('signCeremonyReveal: circleId, kind, subject and authorRef are required');
-  const kp = nacl.sign.keyPair.fromSeed(authoritySecret);
+  const kp = ed25519KeyPairFromSeed(authoritySecret);
   const msg = new TextEncoder().encode(ceremonyRevealMessage({ circleId, kind, subject, authorRef, facts }));
-  return { authorityPubKey: b64encode(kp.publicKey), sig: b64encode(nacl.sign.detached(msg, kp.secretKey)) };
+  return { authorityPubKey: b64encode(kp.publicKey), sig: b64encode(ed25519Sign(msg, kp.secretKey)) };
 }
 
 /**
@@ -91,9 +91,9 @@ export function ceremonyCommitmentDeclaration({ circleId, circleAddress, commitm
 
 /** Sign the declaration with a per-circle seed (the same key the address proves). Returns b64. */
 export function signCeremonyCommitmentFromSeed(circleSeed, { circleId, circleAddress, commitment } = {}) {
-  const kp = nacl.sign.keyPair.fromSeed(circleSeed);
+  const kp = ed25519KeyPairFromSeed(circleSeed);
   const msg = new TextEncoder().encode(ceremonyCommitmentDeclaration({ circleId, circleAddress, commitment }));
-  return b64encode(nacl.sign.detached(msg, kp.secretKey));
+  return b64encode(ed25519Sign(msg, kp.secretKey));
 }
 
 /** Verify a declared commitment against the (proven) circle address that declared it. */

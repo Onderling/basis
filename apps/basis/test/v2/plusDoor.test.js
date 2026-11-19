@@ -25,6 +25,9 @@ const door = (over = {}) => {
   const d = createPlusDoor({
     llm: { invoke: async () => null }, interpret: async () => null, threads: threadsOf(), threadId: 'own:me', t, lang: 'nl',
     circles: async () => [], ownListsOf: async () => [], callSkill, ...over,
+    // the shell's own read of the "+"'s ceiling answers as the real op does when nothing is said (3); the reads these
+    // tests fake are the person's own things. A failed ceiling read is pinned in plusCeiling.test.js
+    ...(over.readAs && !over.ceilingOf ? { ceilingOf: async () => 3 } : {}),
   });
   return { d, callSkill };
 };

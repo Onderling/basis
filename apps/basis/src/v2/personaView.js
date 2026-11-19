@@ -25,6 +25,7 @@
  */
 
 import { firstContactRows, FIRST_CONTACT_CONTROLS } from './firstContact.js';
+import { plusCeilingRow } from './plusCeilingRow.js';
 
 const FIRST_CONTACT_KEYS = new Set(FIRST_CONTACT_CONTROLS.map((c) => c.key));
 import { attributeKeys, bucketsFor } from '@onderling/attribute-charter';
@@ -285,7 +286,8 @@ export function buildMijViewModel({ personas, defaultId = 'default', circles, re
       return { key, state, value: displayValue(value), l10n: valueL10nFor(key) };
     });
     // who may write to this persona first: its two first-contact controls (firstContact.js), with the values in force
-    return { id: p.id, name: (typeof p.name === 'string' && p.name) ? p.name : p.id, isDefault, entries, firstContact: firstContactRows(p) };
+    // and how far the person's own "+" goes for it (plusCeilingRow.js), inherited from the general persona
+    return { id: p.id, name: (typeof p.name === 'string' && p.name) ? p.name : p.id, isDefault, entries, firstContact: firstContactRows(p), plusCeiling: plusCeilingRow(p, { general: dflt }) };
   });
 
   // ── 3 · per circle: who sees what ────────────────────────────────────────

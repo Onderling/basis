@@ -386,6 +386,25 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
                 })}
               </View>
             ))}
+            {/* how far the person's own "+" goes for this persona (plusCeilingRow.js, web twin: circleMij's card): its four
+                choices, the one in force marked; a tap writes what the row says (its own op) for THIS persona */}
+            {p.plusCeiling ? ((row) => (
+              <View style={styles.firstContact}>
+                <Text style={styles.entryKey}>{t(row.labelKey)}</Text>
+                {row.choices.map((choice) => {
+                  const on = choice.value === row.value;
+                  return (
+                    <Pressable key={String(choice.value)} accessibilityRole="button" accessibilityState={{ selected: on }} disabled={on}
+                      style={[styles.choice, on && styles.choiceOn]}
+                      testID={`mij-plus-ceiling-${p.id}-${choice.value}`}
+                      onPress={async () => { try { const w = row.write(choice.value); await callSkill(w.app, w.opId, w.args); } catch { /* the model shows what holds */ } await load(); }}>
+                      <Text style={[styles.choiceText, on && styles.choiceTextOn]}>{t(choice.labelKey)}</Text>
+                    </Pressable>
+                  );
+                })}
+                <Text style={styles.inherit}>{t(row.hintKey)}</Text>
+              </View>
+            ))(p.plusCeiling) : null}
           </View>
         ))}
 

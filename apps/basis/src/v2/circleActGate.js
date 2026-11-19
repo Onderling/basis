@@ -11,7 +11,9 @@
  *     screen's own writes, plumbing) is not checked;
  *   - that WRITES: a read is not checked here (reads are their own row: blanking a screen needs a look);
  *   - in a CIRCLE: the op's writes are the circle's (`writes.scope`), not a person's own or a device's; the circle is
- *     the op's own argument (`circleArg`), else the circle the person is looking at.
+ *     the op's own argument (`circleArg`), else the circle the person is looking at; the person's own place
+ *     (`isOwnPlaceId`) is no circle;
+ *   - that the circle CAN switch off: an op with no row a circle could turn is not refused here (logged as `no-row`).
  * The circle's policy and the member's opt-outs come from the shell's own stores through ONE reader handed in at
  * composition (`circleCapabilityInputs`); nothing is decided in a shell. No reader (the box, until its row): no check.
  */
@@ -22,6 +24,7 @@ import { refuse } from './refusal.js';
 import { isAppSurfaceEnabled } from './appFeature.js';
 import { isFeatureEnabled } from './circlePolicy.js';
 import { processRefusalLog } from './refusalLog.js';
+import { isOwnPlaceId } from './grantsManifest.js';
 
 /** Scopes whose writes are not a circle's (a person's own, this device's): no circle's switch governs them. */
 const NOT_A_CIRCLES = new Set(['person', 'device', 'own']);
@@ -45,6 +48,8 @@ export async function circleActRefusal({ app, op, args = {}, ctx = {}, manifests
   if (NOT_A_CIRCLES.has(declared?.writes?.scope)) return null;
   const circleId = circleArg(args) ?? activeCircle?.() ?? null;
   if (!circleId) return null;
+  // the person's OWN place is no circle: none of a circle's switches governs it (an own appointment from the '+')
+  if (isOwnPlaceId(circleId)) return null;
   let given = null;
   try { given = await inputs(circleId); } catch {
     // a broken store must not be an open gate nobody sees: the act goes on, and the log says so (codes only)
@@ -60,7 +65,18 @@ export async function circleActRefusal({ app, op, args = {}, ctx = {}, manifests
     optOuts: given.override?.capabilityOptOuts,
   });
   const r = checkCapability({ op: declared, appOrigin: app, args }, eff);
-  return r.allow ? null : refuse('availability', r.code);
+  if (r.allow) return null;
+  // A circle refuses only what it CAN switch off. Refused even with the app on and nothing switched off, the op has no
+  // row a circle could turn (posting an offer, setting a role: the rows the capability set still lacks); that is not
+  // this circle's decision, so the act goes on and the log says so in codes, for the row to be added.
+  if (r.code === 'capability-denied') {
+    const possible = effectiveCapabilities(manifests.map((x) => ({ manifest: x, appOrigin: x?.app })), { apps: [app] });
+    if (!checkCapability({ op: declared, appOrigin: app, args }, possible).allow) {
+      processRefusalLog().note({ tag: 'gate', lane: 'availability', check: 'circle-capability', reason: 'no-row' });
+      return null;
+    }
+  }
+  return refuse('availability', r.code);
 }
 
 /**

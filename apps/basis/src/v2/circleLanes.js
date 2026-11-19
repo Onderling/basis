@@ -32,7 +32,7 @@ import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUB
 import { makeSyncSelection, HOLD_EVERYTHING } from './syncSelection.js';
 import { GRANTS_BROADCAST } from './grantsRail.js';
 import { makeItemsPeerHandler, ITEMS_BROADCAST, ITEMS_CATCHUP_SUBTYPES } from './itemsRail.js';
-import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
+import { OWN_DEVICES_SCOPE, isOwnPlaceId } from './grantsManifest.js';
 import { makeFrontierReplay } from './frontierReplay.js';
 import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from './chatRail.js';
 import { KEY_STATEMENT_BROADCAST, KEY_CATCHUP_SUBTYPES, makeKeyPeerHandler } from './keyRail.js';
@@ -183,7 +183,7 @@ export function buildCircleLanes({
   const refusedKringSaid = new Set();
   const refusedCarrySaid = new Set();   // (reason, address) pairs already said — the log names a fact once
   // the person's OWN lanes (their contact book, devices, codes) are not a silo a device declines: always held
-  const isOwnLaneId = (circleId) => circleId === OWN_DEVICES_SCOPE || String(circleId).startsWith(`${OWN_DEVICES_SCOPE}:`);
+  const isOwnLaneId = isOwnPlaceId;
   const holdsFor = (silo) => (circleId) => {
     if (isOwnLaneId(circleId)) return true;
     if (!selection.kringOn(circleId)) {

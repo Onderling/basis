@@ -58,6 +58,31 @@ describe('the reply: a line and a button per thing', () => {
   });
 });
 
+describe('the shops told apart: a head per shop, the rows under it, numbered on', () => {
+  const MIXED = [ITEMS[0], ITEMS[1], { label: 'AH Biologische melk', price: '1.59', seller: 'Albert Heijn', ref: { type: 'Product', ref: 'ah:2' } }];
+  it('the things are kept and shown per shop, in the order the shops first came, so a number stays the row\'s', () => {
+    const keeper = makeChoiceKeeper();
+    const r = toolChoicesReply({ ok: true, name: 'boodschappen', title: 'Boodschappen', items: MIXED }, { threadId: 'x', keeper, t });
+    expect(r.items.map((i) => i.seller)).toEqual(['Albert Heijn', 'Albert Heijn', 'Jumbo']);
+    expect(keeper.take('x', 2)?.label).toBe('AH Biologische melk');
+    expect(keeper.take('x', 3)?.label).toBe('Jumbo halfvolle melk 1 L');
+    // the shop is the head now, not part of the row
+    expect(r.items[0].label).not.toContain('Albert Heijn');
+    expect(r.items[0].label).toContain('€ 1,19');
+  });
+  it('the painted list says each row\'s shop and the shops in order (the op declares groupBy on its chat surface)', () => {
+    const r = toolChoicesReply({ ok: true, name: 'boodschappen', title: 'Boodschappen', items: MIXED }, { threadId: 'x', keeper: makeChoiceKeeper(), t });
+    const painted = renderReply({ shape: 'list', payload: r }, { t, appOrigin: 'tools', opId: 'useTool', manifestsByOrigin: { tools: toolsManifest } });
+    expect(painted.items.map((i) => i.group)).toEqual(['Albert Heijn', 'Albert Heijn', 'Jumbo']);
+    expect(painted.groups).toEqual(['Albert Heijn', 'Jumbo']);
+  });
+  it('a list of an op that declares no groupBy has no groups', () => {
+    const painted = renderReply({ shape: 'list', payload: { items: [{ id: '1', label: 'melk', seller: 'x' }] } }, { t, appOrigin: 'tools', opId: 'listTools', manifestsByOrigin: { tools: toolsManifest } });
+    expect(painted.groups).toBeUndefined();
+    expect(painted.items[0].group).toBeUndefined();
+  });
+});
+
 function door({ lists = [{ id: 'L1', label: 'Boodschappen', type: 'list' }, { id: 'L2', label: 'Albert Heijn', type: 'list' }], shopping = 'Boodschappen' } = {}) {
   const calls = [];
   const keeper = makeChoiceKeeper();

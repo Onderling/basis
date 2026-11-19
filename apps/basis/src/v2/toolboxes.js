@@ -242,9 +242,9 @@ export function makeChoiceKeeper({ now = () => Date.now(), keepMs = CHOICE_KEEP 
   };
 }
 
-/** A thing's row: its name, then what tells it apart (its detail, its seller) and its price, as given. */
+/** A thing's row: its name, then what tells it apart (its detail) and its price, as given; the shop is the row's head. */
 const thingRow = (x, t) => {
-  const more = [x.detail && x.detail !== x.seller ? x.detail : null, x.seller, x.price ? `€ ${String(x.price).replace('.', ',')}` : null].filter(Boolean).join(' · ');
+  const more = [x.detail && x.detail !== x.seller ? x.detail : null, x.price ? `€ ${String(x.price).replace('.', ',')}` : null].filter(Boolean).join(' · ');
   return more ? t('circle.bot.toolbox_found_row', { label: x.label, more }) : String(x.label ?? '');
 };
 
@@ -258,15 +258,19 @@ const thingRow = (x, t) => {
  * @param {{threadId: string, keeper: ReturnType<typeof makeChoiceKeeper>, t: Function}} o
  */
 export function toolChoicesReply(r, { threadId, keeper, t }) {
-  const items = r?.ok && Array.isArray(r.items) ? r.items : null;
-  if (!items || !items.length) return r;
+  const found = r?.ok && Array.isArray(r.items) ? r.items : null;
+  if (!found || !found.length) return r;
+  // per shop, in the order the shops first came (the shop is the row's head): kept in that same order, so the number a
+  // row shows is the number a tap or a typed '2' picks
+  const order = [...new Set(found.map((x) => String(x?.seller ?? '')))];
+  const items = order.flatMap((s) => found.filter((x) => String(x?.seller ?? '') === s));
   keeper?.keep?.(threadId, items);
   // a row of type `tool-thing`, numbered: the manifest's row button (`tools.pickThing`) is painted on it by the shared
   // renderer, as on every surface that paints an answer's items
   return {
     ...r,
     title: r.title ?? r.name,
-    items: items.map((x, i) => ({ id: String(i + 1), type: 'tool-thing', label: thingRow(x, t) })),
+    items: items.map((x, i) => ({ id: String(i + 1), type: 'tool-thing', label: thingRow(x, t), ...(x?.seller ? { seller: String(x.seller) } : {}) })),
   };
 }
 

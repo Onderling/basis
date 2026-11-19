@@ -8,7 +8,7 @@
  * while owning the query/activeCategories state. Pure DOM → unit-testable under happy-dom.
  */
 
-import { buildScreenModel } from '../../src/v2/screenModel.js';
+import { buildScreenModel, audienceScopeLine } from '../../src/v2/screenModel.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
 /**
@@ -72,11 +72,12 @@ export function renderListRows(listEl, { rows = [], t, onRowAction, onRowOpen } 
  * pure model carries only the audience id. Shared helper → web≡mobile by
  * construction from the same model field.
  */
-function audienceScopeCaption(container, { tr, audienceScope }) {
-  if (audienceScope == null) return;
+function audienceScopeCaption(container, { tr, audienceScope, circleNameOf = null }) {
+  const line = audienceScopeLine(audienceScope, { nameOf: circleNameOf, t: tr });
+  if (line == null) return;
   const caption = document.createElement('p');
   caption.className = 'list-screen__scope-caption';
-  caption.textContent = tr('circle.screen.audience_scope');
+  caption.textContent = line;
   container.appendChild(caption);
 }
 
@@ -115,7 +116,7 @@ function categoryBar(container, { categories, onToggle }) {
 
 /** Controlled full render over a prebuilt model (used for tests + one-shot renders). */
 export function renderListScreen(container, {
-  model, t, title, query = '', onQuery, onToggleCategory, onRowAction, onRowOpen,
+  model, t, title, query = '', onQuery, onToggleCategory, onRowAction, onRowOpen, circleNameOf = null,
 } = {}) {
   const tr = translatorOr(t, 'listScreen.js');
   container.innerHTML = '';
@@ -126,7 +127,7 @@ export function renderListScreen(container, {
     h.textContent = title;
     container.appendChild(h);
   }
-  audienceScopeCaption(container, { tr, audienceScope: model?.audienceScope });
+  audienceScopeCaption(container, { tr, audienceScope: model?.audienceScope, circleNameOf });
   searchBox(container, { tr, query, onQuery });
   categoryBar(container, { categories: Array.isArray(model?.categories) ? model.categories : [], onToggle: onToggleCategory });
   const listEl = document.createElement('ul');
@@ -142,7 +143,7 @@ export function renderListScreen(container, {
  *
  * @param {object} block  { items, categoryField?, labelField?, searchFields?, manifestsByOrigin?, appOrigin?, title? }
  */
-export function renderListBlock(container, { block = {}, t, onRowAction, onRowOpen, capabilityMatrix = [] } = {}) {
+export function renderListBlock(container, { block = {}, t, onRowAction, onRowOpen, capabilityMatrix = [], circleNameOf = null } = {}) {
   const tr = translatorOr(t, 'listScreen.js');
   container.innerHTML = '';
   container.classList.add('list-screen');
@@ -164,7 +165,7 @@ export function renderListBlock(container, { block = {}, t, onRowAction, onRowOp
     h.textContent = block.title;
     container.appendChild(h);
   }
-  audienceScopeCaption(container, { tr, audienceScope: baseModel.audienceScope });
+  audienceScopeCaption(container, { tr, audienceScope: baseModel.audienceScope, circleNameOf });
 
   const rowsEl = document.createElement('ul');
   rowsEl.className = 'list-screen__rows';

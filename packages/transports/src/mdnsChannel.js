@@ -12,6 +12,7 @@
  * receiver expects exactly the next counter, and a replayed, dropped or reordered frame fails to open.
  */
 import nacl from 'tweetnacl';
+import { secretboxSeal, secretboxOpen } from '@onderling/core';   // secretbox behind the port a shell may speed up (L619)
 import { b64Encode, b64Decode } from './utils/base64.js';
 
 const CHANNEL_DOMAIN = 'onderling-mdns-channel-v1';
@@ -65,11 +66,11 @@ export function openChannel({ role, mySecret, theirPublic, transcript }) {
   let received = 0;
   return {
     transcript,
-    seal(bytes) { return b64Encode(nacl.secretbox(bytes, counterNonce(sent++), sendKey)); },
+    seal(bytes) { return b64Encode(secretboxSeal(bytes, counterNonce(sent++), sendKey)); },
     open(b64) {
       let box;
       try { box = b64Decode(b64); } catch { return null; }
-      const plain = nacl.secretbox.open(box, counterNonce(received), recvKey);
+      const plain = secretboxOpen(box, counterNonce(received), recvKey);
       if (plain) received += 1;
       return plain;
     },

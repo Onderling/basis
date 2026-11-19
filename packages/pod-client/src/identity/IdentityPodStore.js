@@ -49,6 +49,7 @@
  */
 
 import nacl  from 'tweetnacl';
+import { secretboxSeal, secretboxOpen } from '@onderling/core';   // secretbox behind the port a shell may speed up (L619)
 
 import { b64encode, b64decode } from '@onderling/core';
 import { Bootstrap }      from '@onderling/core';
@@ -96,7 +97,7 @@ export function encryptResource(bootstrap, relativePath, plaintextBytes) {
   const salt  = nacl.randomBytes(SALT_LEN);
   const key   = bootstrap.deriveResourceKey(relativePath, salt);
   const nonce = nacl.randomBytes(NONCE_LEN);
-  const ct    = nacl.secretbox(plaintextBytes, nonce, key);
+  const ct    = secretboxSeal(plaintextBytes, nonce, key);
   return JSON.stringify({
     v:     ENVELOPE_V1,
     alg:   ENVELOPE_ALG,
@@ -146,7 +147,7 @@ export function decryptResource(bootstrap, relativePath, envelopeJson) {
     });
   }
   const key   = bootstrap.deriveResourceKey(relativePath, salt);
-  const plain = nacl.secretbox.open(ct, nonce, key);
+  const plain = secretboxOpen(ct, nonce, key);
   if (!plain) {
     throw Object.assign(new Error('IdentityPodStore: envelope decryption / MAC failed'), {
       code: 'IDENTITY_DECRYPT_FAILED',

@@ -16,7 +16,8 @@ describe('a list scoped to an audience — web ≡ mobile', () => {
     expect(read('../../../basis-mobile/src/screens/v2/CircleListScreen.js')).toMatch(/const shared = \{[^}]*defaultAudience/);
   });
   it('both say so', () => {
-    expect(read('../../web/v2/listScreen.js')).toMatch(/circle\.screen\.audience_scope/);
-    expect(read('../../../basis-mobile/src/screens/v2/CircleListScreen.js')).toMatch(/model\.audienceScope != null \? <Text[^>]*>\{t\('circle\.screen\.audience_scope'\)\}/);
+    // the same shared line on both (which circle, by name, when the host can say: ledger L747)
+    expect(read('../../web/v2/listScreen.js')).toMatch(/audienceScopeLine\(/);
+    expect(read('../../../basis-mobile/src/screens/v2/CircleListScreen.js')).toMatch(/audienceScopeLine\(/);
   });
 });

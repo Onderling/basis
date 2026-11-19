@@ -229,7 +229,20 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
   // delegation custody it rides the device's own record (`by` — the authority signed it).
   const authorityPubKeyB64 = rootAuthorityPubKeyB64 ?? (enrolledDevice?.record?.by ?? null);
   if (!authorityPubKeyB64 && typeof console !== 'undefined') console.warn('[ceremony] no owner-root public key on this device — its addresses cannot be retired by a ceremony until it re-enrolls');
-  const ceremonyCommitmentFor = (circleId) => (authorityPubKeyB64 ? ceremonyCommitment(authorityPubKeyB64, circleId) : null);
+  // Memoised per circle on THIS runtime: both inputs (this const authority key and the circle id) never change while the
+  // runtime lives — a re-key moves the circle ROOT (`switchCircleRoot`), not the authority — and the membership lane
+  // asked for it at every statement it checked. Bounded like the address memo; never persisted.
+  const commitments = new Map();   // circleId → commitment
+  const ceremonyCommitmentFor = (circleId) => {
+    if (!authorityPubKeyB64) return null;
+    let c = commitments.get(circleId);
+    if (c === undefined) {
+      c = ceremonyCommitment(authorityPubKeyB64, circleId);
+      if (commitments.size >= CIRCLE_ADDRESS_MEMO_MAX) commitments.delete(commitments.keys().next().value);
+      commitments.set(circleId, c);
+    }
+    return c;
+  };
   const signCeremonyCommitment = (circleId, address, commitment) =>
     signCeremonyCommitmentFromSeed(deriveCircleSeed(circleSeed, circleId), { circleId, circleAddress: address, commitment });
 

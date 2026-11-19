@@ -197,6 +197,7 @@ import {
   effectiveProperties,
   profileFactsOf, withProfileFacts, factsDiffer, nextFactsAt, stampChangedFacts,
   firstMessagesOf, FIRST_MESSAGE_POLICIES, FIRST_MESSAGES_KEY, CIRCLE_MEMBERS_KEY, circleMembersMayWriteOf,
+  PLUS_CEILING_KEY, isPlusCeiling, plusCeilingFor,
 } from '@onderling/agent-registry';
 // REQUESTABLE BRIDGE (host-wiring seam J6) — the recipient's per-circle task
 // surface (`createTaskStore`) + the convergence handler (`requestableSkillHandler`)
@@ -1954,6 +1955,20 @@ export async function createRealHouseholdAgent(opts = {}) {
         return { ok: true };
       },
       getProperties: async ({ profileId }) => (await agentsRegistry.lookup(profileId))?.properties ?? {},
+      // How far the person's own "+" goes for a persona (`_plus.ceiling`): a reserved key, so it has its own writer;
+      // the read resolves it as any property (own, else the general persona's), 3 when nothing is said
+      setPlusCeiling: async ({ profileId, ceiling }) => {
+        if (!isPlusCeiling(ceiling)) return { ok: false, reason: 'invalid-ceiling' };
+        const cur = await agentsRegistry.lookup(profileId);
+        if (!cur) return { ok: false, reason: 'no-such-profile' };
+        await agentsRegistry.register({ ...cur, properties: setOwn(cur.properties ?? {}, PLUS_CEILING_KEY, ceiling) });
+        return { ok: true };
+      },
+      plusCeilingOf: async ({ profileId }) => {
+        const [self, dflt] = await Promise.all([agentsRegistry.lookup(profileId), profileId === 'default' ? null : agentsRegistry.lookup('default')]);
+        const byId = { ...(self ? { [profileId]: self } : {}), ...(dflt ? { default: dflt } : {}) };
+        return plusCeilingFor((id) => byId[id] ?? null, profileId, { defaultProfileId: 'default' });
+      },
       // Drivers (#3) — set an OWN personal driver property: build+validate the { kind, text, tags[] } value
       // (createDriver throws on an empty driver → the core reports invalid-driver), then store it like any
       // property (setOwn merge + re-register the full entry). getDrivers filters the map to driver values.

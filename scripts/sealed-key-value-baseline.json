@@ -91,6 +91,10 @@
     "count": 2,
     "note": "not sealable: cc.relayUrl is read at module load, before the agent and its content key exist (apps/basis/web/v2/circleApp.js:1649 and :1730; the phone reads it while booting, apps/basis-mobile/src/core/agentBundle.js resolveMobileRelayUrl); it is the device's chosen relay, not a person's content"
   },
+  "apps/basis/src/v2/screenClient.js": {
+    "count": 1,
+    "note": "not sealable: onderling.screen.<toolbox>.* — a screen's own storage; a screen has no content key at all (its own key sits in the same storage), so it is a bearer device by design, as the client notes tell toolbox builders"
+  },
   "apps/basis/src/v2/screenView.js": {
     "count": 2,
     "note": "not sealable: onderling.screen.<bot> — a screen's grant, including its capability tokens to act as the person at the bot; a screen has no content key at all (its own key sits in the same storage), so it is a bearer device by design, as the client notes tell toolbox builders"

@@ -119,7 +119,7 @@ import { ensureHouseholdLists, householdBotApps, templateLists, loadListItems, e
 import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
-import { makeToolboxOps, toolboxListLine, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords } from '../src/v2/toolboxes.js';
+import { makeToolboxOps, toolboxListLine, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords, makeChoiceKeeper, toolChoicesReply, makePickThing, toolChoiceGateRule } from '../src/v2/toolboxes.js';
 import { wrapCallSkillWithEgressGate, isExternalEgressOp } from '../src/core/agent/egressGate.js';   // what leaves for a toolbox, and its record   // a circle's toolboxes (L1035): the key from the operator's config
 import { toolsManifest } from '../src/v2/toolsManifest.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -138,7 +138,7 @@ import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, openOfferPers
 import { primeCircleSecurity, announceCircleAddresses, presenceCircleIds } from '../src/v2/circleSecurityPriming.js';
 import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } from '../src/v2/circleAddressRegistration.js';
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
-import { installBoxSignatureEquation } from '../src/v2/signatureEquations.js';
+import { installBoxSignatureEquation, installBoxSigning } from '../src/v2/signatureEquations.js';
 import { buildCircleLanes, pullCircleLanes } from '../src/v2/circleLanes.js';
 import { runStartQueue, startQueueSiblings } from '../src/v2/startQueue.js';
 import { createNodeFsBackend } from '@onderling/pseudo-pod/node';
@@ -294,6 +294,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
   // THE SIGNATURE CHECK: node:crypto behind the one strict rule (taken only if it agrees on the edge-case vectors and on an
   // honest and a tampered signature; else tweetnacl stays). Before any store is read, so every check of this run is the fast one.
   { const eq = await installBoxSignatureEquation(nodeCrypto); console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`); }
+  { const sg = installBoxSigning(nodeCrypto); console.info(`[security] signing: ${sg.ok ? sg.name : `tweetnacl (${sg.reason})`}`); }
   try {
     const forgot = await runPendingForget({
       markerVault: vault,
@@ -1408,14 +1409,21 @@ if (tgToken || inboxDoor.bridge) {
   });
   await toolboxes.load();
   toolboxesRef = toolboxes;
+  // the last list of things shown per thread, so a button carries only its number (L1035)
+  const toolChoices = makeChoiceKeeper();
+  // through the box's own gated call, as the person who tapped (`ctx`); the shopping list is the template's role
+  const pickThing = makePickThing({ keeper: toolChoices, callSkill, shoppingList: () => templateLists(t).find((l) => l.kind === 'shopping')?.name ?? null });
   agent.mountAppOps('tools', {
     // a refusal or an empty answer told in the person's own language (`ctx.lang`): the sentence, never the key or an address
     useTool: async (args, ctx) => {
       const r = await toolboxes.useTool(args);
       const tp = (k, p) => t(k, p, ctx?.lang ?? undefined);
       if (!r.ok) return { ...r, error: { code: r.code, message: toolboxRefusalText(r, tp) } };
-      return Array.isArray(r.items) && !r.items.length ? { ...r, message: tp('circle.bot.toolbox_none_found', { title: r.title ?? r.name }) } : r;
+      if (Array.isArray(r.items) && !r.items.length) return { ...r, message: tp('circle.bot.toolbox_none_found', { title: r.title ?? r.name }) };
+      return toolChoicesReply(r, { threadId: ctx?.threadId ?? ctx?.caller, keeper: toolChoices, t: tp });
     },
+    // the answer to "which one" after a list of things (the row's button, `/kies <n>`), in the person's own language
+    pickThing: (args, ctx) => pickThing(args, ctx, (k, p) => t(k, p, ctx?.lang ?? undefined)),
     // which toolboxes are on, in words wherever it is painted (a screen too, never a bare tick): `/toolbox`'s own wording
     listTools: async (args, ctx) => {
       const r = await toolboxes.listTools(args);
@@ -1585,7 +1593,7 @@ if (tgToken || inboxDoor.bridge) {
       // one add per thing named ("melk en kaas" → two), whether the gate or the model chose the add
       expand: expandAdds({ t }),
       // the lists' words, then the words a toolbox's admin named (read live: adding or removing one changes them at once)
-      gateRules: [...listsGateRules(values.lang, templateLists(t)), toolboxGateRule(() => toolboxes.wordsNow())],
+      gateRules: [toolChoiceGateRule(toolChoices), ...listsGateRules(values.lang, templateLists(t)), toolboxGateRule(() => toolboxes.wordsNow())],
       // the first message says what this bot does for this person, and how the reminders stand and change
       welcomeFor: ({ role, ops, t: tp }) => welcomeLines({ ops, role, lists: templateLists(t), t: tp ?? t, settings: reminderSettings(), toolboxLine: toolboxWelcomeLine(toolboxes.wordsNow(), tp ?? t) }),
       // without the model (off, or not answering): what does work, for this person — the word rules and the commands

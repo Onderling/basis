@@ -1314,6 +1314,7 @@
 .cc-mij__entry-key { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); flex: 0 0 38%; }
 .cc-mij__inherit { color: var(--ink-soft); }
 .cc-mij__absent { font-family: var(--font-mono); color: var(--ink-soft); }
+.cc-mij__hint { display: block; flex-basis: 100%; color: var(--ink-soft); font-size: 0.85em; margin-top: 4px; }
 .cc-mij__own-mark { font-family: var(--font-mono); font-size: 9.5px; font-weight: 800; letter-spacing: .08em; color: var(--accent-ink); }
 .cc-mij__own-value { font-weight: 700; }
 .cc-mij__table-wrap { overflow-x: auto; }

@@ -36,7 +36,7 @@ describe('the bot\'s slim map', () => {
     const RUNNER_ONLY = ['sendWeekOverview', 'sayReminder'];
     // …and emptying one's own thread (`/vergeet`) is typed, never a tool: the model is not handed a delete
     // (a household note is written and taken away by people, typed or said to the gate — never the model's: no tool)
-    const SLASH_ONLY = ['__generic__:household:add:note', '__generic__:household:remove:note', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-forget'];
+    const SLASH_ONLY = ['__generic__:household:add:note', '__generic__:household:remove:note', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-forget', 'pickThing'];
     // …and a greeting is the gate's (no surface): answered without the model, never a tool it holds
     const GATE_ONLY = ['assistant-hello'];
     const bare = (ids) => ids.map((q) => q.slice(q.indexOf('.') + 1));

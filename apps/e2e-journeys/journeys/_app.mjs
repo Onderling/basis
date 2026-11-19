@@ -202,14 +202,7 @@ function wireLanes(node) {
  * @returns {Promise<{people: object[], admin: object, outsiders: object[], circleId: string, pod: object|null, close: () => Promise<void>}>}
  */
 export async function bootAppCircle({ relayUrl, circleId, handles, pod = null, outsiders = [] }) {
-  const people = await Promise.all(
-    [...handles, ...outsiders].map((h) => bootRealAgentNode(h, {
-      itemsLane: true,                                              // composes the DEVICE LOG
-      ...(pod ? { agentOpts: { provisionCircleMedium: mediumFor(h, pod, circleId) } } : {}),
-    })),
-  );
-  await connectNodesOverRelay(people, { relayUrl });
-  for (const n of people) wireLanes(n);
+  const people = await bootPeople({ relayUrl, handles: [...handles, ...outsiders], pod, circleId });
 
   const guests = people.slice(handles.length);   // on the relay, deliberately not in the circle
   const members = people.slice(0, handles.length);
@@ -237,6 +230,24 @@ export async function bootAppCircle({ relayUrl, circleId, handles, pod = null, o
     people: members, admin, outsiders: guests, circleId, pod,
     close: () => teardown(...people),
   };
+}
+
+/**
+ * Boot people the way a shell composes a device (the device log on, the lane receivers a shell registers), on one
+ * relay. `bootAppCircle` builds its circle on these; a script that makes several circles out of the same people
+ * (`seed-alpha-size.mjs`) starts here too.
+ * @param {{relayUrl: string, handles: string[], pod?: object|null, circleId?: string}} a
+ */
+export async function bootPeople({ relayUrl, handles, pod = null, circleId = null }) {
+  const people = await Promise.all(
+    handles.map((h) => bootRealAgentNode(h, {
+      itemsLane: true,                                              // composes the DEVICE LOG
+      ...(pod ? { agentOpts: { provisionCircleMedium: mediumFor(h, pod, circleId) } } : {}),
+    })),
+  );
+  await connectNodesOverRelay(people, { relayUrl });
+  for (const n of people) wireLanes(n);
+  return people;
 }
 
 /** Send a circle chat message the way a shell does: append the signed render entry AND fan the

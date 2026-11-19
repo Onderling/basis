@@ -7,6 +7,10 @@ assistant-thread build.
 
 ## What a person can do
 
+- Choose per persona how far the "+" goes (`setPlusCeiling`, kept on the persona as `_plus.ceiling`, inherited from
+  the general persona): nothing (the "+" is off for it), only looking things up, also their own things, or also their
+  circles' things after their yes on a card (the default). The "+" offers nothing heavier than that (`opWeight`,
+  `withinWeight`), and can never change it: the op weighs as the person's control and has no chat surface.
 - Ask in their own words ("wat kan je voor me doen?", "waar ligt de sleutel?") and get an answer in words from their
   own model, which is told it is their own place and reads their own notes, appointments and lists, as the self that
   is ticked.
@@ -49,6 +53,7 @@ assistant-thread build.
 
 <!-- catalogue-ops
 assistant: assistant-memory assistant-forget assistant-language
+agents: setPlusCeiling getPlusCeiling
 -->
 
 ## Proof

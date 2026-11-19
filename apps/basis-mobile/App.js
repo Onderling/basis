@@ -15,7 +15,7 @@
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as sodium from 'react-native-libsodium';
-import { installPhoneSignatureEquation, installPhoneSigning } from '../basis/src/v2/signatureEquations.js';
+import { installPhoneSignatureEquation, installPhoneSigning, installPhoneSecretbox } from '../basis/src/v2/signatureEquations.js';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, Pressable, Text, StyleSheet, BackHandler, AppState } from 'react-native';
 import { flushPendingSaves } from '@onderling/local-store';
@@ -96,6 +96,8 @@ installPhoneSignatureEquation(sodium)
   .catch(() => { /* tweetnacl stays */ });
 // …and SIGNING + key derivation through the same module (L619): taken only on tweetnacl's exact bytes.
 { const s = installPhoneSigning(sodium); console.info(`[security] signing: ${s.ok ? s.name : `tweetnacl (${s.reason})`}`); }
+// …and SECRETBOX (every sealed store's rows, the tunnel seal) through the same module (L619): the same exact-bytes rule.
+{ const s = installPhoneSecretbox(sodium); console.info(`[security] secretbox: ${s.ok ? s.name : `tweetnacl (${s.reason})`}`); }
 
 export default function App() {
   const [localeReady, setLocaleReady] = useState(false);

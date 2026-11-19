@@ -980,8 +980,12 @@ export async function startRelay(opts = {}) {
         // day-quota so a flood is stopped cheaply (O(1)) without burning the
         // sender's daily allowance. Socket stays open (transient burst is
         // absorbed by the bucket); only over-rate frames get OVER_RATE.
+        // The answer names the refused envelope (`id`, as the `undelivered` frame does), so the sender's transport
+        // can re-send exactly that frame later. It goes only to this socket, which sent the frame and already knows
+        // the id; it says nothing about the receiver.
         if (msgBucket && !msgBucket.take()) {
-          socket.send(JSON.stringify({ type: 'error', message: 'OVER_RATE' }));
+          const refusedId = typeof envelope?._id === 'string' && envelope._id ? { id: envelope._id } : {};
+          socket.send(JSON.stringify({ type: 'error', message: 'OVER_RATE', ...refusedId }));
           logLine(`[relay] rate-limited ${shortId(registeredAddress)} send`);
           return;
         }

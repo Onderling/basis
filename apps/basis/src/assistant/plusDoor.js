@@ -23,7 +23,7 @@ import { composeAssistantCatalogue } from './assistantCatalogue.js';
 import { catalogueManifests } from '../v2/manifestSources.js';
 import { withAssistantOps } from '../v2/assistantOps.js';
 import { assistantManifest } from '../v2/assistantManifest.js';
-import { opScopes, verbKind, isPeopleWritten } from '@onderling/app-manifest';
+import { opScopes, verbKind, isPeopleWritten, opWeight } from '@onderling/app-manifest';
 import { OWN_DEVICES_SCOPE } from '../v2/grantsManifest.js';
 import { makeOpAvailability } from '../v2/opAvailability.js';
 import { ownPlacePolicy } from '../v2/circlePolicy.js';
@@ -119,7 +119,7 @@ export function ownPlaceCatalogue({ householdManifest, apps } = {}) {
   const { catalogue: placed, manifestsByOrigin } = composeAssistantCatalogue({
     apps: apps ?? ownPlaceApps(catalogueManifests({ householdManifest })), householdManifest, place: 'own',
   });
-  const offered = proposable(availableOnly(placed, manifestsByOrigin, ownPlacePolicy(Object.keys(manifestsByOrigin))), manifestsByOrigin);
+  const offered = withinWeight(proposable(availableOnly(placed, manifestsByOrigin, ownPlacePolicy(Object.keys(manifestsByOrigin))), manifestsByOrigin), manifestsByOrigin, PLUS_CEILING);
   // no app's circle-bot background in the own place: the place's own lines say what it is (`OWN_PLACE_LINES`)
   const out = { catalogue: { ...offered, systemPromptFor: () => null }, manifestsByOrigin };
   byManifest.set(key, out);
@@ -166,6 +166,24 @@ export function proposable(catalogue, manifestsByOrigin = {}) {
     return [k, { ...e, op: { ...e.op, surfaces: { ...e.op.surfaces, chat: { hint } } } }];
   }));
   return { ...catalogue, opsById };
+}
+
+/**
+ * How far the "+" goes: the heaviest weight it offers (`opWeight`, ledger L977). 3 = own things and a circle's through
+ * the card, what the "+" did before the weight existed. The ceiling per persona (hidden, 1, 2 or 3) will set it.
+ */
+export const PLUS_CEILING = 3;
+
+/**
+ * A catalogue cut to the ops whose weight is at most `ceiling`: a 4 or 5 (who reaches what) is only pointed to on its
+ * settings screen, a 6 (keys) never offered, and an op without a weight (a write that does not say what it writes) not
+ * offered at all. `ceiling` 0 is a hidden persona: nothing.
+ * @param {object} catalogue @param {object} manifestsByOrigin `{app → manifest}` @param {number} [ceiling]
+ */
+export function withinWeight(catalogue, manifestsByOrigin = {}, ceiling = PLUS_CEILING) {
+  if (!catalogue?.opsById) return catalogue;
+  const fits = (e) => { const w = opWeight(manifestsByOrigin?.[e?.appOrigin] ?? null, e?.op); return w !== null && w <= ceiling; };
+  return { ...catalogue, opsById: new Map([...catalogue.opsById].filter(([, e]) => fits(e))) };
 }
 
 /**

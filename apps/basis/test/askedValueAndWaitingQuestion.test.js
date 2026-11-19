@@ -18,7 +18,7 @@ import nl from '../src/locales/circle.nl.json' with { type: 'json' };
 
 const tr = (k, p) => { const v = k.split('.').slice(1).reduce((o, x) => o?.[x], nl); const s = typeof v === 'string' ? v : (v?.text ?? k); return s.replace(/\{\{(\w+)\}\}/g, (_, n) => String(p?.[n] ?? '')); };
 const ANN = 'telegram:42';
-// an op with a required enum, as any app may declare one (not '/kies': that is the toolboxes' own pick since slice 5, first mount wins)
+// an op with a required enum, as any app may declare one (not '/kies': the toolboxes' pick of a thing owns it, first mount wins)
 const demo = { app: 'demo', itemTypes: [], operations: [{ id: 'pick', verb: 'set', params: [{ name: 'color', kind: 'enum', of: ['red', 'blue'], required: true }], surfaces: { slash: { command: '/kleur', body: 'argline' }, chat: { hint: 'pick a color' } } }] };
 
 function bot() {

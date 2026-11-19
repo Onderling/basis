@@ -138,7 +138,7 @@ import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, openOfferPers
 import { primeCircleSecurity, announceCircleAddresses, presenceCircleIds } from '../src/v2/circleSecurityPriming.js';
 import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } from '../src/v2/circleAddressRegistration.js';
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
-import { installBoxSignatureEquation } from '../src/v2/signatureEquations.js';
+import { installBoxSignatureEquation, installBoxSigning } from '../src/v2/signatureEquations.js';
 import { buildCircleLanes, pullCircleLanes } from '../src/v2/circleLanes.js';
 import { runStartQueue, startQueueSiblings } from '../src/v2/startQueue.js';
 import { createNodeFsBackend } from '@onderling/pseudo-pod/node';
@@ -294,6 +294,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
   // THE SIGNATURE CHECK: node:crypto behind the one strict rule (taken only if it agrees on the edge-case vectors and on an
   // honest and a tampered signature; else tweetnacl stays). Before any store is read, so every check of this run is the fast one.
   { const eq = await installBoxSignatureEquation(nodeCrypto); console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`); }
+  { const sg = installBoxSigning(nodeCrypto); console.info(`[security] signing: ${sg.ok ? sg.name : `tweetnacl (${sg.reason})`}`); }
   try {
     const forgot = await runPendingForget({
       markerVault: vault,

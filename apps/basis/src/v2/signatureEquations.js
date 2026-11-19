@@ -17,7 +17,7 @@
  * imports nothing platform-specific.
  */
 import nacl from 'tweetnacl';
-import { useSignatureEquation } from '@onderling/core';
+import { useSignatureEquation, useSigningEquation } from '@onderling/core';
 
 // The DER prefix of an Ed25519 public key in SubjectPublicKeyInfo form; the 32 key bytes follow it.
 const SPKI_ED25519_PREFIX = Uint8Array.from([0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00]);
@@ -91,6 +91,69 @@ export function libsodiumEquation(sodium) {
  */
 export async function installPhoneSignatureEquation(sodium) {
   try { return await useSignatureEquation(libsodiumEquation(sodium)); } catch (e) { return { ok: false, reason: String(e?.message ?? e) }; }
+}
+
+/**
+ * The phone's SIGNING and key derivation (libsodium's C over JSI, the module its check uses; ledger L619). The kernel
+ * takes it only if it gives tweetnacl's exact bytes on fixed seeds and messages (`useSigningEquation`).
+ * @param {object} sodium  `react-native-libsodium`
+ */
+export function libsodiumSigning(sodium) {
+  return {
+    name: 'libsodium-jsi',
+    keyPairFromSeed: (seed) => { const kp = sodium.crypto_sign_seed_keypair(seed); return { publicKey: kp.publicKey, secretKey: kp.privateKey }; },
+    sign: (msg, secretKey) => sodium.crypto_sign_detached(msg, secretKey),
+  };
+}
+
+// The DER prefix of an Ed25519 private key in PKCS#8 form; the 32 seed bytes follow it.
+const PKCS8_ED25519_PREFIX = Uint8Array.from([0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20]);
+
+/**
+ * The box's SIGNING and key derivation (node:crypto, OpenSSL), synchronous (ledger L619). The web has none: WebCrypto's
+ * Ed25519 is asynchronous and every signing path is synchronous, so the web keeps tweetnacl.
+ * @param {{ createPrivateKey: Function, createPublicKey: Function, sign: Function }} nodeCrypto  `node:crypto`
+ */
+export function nodeCryptoSigning(nodeCrypto) {
+  const keys = new Map();   // seed (base64) → KeyObject; a key is parsed once
+  const privateKeyOf = (seed) => {
+    const id = Buffer.from(seed).toString('base64');
+    let k = keys.get(id);
+    if (!k) {
+      const der = new Uint8Array(PKCS8_ED25519_PREFIX.length + 32);
+      der.set(PKCS8_ED25519_PREFIX); der.set(seed, PKCS8_ED25519_PREFIX.length);
+      k = nodeCrypto.createPrivateKey({ key: Buffer.from(der), format: 'der', type: 'pkcs8' });
+      if (keys.size > 4096) keys.clear();
+      keys.set(id, k);
+    }
+    return k;
+  };
+  return {
+    name: 'node-crypto',
+    keyPairFromSeed: (seed) => {
+      const spki = nodeCrypto.createPublicKey(privateKeyOf(seed)).export({ format: 'der', type: 'spki' });
+      const publicKey = new Uint8Array(spki.subarray(spki.length - 32));
+      const secretKey = new Uint8Array(64); secretKey.set(seed); secretKey.set(publicKey, 32);
+      return { publicKey, secretKey };
+    },
+    sign: (msg, secretKey) => new Uint8Array(nodeCrypto.sign(null, msg, privateKeyOf(secretKey.subarray(0, 32)))),
+  };
+}
+
+/**
+ * Install the box's signing (node:crypto). Returns what `useSigningEquation` said (tweetnacl stays on a refusal).
+ * @param {object} nodeCrypto  `node:crypto`
+ */
+export function installBoxSigning(nodeCrypto) {
+  try { return useSigningEquation(nodeCryptoSigning(nodeCrypto)); } catch (e) { return { ok: false, reason: String(e?.message ?? e) }; }
+}
+
+/**
+ * Install the phone's signing (libsodium over JSI). Returns what `useSigningEquation` said (tweetnacl stays on a refusal).
+ * @param {object} sodium  `react-native-libsodium`
+ */
+export function installPhoneSigning(sodium) {
+  try { return useSigningEquation(libsodiumSigning(sodium)); } catch (e) { return { ok: false, reason: String(e?.message ?? e) }; }
 }
 
 /**

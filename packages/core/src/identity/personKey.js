@@ -17,7 +17,6 @@
  * cannot vouch for a version. That is what closes the hole of 2026-09-16: a revoked device holds seed n and could
  * sign "n vouches for n+1" itself; it cannot sign as the link key.
  */
-import nacl from 'tweetnacl';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
@@ -25,6 +24,7 @@ import { verifyEd25519Strict } from '../crypto/ed25519Strict.js';
 import { AgentIdentity } from './AgentIdentity.js';
 import { VaultMemory } from '@onderling/vault';
 import { parseUntrustedJson } from '../security/untrustedJson.js';
+import { ed25519KeyPairFromSeed, ed25519Sign } from '../crypto/ed25519Sign.js';   // signing + derivation behind the port a shell may speed up (L619)
 
 const HKDF_INFO_NS = 'onderling-identity-v1:';
 // FIXED domain-separation salt — permanent, never change (would re-key every person key).
@@ -63,13 +63,13 @@ export function derivePersonLinkKeySeed(profileSeed) {
 /** The public key (b64) behind a person-key seed — what a circle learns. (Also the link key's public half from its seed.) */
 export function personKeyPubKeyB64(seed) {
   if (!(seed instanceof Uint8Array) || seed.length !== 32) throw new Error('personKeyPubKeyB64: seed must be a 32-byte Uint8Array');
-  return b64encode(nacl.sign.keyPair.fromSeed(seed).publicKey);
+  return b64encode(ed25519KeyPairFromSeed(seed).publicKey);
 }
 
 /** Sign with a person-key seed (b64 signature). */
 export function signWithPersonKey(seed, messageBytes) {
-  const kp = nacl.sign.keyPair.fromSeed(seed);
-  return b64encode(nacl.sign.detached(messageBytes, kp.secretKey));
+  const kp = ed25519KeyPairFromSeed(seed);
+  return b64encode(ed25519Sign(messageBytes, kp.secretKey));
 }
 
 /** The announcement shape a join or create carries: `{ version, pubKey }`, or null when malformed. */

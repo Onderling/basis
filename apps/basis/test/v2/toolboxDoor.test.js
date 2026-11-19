@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { withAssistantOps } from '../../src/v2/assistantOps.js';
 import { makeToolboxOps } from '../../src/v2/toolboxes.js';
+import { renderReply } from '../../src/renderer.js';
 
 const KEY = 'geheime-sleutel-123';
 const CARD = { name: 'Boodschappen', supportedInterfaces: [{ url: 'http://boodschappen:3000/a2a', protocolBinding: 'JSONRPC', protocolVersion: '1.0' }],
@@ -48,7 +49,10 @@ describe('/toolbox at the door', () => {
     expect(ask.message).toContain('circle.bot.toolbox_card');
     expect(ask.message).toContain('http://boodschappen:3000');
     expect(ask.message).toContain('circle.bot.toolbox_receives_question');
-    expect(ask.buttons.map((b) => b.id)).toEqual(['/toolbox boodschappen aan ja', '/toolbox boodschappen aan nee']);
+    // what reaches a person: the reply as the door's painter renders it (its quick replies are the buttons Telegram and
+    // the bot's thread in Basis show); an op field the renderer does not read would be dropped on the way
+    const painted = renderReply({ shape: 'text', payload: ask }, { t });
+    expect(painted.quickReplies.map((q) => q.slash)).toEqual(['/toolbox boodschappen aan ja', '/toolbox boodschappen aan nee']);
     expect(tools.wordsNow()).toEqual([]);
     const yes = await say('boodschappen aan ja');
     expect(yes.message).toContain('circle.bot.toolbox_on');

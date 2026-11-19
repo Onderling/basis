@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import { groupKeyStrategy } from '@onderling/pod-client';
+import { setShellContentSeal } from '../../src/v2/localStoreSeal.js';
 import {
   createUserLlmDefaultStore, normalizeUserLlmDefault, localStorageUserLlmIo, DEFAULT_USER_LLM,
 } from '../../src/v2/userLlmDefault.js';
@@ -61,7 +63,8 @@ describe('createUserLlmDefaultStore', () => {
     expect(await store.get()).toEqual(full('off', 'off'));
   });
 
-  it('localStorageUserLlmIo persists under a stable key', async () => {
+  it('localStorageUserLlmIo persists under a stable key (sealed: a content key is published, as after a boot)', async () => {
+    setShellContentSeal(groupKeyStrategy({ groupKey: Buffer.from(new Uint8Array(32).fill(4)).toString('base64url') }));
     const mem = new Map();
     const storage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, v) };
     const store = createUserLlmDefaultStore(localStorageUserLlmIo(storage));
@@ -69,5 +72,6 @@ describe('createUserLlmDefaultStore', () => {
     // a fresh store over the same storage reads it back
     const store2 = createUserLlmDefaultStore(localStorageUserLlmIo(storage));
     expect(await store2.get()).toEqual({ ...full('local', 'local-ollama'), cacheSecret: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/) });
+    setShellContentSeal(null);
   });
 });

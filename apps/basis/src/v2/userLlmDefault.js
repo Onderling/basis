@@ -11,6 +11,7 @@
 
 import { CIRCLE_LLM_ROUTE_PRESETS } from './circleLlmRoutes.js';
 import { hmacBase64Url } from '@onderling/core';
+import { sealedJsonIo } from './localStoreSeal.js';
 
 const VALID_MODES   = ['off', 'local', 'cloud'];
 const VALID_PRESETS = Object.keys(CIRCLE_LLM_ROUTE_PRESETS);   // off · local-ollama · confidential-proxy · openai-compatible
@@ -95,18 +96,22 @@ function withCacheSecret(cfg) {
 
 const STORAGE_KEY = 'cc.userLlmDefault';
 
-/** localStorage-backed IO (web). */
-export function localStorageUserLlmIo(storage = globalThis.localStorage) {
+/**
+ * The setting's io, SEALED at rest (ledger L1083): it holds the person's own model endpoint WITH its API key. One io for
+ * both shells (`sealedJsonIo`): a write before the content key is refused, a read before it is "nothing kept" (the
+ * store then answers 'off' and writes nothing over the sealed value), an old plain value is resealed at its first read.
+ * A screen that can read before the key (the phone's first frame) reads again on `onShellContentSeal`.
+ */
+export function sealedUserLlmIo(storage) {
+  const io = sealedJsonIo(storage);
   return {
-    load: () => { try { const s = storage?.getItem(STORAGE_KEY); return s ? JSON.parse(s) : null; } catch { return null; } },
-    save: (v) => { try { storage?.setItem(STORAGE_KEY, JSON.stringify(v)); } catch { /* ignore */ } },
+    load: () => io.load(STORAGE_KEY),
+    save: async (v) => { try { await io.save(STORAGE_KEY, v); } catch { /* no content key yet: kept for this session only */ } },
   };
 }
 
-/** AsyncStorage-backed IO (mobile). Pass the `@react-native-async-storage/async-storage` instance. */
-export function asyncStorageUserLlmIo(AsyncStorage) {
-  return {
-    load: async () => { try { const s = await AsyncStorage?.getItem(STORAGE_KEY); return s ? JSON.parse(s) : null; } catch { return null; } },
-    save: async (v) => { try { await AsyncStorage?.setItem(STORAGE_KEY, JSON.stringify(v)); } catch { /* ignore */ } },
-  };
-}
+/** The web's io (localStorage). */
+export function localStorageUserLlmIo(storage = globalThis.localStorage) { return sealedUserLlmIo(storage); }
+
+/** The phone's io (AsyncStorage). Pass the `@react-native-async-storage/async-storage` instance. */
+export function asyncStorageUserLlmIo(AsyncStorage) { return sealedUserLlmIo(AsyncStorage); }

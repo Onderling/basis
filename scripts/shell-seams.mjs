@@ -372,6 +372,10 @@ export const SEAMS = Object.freeze([
   // option through (`enrolDeviceName: opts.enrolDeviceName`), and a pass-through would satisfy a name-only pattern
   // while no shell supplied a value. The precedent for any seam a bundle forwards.
   { id: 'enrol-names-the-device', pattern: /enrolDeviceName:\s*\(\)\s*=>/, shells: ['web', 'mobile'], why: 'an enrolled device with no typed name reads "another device" on every one of the person\'s other devices' },
+  // THE FIRST FRAME (ledger L1051): before the agent is there a shell paints the default start (`firstFrameTab`, Vandaag),
+  // so a person on the default never sees the app jump to it seconds later. The phone only: the web paints nothing
+  // until its agent is there and opens straight on the start (circleApp's startTabFor); the box has no screen.
+  { id: 'first-frame-tab', pattern: /firstFrameTab\(/, shells: ['mobile'], why: 'the app opens on the circles list and jumps to Vandaag seconds later, under the person\'s finger' },
   // Today's reach card: a device with no relay says so and what works already. The host hands the strip the relay
   // question's own predicate; a shell that does not shows no card, and its person sends into nothing unwarned.
   { id: 'today-knows-no-relay', pattern: /relayKnown:\s*\(\)\s*=>/, shells: ['web', 'mobile'], why: 'a device with no connection point sends into nothing and nothing on Today says so' },

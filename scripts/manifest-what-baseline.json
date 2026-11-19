@@ -1,14 +1,5 @@
 {
   "_note": "L977: ops that still owe writes.what (or reveals, for a device read). Only shrinks: fill in, then run node scripts/lint-manifest-scopes.mjs --update.",
-  "what": [
-    "folio.deleteFromPod",
-    "folio.deleteLocally",
-    "folio.forceRepush",
-    "folio.saveToMyPod",
-    "folio.shareFolder",
-    "folio.syncOnce",
-    "folio.watchStart",
-    "folio.watchStop"
-  ],
+  "what": [],
   "reveals": []
 }

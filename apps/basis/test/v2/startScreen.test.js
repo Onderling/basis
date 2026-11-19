@@ -4,7 +4,7 @@
  * register, painted on My data, written through set-param like every setting.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { startTabFor, startScreenStillApplies, START_SCREEN, START_SCREEN_CHOICES } from '../../src/v2/startScreen.js';
+import { startTabFor, startScreenStillApplies, firstFrameTab, START_SCREEN, START_SCREEN_CHOICES } from '../../src/v2/startScreen.js';
 import { renderCircleMyData } from '../../web/v2/circleMyData.js';
 import { settingsGroupFor } from '../../src/v2/settingsHome.js';
 import { basisManifest as settingsManifest } from '../../manifest.js';
@@ -48,5 +48,17 @@ describe('the start screen after a cold start', () => {
     expect(startScreenStillApplies({ tapped: false, view: 'list', selected: { id: 'c' }, creating: false })).toBe(false);
     expect(startScreenStillApplies({ tapped: false, view: 'list', selected: null, creating: true })).toBe(false);
     expect(startScreenStillApplies({ tapped: false, view: 'contacten', selected: null, creating: false })).toBe(false);
+  });
+});
+
+describe('the first frame, before the agent is there (ledger L1051)', () => {
+  it('paints the default start, Vandaag, so a person on the default never sees the app jump', () => {
+    expect(firstFrameTab()).toBe('screens');
+    expect(firstFrameTab()).toBe(startTabFor(undefined, null));
+  });
+  it('the start may still move it only while the first frame stands: the same view, nothing tapped or opened', () => {
+    expect(startScreenStillApplies({ view: 'screens', first: 'screens' })).toBe(true);
+    expect(startScreenStillApplies({ view: 'list', first: 'screens' })).toBe(false);
+    expect(startScreenStillApplies({ view: 'screens', first: 'screens', tapped: true })).toBe(false);
   });
 });

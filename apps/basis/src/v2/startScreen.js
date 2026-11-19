@@ -24,13 +24,23 @@ const TABS = new Set(['screens', 'circles', 'contacten', 'mij']);
 /**
  * Whether the start screen may still be applied once the agent is there. A person who moved during the cold start
  * keeps their place: a tab tapped (even the one already showing, so the view alone cannot tell), a circle opened, the
- * "Make a circle" wizard opened, or any view other than the list. The shell reads these at the moment it applies the
- * start, not from the render that began it.
- * @param {{tapped?: boolean, view?: string, selected?: object|null, creating?: boolean}} now
+ * "Make a circle" wizard opened, or any view other than the one the first frame painted (`first`). The shell reads
+ * these at the moment it applies the start, not from the render that began it.
+ * @param {{tapped?: boolean, view?: string, selected?: object|null, creating?: boolean, first?: string}} now
  * @returns {boolean}
  */
-export function startScreenStillApplies({ tapped = false, view = 'list', selected = null, creating = false } = {}) {
-  return !tapped && view === 'list' && !selected && !creating;
+export function startScreenStillApplies({ tapped = false, view = 'list', selected = null, creating = false, first = 'list' } = {}) {
+  return !tapped && view === first && !selected && !creating;
+}
+
+/**
+ * The tab a shell paints in its FIRST frame, before the agent (and so the person's setting) is there: the default
+ * start, Vandaag (ledger L1051). A person on the default then never sees the app jump when the agent lands; a person
+ * who chose another start is moved once, only while that first frame stands (`startScreenStillApplies`).
+ * @returns {'screens'}
+ */
+export function firstFrameTab() {
+  return startTabFor(undefined, null);
 }
 
 /**

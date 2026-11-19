@@ -186,3 +186,17 @@ describe('buildScreenModel — SP-5b audience filter (view.defaultAudience → L
     expect(categories).toEqual([{ id: 'x', count: 2, checked: true }]);
   });
 });
+
+describe('the shared list says WHICH circle it is shared with (ledger L747)', () => {
+  const t = (k, v) => (v ? `${k} ${JSON.stringify(v)}` : k);
+  it('the circle\'s name when the host knows it; the general line when not; a union names each', async () => {
+    const { audienceScopeLine } = await import('../../src/v2/screenModel.js');
+    const nameOf = (id) => ({ abc: 'Tuinclub', xyz: 'Thuis' }[id] ?? null);
+    expect(audienceScopeLine(normalizeAudienceRef('circle:abc'), { nameOf, t })).toBe('circle.screen.audience_scope_named {"name":"Tuinclub"}');
+    expect(audienceScopeLine(normalizeAudienceRef('circle:zzz'), { nameOf, t })).toBe('circle.screen.audience_scope');
+    expect(audienceScopeLine(normalizeAudienceRef('circle:abc'), { t })).toBe('circle.screen.audience_scope');
+    expect(audienceScopeLine({ kind: 'union', of: [normalizeAudienceRef('circle:abc'), normalizeAudienceRef('circle:xyz')] }, { nameOf, t })).toBe('circle.screen.audience_scope_named {"name":"Tuinclub, Thuis"}');
+    expect(audienceScopeLine(null, { nameOf, t })).toBeNull();
+  });
+});
+

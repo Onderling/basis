@@ -24,7 +24,7 @@ export const chatManifest = Object.freeze({
     {
       id: 'chat.message',
       description: 'A chat message: the writer signs the wire payload (msgId, text, media pointer) with their per-circle key; receivers verify before it lands and renders.',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appends: [{ lane: CHAT_LANE, kind: 'message' }],
     },
   ],

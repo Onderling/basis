@@ -1123,7 +1123,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
         title: r.title, url: r.url, words: r.words.map((w) => `${w.word} <…>`).join(', '),
         receives: tp(r.receives?.includes('list-refs') ? 'circle.bot.toolbox_receives_list' : 'circle.bot.toolbox_receives_question'),
       }),
-      buttons: [{ id: `/toolbox ${name} aan ja`, label: tp('circle.bot.toolbox_yes') }, { id: `/toolbox ${name} aan nee`, label: tp('circle.bot.toolbox_no') }],
+      quickReplies: [{ slash: `/toolbox ${name} aan ja`, label: tp('circle.bot.toolbox_yes') }, { slash: `/toolbox ${name} aan nee`, label: tp('circle.bot.toolbox_no') }],
     };
   }
 

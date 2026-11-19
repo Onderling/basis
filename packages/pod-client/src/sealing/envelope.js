@@ -30,12 +30,12 @@ import nacl from 'tweetnacl';
 import ed2curve from 'ed2curve';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
+import { utf8Decode } from './utf8.js';
 
 const SENTINEL = 'fp1:';               // kept stable: feedback's existing on-pod envelopes start with it
 // HKDF context (a TypedArray — keeps this module Buffer-free at load time for the browser graph).
 const INFO = new TextEncoder().encode('fp1-kek');
 const te = new TextEncoder();
-const td = new TextDecoder();
 
 // X25519 DER headers (fixed ASN.1 prefixes) — wrap tweetnacl's raw 32-byte keys back into the SPKI/PKCS8
 // DER the rest of the format expects, so the on-wire key bytes (and thus recipientId) are byte-identical
@@ -153,7 +153,7 @@ function unpack(sealedText) {
   if (!/[^\x00-\x7f]/.test(bin)) return JSON.parse(bin);
   const u8 = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-  return JSON.parse(td.decode(u8));
+  return JSON.parse(utf8Decode(u8));
 }
 
 /** RECIPIENT mode — seal a string to one or more recipient public keys (b64url SPKI DER). Needs ONLY public keys. */
@@ -188,7 +188,7 @@ export function open(sealedText, privateKeyB64) {
   const shared = nacl.scalarMult(privRaw, rawKey(epkDer));
   const kek = hkdf(sha256, shared, epkDer, INFO, 32);
   const cek = sbOpen(kek, slot);
-  return td.decode(sbOpen(cek, env.body));
+  return utf8Decode(sbOpen(cek, env.body));
 }
 
 /** GROUP-KEY mode — seal a string under a shared symmetric group key (b64url). Anyone holding the group
@@ -205,7 +205,7 @@ export function openWithGroupKey(sealedText, groupKeyB64) {
   if (env.v === 1) return openV1Group(env, groupKeyB64);       // legacy AES-GCM (Node only)
   if (env.v !== 2) throw new Error(`sealing: unknown envelope version ${env.v}`);
   if (!env.gk) throw new Error('sealing: recipient envelope — use open(text, privateKey)');
-  return td.decode(sbOpen(unb64u(groupKeyB64), env.body));
+  return utf8Decode(sbOpen(unb64u(groupKeyB64), env.body));
 }
 
 // ── v1 LEGACY readers (AES-256-GCM, node:crypto) — Node-only, read-only ─────────────────────────────
@@ -233,10 +233,10 @@ function openV1(env, privateKeyB64) {
   const shared = c.diffieHellman({ privateKey: priv, publicKey: c.createPublicKey({ key: Buffer.from(unb64u(env.epk)), format: 'der', type: 'spki' }) });
   const kek = new Uint8Array(c.hkdfSync('sha256', shared, unb64u(env.epk), INFO, 32));
   const cek = aesDecryptV1(c, kek, slot);
-  return td.decode(aesDecryptV1(c, cek, env.body));
+  return utf8Decode(aesDecryptV1(c, cek, env.body));
 }
 function openV1Group(env, groupKeyB64) {
-  return td.decode(aesDecryptV1(nodeCrypto(), unb64u(groupKeyB64), env.body));
+  return utf8Decode(aesDecryptV1(nodeCrypto(), unb64u(groupKeyB64), env.body));
 }
 
 /** Closures a writer/reader injects. The sealer holds only public keys (or the group key); the opener

@@ -1572,7 +1572,8 @@ manifests (the guard is in the `npm run guards` aggregate, which CI runs as the 
 page on an origin shares its storage, and its scripts can use the keys kept there. So the web app's origin runs only
 the Basis bundle. A toolbox's page, a plugin's view, any bundle we did not build gets an origin of its own (the realm
 is the designed form of this); the page loads no script from another origin, not even a library from a CDN; it
-declares a script policy naming only its own scripts; and it refuses to run inside another page's frame. Held by
+declares a script policy naming only its own scripts; and the main app refuses to run inside another page's frame (a screen address starts there, since Telegram shows
+the screen in a frame). Held by
 `apps/basis/test/webOwnOrigin.test.js`, `apps/basis/test/web/ownWindow.test.js` and the browser spec
 `apps/basis/test-browser/web-own-window.spec.js`. The decision: `docs/decisions.md` 2026-11-18.
 

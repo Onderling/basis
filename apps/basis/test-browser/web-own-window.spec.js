@@ -1,7 +1,7 @@
 /**
  * The web app in a real browser under its own script policy, and framed (ledger L1041).
  *
- * @guard the web app boots under its script policy with no policy violation and NKN present, and framed by another page it refuses to start and says why
+ * @guard the web app boots under its script policy with no policy violation and NKN present; framed by another page the main app refuses and says why, and a screen address starts (Telegram shows the screen in a frame)
  */
 import { test, expect } from '@playwright/test';
 
@@ -22,4 +22,13 @@ test('framed by another page: it does not start and says why', async ({ page }, 
   const frame = page.frameLocator('#f');
   await expect(frame.locator('[data-framed="refused"]')).toBeVisible({ timeout: 30_000 });
   await expect(frame.locator('#circle-root')).toHaveCount(0);
+});
+
+test('framed, a SCREEN address starts all the same (a Telegram client shows the screen in a frame)', async ({ page }, ti) => {
+  const screen = `${ti.project.use.baseURL}/#scherm=not-a-real-link`;
+  await page.setContent(`<iframe id="f" src="${screen}" style="width:800px;height:600px"></iframe>`);
+  const frame = page.frameLocator('#f');
+  // the screen shell ran: it read the address and said it is not a link (no refusal)
+  await expect(frame.locator('[data-screen="invalid"]')).toBeVisible({ timeout: 30_000 });
+  await expect(frame.locator('[data-framed="refused"]')).toHaveCount(0);
 });

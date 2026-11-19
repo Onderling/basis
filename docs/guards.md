@@ -110,7 +110,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | — | one item of EVERY canonical type, written to a circle store on one device, arrives in the | `apps/basis/test/perTypeSyncMatrix.test.js` |
 | — | every op is gated by exactly one capability row, and every row gates at least one op | `apps/basis/test/v2/lendCapabilityRows.test.js` |
 | — | confirming a claim, editing and sharing an appointment pass the capability gate in a circle that did not switch them off | `apps/basis/test/v2/threeActsRows.test.js` |
-| — | web app refuses to start when framed (its own top-level window only), and its entry asks before either shell starts | `apps/basis/test/web/ownWindow.test.js` |
+| — | framed by another page, the web app's main shell refuses to start and a screen address starts (its entry asks before … | `apps/basis/test/web/ownWindow.test.js` |
 | — | web app's page loads no script, stylesheet or frame from another origin, and the NKN library it runs is the installed… | `apps/basis/test/webOwnOrigin.test.js` |
 | — | subtask-spawn gate bites — only an authorized actor can spawn under a parent | `packages/item-store/test/spawnSubtask.test.js` |
 | — | a param declares scope (sync) + kind (security); kind:internal is immutable by construction, and set-param gates on kind | `packages/params/test/params.test.js` |

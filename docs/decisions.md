@@ -2018,8 +2018,10 @@ from a CDN, without an integrity hash and in a different version from the one th
 
 **Decision:** the web app's origin runs the Basis bundle and nothing else. A toolbox's page, a plugin's view, any
 bundle we did not build gets an origin of its own (the realm, `docs/extending.md` §4, is the designed form). The page
-loads no script from another origin; its script policy names only its own scripts; it refuses to run in another
-page's frame.
+loads no script from another origin; its script policy names only its own scripts; the main app refuses to run in
+another page's frame. The one exception is a SCREEN address: Telegram's web client and some desktop clients show the
+screen's Web App ('Open het scherm') in a frame, a framing page cannot read into a frame of another origin, and a
+screen holds one screen's grant, never a person's keys, so a framed screen starts.
 
 **Consequences:** NKN is built into the web app from the installed package. The script policy allows `'unsafe-eval'`
 until the item-type validator's checks are compiled ahead of time. A frame rule in a response header waits on the web

@@ -1598,6 +1598,10 @@
       "text": "De + staat uit voor deze persona.",
       "doc": "The persona the + speaks as has it switched off (the ceiling per persona, 0): nothing is read and nothing reaches a model."
     },
+    "plus_ceiling_unread": {
+      "text": "De + kan nu niet lezen wat hij voor deze persona mag. Probeer het zo nog eens.",
+      "doc": "The ceiling of the persona the + speaks as could not be read (the read failed): this turn runs nothing and reaches no model; a later turn reads it again."
+    },
     "plus_ceiling_refused": {
       "text": "Dat mag de + niet voor deze persona. Doe het zelf, of verander bij je persona wat de + mag.",
       "doc": "A line asked for something heavier than this persona lets the + do (its ceiling): refused, whichever way it came in."

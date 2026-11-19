@@ -1595,6 +1595,10 @@
       "text": "The + is off for this persona.",
       "doc": "The persona the + speaks as has it switched off (the ceiling per persona, 0): nothing is read and nothing reaches a model."
     },
+    "plus_ceiling_unread": {
+      "text": "The + cannot read what it may do for this persona right now. Try again in a moment.",
+      "doc": "The ceiling of the persona the + speaks as could not be read (the read failed): this turn runs nothing and reaches no model; a later turn reads it again."
+    },
     "plus_ceiling_refused": {
       "text": "The + may not do that for this persona. Do it yourself, or change what the + may do on your persona's page.",
       "doc": "A line asked for something heavier than this persona lets the + do (its ceiling): refused, whichever way it came in."

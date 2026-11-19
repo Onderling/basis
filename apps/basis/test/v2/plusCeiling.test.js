@@ -71,6 +71,55 @@ describe('the ceiling of the "+" per persona', () => {
     expect((await three.d.read('Thuis: maak een lijst Boodschappen')).error ?? null).not.toBe(NOT_HERE);
   });
 
+  it('a ceiling that cannot be read closes the "+" for that turn: one line, nothing run, nothing to a model', async () => {
+    const UNREAD = 'circle.vandaag.plus_ceiling_unread';
+    const mk = (ceilingOf, readAs) => {
+      const interpret = vi.fn(async () => ({ opId: 'addEvent', args: { title: 'tandarts', when: '2026-11-17T10:00' } }));
+      const runInCircle = vi.fn(async () => ({ done: 'ok' }));
+      const callSkill = vi.fn(async () => ({ ok: true }));
+      const d = createPlusDoor({
+        llm: { invoke: async () => null }, interpret, threads: createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() }),
+        threadId: 'own:me', t, lang: 'nl', circles: async () => [thuis], ownListsOf: async () => [shopping], callSkill, runInCircle,
+        ...(ceilingOf ? { ceilingOf } : {}), ...(readAs ? { readAs } : {}),
+      });
+      return { d, interpret, runInCircle, callSkill };
+    };
+    // the shell's own read throws
+    const thrown = mk(async () => { throw new Error('vault locked'); });
+    for (const line of ['kun je de tandarts voor me regelen?', 'Thuis: maak een lijst Boodschappen', '/add-note de sleutel ligt bij de buren']) {
+      const r = await thrown.d.read(line);
+      expect(r.error ?? r.done, line).toBe(UNREAD);
+      expect(r.actId ?? r.card ?? null, line).toBeNull();
+    }
+    expect(thrown.interpret).not.toHaveBeenCalled();
+    expect(thrown.runInCircle).not.toHaveBeenCalled();
+    // one self of a set read together cannot be read: the turn is closed too
+    const oneOfTwo = mk(async (self) => { if (self === 'werk') throw new Error('x'); return 3; });
+    expect((await oneOfTwo.d.read('wat staat er vandaag?', { asSelf: 'default', selves: ['default', 'werk'] })).error).toBe(UNREAD);
+    // the op answers ok:false through readAs (the shell's call): the same
+    const refused = mk(null, () => async (app, opId) => (opId === 'getPlusCeiling' ? { ok: false, reason: 'not-found' } : { ok: true, items: [] }));
+    expect((await refused.d.read('kun je de tandarts voor me regelen?')).error).toBe(UNREAD);
+    expect(refused.interpret).not.toHaveBeenCalled();
+    // an answer that is not a ceiling at all is not read either
+    const garbled = mk(async () => 'drie');
+    expect((await garbled.d.read('kun je de tandarts voor me regelen?')).error).toBe(UNREAD);
+    // and a later turn that CAN read it goes on as usual
+    let fail = true;
+    const flaky = mk(async () => { if (fail) throw new Error('once'); return 3; });
+    expect((await flaky.d.read('kun je de tandarts voor me regelen?')).error).toBe(UNREAD);
+    fail = false;
+    expect((await flaky.d.read('kun je de tandarts voor me regelen?')).actId).toBe('calendar.calendar-event');
+  });
+
+  it('a shell with no way to read it at all: 3, the "+" as before', async () => {
+    const d = createPlusDoor({
+      llm: { invoke: async () => null }, interpret: async () => ({ opId: 'addEvent', args: { title: 'tandarts', when: '2026-11-17T10:00' } }),
+      threads: createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() }),
+      threadId: 'own:me', t, lang: 'nl', circles: async () => [thuis], ownListsOf: async () => [shopping], callSkill: vi.fn(async () => ({ ok: true })),
+    });
+    expect((await d.read('kun je de tandarts voor me regelen?')).actId).toBe('calendar.calendar-event');
+  });
+
   it('nothing said: 3, the "+" as before', async () => {
     const { d } = door({ interpret: async () => ({ opId: 'addEvent', args: { title: 'tandarts', when: '2026-11-17T10:00' } }) });
     expect((await d.read('kun je de tandarts voor me regelen?')).actId).toBe('calendar.calendar-event');

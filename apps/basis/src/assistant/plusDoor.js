@@ -244,7 +244,9 @@ export function createPlusDoor({
   // a getter; absent/null: no model is set
   routeLine = null,
   // how far the "+" goes for a self (0 off · 1 reads · 2 own things · 3 a circle's after a yes): by default read as that
-  // self through the shell's own call (`agents.getPlusCeiling`); anything unreadable is the default, the "+" as before
+  // self through the shell's own call (`agents.getPlusCeiling`, which answers 3 when nothing is said anywhere). A read
+  // that FAILS (throws, `ok:false`, or no ceiling in the answer) closes the "+" for that turn; only a shell with no way
+  // to read it at all gets 3, the "+" as before
   ceilingOf = null,
 } = {}) {
   if (typeof t !== 'function') throw new TypeError('createPlusDoor: t required');
@@ -267,11 +269,16 @@ export function createPlusDoor({
   const { catalogue: cat, manifestsByOrigin } = ownPlaceCatalogue({ householdManifest, apps });
   // THE CEILING of this turn (the strictest of its selves): what the model is handed, and what any way in may run
   const ceilingOfSelf = typeof ceilingOf === 'function' ? ceilingOf
-    : (typeof readAs === 'function' ? async (self) => (await readAs(self)('agents', 'getPlusCeiling', { id: self ?? 'default' }))?.ceiling : null);
+    : (typeof readAs === 'function' ? async (self) => {
+      const r = await readAs(self)('agents', 'getPlusCeiling', { id: self ?? 'default' });
+      return r?.ok === false ? null : r?.ceiling;
+    } : null);
+  /** The strictest ceiling of the set, or `null` when any self's cannot be read (the turn then runs nothing). */
   const ceilingFor = async (set) => {
     if (!ceilingOfSelf) return PLUS_CEILING;
-    const each = await Promise.all(set.map((id) => Promise.resolve().then(() => ceilingOfSelf(id)).catch(() => PLUS_CEILING)));
-    return Math.min(...each.map((c) => (PLUS_CEILINGS.includes(c) ? c : PLUS_CEILING)));
+    const each = await Promise.all(set.map((id) => Promise.resolve().then(() => ceilingOfSelf(id)).catch(() => null)));
+    if (!each.every((c) => PLUS_CEILINGS.includes(c))) return null;
+    return Math.min(...each);
   };
   let turnCeiling = PLUS_CEILING;
   const CUTS = new Map();
@@ -486,7 +493,10 @@ export function createPlusDoor({
     // nothing is read and nothing reaches a model before it
     if (!primary) return { askSelf: true };
     const asSelf = primary;
-    turnCeiling = await ceilingFor(set);
+    const ceilingRead = await ceilingFor(set);
+    // unreadable: the "+" cannot know what it may do now, so this turn runs nothing and says so (a later turn reads again)
+    if (ceilingRead === null) { turnCeiling = 0; return { error: t('circle.vandaag.plus_ceiling_unread') }; }
+    turnCeiling = ceilingRead;
     // 0: the "+" is off for this persona; nothing of it reaches a model
     if (turnCeiling <= 0) return { done: t('circle.vandaag.plus_ceiling_off') };
     const slash = text.startsWith('/') ? commands.parse(text) : null;

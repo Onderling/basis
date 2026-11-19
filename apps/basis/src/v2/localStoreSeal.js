@@ -26,6 +26,26 @@ let current = null;
  */
 export function setShellContentSeal(strategy) {
   current = (strategy && typeof strategy.seal === 'function' && typeof strategy.open === 'function') ? strategy : null;
+  if (current && waiting.length) {
+    const now = waiting.splice(0);
+    for (const fn of now) { try { fn(current); } catch { /* one listener never stops the others */ } }
+  }
+}
+
+/** Listeners waiting for the key (`onShellContentSeal`), each called once. */
+const waiting = [];
+
+/**
+ * Call `fn(strategy)` once the content key is published: at once when it already is, else when `setShellContentSeal`
+ * publishes it. For a reader that may run before the key (a screen's first frame): it reads again when the key arrives.
+ * @param {(strategy: object) => void} fn
+ * @returns {() => void} unsubscribe (a no-op once called)
+ */
+export function onShellContentSeal(fn) {
+  if (typeof fn !== 'function') return () => {};
+  if (current) { try { fn(current); } catch { /* the listener's own failure */ } return () => {}; }
+  waiting.push(fn);
+  return () => { const i = waiting.indexOf(fn); if (i >= 0) waiting.splice(i, 1); };
 }
 
 /** This device's content-seal strategy, or null before boot has reached it. */
@@ -151,4 +171,41 @@ export function sealedLocalVault(vault) {
       return typeof v === 'function' ? v.bind(target) : v;
     },
   });
+}
+
+/**
+ * A JSON value per key, SEALED at rest with this device's content key (ledger L1083) — the io the small stores of a
+ * person's content use (`load(key)`, `save(key, value)`, `remove(key)`). Keys stay legible.
+ *   • Before the key exists a write is REFUSED (it throws; the stores' saves swallow it) and a read answers `null`
+ *     ("nothing kept"): a sealed value is never handed on as if it were the value.
+ *   • A value that will not open with this key (another device's, or corrupt) reads `null` too, and is not overwritten.
+ *   • A PLAIN value from before sealing reads as itself and is rewritten sealed at that read, once, so content does not
+ *     sit in plain text until the person happens to change it. A read that finds a sealed value writes nothing.
+ * The value is never logged.
+ * @param {object} storage  `getItem` / `setItem` / `removeItem` (sync or async)
+ */
+export function sealedJsonIo(storage) {
+  return {
+    async load(key) {
+      let raw = null;
+      try { raw = await storage?.getItem?.(key); } catch { return null; }
+      if (raw == null || raw === '') return null;
+      const s = current;
+      if (!s) return null;
+      let plain;
+      try { plain = s.open(String(raw)); } catch { return null; }
+      let value = null;
+      try { value = JSON.parse(plain); } catch { return null; }
+      if (plain === raw) {   // it was plain: seal it now, once
+        try { await storage.setItem(key, s.seal(plain)); } catch { /* the next read tries again */ }
+      }
+      return value;
+    },
+    async save(key, value) {
+      const s = current;
+      if (!s) throw new Error('sealedJsonIo: refusing to write unsealed — no content key yet');
+      await storage.setItem(key, s.seal(JSON.stringify(value)));
+    },
+    async remove(key) { await storage?.removeItem?.(key); },
+  };
 }

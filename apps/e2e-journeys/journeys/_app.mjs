@@ -236,14 +236,22 @@ export async function bootAppCircle({ relayUrl, circleId, handles, pod = null, o
  * Boot people the way a shell composes a device (the device log on, the lane receivers a shell registers), on one
  * relay. `bootAppCircle` builds its circle on these; a script that makes several circles out of the same people
  * (`seed-alpha-size.mjs`) starts here too.
- * @param {{relayUrl: string, handles: string[], pod?: object|null, circleId?: string}} a
+ * @param {{relayUrl: string, handles: string[], pod?: object|null, circleId?: string, onUndelivered?: (handle: string, info: object) => void}} a
  */
-export async function bootPeople({ relayUrl, handles, pod = null, circleId = null }) {
+export async function bootPeople({ relayUrl, handles, pod = null, circleId = null, onUndelivered = null }) {
   const people = await Promise.all(
-    handles.map((h) => bootRealAgentNode(h, {
-      itemsLane: true,                                              // composes the DEVICE LOG
-      ...(pod ? { agentOpts: { provisionCircleMedium: mediumFor(h, pod, circleId) } } : {}),
-    })),
+    handles.map((h) => {
+      // a shell hands its give-up consumers to the secure agent (`makeGiveUpConsumers`); a script that counts what the
+      // relay gave up on hears it here, per sender
+      const agentOpts = {
+        ...(pod ? { provisionCircleMedium: mediumFor(h, pod, circleId) } : {}),
+        ...(typeof onUndelivered === 'function' ? { secureAgentOpts: { onUndelivered: (info) => onUndelivered(h, info) } } : {}),
+      };
+      return bootRealAgentNode(h, {
+        itemsLane: true,                                              // composes the DEVICE LOG
+        ...(Object.keys(agentOpts).length ? { agentOpts } : {}),
+      });
+    }),
   );
   await connectNodesOverRelay(people, { relayUrl });
   for (const n of people) wireLanes(n);

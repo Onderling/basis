@@ -183,7 +183,7 @@ export function toolChoiceGateRule(keeper) {
   const command = (text, ctx) => {
     const m = /^\s*(?:\/?kies\s+)?(\d{1,2})(?:\s+(\d{1,2}))?\s*\.?\s*$/iu.exec(String(text ?? ''));
     if (!m) return null;
-    const thread = ctx?.id ?? ctx?.threadId ?? null;
+    const thread = choiceThreadOf(ctx);
     if (!thread || !keeper?.take?.(thread, m[1])) return null;
     return { opId: 'pickThing', appOrigin: 'tools', args: { spec: m[2] ? `${m[1]} ${m[2]}` : m[1] } };
   };
@@ -246,6 +246,16 @@ export function toolboxWelcomeLine(words, t, lang = 'nl') {
 /** The device-log kind of a toolbox call's record (packages/item-store entryKinds: kept like the own record, local). */
 /** How long a thread's last list of things can still be answered with a tap (the box's memory; gone on a restart). */
 export const CHOICE_KEEP = param({ key: 'tools.choiceKeepMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 * 60_000 });
+
+/**
+ * The key a thread's kept list of things lives under: ONE rule for the gate rule (which gets the engine's `ctx.id`) and
+ * the ops (which get the door's `ctx.threadId`, else the person), so a typed '2' and a button find the same list.
+ * @param {{threadId?: string, id?: string, caller?: string}|null} ctx
+ * @returns {string|null}
+ */
+export function choiceThreadOf(ctx) {
+  return ctx?.threadId ?? ctx?.id ?? ctx?.caller ?? null;
+}
 
 /**
  * The last list of things shown in each thread, so a button can carry only its number (Telegram caps a button's data
@@ -334,7 +344,7 @@ function thingItem(x, n, tag, t) {
 export function makeMoreThings({ keeper, t }) {
   return async (args, ctx) => {
     const [tag, gi, from] = String(args?.spec ?? args?._match ?? '').trim().split(/\s+/);
-    const thread = ctx?.threadId ?? ctx?.caller ?? null;
+    const thread = choiceThreadOf(ctx);
     const kept = keeper?.list?.(thread, tag);
     const gone = { ok: false, error: { code: 'list-gone', message: t('circle.bot.toolbox_more_gone') } };
     if (!kept) return gone;
@@ -373,15 +383,18 @@ export function listForThing(thing, lists, shopping) {
 export function makePickThing({ keeper, callSkill, shoppingList = () => null }) {
   return async (args, ctx, t) => {
     const [n, m] = String(args?.spec ?? args?._match ?? '').trim().split(/\s+/);
-    const thing = keeper?.take?.(ctx?.threadId ?? ctx?.caller, n) ?? null;
+    const thing = keeper?.take?.(choiceThreadOf(ctx), n) ?? null;
     if (!thing) return { ok: false, error: { code: 'choice-gone', message: t('circle.bot.toolbox_pick_gone') } };
     const read = await callSkill('lists', 'listLists', {}, ctx);
     const lists = (read?.ok && Array.isArray(read.items) ? read.items : []).filter((l) => l?.type === 'list' && l.label);
-    const chosen = m !== undefined ? (lists[Number(m) - 1]?.label ?? null) : listForThing(thing, lists, shoppingList());
+    // the list a button names by its id (a list added in between never moves the thing elsewhere); a typed number is the
+    // place the person sees
+    const named = m !== undefined ? (lists.find((l) => l.id !== undefined && String(l.id) === m) ?? (/^\d+$/.test(m) ? lists[Number(m) - 1] : null)) : null;
+    const chosen = m !== undefined ? (named?.label ?? null) : listForThing(thing, lists, shoppingList());
     if (!chosen) {
       if (!lists.length) return { ok: false, error: { code: 'no-list', message: t('circle.bot.toolbox_pick_no_list') } };
       return { ok: true, message: t('circle.bot.toolbox_pick_which_list', { label: thing.label }),
-        quickReplies: lists.map((l, i) => ({ label: String(l.label).slice(0, 60), slash: `/kies ${n} ${i + 1}` })) };
+        quickReplies: lists.map((l, i) => ({ label: String(l.label).slice(0, 60), slash: `/kies ${n} ${l.id ?? i + 1}` })) };
     }
     const ref = thing.ref && typeof thing.ref.type === 'string' && typeof thing.ref.ref === 'string' ? { type: thing.ref.type, ref: thing.ref.ref } : undefined;
     // the person's own act at the bot (their tap, or the number they typed): it names its door, so the circle's switches apply

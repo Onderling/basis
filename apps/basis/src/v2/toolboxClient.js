@@ -27,6 +27,15 @@ export const THUMB_MAX_BYTES = param({ key: 'tools.thumbMaxBytes', scope: PARAM_
 export const THUMB_MAX_COUNT = param({ key: 'tools.thumbMaxCount', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 });
 /** …each fetched within this time, or left out. */
 export const THUMB_TIMEOUT = param({ key: 'tools.thumbTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3_000 });
+/** At most this many things from one answer (the rest is not read: an outside toolbox can answer thousands). */
+export const TOOL_ROWS_MAX = param({ key: 'tools.rowsMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 24 });
+/** The longest name, detail and seller a thing may carry (cut with an ellipsis): an outside toolbox's text, capped. */
+export const TOOL_TEXT_MAX = Object.freeze({
+  label: param({ key: 'tools.labelMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 120 }),
+  detail: param({ key: 'tools.detailMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 160 }),
+  seller: param({ key: 'tools.sellerMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60 }),
+});
+const cut = (text, max) => (text.length > max ? `${text.slice(0, Math.max(0, max - 1))}…` : text);
 
 const CARD_PATH = '/.well-known/agent-card.json';
 const trimSlash = (s) => String(s ?? '').replace(/\/+$/, '');
@@ -108,17 +117,18 @@ export function readItemList(output, { source = null } = {}) {
   const refuse = { ok: false, code: 'not-an-item-list' };
   if (!output || typeof output !== 'object' || output['@type'] !== 'ItemList' || !Array.isArray(output.itemListElement)) return refuse;
   const items = [];
-  for (const el of output.itemListElement) {
+  // capped at the wire: an outside toolbox's rows and texts never ride on uncut (the relay, the keeper, a message)
+  for (const el of output.itemListElement.slice(0, TOOL_ROWS_MAX)) {
     const thing = el?.item;
     const type = thing?.['@type']; const id = thing?.identifier; const name = thing?.name;
     if (typeof type !== 'string' || !type || typeof id !== 'string' || !id || typeof name !== 'string' || !name) return refuse;
     const offer = Array.isArray(thing.offers) ? thing.offers[0] : thing.offers;
     items.push({
-      label: name,
-      detail: typeof thing.description === 'string' && thing.description ? thing.description : null,
+      label: cut(name, TOOL_TEXT_MAX.label),
+      detail: typeof thing.description === 'string' && thing.description ? cut(thing.description, TOOL_TEXT_MAX.detail) : null,
       image: typeof thing.image === 'string' && /^https?:\/\//.test(thing.image) ? thing.image : null,
       price: typeof offer?.price === 'string' || typeof offer?.price === 'number' ? String(offer.price) : null,
-      seller: typeof offer?.seller?.name === 'string' ? offer.seller.name : null,
+      seller: typeof offer?.seller?.name === 'string' ? cut(offer.seller.name, TOOL_TEXT_MAX.seller) : null,
       ref: { type, ref: id, ...(source ? { source } : {}) },
     });
   }

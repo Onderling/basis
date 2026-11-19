@@ -110,11 +110,13 @@ describe('a toolbox\'s things as buttons, on the booted box', () => {
     const withButtons = found.find((m) => buttonsOf(m).length);
     expect(withButtons, `no buttons: ${JSON.stringify(found)}`).toBeTruthy();
     expect(withButtons.text).toContain('Halfvolle melk 1 L');
-    expect(buttonsOf(withButtons)).toEqual(['pickThing:1', 'pickThing:2']);
+    // a button names its list and its number (`pickThing:<tag>.<n>`)
+    const [first, second] = buttonsOf(withButtons);
+    expect([first, second].map((d) => d.replace(/:[a-z0-9]+\./, ':'))).toEqual(['pickThing:1', 'pickThing:2']);
 
-    const added = await tap('pickThing:1');
+    const added = await tap(first);
     expect(added.map((m) => m.text)).toEqual(['Op Boodschappen: Halfvolle melk 1 L.']);
-    const raised = await tap('pickThing:1');
+    const raised = await tap(first);
     expect(raised.map((m) => m.text).join('\n')).toMatch(/2/);
 
     // the words, at every door (Fable's ruling on L1035): the list is numbered, and '2' or 'kies 2' picks the second
@@ -129,6 +131,10 @@ describe('a toolbox\'s things as buttons, on the booted box', () => {
     expect(typed.map((m) => m.text)).toEqual(['Op Boodschappen: Jumbo halfvolle melk 1 L.']);
     const kies = await ask('kies 2');
     expect(kies.map((m) => m.text).join('\n')).toMatch(/Jumbo halfvolle melk 1 L[\s\S]*2|2[\s\S]*Jumbo halfvolle melk 1 L/);
+    // a newer list replaces the kept one: a button of the OLDER message picks nothing (never a thing of the newer list)
+    await ask('zoek kaas');
+    const stale = await tap(second);
+    expect(stale.map((m) => m.text)).toEqual(["Die lijst ken ik niet meer. Zoek opnieuw en tik er een aan."]);
     // nothing the toolbox should not see, and the key in no message
     expect(JSON.stringify(api.calls)).not.toContain(KEY);
   }, 180_000);

@@ -230,12 +230,26 @@ export const CHOICE_KEEP = param({ key: 'tools.choiceKeepMs', scope: PARAM_SCOPE
  */
 export function makeChoiceKeeper({ now = () => Date.now(), keepMs = CHOICE_KEEP } = {}) {
   const kept = new Map();
+  let seq = 0;
   return {
-    keep(threadId, items) { if (threadId) kept.set(String(threadId), { at: now(), items: Array.isArray(items) ? items.slice() : [] }); },
-    /** Thing `n` (1-based) of the thread's last list, or null when there is none, it is old, or `n` was not shown. */
-    take(threadId, n) {
+    /**
+     * Keep a thread's list; returns its short tag, which its buttons carry (`<tag>.<n>`), so a button of an OLDER message
+     * never picks from the list kept after it.
+     */
+    keep(threadId, items) {
+      const tag = `${(now() % 46656).toString(36)}${(seq++ % 36).toString(36)}`;
+      if (threadId) kept.set(String(threadId), { at: now(), tag, items: Array.isArray(items) ? items.slice() : [] });
+      return tag;
+    },
+    /**
+     * Thing `n` (1-based) of the thread's last list, or null when there is none, it is old, or `n` was not shown. A
+     * tagged pick (`<tag>.<n>`, a button) must name the kept list; a bare number (typed) means the last list.
+     */
+    take(threadId, pick) {
       const k = kept.get(String(threadId ?? ''));
       if (!k || now() - k.at > keepMs) return null;
+      const [tag, n] = String(pick ?? '').includes('.') ? String(pick).split('.') : [null, pick];
+      if (tag !== null && tag !== k.tag) return null;
       const i = Number(n);
       return Number.isInteger(i) && i >= 1 && i <= k.items.length ? k.items[i - 1] : null;
     },
@@ -260,13 +274,14 @@ const thingRow = (x, t) => {
 export function toolChoicesReply(r, { threadId, keeper, t }) {
   const items = r?.ok && Array.isArray(r.items) ? r.items : null;
   if (!items || !items.length) return r;
-  keeper?.keep?.(threadId, items);
+  const tag = keeper?.keep?.(threadId, items) ?? null;
   // a row of type `tool-thing`, numbered: the manifest's row button (`tools.pickThing`) is painted on it by the shared
   // renderer, as on every surface that paints an answer's items
   return {
     ...r,
     title: r.title ?? r.name,
-    items: items.map((x, i) => ({ id: String(i + 1), type: 'tool-thing', label: thingRow(x, t) })),
+    // the row's id is its button's data: the kept list's tag and the number (`pickThing:<tag>.<n>`)
+    items: items.map((x, i) => ({ id: tag ? `${tag}.${i + 1}` : String(i + 1), type: 'tool-thing', label: thingRow(x, t) })),
   };
 }
 

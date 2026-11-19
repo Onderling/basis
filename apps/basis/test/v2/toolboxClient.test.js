@@ -7,7 +7,7 @@
  * The list answer follows the agreed shape (schema.org ItemList of Things; the brief's section 4 as ruled).
  */
 import { describe, it, expect } from 'vitest';
-import { readToolboxCard, callTool, readItemList, priceCents } from '../../src/v2/toolboxClient.js';
+import { readToolboxCard, callTool, readItemList, priceCents, TOOL_ROWS_MAX, TOOL_TEXT_MAX } from '../../src/v2/toolboxClient.js';
 
 const BASE = 'http://boodschappen:3000';
 const CARD = {
@@ -82,6 +82,18 @@ describe('a call', () => {
 });
 
 describe('a list of things', () => {
+  it('caps what an outside toolbox may hand on at the wire: the rows, and the length of a name, a detail and a seller', () => {
+    const el = (i, name = `ding ${i}`, extra = {}) => ({ '@type': 'ListItem', item: { '@type': 'Product', identifier: `x:${i}`, name, ...extra } });
+    const many = { '@type': 'ItemList', itemListElement: Array.from({ length: 5000 }, (_, i) => el(i)) };
+    expect(readItemList(many).items).toHaveLength(TOOL_ROWS_MAX);
+    const long = 'a'.repeat(50_000);
+    const one = readItemList({ '@type': 'ItemList', itemListElement: [el(1, long, { description: long, offers: { price: '1', seller: { name: long } } })] }).items[0];
+    expect(one.label.length).toBeLessThanOrEqual(TOOL_TEXT_MAX.label);
+    expect(one.detail.length).toBeLessThanOrEqual(TOOL_TEXT_MAX.detail);
+    expect(one.seller.length).toBeLessThanOrEqual(TOOL_TEXT_MAX.seller);
+    expect(one.label.endsWith('…')).toBe(true);
+  });
+
   it('reads label, detail, picture, price and the reference as given; the source rides beside it', () => {
     const r = readItemList(ITEM_LIST, { source: 'boodschappen' });
     expect(r.ok).toBe(true);

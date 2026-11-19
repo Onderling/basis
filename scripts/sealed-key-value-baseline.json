@@ -99,6 +99,10 @@
     "count": 2,
     "note": "not content: cc.relayUrl — the device's chosen relay"
   },
+  "apps/basis/src/v2/screenClient.js": {
+    "count": 1,
+    "note": "not sealable: onderling.screen.<toolbox>.* — a screen's own storage; a screen has no content key at all (its own key sits in the same storage), so it is a bearer device by design, as the client notes tell toolbox builders"
+  },
   "apps/basis/src/v2/screenView.js": {
     "count": 2,
     "note": "debt: onderling.screen.<bot> — a screen's GRANT, including its capability tokens to act as the person at the bot (a credential)"

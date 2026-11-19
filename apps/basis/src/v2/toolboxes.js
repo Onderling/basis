@@ -304,7 +304,8 @@ export function makePickThing({ keeper, callSkill, shoppingList = () => null }) 
         quickReplies: lists.map((l, i) => ({ label: String(l.label).slice(0, 60), slash: `/kies ${n} ${i + 1}` })) };
     }
     const ref = thing.ref && typeof thing.ref.type === 'string' && typeof thing.ref.ref === 'string' ? { type: thing.ref.type, ref: thing.ref.ref } : undefined;
-    const r = await callSkill('lists', 'addToList', { list: chosen, text: thing.label, ...(ref ? { ref } : {}), quantity: 1 }, ctx);
+    // the person's own act at the bot (their tap, or the number they typed): it names its door, so the circle's switches apply
+    const r = await callSkill('lists', 'addToList', { list: chosen, text: thing.label, ...(ref ? { ref } : {}), quantity: 1 }, { ...ctx, door: 'bot' });
     if (!r?.ok) return { ok: false, error: { code: r?.code ?? 'refused', message: typeof r?.error === 'string' ? r.error : (r?.error?.message ?? t('circle.bot.toolbox_pick_failed')) } };
     if (r.duplicate) return { ok: true, message: t('circle.lists.quantity_raised', { item: thing.label, list: chosen, quantity: r.quantity }) };
     return { ok: true, message: t('circle.bot.toolbox_pick_added', { list: chosen, label: thing.label }) };

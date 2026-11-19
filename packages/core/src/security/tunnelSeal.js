@@ -29,6 +29,7 @@
  *   { type: 'tunnel-result', status: 'completed', parts: [...] }
  */
 import nacl                                         from 'tweetnacl';
+import { secretboxSeal, secretboxOpen } from '../crypto/secretbox.js';   // secretbox behind the port a shell may speed up (L619)
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
 import { parseUntrustedJson } from './untrustedJson.js';
 
@@ -62,7 +63,7 @@ export function sealTunnelOW({ key, innerOW } = {}) {
 
   const nonce      = nacl.randomBytes(nacl.secretbox.nonceLength);
   const plaintext  = new TextEncoder().encode(JSON.stringify(innerOW));
-  const ciphertext = nacl.secretbox(plaintext, nonce, keyBytes);
+  const ciphertext = secretboxSeal(plaintext, nonce, keyBytes);
 
   return { sealed: b64encode(ciphertext), nonce: b64encode(nonce) };
 }
@@ -92,7 +93,7 @@ export function openTunnelOW({ key, sealed, nonce } = {}) {
   if (keyBytes.length   !== nacl.secretbox.keyLength)   return null;
   if (nonceBytes.length !== nacl.secretbox.nonceLength) return null;
 
-  const plaintext = nacl.secretbox.open(cipherBytes, nonceBytes, keyBytes);
+  const plaintext = secretboxOpen(cipherBytes, nonceBytes, keyBytes);
   if (!plaintext) return null;
 
   try {

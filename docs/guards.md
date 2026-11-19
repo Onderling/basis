@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 84
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 85
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -59,6 +59,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `no-relay-literal` | — | the public relay's domain appears nowhere in the tree |
 | `no-relay-word` | — | THE WORD "RELAY" IS NOT SHOWN TO A PERSON |
 | `one-scan-loop` | — | a scanned text is classified by ONE first-match loop (`packages/qr`, `classifyQrPayload`) |
+| `one-secretbox` | — | every secretbox (XSalsa20-Poly1305) seal and open this code makes goes through ONE port |
 | `one-sibling-carry` | — | a person's own devices are reached by ONE carry (`apps/basis/src/v2/siblingCarry.js`) |
 | `one-signature-check` | — | every Ed25519 signature check in shipped code goes through ONE function, |
 | `one-signing` | — | every Ed25519 signature this code MAKES, and every key pair it derives from a seed, goes through |

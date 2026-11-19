@@ -20,6 +20,7 @@
  * Ed25519 identities.
  */
 import nacl       from 'tweetnacl';
+import { secretboxSeal, secretboxOpen } from '../crypto/secretbox.js';   // secretbox behind the port a shell may speed up (L619)
 import ed2curve   from 'ed2curve';
 // `node:crypto` is shimmed on React Native — use the pure-JS HKDF
 // from `@noble/hashes` (already a core dep). Output is byte-identical
@@ -439,7 +440,7 @@ export class AgentIdentity {
    * @returns {Uint8Array}
    */
   static secretbox(plaintext, nonce, sessionKey) {
-    return nacl.secretbox(plaintext, nonce, sessionKey);
+    return secretboxSeal(plaintext, nonce, sessionKey);
   }
 
   /**
@@ -447,7 +448,7 @@ export class AgentIdentity {
    * @returns {Uint8Array|null} null if authentication fails
    */
   static secretunbox(ciphertext, nonce, sessionKey) {
-    return nacl.secretbox.open(ciphertext, nonce, sessionKey);
+    return secretboxOpen(ciphertext, nonce, sessionKey);
   }
 }
 

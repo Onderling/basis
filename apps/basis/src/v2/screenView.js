@@ -143,7 +143,7 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
      * to pick. `granted()` resolves when the bot's grant arrives.
      * @returns {Promise<{code: string, offer?: string}>}
      */
-    async connect({ label = null } = {}) {
+    async connect({ label = null, toolbox = null } = {}) {
       if (!parsed.ok || parsed.resumeOnly) throw new Error(`screenView: not a screen link (${parsed.reason ?? 'a kept grant resumes, it does not pair'})`);
       if (parsed.pasteMode || parsed.launchMode) parsed.nonce = randomNonce();
       sa = await makeAgent();
@@ -171,7 +171,8 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
         await sendToBot({ subtype: SCREEN_OFFER_SUBTYPE, launch: { initData: parsed.initData, k: viewPubKey, n: parsed.nonce } });
         return { code: null, launched: true };
       }
-      const offer = encodePairingOffer({ viewPubKey, relayUrl: parsed.relayUrl, nonce: parsed.nonce, label });
+      // a toolbox's page names its toolbox: the bot pairs it for that toolbox only (L1049)
+      const offer = encodePairingOffer({ viewPubKey, relayUrl: parsed.relayUrl, nonce: parsed.nonce, label, ...(toolbox ? { toolbox } : {}) });
       const code = await screenCode(viewPubKey, parsed.nonce);
       if (parsed.pasteMode) return { code, offer };   // nothing sent: the person carries the offer to their own chat
       await sendToBot({ subtype: SCREEN_OFFER_SUBTYPE, offer });

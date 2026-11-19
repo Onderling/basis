@@ -67,7 +67,8 @@ describe('a call', () => {
   it('a tool\'s own error (HTTP 200) is its code, passed on', async () => {
     const r = await callTool({ endpoint: `${BASE}/a2a`, key: 'k', tool: 'products.search', input: { query: '' },
       fetch: replay(answer({ operation: 'products.search', error: { code: 'invalid_input', params: { issues: ['query: Too small'] } } })).fetch });
-    expect(r).toEqual({ ok: false, code: 'tool-error', toolCode: 'invalid_input' });
+    // the tool's code, and its code AND params as the toolbox gave them (a toolbox's page words them)
+    expect(r).toMatchObject({ ok: false, code: 'tool-error', toolCode: 'invalid_input', toolError: { code: 'invalid_input', params: { issues: ['query: Too small'] } } });
   });
   it('the endpoint\'s own errors, a timeout and a broken answer each end in one code', async () => {
     const at = { endpoint: `${BASE}/a2a`, key: 'k', tool: 'products.choices', input: {} };

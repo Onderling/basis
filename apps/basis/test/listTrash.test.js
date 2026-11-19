@@ -98,6 +98,12 @@ describe('the trash', () => {
     expect((await ops.restoreEntry({ item: 'Feest' }, as('ann', 'admin'))).code).toBe('not-found');
   });
 
+  it('removing (or previewing the removal of) a list that does not exist answers the fixed code not-found (L1035, for a toolbox\'s page)', async () => {
+    const { ops } = world();
+    expect(await ops.removeList({ list: 'Bestaat niet' }, as('ann'))).toMatchObject({ ok: false, code: 'not-found' });
+    expect(await ops.removeList({ list: 'Bestaat niet', preview: true }, as('ann'))).toMatchObject({ ok: false, code: 'not-found' });
+  });
+
   it('an entry whose list is gone does not come back on its own', async () => {
     const { ops } = world();
     await ops.createList({ text: 'Feest' });

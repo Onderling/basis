@@ -48,6 +48,14 @@ export const toolsManifest = Object.freeze({
       },
     },
     {
+      // "Meer van <winkel>" (ledger L1035): the rest of one shop's things from the thread's KEPT list, each with its own
+      // number. Reached by the button under a shop's cards (its line '/meer <tag> <shop> <from>'), never a model's pick
+      // (no chat surface); a read of what was already fetched, so nothing leaves the box.
+      id: 'moreThings', visibility: 'authenticated', verb: 'list',
+      params: [{ name: 'spec', kind: 'string', required: false }],
+      surfaces: { slash: { command: '/meer', body: 'argline' } },
+    },
+    {
       id: 'listTools', visibility: 'authenticated', verb: 'list',
       // a member sees what is on; the admin's `/toolbox` lists every placed one with its on/off (`all`)
       params: [{ name: 'all', kind: 'boolean', required: false }],

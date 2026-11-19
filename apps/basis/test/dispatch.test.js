@@ -80,6 +80,12 @@ describe('runDispatch — error path', () => {
     expect(reply.error).toEqual({ code: 'unauthorised', message: 'not authorised' });
   });
 
+  it('a refusal whose error is an object with words ({code, message}) is an error bubble too, never painted as the op\'s shape (an empty list)', async () => {
+    const reply = await runDispatch({ ...readyDispatch, replyShape: 'list' }, async () => ({ ok: false, error: { code: 'list-gone', message: 'Die lijst is weg.' } }));
+    expect(reply.error).toMatchObject({ code: 'skill-error', message: 'Die lijst is weg.', reason: 'list-gone' });
+    expect(reply.shape).toBe('text');
+  });
+
   it('handles non-Error thrown values gracefully', async () => {
     const reply = await runDispatch(readyDispatch, async () => {
       throw 'string error';   // eslint-disable-line no-throw-literal

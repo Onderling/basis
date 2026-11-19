@@ -13,6 +13,12 @@
       "spec": "welk ding, en welke lijst"
     }
   },
+  "moreThings": {
+    "what": "Meer van één winkel tonen uit de lijst die net kwam: de knop onder de kaarten.",
+    "params": {
+      "spec": "welke lijst, welke winkel, vanaf waar"
+    }
+  },
   "listTools": {
     "what": "Laat zien welke toolboxen aan staan, en met welk woord je ze gebruikt.",
     "params": {

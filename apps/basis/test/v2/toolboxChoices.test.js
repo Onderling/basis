@@ -31,7 +31,7 @@ describe('the reply: a line and a button per thing', () => {
     expect(painted.title).toBe('Boodschappen');
     expect(painted.items[0].label).toContain('Halfvolle melk 1 L');
     expect(painted.items[0].label).toContain('€ 1,19');
-    expect(painted.items.map((i) => i.buttons.map((b) => b.callbackData))).toEqual([['pickThing:1'], ['pickThing:2'], ['pickThing:3']]);
+    expect(painted.items.map((i) => i.buttons.map((b) => b.callbackData.replace(/:[a-z0-9]+\./, ':')))).toEqual([['pickThing:1'], ['pickThing:2'], ['pickThing:3']]);
     expect(painted.items[0].buttons[0].label).toBe('circle.bot.toolbox_pick_button');
     for (const i of painted.items) for (const b of i.buttons) expect(Buffer.byteLength(b.callbackData)).toBeLessThanOrEqual(64);
     // what goes on the list is the thing's own name, not the row's detail
@@ -96,6 +96,26 @@ function door({ lists = [{ id: 'L1', label: 'Boodschappen', type: 'list' }, { id
   const pick = (n, threadId = 'telegram:1', caller = 'telegram:1') => op({ spec: String(n) }, { caller, threadId, door: 'slash' }, t);
   return { keeper, calls, pick };
 }
+
+describe('a button names its own list: an older message\'s button never picks from a newer list', () => {
+  it('melk, then kaas, then a tap on the OLDER melk message: choice gone, nothing on a list; the newer button works', async () => {
+    const keeper = makeChoiceKeeper();
+    const melk = toolChoicesReply({ ok: true, items: [ITEMS[0], ITEMS[1]] }, { threadId: 'telegram:1', keeper, t });
+    const kaas = toolChoicesReply({ ok: true, items: [{ label: 'Goudse kaas', seller: 'Jumbo' }] }, { threadId: 'telegram:1', keeper, t });
+    const idOf = (r) => r.items[0].id;
+    expect(idOf(melk)).not.toBe(idOf(kaas));
+    expect(idOf(kaas)).toMatch(/^[a-z0-9]+\.1$/);
+    expect(keeper.take('telegram:1', idOf(melk))).toBeNull();
+    expect(keeper.take('telegram:1', idOf(kaas))?.label).toBe('Goudse kaas');
+    // a typed number keeps meaning the last list
+    expect(keeper.take('telegram:1', '1')?.label).toBe('Goudse kaas');
+  });
+  it('the button data carries the tag and stays under Telegram\'s 64 bytes', () => {
+    const r = toolChoicesReply({ ok: true, title: 'B', items: ITEMS }, { threadId: 'x', keeper: makeChoiceKeeper(), t });
+    const painted = renderReply({ shape: 'list', payload: r }, { t, appOrigin: 'tools', manifestsByOrigin: { tools: toolsManifest } });
+    for (const i of painted.items) for (const b of i.buttons) { expect(b.callbackData).toMatch(/^pickThing:[a-z0-9]+\.\d+$/); expect(Buffer.byteLength(b.callbackData)).toBeLessThanOrEqual(64); }
+  });
+});
 
 describe('the words: "2" or "kies 2" picks from the last list in this thread', () => {
   const kept = () => { const k = makeChoiceKeeper(); k.keep('tg:9', [{ label: 'melk' }, { label: 'brood' }]); return k; };

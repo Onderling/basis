@@ -46,7 +46,7 @@ export const listsManifest = {
       // offered in a circle and in the person's own "+" (their own lists): where, declared once (app-manifest scopes)
       scopes: ['circle', 'own'],
       verb:      'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'list' },
       requires:  ['lists'],
       // Two people naming a list at the same moment write the same field; last-writer-by-content is the
@@ -69,7 +69,7 @@ export const listsManifest = {
       id:        'addToList', visibility: 'authenticated',
       scopes: ['circle', 'own'],
       verb:      'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'list-item' },
       requires:  ['lists'],
       // The entry's own text merges by content. The CONTAINMENT edge it also writes is not a mergeable
@@ -128,7 +128,7 @@ export const listsManifest = {
       id:        'markListItemDone', visibility: 'authenticated',
       scopes: ['circle', 'own'],
       verb:      'complete',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'list-item' },
       requires:  ['lists'],
       // Ticking off is a CLAIM in the same sense a task claim is: the first person to do it is the one
@@ -151,7 +151,7 @@ export const listsManifest = {
       // and task stay two types (their verbs differ); this is the one verb between them.
       id:        'makeChore', visibility: 'authenticated', group: 'compose',
       verb:      'update',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'list-item' },
       requires:  ['lists'],
       // the type is the line's content as anything else is: the later write wins (a chore stays one)
@@ -172,7 +172,7 @@ export const listsManifest = {
       // about it, in a person's words ("60", "ook avond", "7:30"; "gewoon" drops it) — whoever may edit the entry.
       id:        'entryReminders', visibility: 'authenticated', group: 'compose',
       verb:      'update',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'list-item' },
       requires:  ['lists'],
       resolves:  [{ field: 'reminders', policy: 'content' }],
@@ -233,7 +233,7 @@ export const listsManifest = {
       id:        'removeFromList', visibility: 'authenticated', group: 'compose',
       scopes: ['circle', 'own'],
       verb:      'remove',
-      writes:    { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'list-item' },
       requires:  ['lists'],
       params: [
@@ -252,7 +252,7 @@ export const listsManifest = {
       id:        'removeList', visibility: 'authenticated', group: 'compose',
       scopes: ['circle', 'own'],
       verb:      'remove',
-      writes:    { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       requires:  ['lists'],
       params: [
         { name: 'list', kind: 'string', required: true, schema: { minLength: 1 }, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
@@ -272,7 +272,7 @@ export const listsManifest = {
       id:        'restoreList', visibility: 'authenticated', group: 'compose',
       scopes: ['circle', 'own'],
       verb:      'unarchive',
-      writes:    { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       requires:  ['lists'],
       params: [
         { name: 'list', kind: 'string', required: false },
@@ -288,7 +288,7 @@ export const listsManifest = {
       id:        'restoreEntry', visibility: 'authenticated', group: 'compose',
       scopes: ['circle', 'own'],
       verb:      'unarchive',
-      writes:    { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       requires:  ['lists'],
       params: [
         { name: 'item', kind: 'string', required: false },
@@ -302,7 +302,7 @@ export const listsManifest = {
       id:        'editEntry', visibility: 'authenticated', group: 'compose',
       scopes: ['circle', 'own'],
       verb:      'edit',
-      writes:    { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'list-item' },
       requires:  ['lists'],
       // Two people fixing the same entry write the same field; the text merges by content.

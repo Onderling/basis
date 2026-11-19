@@ -41,6 +41,10 @@ describe('opWeight: the table of the design, section 2', () => {
     expect(w('device', 'keys')).toBe(6);
     expect(w('circle', 'keys')).toBe(6);
     expect(opWeight(m, { id: 'buildEnrollOffer', verb: 'get', reveals: 'keys' })).toBe(6);
+    // a WRITE that hands back a credential (an invite token, a pairing offer) is 6 too, whatever it writes
+    expect(w('circle', 'control', { reveals: 'keys' })).toBe(6);
+    expect(w('person', 'content', { reveals: 'keys' })).toBe(6);
+    expect(w('circle', 'content', { reveals: 'none' })).toBe(3);
   });
 
   it('no level for a writing op without `what`, an unknown word, or an unclassified verb', () => {

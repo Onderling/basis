@@ -122,7 +122,7 @@ describe('lint-manifest-scopes: what an op writes, and what a device read hands 
   it('the baseline holds what is owed today: it may only shrink', () => {
     const owed = [{ app: 'x', opId: 'a', kind: 'what' }, { app: 'x', opId: 'b', kind: 'reveals' }, { app: 'x', opId: 'c', kind: 'bad' }];
     const baseline = { what: ['x.a', 'x.gone'], reveals: [] };
-    const red = judgeWhat({ owed, baseline, declared: new Set(['x.a', 'x.b', 'x.c']) });
+    const red = judgeWhat({ owed, baseline });
     // owed and baselined: quiet; owed and not baselined: red; a bad word: red; a baseline entry no longer owed: red
     expect(red.map((r) => r.split(':')[0]).sort()).toEqual(['baseline x.gone', 'x.b', 'x.c']);
     expect(shrunkWhatBaseline({ owed, baseline })).toEqual({ what: ['x.a'], reveals: [] });

@@ -12,18 +12,33 @@
 // dispatch-boundary composition — no transport, no UI (the shell renders `onReceipt`).
 import { gateEgress } from '@onderling/agent-registry';
 
-// Router-detection (§10a): "external-egress = the op resolves to a NON-LOCAL target". The PLATFORM decides this
-// (not the app's self-declaration, not the user) — because a bot can't be trusted to declare its own egress.
-// Today EVERY app-origin routes to a local handler / the user's own pod / an in-process agent, so none egress
-// to a third party. `isExternalEgressOp` therefore returns false for all known-local origins (the gate stays
-// inert) and — fail-SAFE — treats an UNKNOWN origin as external (an unrecognised target is gated, not trusted).
-// When a real external route lands (an MCP tool, a remote A2A agent), its origin is simply not in this set and
-// the gate activates for it. NOTE: per §10a the live callSkill is NOT wrapped until such an op exists — this
-// classifier + wrapCallSkillWithEgressGate compose the ready-to-install seam.
-export const LOCAL_APP_ORIGINS = Object.freeze(new Set(['household', 'tasks', 'pinboard', 'folio', 'calendar', 'agents']));
+// Which apps reach OUTSIDE: the ones whose manifest declares the reserved host `'@placed'` (the hosts a box's operator
+// places as toolboxes; none is fixed in the code). Derived from the manifests, never a hand list: the gate's list and the
+// manifests agree by construction (a hand list of LOCAL origins used to stand here and had gone stale: lists, assistant
+// and params were missing from it, so wrapping the waist would have gated them). Ledger L1035.
+import { allManifests } from '../../v2/manifestSources.js';
 
-export function isExternalEgressOp(appOrigin /*, opId */) {
-  return typeof appOrigin === 'string' && appOrigin.length > 0 && !LOCAL_APP_ORIGINS.has(appOrigin);
+/** The reserved host word: "the hosts a box's operator places" (docs/conventions/manifest-standard.md). */
+export const PLACED_HOSTS = '@placed';
+
+/** The app origins whose manifest declares `'@placed'`. */
+export function externalOrigins(manifests = allManifests()) {
+  return new Set((Array.isArray(manifests) ? manifests : []).filter((m) => Array.isArray(m?.hosts) && m.hosts.includes(PLACED_HOSTS)).map((m) => m.app));
+}
+
+/**
+ * Does a call to this origin reach outside? Its manifest declares `'@placed'`, OR no manifest declares the origin at all
+ * (an unrecognised target). Every known app that declares no placed host is local.
+ *
+ * What the gate then DOES with an unknown origin, said plainly: when the composition declares
+ * `gateInputs` for it, the disclosure path below gates it; when nothing declares its inputs, the call passes on to the
+ * waist unchanged, and the waist itself refuses an origin it does not know (`realAgent` `callSkill` throws
+ * `unknown appOrigin`). So an unknown origin is never SENT anywhere by this gate; the refusal is the waist's.
+ */
+export function isExternalEgressOp(appOrigin, _opId, manifests = allManifests()) {
+  if (typeof appOrigin !== 'string' || !appOrigin) return false;
+  const known = new Set((Array.isArray(manifests) ? manifests : []).map((m) => m?.app).filter(Boolean));
+  return externalOrigins(manifests).has(appOrigin) || !known.has(appOrigin);
 }
 
 /**
@@ -38,16 +53,32 @@ export function isExternalEgressOp(appOrigin /*, opId */) {
  * @param {object} [o.vocabulary]   a createVocabulary(...) for the governed check
  * @returns {(appOrigin:string, opId:string, args:object)=>Promise<any>}  a wrapped callSkill
  */
-export function wrapCallSkillWithEgressGate(callSkill, { isExternalEgress, gateInputs, onReceipt, policyTable, vocabulary } = {}) {
+export function wrapCallSkillWithEgressGate(callSkill, { isExternalEgress, gateInputs, onReceipt, policyTable, vocabulary, toolCall = null } = {}) {
   const isExternal = typeof isExternalEgress === 'function'
     ? isExternalEgress
     : (_appOrigin, opId) => (isExternalEgress instanceof Set ? isExternalEgress.has(opId) : false);
+  // the call's context (who asks, through which door, in which language) travels on, never dropped
+  const call = (a, o, x, ctx) => (ctx === undefined ? callSkill(a, o, x) : callSkill(a, o, x, ctx));
+  const toolOps = new Set(toolCall?.ops ?? ['useTool']);
 
-  return async function gatedCallSkill(appOrigin, opId, args) {
-    if (!isExternal(appOrigin, opId) || typeof gateInputs !== 'function') return callSkill(appOrigin, opId, args);
+  return async function gatedCallSkill(appOrigin, opId, args, ctx) {
+    if (!isExternal(appOrigin, opId)) return call(appOrigin, opId, args, ctx);
+
+    // A TOOLBOX'S TOOL (L1035): exactly the tool and its input leave; a toolbox that is not on is refused before the
+    // call; every call is recorded (who, which toolbox, which tool, how it ended), never the words.
+    if (toolCall && toolOps.has(opId)) {
+      const { toolbox, tool, input } = args ?? {};
+      const note = (outcome) => { try { toolCall.record?.({ person: ctx?.caller ?? ctx?.person ?? null, toolbox: toolbox ?? null, tool: tool ?? null, outcome }); } catch { /* the record never breaks a call */ } };
+      if (typeof toolCall.isOn === 'function' && !(await toolCall.isOn(toolbox))) { note('refused'); return { ok: false, code: 'toolbox-off', name: toolbox ?? '' }; }
+      let res;
+      try { res = await call(appOrigin, opId, { toolbox, tool, ...(input !== undefined ? { input } : {}) }, ctx); } catch (e) { note('failed'); throw e; }
+      note(res?.ok === false ? (res?.code === 'toolbox-off' || res?.code === 'tool-not-offered' || res?.code === 'toolbox-no-key' ? 'refused' : 'failed') : 'ok');
+      return res;
+    }
+    if (typeof gateInputs !== 'function') return call(appOrigin, opId, args, ctx);
 
     const inputs = gateInputs(appOrigin, opId, args);
-    if (!inputs || !inputs.request) return callSkill(appOrigin, opId, args);   // nothing declared → pass through
+    if (!inputs || !inputs.request) return call(appOrigin, opId, args, ctx);   // nothing declared → pass through
 
     const { allow, payload, receipt } = gateEgress({
       request: inputs.request, released: inputs.released, contextType: inputs.contextType, policyTable, vocabulary,
@@ -58,6 +89,6 @@ export function wrapCallSkillWithEgressGate(callSkill, { isExternalEgress, gateI
     if (!allow) return { ok: false, error: 'egress-blocked', reason: 'governed-forbidden', receipt };
 
     // Only the gated payload (the coarse released set) travels — attach it under `_egress` for the external op.
-    return callSkill(appOrigin, opId, { ...(args ?? {}), _egress: payload });
+    return call(appOrigin, opId, { ...(args ?? {}), _egress: payload }, ctx);
   };
 }

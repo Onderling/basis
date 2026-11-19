@@ -18,8 +18,8 @@ import { bootRealAgentNode, teardown } from './support/pairRealAgents.js';
 const nodes = [];
 afterAll(() => teardown(nodes));
 
-const MEMBER = ['listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'listDone', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry', 'restoreEntry', 'entryReminders', 'makeChore', 'shopVisit', 'listMine', 'listOpen', 'claimTask', 'completeTask', 'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent', 'assistant-memory', 'assistant-language', 'assistant-reminders', 'remindMe', 'cancelReminder', 'assistant-overview', 'weekOverview', 'assistant-people', 'assistant-feedback', '__generic__:household:list:note', 'assistant-planned'];
-const ADMIN_EXTRA = ['reassignTask', 'removeTask', 'editTask'];
+const MEMBER = ['listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'listDone', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry', 'restoreEntry', 'entryReminders', 'makeChore', 'shopVisit', 'listMine', 'listOpen', 'claimTask', 'completeTask', 'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent', 'assistant-memory', 'assistant-language', 'assistant-reminders', 'remindMe', 'cancelReminder', 'assistant-overview', 'weekOverview', 'assistant-people', 'assistant-feedback', '__generic__:household:list:note', 'assistant-planned', 'useTool', 'listTools'];
+const ADMIN_EXTRA = ['reassignTask', 'removeTask', 'editTask'];   // the toolbox ops are the admin's too, but never the model's (no chat surface)
 
 describe('the bot\'s slim map', () => {
   const { catalogue } = composeAssistantCatalogue({ apps: ['lists', 'tasks', 'calendar'], slim: true });

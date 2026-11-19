@@ -169,6 +169,9 @@ export const SEAMS = Object.freeze([
   // A hosted bot keeps its household's export file (the one format kept readable across versions) on its own disk,
   // one a night, so a snapshot carries it off and /import can read it back. A person's device keeps no such shelf.
   { id: 'household-export-shelf', pattern: /createExportShelf\(/, shells: ['box'], why: 'a hosted bot\'s household survives a wipe, a lost disk and a new version' },
+  // THE EGRESS GATE (L1035): what leaves for a toolbox passes one gate at the box's waist. Web and phone hold no
+  // toolboxes (the tools app is a door manifest of the box): a screen reaches a tool through the box's door.
+  { id: 'egress-gate', pattern: /wrapCallSkillWithEgressGate\(/, shells: ['box'], why: 'exactly a toolbox\'s tool and its input leave, an off toolbox is refused before the call, and every call is recorded' },
   { id: 'bot-inbox-door', pattern: /createInboxDoor\(/, shells: ['box'], why: 'a function profile\'s contact inbox is answered by its assistant; a person\'s never is' },
   // A household bot WRITES FIRST (reminders of what people dated): only a shell that hosts a bot runs the tick. Web and
   // mobile are a person's devices and write first to nobody.

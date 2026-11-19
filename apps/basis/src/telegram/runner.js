@@ -143,7 +143,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     return ops;
   }
 
-  async function paint(chatId, rendered) {
+  async function paint(chatId, rendered, { readAgain = false } = {}) {
     if (!rendered) return;
     const offered = offeredOps(chatId);
     const onMap = (b) => !offered || offered.has(String(b?.callbackData ?? '').split(':')[0]);
@@ -156,7 +156,9 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       // "Ververs": the same read again, as a new message — a list message goes stale the moment someone ticks a line
       // elsewhere (asked for by a household member). A quick reply: the read's own slash line, decided by the gate like
       // a typed one. Telegram carries a button's data in 64 bytes; a list whose name does not fit simply has none.
-      const refreshLine = rendered.title && (!offered || offered.has('listEntries')) ? `/list-entries ${rendered.title}` : null;
+      // Only a lists read is read again by it (`readAgain`): another app's titled list (a toolbox's things) is no list of
+      // the household's, and its title would read the household's list of that name.
+      const refreshLine = readAgain && rendered.title && (!offered || offered.has('listEntries')) ? `/list-entries ${rendered.title}` : null;
       const refresh = refreshLine && new TextEncoder().encode(refreshLine).length <= 64
         ? [{ id: refreshLine, label: tc(chatId)('circle.telegram.refresh') }] : [];
       if (!items.length) { await say(chatId, [...head, rendered.text ?? tc(chatId)('circle.telegram.empty_list')].join('\n'), refresh.length ? refresh : undefined); return; }
@@ -218,7 +220,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     const fact = !reply?.error && (rendered.kind === 'text' || isReadFamily(ready.opId)) ? replyFact(reply?.payload, { opId: ready.opId, args: ready.args }) : null;
     if (fact?.fold && turns.has(chatId)) { (turns.get(chatId).lines ??= []).push(fact); return; }
     const line = fact ? replyLines([fact], { t: tc(chatId) })[0] : null;
-    await paint(chatId, line ? { ...rendered, kind: 'text', text: line } : rendered);
+    await paint(chatId, line ? { ...rendered, kind: 'text', text: line } : rendered, { readAgain: ready.opId === 'listEntries' });
   }
 
   /** `/help` (and the `help` op): the commands this bot answers to, with their hints — from the catalogue as scoped to

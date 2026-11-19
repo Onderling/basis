@@ -42,6 +42,9 @@ export const BOT_SCREEN_NEVER = Object.freeze([
   // a toolbox is used by its word in the chat (`zoek melk`), which names the tool and its input; a button with fields for a
   // toolbox, a tool and an input object means nothing to a person
   'tools.useTool',
+  // "meer" pages the list a chat thread was shown (the keeper is per thread): a screen has no such thread, so it never
+  // holds the op and its management screen paints no button that could only answer "that list is gone"
+  'tools.moreThings',
 ]);
 
 /**

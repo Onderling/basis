@@ -1,0 +1,150 @@
+{
+  "apps/basis-mobile/App.js": {
+    "count": 1,
+    "note": "not content: cc.firstBootSeeded.v1 — a first-boot flag"
+  },
+  "apps/basis-mobile/src/core/circleRecipePendingStorageRN.js": {
+    "count": 1,
+    "note": "debt: cc.circleRecipePending.* — an incoming circle recipe, plain"
+  },
+  "apps/basis-mobile/src/core/circleRulesPendingStorageRN.js": {
+    "count": 1,
+    "note": "debt: cc.circleRulesPending.* — an incoming circle rules document, plain"
+  },
+  "apps/basis-mobile/src/core/circleStoresRN.js": {
+    "count": 3,
+    "note": "debt: the shared IO helpers write cc.circleOverride., cc.availability, cc.sharedWithMe, cc.userScreens and cc.circlePinned raw; the same helpers are sealed by their caller for cc.circlePolicy., cc.circleRecipe., cc.circleRules. (sealedKeyValue)"
+  },
+  "apps/basis-mobile/src/core/firstRun.js": {
+    "count": 1,
+    "note": "not content: the welcomed flag"
+  },
+  "apps/basis-mobile/src/core/localisation.js": {
+    "count": 1,
+    "note": "not content: the app language"
+  },
+  "apps/basis-mobile/src/core/mappingsStoreRN.js": {
+    "count": 1,
+    "note": "debt: onderling.mappings:* — extension mappings (pod-routing rows)"
+  },
+  "apps/basis-mobile/src/core/nativeCalendar.js": {
+    "count": 1,
+    "note": "debt: cc.nativeCalendar.eventIdMap — which appointments were copied to the phone calendar (ids)"
+  },
+  "apps/basis-mobile/src/core/nearbyAllowsStore.js": {
+    "count": 4,
+    "note": "not content: Nearby consent switches, the radio switch, which self enters the room, the first-use question asked"
+  },
+  "apps/basis-mobile/src/screens/v2/CircleAdvisorScreen.js": {
+    "count": 1,
+    "note": "not content: cc.advisorShown.* — when the advisor card was dismissed"
+  },
+  "apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js": {
+    "count": 6,
+    "note": "debt: cc.actionFrequency (which ops the person used), cc.circleSkill.* (the person's offering per circle), cc.circleSeenAt; not content: cc.lastTab, cc.circleViewMode"
+  },
+  "apps/basis/src/core/handlers/personaPropsUpdate.js": {
+    "count": 1,
+    "note": "debt: cc.sharedDisclosure.* — what the person last shared of themselves with each circle (persona properties)"
+  },
+  "apps/basis/src/household/persist.js": {
+    "count": 1,
+    "note": "sealed by its caller: the AsyncStorage persist adapter is wrapped by sealedPersist in buildHouseholdDataSource"
+  },
+  "apps/basis/src/v2/addressFallback.js": {
+    "count": 1,
+    "note": "sealed by its caller: cc.fallbackOffer — both shells hand fallbackOfferStateIo sealedKeyValue"
+  },
+  "apps/basis/src/v2/askMatches.js": {
+    "count": 2,
+    "note": "debt: cc.askMatchSkips — which ask posts the person skipped for which people (ids)"
+  },
+  "apps/basis/src/v2/circleKindFactory.js": {
+    "count": 1,
+    "note": "debt: the web's pending stores built here — cc.circleRecipePending.* and cc.circleRulesPending.* (an incoming circle recipe or rules document, plain)"
+  },
+  "apps/basis/src/v2/circlePinStore.js": {
+    "count": 1,
+    "note": "debt: cc.circlePinned — the circle ids the person pinned (membership metadata)"
+  },
+  "apps/basis/src/v2/circlePolicyStore.js": {
+    "count": 3,
+    "note": "debt: cc.circleOverride.* (the member override io, raw on web); sealed by its caller: the policy IO (sealedKeyValue in localCirclePolicyStore and the shells); not content: cc.circlePolicyPending.* holds {pending: bool}"
+  },
+  "apps/basis/src/v2/circleRecipe.js": {
+    "count": 1,
+    "note": "sealed by its caller: localCircleRecipeStore hands the IO sealedKeyValue"
+  },
+  "apps/basis/src/v2/circleRules.js": {
+    "count": 1,
+    "note": "sealed by its caller: localCircleRulesStore hands the IO sealedKeyValue"
+  },
+  "apps/basis/src/v2/connectionPoints.js": {
+    "count": 2,
+    "note": "debt: cc.connectionPoints — the relay points per circle (circle ids and relays)"
+  },
+  "apps/basis/src/v2/contactUnread.js": {
+    "count": 1,
+    "note": "debt: cc.contactSeenAt — per contact, when their thread was last read (contact ids)"
+  },
+  "apps/basis/src/v2/contactsSource.js": {
+    "count": 1,
+    "note": "debt: cc.contactNames — each contact's last-read display name"
+  },
+  "apps/basis/src/v2/deliverySettings.js": {
+    "count": 2,
+    "note": "not content: cc.delivery — the person's delivery-receipt preferences"
+  },
+  "apps/basis/src/v2/enrolForgets.js": {
+    "count": 1,
+    "note": "not content: the forget-pending marker on the plain marker vault (beside restore-pending); it names the throwaway self's circle ids and is deleted once the forget runs"
+  },
+  "apps/basis/src/v2/enrollOffer.js": {
+    "count": 1,
+    "note": "debt: onderling.enrollOffer — the offer link (relays and circle ids plain; personas and devices sealed by the phrase); the box stashes it sealed (boxStorage)"
+  },
+  "apps/basis/src/v2/memberAvailability.js": {
+    "count": 1,
+    "note": "debt: cc.availability — the person's availability (away windows)"
+  },
+  "apps/basis/src/v2/onboardingFlags.js": {
+    "count": 2,
+    "note": "not content: first-run flags (cc.onboardingDone, cc.introCardSeen, …)"
+  },
+  "apps/basis/src/v2/policyUpdateLane.js": {
+    "count": 1,
+    "note": "debt: cc.circlePolicyHead.* — the version and the ORIGINAL signed statement of a circle's policy, plain beside the sealed policy"
+  },
+  "apps/basis/src/v2/relayPref.js": {
+    "count": 2,
+    "note": "not content: cc.relayUrl — the device's chosen relay"
+  },
+  "apps/basis/src/v2/screenView.js": {
+    "count": 2,
+    "note": "debt: onderling.screen.<bot> — a screen's GRANT, including its capability tokens to act as the person at the bot (a credential)"
+  },
+  "apps/basis/src/v2/sharedWithMeStore.js": {
+    "count": 1,
+    "note": "debt: cc.sharedWithMe — what others shared with the person"
+  },
+  "apps/basis/src/v2/themePref.js": {
+    "count": 1,
+    "note": "not content: basis.theme — the theme"
+  },
+  "apps/basis/src/v2/userLlmDefault.js": {
+    "count": 2,
+    "note": "debt: cc.userLlmDefault — the person's own model endpoint, INCLUDING ITS API KEY (a secret)"
+  },
+  "apps/basis/src/v2/userScreens.js": {
+    "count": 1,
+    "note": "debt: cc.userScreens — the person's own pages (names and blocks chosen)"
+  },
+  "apps/basis/src/web/localStoragePeerBackend.js": {
+    "count": 1,
+    "note": "debt: cc-peers:* — the circle peer graph (peers' addresses per circle)"
+  },
+  "apps/basis/web/v2/circleApp.js": {
+    "count": 17,
+    "note": "debt: mixed — cc.actionFrequency (which ops the person used), cc.agentRequestQueue (pending agent-add requests), cc.circlePolicyHead.* via the head store (the circle policy statement, sealed elsewhere, plain here), cc.contactSeenAt + cc.contactNames (contacts' names), cc.circleSeenAt, cc.circleViewMode, cc.circleSkill.* (the person's offering per circle), cc.advisorShown.*; not content: basis.theme, cc.lastTab, circle.app.lang, basis.nearby-asked:*, basis.nearbySelf, basis.nearbyAllows, cc.activeCircle (sessionStorage)"
+  }
+}

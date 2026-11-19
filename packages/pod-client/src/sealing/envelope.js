@@ -141,7 +141,20 @@ function sbOpen(keyU8, slot) {
 }
 
 function pack(env) { return SENTINEL + b64u(te.encode(JSON.stringify(env))); }
-function unpack(sealedText) { return JSON.parse(td.decode(unb64u(sealedText.slice(SENTINEL.length)))); }
+/**
+ * The envelope's JSON, decoded ONCE (ledger L619): what `pack` writes is ASCII by construction (base64 fields and
+ * numbers), so the base64 decode's binary string IS the JSON text, and the UTF-8 decoder (a JavaScript polyfill on the
+ * phone, ~half the cost of opening a record) runs only on the plaintext. An envelope with any non-ASCII byte (none
+ * this code writes) takes the full decode.
+ */
+function unpack(sealedText) {
+  const bin = atob(String(sealedText.slice(SENTINEL.length)).replace(/-/g, '+').replace(/_/g, '/'));
+  // eslint-disable-next-line no-control-regex
+  if (!/[^\x00-\x7f]/.test(bin)) return JSON.parse(bin);
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return JSON.parse(td.decode(u8));
+}
 
 /** RECIPIENT mode — seal a string to one or more recipient public keys (b64url SPKI DER). Needs ONLY public keys. */
 export function seal(plaintext, recipients) {

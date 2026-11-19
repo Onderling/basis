@@ -170,8 +170,11 @@ function stableJson(v) {
  * @param {{book?: object|null, circles?: Array<{id?: string, groupId?: string}>, expandedBlockId?: string|null, selves?: string[]}} a
  * @returns {string}
  */
-export function vandaagLandingKey({ book = null, circles = [], expandedBlockId = null, selves = [] } = {}) {
+export function vandaagLandingKey({ book = null, circles = [], expandedBlockId = null, selves = [], circlesKnown } = {}) {
   const page = getActiveScreen(book);
   const ids = (Array.isArray(circles) ? circles : []).map((c) => (typeof c === 'string' ? c : (c?.id ?? c?.groupId))).filter(Boolean).sort();
-  return stableJson({ page: page ? { id: page.id, blocks: page.blocks ?? [] } : null, expandedBlockId: expandedBlockId ?? null, circles: ids, selves: [...(selves ?? [])].sort() });
+  // a host that learns its circles after its first frame (the phone) says so: the key moves when the list was read, so
+  // a person in no circle gets the strip then (the list stays [] and would not move the key). The web passes nothing.
+  const known = circlesKnown === undefined ? {} : { circlesKnown: !!circlesKnown };
+  return stableJson({ page: page ? { id: page.id, blocks: page.blocks ?? [] } : null, expandedBlockId: expandedBlockId ?? null, circles: ids, selves: [...(selves ?? [])].sort(), ...known });
 }

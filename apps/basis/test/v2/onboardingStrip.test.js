@@ -23,6 +23,18 @@ describe('onboardingCards', () => {
 });
 
 describe('materializeOnboarding', () => {
+  it('while the host does not know the circles yet (a cold start), the strip says nothing, never "not in a circle yet" (L1051)', async () => {
+    const callSkill = async () => ({ entry: { handle: null } });
+    const early = await materializeOnboarding({ id: 'o' }, { callSkill, circles: [], introSeen: async () => false, circlesKnown: () => false });
+    expect(early.status).toBe('empty');
+    expect(early.content?.noCircle ?? false).toBe(false);
+    expect(early.content?.cards ?? []).toEqual([]);
+    const known = await materializeOnboarding({ id: 'o' }, { callSkill, circles: [], introSeen: async () => false, circlesKnown: () => true });
+    expect(known.content.noCircle).toBe(true);
+    // a host that does not pass it (the web: it paints after its circles are read) is as before
+    expect((await materializeOnboarding({ id: 'o' }, { callSkill, circles: [], introSeen: async () => false })).content.noCircle).toBe(true);
+  });
+
   it('reads the handle from the profile and the circles without the help circle; empty when nothing is left', async () => {
     const callSkill = async (app, op) => (app === 'pinboard' && op === 'getMyProfile' ? { entry: { handle: null } } : null);
     const b = await materializeOnboarding({ id: 'o', type: 'onboarding' }, { callSkill, circles: [{ id: HELP_CIRCLE_ID }], introSeen: async () => true });

@@ -580,6 +580,8 @@ export default function CircleLauncherScreen({
   // Whether the list has had a real answer: "No circles yet." is said only then, never in "not known yet" (see
   // `launcherListPaint`).
   const [launcherSettled, setLauncherSettled] = useState(false);
+  const launcherSettledRef = useRef(false);
+  launcherSettledRef.current = launcherSettled;
   // The developer switch (`app.developer`, a register param, off by default in every build): the Advanced screen — raw
   // parameter keys and values, a developer tool — is offered only when it is on. Read each time Me opens.
   const [developerOn, setDeveloperOn] = useState(false);
@@ -1317,7 +1319,8 @@ export default function CircleLauncherScreen({
   const vandaagKey = useMemo(() => vandaagLandingKey({
     book: screensBook, circles: circlesShown, expandedBlockId,
     selves: [...selvesOn, ...heldSelves.map((p) => `held:${p?.id ?? p}`)],
-  }), [screensBook, circlesShown, expandedBlockId, selvesOn, heldSelves]);
+    circlesKnown: launcherSettled,
+  }), [screensBook, circlesShown, expandedBlockId, selvesOn, heldSelves, launcherSettled]);
   // what Today's blocks, "Nieuw voor jou" and the banner read, as the page stands now (web parity: `forYouHostOps`)
   const forYouHostOpsNow = useCallback(() => {
     const { circles, circlesShown, selvesOn, heldSelves, unreadMyRefs } = vandaagInputs.current;
@@ -1402,7 +1405,9 @@ export default function CircleLauncherScreen({
         // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
         introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags),
         // the reach card: does this device know any relay (the relay question's own predicate, web parity)
-        relayKnown: () => relayQuestion.knows() },
+        relayKnown: () => relayQuestion.knows(),
+        // the circles are known once the list was read: before, the strip says nothing (not "in no circle")
+        circlesKnown: () => launcherSettledRef.current },
     });
   }, [bundle, eventLog, forYouHostOpsNow]);   // eslint-disable-line react-hooks/exhaustive-deps -- onboardingFlags is a stable memo declared further down (read at call time, never during render)
   // VANDAAG'S HEAD (`screenHead.js`, web parity): the blocks as last read for the landing's key, kept current by the

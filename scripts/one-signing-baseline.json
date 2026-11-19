@@ -1,0 +1,5 @@
+{
+  "packages/core/src/crypto/ed25519Strict.js": 1,
+  "packages/pod-client/src/sealing/envelope.js": 1,
+  "packages/transports/src/NknTransport.js": 1
+}

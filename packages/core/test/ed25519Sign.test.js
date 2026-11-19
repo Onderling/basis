@@ -3,7 +3,7 @@
  * libsodium), and the kernel takes it only if it gives tweetnacl's exact bytes. Ed25519 is deterministic, so a key
  * pair from a seed and a signature of a message have one right answer; anything else is refused and tweetnacl stays.
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import nacl from 'tweetnacl';
 import { ed25519KeyPairFromSeed, ed25519Sign, useSigningEquation, signingEquationName } from '../src/crypto/ed25519Sign.js';
 
@@ -50,5 +50,22 @@ describe('signing and key derivation behind the port', () => {
     expect(throws.ok).toBe(false);
     expect(useSigningEquation({ name: 'half' }).ok).toBe(false);
     expect(signingEquationName()).toBe('tweetnacl');
+  });
+
+  it('an installed implementation that throws later: that call answers by tweetnacl (same bytes), said once', () => {
+    let broken = false;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(useSigningEquation({
+      name: 'flaky',
+      keyPairFromSeed: (s) => { if (broken) throw new Error('jsi gone'); return nacl.sign.keyPair.fromSeed(s); },
+      sign: (m, sk) => { if (broken) throw new Error('jsi gone'); return nacl.sign.detached(m, sk); },
+    }).ok).toBe(true);
+    broken = true;
+    const ref = nacl.sign.keyPair.fromSeed(seed);
+    expect([...ed25519KeyPairFromSeed(seed).secretKey]).toEqual([...ref.secretKey]);
+    expect([...ed25519Sign(msg, ref.secretKey)]).toEqual([...nacl.sign.detached(msg, ref.secretKey)]);
+    ed25519Sign(msg, ref.secretKey);
+    expect(warn.mock.calls.filter((c) => String(c[0]).includes('flaky')).length).toBe(1);
+    warn.mockRestore();
   });
 });

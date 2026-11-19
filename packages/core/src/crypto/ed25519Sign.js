@@ -22,7 +22,19 @@ let impl = TWEETNACL;
  * @param {Uint8Array} seed
  * @returns {{publicKey: Uint8Array, secretKey: Uint8Array}}  secretKey is the 64-byte seed‖public form
  */
-export function ed25519KeyPairFromSeed(seed) { return impl.keyPairFromSeed(seed); }
+export function ed25519KeyPairFromSeed(seed) {
+  if (impl === TWEETNACL) return TWEETNACL.keyPairFromSeed(seed);
+  try { return impl.keyPairFromSeed(seed); } catch (e) { failedOnce(e); return TWEETNACL.keyPairFromSeed(seed); }
+}
+
+/** An installed implementation that throws AFTER its vetting: that call answers by tweetnacl (the same bytes, by the
+ *  vetting), and the log says so once per implementation, so a broken native module never breaks a send or a start. */
+let saidFailure = null;
+function failedOnce(e) {
+  if (saidFailure === impl.name) return;
+  saidFailure = impl.name;
+  console.warn(`[security] signing: ${impl.name} threw (${String(e?.message ?? e)}); tweetnacl answers for such calls`);
+}
 
 /**
  * A detached Ed25519 signature.
@@ -30,7 +42,10 @@ export function ed25519KeyPairFromSeed(seed) { return impl.keyPairFromSeed(seed)
  * @param {Uint8Array} secretKey  64 bytes, as `ed25519KeyPairFromSeed` gives it
  * @returns {Uint8Array}  64 bytes
  */
-export function ed25519Sign(msg, secretKey) { return impl.sign(msg, secretKey); }
+export function ed25519Sign(msg, secretKey) {
+  if (impl === TWEETNACL) return TWEETNACL.sign(msg, secretKey);
+  try { return impl.sign(msg, secretKey); } catch (e) { failedOnce(e); return TWEETNACL.sign(msg, secretKey); }
+}
 
 /** Which implementation answers now ('tweetnacl' until a shell installs one). For diagnostics. */
 export function signingEquationName() { return impl.name; }
@@ -52,7 +67,7 @@ function vectors() {
  * @returns {{ok: boolean, name: string, reason?: string}}
  */
 export function useSigningEquation(eq) {
-  if (eq == null) { impl = TWEETNACL; return { ok: true, name: impl.name }; }
+  if (eq == null) { impl = TWEETNACL; saidFailure = null; return { ok: true, name: impl.name }; }
   if (typeof eq?.name !== 'string' || !eq.name || typeof eq.keyPairFromSeed !== 'function' || typeof eq.sign !== 'function') {
     return { ok: false, name: impl.name, reason: 'not-an-implementation' };
   }
@@ -70,5 +85,6 @@ export function useSigningEquation(eq) {
     return { ok: false, name: impl.name, reason: `failed: ${String(e?.message ?? e)}` };
   }
   impl = Object.freeze({ name: eq.name, keyPairFromSeed: eq.keyPairFromSeed, sign: eq.sign });
+  saidFailure = null;
   return { ok: true, name: impl.name };
 }

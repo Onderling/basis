@@ -115,7 +115,9 @@ const PKCS8_ED25519_PREFIX = Uint8Array.from([0x30, 0x2e, 0x02, 0x01, 0x00, 0x30
  * @param {{ createPrivateKey: Function, createPublicKey: Function, sign: Function }} nodeCrypto  `node:crypto`
  */
 export function nodeCryptoSigning(nodeCrypto) {
-  const keys = new Map();   // seed (base64) → KeyObject; a key is parsed once
+  // seed (base64) → KeyObject, a key parsed once. The seeds stay in this process's memory only, up to 4096 (the box: its
+  // own personas and circle addresses); that is fine on the box, the one place this runs (Fable 2026-11-19).
+  const keys = new Map();
   const privateKeyOf = (seed) => {
     const id = Buffer.from(seed).toString('base64');
     let k = keys.get(id);

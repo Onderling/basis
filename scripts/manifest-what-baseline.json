@@ -1,13 +1,6 @@
 {
   "_note": "L977: ops that still owe writes.what (or reveals, for a device read). Only shrinks: fill in, then run node scripts/lint-manifest-scopes.mjs --update.",
   "what": [
-    "calendar.addEvent",
-    "calendar.cancelEvent",
-    "calendar.rsvpAccept",
-    "calendar.rsvpDecline",
-    "calendar.rsvpTentative",
-    "calendar.shareEvent",
-    "calendar.updateEvent",
     "folio.deleteFromPod",
     "folio.deleteLocally",
     "folio.forceRepush",

@@ -14,6 +14,8 @@ import { REMINDER_RULES_KEY, reminderRulesFrom, reminderRulesValue, reminderLaye
 import { layeredRules, reminderOccurrences } from './reminderOccurrences.js';
 import { upcoming } from './intentions.js';
 import { assistantManifest } from './assistantManifest.js';
+/** The ops beyond a role's weight at the bot, each named with its reason on its row (`botException`). */
+const BOT_EXCEPTIONS = new Set(assistantManifest.operations.filter((o) => o.botException).map((o) => o.id));
 import { createIntentionBook } from './intentionBook.js';
 import { createOwnDevicesStore } from './ownDevicesStore.js';
 import { WEEK_OVERVIEW_OP, weekOverviewOn, switchWeekOverview } from './weekOverviewRows.js';
@@ -174,6 +176,11 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       const refused = await refusal(`assistant.${op}`, caller, levelOf(op));
       // the host gate's refusal (`{layer, code}`, the one shape) rides along; the door says the admin's line
       if (refused) return { ok: false, error: { code: refused.code ?? String(refused), message: t('circle.bot.admin_only') }, refusal: refused };
+    }
+    // an op beyond the role's weight at the bot (`botException` on its row: a person's own screen, identity link, the
+    // household in their own app) runs only from the person's OWN private chat; never in a group, never from a screen
+    if (BOT_EXCEPTIONS.has(op) && !(await fromPrivateDoor(caller ?? ctx?.threadId, ctx))) {
+      return { ok: false, error: { code: 'not-private', message: t('circle.bot.kring_not_private') } };
     }
     try {
       if (op === 'assistant-screen-approve') return approveOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);

@@ -126,8 +126,11 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
     whenState(s, { signal } = {}) {
       if (current === s) return Promise.resolve(s);
       return new Promise((resolve, reject) => {
-        const off = this.onState((now2) => { if (now2 === s) { off(); resolve(s); } });
-        signal?.addEventListener?.('abort', () => { off(); reject(Object.assign(new Error('aborted'), { code: 'aborted' })); }, { once: true });
+        // the abort listener goes when this settles: a page that reuses one signal does not pile them up
+        const onAbort = () => { off(); reject(Object.assign(new Error('aborted'), { code: 'aborted' })); };
+        const off0 = this.onState((now2) => { if (now2 === s) { off(); resolve(s); } });
+        const off = () => { off0(); signal?.removeEventListener?.('abort', onAbort); };
+        signal?.addEventListener?.('abort', onAbort, { once: true });
       });
     },
 
@@ -190,12 +193,13 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
       inFlight += 1;
       setState('busy');
       let timer = null;
+      let onAbort = null;
       let after = 'connected';   // what the screen is once no call is in flight
       try {
         const answer = await Promise.race([
           view.call(op, input),
           new Promise((_, reject) => { timer = setTimeout(() => reject(Object.assign(new Error('timeout'), { code: 'timeout' })), timeoutMs); }),
-          new Promise((_, reject) => signal?.addEventListener?.('abort', () => reject(Object.assign(new Error('aborted'), { code: 'aborted' })), { once: true })),
+          new Promise((_, reject) => { onAbort = () => reject(Object.assign(new Error('aborted'), { code: 'aborted' })); signal?.addEventListener?.('abort', onAbort, { once: true }); }),
         ]);
         const code = screenClientCode(null, answer);
         return code ? { ...answer, ok: false, code } : answer;
@@ -207,6 +211,8 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
         return { ok: false, code, message: String(e?.message ?? e) };
       } finally {
         if (timer) clearTimeout(timer);
+        // the abort listener goes when the call settles: a page that reuses one signal does not pile them up
+        if (onAbort) signal?.removeEventListener?.('abort', onAbort);
         inFlight = Math.max(0, inFlight - 1);
         if (after !== 'connected') setState(after);
         else if (inFlight === 0 && current === 'busy') setState('connected');

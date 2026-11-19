@@ -1,5 +1,5 @@
 // The screen client a toolbox's page imports (onderling-screen-client.js). Hand-written beside the source; the build
-// copies it next to the one file. See apps/basis/docs/screen-client.md for the codes and the limits.
+// copies it next to the one file. Every refusal's code is listed below.
 
 /** The client's version (also in the VERSION file beside the build). */
 export const SCREEN_CLIENT_VERSION: string;

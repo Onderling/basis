@@ -26,9 +26,9 @@ was started 2026-11-18 with the first toolbox, a grocery search.
   `{code: 'tool-error', toolError: {code, params}}`; an answer too large for one relay envelope as `answer-too-large`
   (never cut); over the screen's call budget (3 a second, a burst of 60) `rate-limited`.
   The page does this with the **screen client**, one file built from the web app's own screen code
-  (`apps/basis/scripts/build-screen-client.mjs`); how a page uses it, every code and what each browser does with
-  storage from disk: [`apps/basis/docs/screen-client.md`](../../apps/basis/docs/screen-client.md). The page is bound to its
-  own toolbox: it pairs only for a toolbox that is on, and calls only that one (`toolbox-not-yours` otherwise).
+  (`apps/basis/src/v2/screenClient.js`, built by `apps/basis/scripts/build-screen-client.mjs`; its types in
+  `screenClient.d.ts`). The page is bound to its own toolbox: it pairs only for a toolbox that is on, and calls only that
+  one (`toolbox-not-yours` otherwise).
 - **The household's admin** types `/toolbox`: the toolboxes the box's operator placed, each with its words and whether
   it is on. `/toolbox <naam> aan` shows the toolbox's card (its name, address, words and what it receives) and switches
   it on after their yes, in their own private chat only. `/toolbox <naam> uit` switches it off.

@@ -136,4 +136,18 @@ describe('the screen client', () => {
     ac.abort();
     await expect(never).rejects.toMatchObject({ code: 'aborted' });
   });
+
+  it('a page that reuses one signal does not pile up abort listeners (call and whenState remove theirs when they settle)', async () => {
+    const live = new Set();
+    const signal = { aborted: false, addEventListener: (_t, fn) => live.add(fn), removeEventListener: (_t, fn) => live.delete(fn) };
+    const { createView } = fakeViews();
+    const c = createScreenClient({ toolbox: 'b', bot: BOT, storage: memoryStorage(), createView });
+    await c.startPairing(); await c.waitForGrant();
+    for (let i = 0; i < 5; i += 1) await c.call('lists.listEntries', {}, { signal });
+    const busyThenBack = c.whenState('busy', { signal });
+    await c.call('lists.listEntries', {});
+    await busyThenBack;
+    expect(live.size).toBe(0);
+  });
 });
+

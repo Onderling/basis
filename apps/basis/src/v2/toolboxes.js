@@ -16,6 +16,7 @@
 import { readToolboxCard, callTool, readItemList } from './toolboxClient.js';
 import { firstPartyFirstWords } from '@onderling/app-manifest';
 import { GATE_WORDS } from './gateWords.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 const ON_KEY = 'tools.on';
 const NAME = /^[a-z][a-z0-9-]{0,31}$/;
@@ -201,6 +202,63 @@ export function toolboxWelcomeLine(words, t, lang = 'nl') {
 }
 
 /** The device-log kind of a toolbox call's record (packages/item-store entryKinds: kept like the own record, local). */
+/** How long a thread's last list of things can still be answered with a tap (the box's memory; gone on a restart). */
+export const CHOICE_KEEP = param({ key: 'tools.choiceKeepMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 * 60_000 });
+
+/**
+ * The last list of things shown in each thread, so a button can carry only its number (Telegram caps a button's data
+ * at 64 bytes). The next list in a thread replaces the last; another thread has its own; an old list is gone.
+ * @param {{now?: () => number, keepMs?: number}} [o]
+ */
+export function makeChoiceKeeper({ now = () => Date.now(), keepMs = CHOICE_KEEP } = {}) {
+  const kept = new Map();
+  return {
+    keep(threadId, items) { if (threadId) kept.set(String(threadId), { at: now(), items: Array.isArray(items) ? items.slice() : [] }); },
+    /** Thing `n` (1-based) of the thread's last list, or null when there is none, it is old, or `n` was not shown. */
+    take(threadId, n) {
+      const k = kept.get(String(threadId ?? ''));
+      if (!k || now() - k.at > keepMs) return null;
+      const i = Number(n);
+      return Number.isInteger(i) && i >= 1 && i <= k.items.length ? k.items[i - 1] : null;
+    },
+  };
+}
+
+/** A thing's line: its name, then what tells it apart (its detail, its seller) and its price, as given. */
+const thingLine = (x, n, t) => t('circle.bot.toolbox_found_row', {
+  n, label: x.label, more: [x.detail && x.detail !== x.seller ? x.detail : null, x.seller, x.price ? `€ ${String(x.price).replace('.', ',')}` : null].filter(Boolean).join(' · '),
+});
+
+/**
+ * A toolbox's list of things as a reply: a line per thing and one button each, `/kies <n>` (the answer to "which
+ * one", ledger L1035). The list is kept for the thread it was shown in. Anything else (a refusal, nothing
+ * found, an answer that is not a list) passes unchanged.
+ * @param {object} r  `useTool`'s answer
+ * @param {{threadId: string, keeper: ReturnType<typeof makeChoiceKeeper>, t: Function}} o
+ */
+export function toolChoicesReply(r, { threadId, keeper, t }) {
+  const items = r?.ok && Array.isArray(r.items) ? r.items : null;
+  if (!items || !items.length) return r;
+  keeper?.keep?.(threadId, items);
+  return {
+    ...r,
+    message: [t('circle.bot.toolbox_found_head', { title: r.title ?? r.name }), ...items.map((x, i) => thingLine(x, i + 1, t))].join('\n'),
+    buttons: items.map((x, i) => ({ label: String(x.label ?? '').slice(0, 60), id: `/kies ${i + 1}` })),
+  };
+}
+
+/**
+ * Which list a chosen thing goes on: the list of the shop that sells it (its name holds the seller's, as a shop visit
+ * matches), else the household's shopping list (the template's shopping role), else none: the door asks.
+ * @param {{seller?: string}} thing @param {Array<{label: string}>} lists @param {string|null} shopping
+ */
+export function listForThing(thing, lists, shopping) {
+  const seller = String(thing?.seller ?? '').trim().toLowerCase();
+  const own = seller ? lists.find((l) => String(l.label ?? '').toLowerCase().includes(seller)) : null;
+  if (own) return own.label;
+  return shopping && lists.some((l) => l.label === shopping) ? shopping : null;
+}
+
 export const TOOL_CALL_KIND = 'tool-call';
 
 /**

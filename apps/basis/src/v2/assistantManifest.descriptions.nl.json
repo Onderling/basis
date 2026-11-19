@@ -186,5 +186,9 @@
   "assistant-toolbox": {
     "what": "Laat de toolboxen op de box zien, of zet er een aan of uit.",
     "params": { "spec": "welke toolbox, aan of uit" }
+  },
+  "assistant-pick": {
+    "what": "Een ding dat een toolbox vond op een lijst zetten: de knop eronder.",
+    "params": { "spec": "welk ding, en welke lijst" }
   }
 }

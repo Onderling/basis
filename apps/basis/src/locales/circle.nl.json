@@ -6297,6 +6297,34 @@
     "toolbox_word_taken": {
       "text": "Het woord '{{word}}' van {{title}} gebruik ik al voor iets anders. Kies in het bestand op de box een ander woord.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_found_head": {
+      "text": "{{title}} vond:",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_found_row": {
+      "text": "{{n}}. {{label}} ({{more}})",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_added": {
+      "text": "Op {{list}}: {{label}}.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_gone": {
+      "text": "Die lijst ken ik niet meer. Zoek opnieuw en tik er een aan.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_which_list": {
+      "text": "Op welke lijst moet {{label}}?",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_no_list": {
+      "text": "Er is nog geen lijst om het op te zetten. Maak er eerst een.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_failed": {
+      "text": "Dat kon niet op de lijst.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     }
   },
   "op": {

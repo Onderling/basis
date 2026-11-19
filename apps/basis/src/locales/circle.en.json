@@ -6292,6 +6292,34 @@
     "toolbox_word_taken": {
       "text": "I already use the word '{{word}}' of {{title}} for something else. Choose another word in the file on the box.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_found_head": {
+      "text": "{{title}} found:",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_found_row": {
+      "text": "{{n}}. {{label}} ({{more}})",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_added": {
+      "text": "On {{list}}: {{label}}.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_gone": {
+      "text": "I no longer know that list. Search again and tap one.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_which_list": {
+      "text": "Which list should {{label}} go on?",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_no_list": {
+      "text": "There is no list yet to put it on. Make one first.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_failed": {
+      "text": "That could not be put on the list.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     }
   },
   "op": {

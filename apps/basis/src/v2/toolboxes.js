@@ -13,7 +13,7 @@
  * What leaves on a call: the tool's id and its input (the words of the question), nothing about the person or circle.
  * The wire is `toolboxClient.js`. Pure composition: the store, the key reader and `fetch` are handed in.
  */
-import { readToolboxCard, callTool, readItemList } from './toolboxClient.js';
+import { readToolboxCard, callTool, readItemList, fetchThumbs } from './toolboxClient.js';
 import { firstPartyFirstWords } from '@onderling/app-manifest';
 import { GATE_WORDS } from './gateWords.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
@@ -140,7 +140,10 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
       const r = await callTool({ endpoint: live.endpoint, key, tool, input: input && typeof input === 'object' ? input : {}, fetch });
       if (!r.ok) { log('tools', 'refused', { check: 'call', reason: r.code, ...(r.toolCode ? { toolCode: r.toolCode } : {}) }); return { ...r, name: n }; }
       const list = readItemList(r.output, { source: n });
-      return list.ok ? { ok: true, name: n, title: live.title, tool, items: list.items } : { ok: true, name: n, title: live.title, tool, output: r.output };
+      if (!list.ok) return { ok: true, name: n, title: live.title, tool, output: r.output };
+      // the pictures, fetched here by the box from the toolbox's own host and handed on as bytes; no door ever fetches one
+      const items = await fetchThumbs(list.items, { endpoint: live.endpoint, key, fetch });
+      return { ok: true, name: n, title: live.title, tool, items };
     },
   };
 }

@@ -460,6 +460,8 @@ function renderListItems(payload, opts, t) {
     const out = { id, label, buttons };
     if (staleHint) out.staleHint = staleHint;
     if (embed)     out.embed     = embed;
+    // a picture the BOX fetched for the row (`thumb`: {mime, data} base64): a door that can show one does; the row stays
+    if (item && typeof item === 'object' && item.thumb && typeof item.thumb.data === 'string' && /^image\/(jpeg|png|webp)$/.test(item.thumb.mime ?? '')) out.thumb = { mime: item.thumb.mime, data: item.thumb.data };
     // the row's group, when the op declares one (`groupBy`): a door paints a head where it changes
     if (opts?.groupBy && item && typeof item === 'object' && item[opts.groupBy] != null && item[opts.groupBy] !== '') out.group = String(item[opts.groupBy]);
     // 2026-05-27 — contact rows carry the peer's peer address as

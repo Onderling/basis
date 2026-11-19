@@ -273,7 +273,7 @@ export function toolChoicesReply(r, { threadId, keeper, t }) {
   return {
     ...r,
     title: r.title ?? r.name,
-    items: items.map((x, i) => ({ id: String(i + 1), type: 'tool-thing', label: thingRow(x, t), ...(x?.seller ? { seller: String(x.seller) } : {}) })),
+    items: items.map((x, i) => ({ id: String(i + 1), type: 'tool-thing', label: thingRow(x, t), ...(x?.seller ? { seller: String(x.seller) } : {}), ...(x?.thumb ? { thumb: x.thumb } : {}) })),
   };
 }
 

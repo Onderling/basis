@@ -338,6 +338,18 @@ export class TelegramBridge {
    * @param {import('./MessagingBridge.js').SendReplyArgs} args
    * @returns {Promise<void>}
    */
+  /**
+   * A picture as a photo message of its own: the BYTES the caller holds (never a URL for Telegram to fetch), a caption,
+   * buttons under it.
+   * @param {{chatId: string|number, photo: Uint8Array, caption?: string, buttons?: Array<{id: string, label: string}>}} o
+   */
+  async sendPhoto({ chatId, photo, caption = '', buttons } = /** @type {any} */ ({})) {
+    if (!this.#bot) throw new Error('TelegramBridge: not started');
+    const extra = { ...(caption ? { caption } : {}) };
+    if (Array.isArray(buttons) && buttons.length) extra.reply_markup = { inline_keyboard: layoutButtons(buttons) };
+    await this.#bot.telegram.sendPhoto(chatId, { source: Buffer.from(photo), filename: 'thing.jpg' }, extra);
+  }
+
   async sendReply({ chatId, replyTo, text, buttons, noPreview = false } = /** @type {any} */ ({})) {
     /** @type {Record<string, any>} */
     const extra = {};

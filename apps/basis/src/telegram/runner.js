@@ -32,6 +32,7 @@ import { createLastReads } from '../v2/lastRead.js';
 import { telegramPlain } from './telegramPlain.js';
 import { scrubSecrets } from '@onderling/logger';
 import { modelDownClass } from '../v2/modelWatch.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /** The line a person gets when the model did not answer, by cause class. */
 const MODEL_DOWN_LINE = { refused: 'circle.bot.model_refused', slow: 'circle.bot.model_slow', unreachable: 'circle.bot.model_down' };
@@ -71,6 +72,9 @@ const NO_WORDS = new Set(['nee', 'n', 'no', 'laat maar', 'nee, laat maar']);
  *   the turn took (slash · tap · form · confirm · gate rule · llm · hint), what was dispatched, what went
  *   back, how long it took — so a walk can be read afterwards instead of retold. Chat ids are shortened.
  */
+/** How many things of one group (a shop) a door that shows pictures shows as photo cards; the rest come in words. */
+const CARDS_PER_GROUP = param({ key: 'telegram.cardsPerGroup', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
+
 export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode, promptLines = null, roleFor = null, scopeToRole = null, gateRules = null, hintsFor = null, expand = null, welcomeFor = null, basicHelpFor = null, helpLines = null } = {}) {
   if (!bridge || typeof bridge.onMessage !== 'function' || typeof bridge.sendReply !== 'function') throw new TypeError('createTelegramRunner: a MessagingBridge is required');
   if (typeof callSkill !== 'function') throw new TypeError('createTelegramRunner: callSkill is required');
@@ -162,6 +166,25 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       const refresh = refreshLine && new TextEncoder().encode(refreshLine).length <= 64
         ? [{ id: refreshLine, label: tc(chatId)('circle.telegram.refresh') }] : [];
       if (!items.length) { await say(chatId, [...head, rendered.text ?? tc(chatId)('circle.telegram.empty_list')].join('\n'), refresh.length ? refresh : undefined); return; }
+      // things with a picture (the box fetched it; `thumb`), at a door that shows pictures: a photo card per thing, its
+      // number and words the caption, its own buttons under it; per group (a shop) a head line first, at most
+      // CARDS_PER_GROUP cards, the rest of the group in words under them. A door without pictures gets the words below.
+      const canPhoto = typeof bridge.sendPhoto === 'function' && (typeof bridge.canSendPhoto !== 'function' || bridge.canSendPhoto(chatId));
+      if (canPhoto && items.some((it) => it.thumb)) {
+        if (head.length) await say(chatId, head.join('\n'));
+        const buttonsOf = (it) => (it.buttons ?? []).filter(onMap).map((b) => ({ id: b.callbackData, label: b.label }));
+        const groups = rendered.groups ? [...rendered.groups, null] : [null];
+        for (const g of groups) {
+          const mine = items.map((it, i) => ({ it, n: i + 1 })).filter(({ it }) => (rendered.groups ? (it.group ?? null) === g : true));
+          if (!mine.length) continue;
+          if (g) await say(chatId, `${g}:`);
+          const cards = mine.filter(({ it }) => it.thumb).slice(0, CARDS_PER_GROUP);
+          for (const { it, n } of cards) await bridge.sendPhoto({ chatId, photo: Buffer.from(it.thumb.data, 'base64'), caption: `${n}. ${it.label}`, buttons: buttonsOf(it) });
+          const rest = mine.filter((x) => !cards.includes(x));
+          if (rest.length) await say(chatId, rest.map(({ it, n }) => `${n}. ${it.label}`).join('\n'), rest.flatMap(({ it, n }) => buttonsOf(it).map((b) => ({ ...b, label: `${b.label}: ${n}` }))));
+        }
+        return;
+      }
       // a list the op groups (`rendered.groups`, a toolbox's things per shop): a head line where the group changes; the
       // numbers run on across the heads (they are what a tap or a typed '2' picks)
       const lines = [...head];

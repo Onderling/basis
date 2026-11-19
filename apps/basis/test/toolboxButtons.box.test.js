@@ -29,6 +29,8 @@ async function fakeToolbox() {
     req.on('data', (c) => { body += c; });
     req.on('end', () => {
       const json = (status, v) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(v)); };
+      // the toolbox serves its things' pictures itself (the box fetches them from this host only)
+      if (req.method === 'GET' && req.url.startsWith('/img/')) { res.writeHead(200, { 'Content-Type': 'image/jpeg' }); res.end(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 74, 70, 73, 70])); return; }
       if (req.method === 'GET' && req.url === '/.well-known/agent-card.json') {
         return json(200, { name: 'Boodschappen', supportedInterfaces: [{ url: `${base}/a2a`, protocolBinding: 'JSONRPC', protocolVersion: '1.0' }], skills: [{ id: 'products.choices', name: 'Products Choices' }] });
       }
@@ -36,7 +38,7 @@ async function fakeToolbox() {
         if (req.headers.authorization !== `Bearer ${KEY}`) return json(401, { jsonrpc: '2.0', id: null, error: { code: -32001, message: 'Unauthorized' } });
         const msg = JSON.parse(body);
         const data = msg.params.message.parts[0].data;
-        const product = (id, name, price, seller) => ({ '@type': 'ListItem', item: { '@type': 'Product', identifier: id, name, offers: { price, seller: { name: seller } } } });
+        const product = (id, name, price, seller) => ({ '@type': 'ListItem', item: { '@type': 'Product', identifier: id, name, image: `${base}/img/${id}.jpg`, offers: { price, seller: { name: seller } } } });
         return json(200, { jsonrpc: '2.0', id: msg.id, result: { message: { role: 'ROLE_AGENT', parts: [{ data: { operation: data.operation, output: {
           '@type': 'ItemList', itemListElement: [product('ah:33693', 'Halfvolle melk 1 L', '1.19', 'Albert Heijn'), product('jumbo:753536PAK', 'Jumbo halfvolle melk 1 L', '1.05', 'Jumbo')],
         } } }] } } });
@@ -98,7 +100,13 @@ describe('a toolbox\'s things as buttons, on the booted box', () => {
     const on = await tap('/toolbox boodschappen aan ja');
     expect(on.map((m) => m.text).join('\n')).toMatch(/aan|on/i);
 
+    const photosBefore = api.photos(ADMIN).length;
     const found = await ask('zoek melk');
+    // a picture per thing, as a photo of its own (bytes from the box), its caption the row, its own Kies button under it
+    const cards = api.photos(ADMIN).slice(photosBefore);
+    expect(cards.map((c) => c.caption)).toEqual([expect.stringMatching(/^1\. Halfvolle melk 1 L/), expect.stringMatching(/^2\. Jumbo halfvolle melk 1 L/)]);
+    expect(cards.every((c) => c.photoBytes > 0)).toBe(true);
+    expect(cards.map((c) => (c.reply_markup?.inline_keyboard ?? []).flat().map((b) => b.callback_data.replace(/:[a-z0-9]+\./, ':')))).toEqual([['pickThing:1'], ['pickThing:2']]);
     const withButtons = found.find((m) => buttonsOf(m).length);
     expect(withButtons, `no buttons: ${JSON.stringify(found)}`).toBeTruthy();
     expect(withButtons.text).toContain('Halfvolle melk 1 L');

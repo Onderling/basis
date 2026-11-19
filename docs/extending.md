@@ -129,6 +129,10 @@ peer would. A realm is not something Basis implements; it is configured:
 | mobile | a WebView per realm (later an embedded JavaScript interpreter) | process or context isolation; also the only shape app stores permit for downloaded JavaScript |
 | an always-on device | a subprocess with network permission limited to the declared hosts | operating-system isolation; the permission flag *is* the `hosts` list |
 
+On the web an extension's realm, and any page of its own, always has an origin other than the web app's: a page on
+the web app's origin could use the keys that origin keeps, whatever path it is served under (`docs/decisions.md`
+2026-11-18).
+
 The channel between a realm and the host is a transport in the ordinary sense — it implements the same port
 every network adapter does ([`ports.md`](./conventions/ports.md)) and passes the same harness. So from the
 host's point of view an extension is an external agent that happens to run locally, and the gate it meets

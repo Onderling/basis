@@ -113,6 +113,8 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | — | a write a circle switched off is refused when tapped, the same refusal as the typed line; a door-less call (plumbing,… | `apps/basis/test/tapAsksTheCircle.test.js` |
 | — | every op is gated by exactly one capability row, and every row gates at least one op | `apps/basis/test/v2/lendCapabilityRows.test.js` |
 | — | confirming a claim, editing and sharing an appointment pass the capability gate in a circle that did not switch them off | `apps/basis/test/v2/threeActsRows.test.js` |
+| — | framed by another page, the web app's main shell refuses to start and a screen address starts (its entry asks before … | `apps/basis/test/web/ownWindow.test.js` |
+| — | web app's page loads no script, stylesheet or frame from another origin, and the NKN library it runs is the installed… | `apps/basis/test/webOwnOrigin.test.js` |
 | — | subtask-spawn gate bites — only an authorized actor can spawn under a parent | `packages/item-store/test/spawnSubtask.test.js` |
 | — | a param declares scope (sync) + kind (security); kind:internal is immutable by construction, and set-param gates on kind | `packages/params/test/params.test.js` |
 | G-C1 | a circle owns ONE store: the local write and its publisher are the same object | `apps/basis/test/appTaskFanTwoDevice.test.js` |

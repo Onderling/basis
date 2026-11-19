@@ -2007,3 +2007,24 @@ The sealing of circle content moves out of the pod client before any pod package
 read that overlaps a write, a shared-pod post that shows only on opening the circle, the key file races, the sign-in on
 a box) are kept as a list of what a replacement must not repeat. No new pod feature without asking. Ledger: L995
 (L943 answered; L939, L941, L938 carried).
+
+## 2026-11-18 — Nothing that is not Basis runs on the web app's origin (Frits)
+
+**Context:** a toolbox's page was proposed to be hosted beside the web app. A browser separates pages by origin, never
+by path: everything a page keeps (local storage, IndexedDB, the service worker) is shared by every page on its origin,
+and a script on that origin can use the keys kept there, sealed or not (the root key's wrap key is usable by any
+same-origin code). Frits: "make this foolproof". Found while reading for it: the web app itself loaded its NKN library
+from a CDN, without an integrity hash and in a different version from the one the transport is tested against.
+
+**Decision:** the web app's origin runs the Basis bundle and nothing else. A toolbox's page, a plugin's view, any
+bundle we did not build gets an origin of its own (the realm, `docs/extending.md` §4, is the designed form). The page
+loads no script from another origin; its script policy names only its own scripts; the main app refuses to run in
+another page's frame. The one exception is a SCREEN address: Telegram's web client and some desktop clients show the
+screen's Web App ('Open het scherm') in a frame, a framing page cannot read into a frame of another origin, and a
+screen holds one screen's grant, never a person's keys, so a framed screen starts.
+
+**Consequences:** NKN is built into the web app from the installed package. The script policy allows `'unsafe-eval'`
+until the item-type validator's checks are compiled ahead of time. A frame rule in a response header waits on the web
+app's host (the static host sends no headers today). Whether the web app keeps its address beside the public site
+(`onderling.org/basis`, the site's origin) or moves to one of its own is Frits's to decide. When a toolbox's record
+names a page, switching it on is refused if that page's origin is the web app's. Ledger: L1041.

@@ -16,9 +16,15 @@
  * (Calendar.requestCalendarPermissionsAsync) + the watch loop over the calendar
  * source — is DEVICE-BOUND and lands with the parked device session (same bucket
  * as the attach menu); until then nothing constructs this on a phone.
+ *
+ * The `itemId → eventId` map is SEALED at rest (ledger L1083: which of the person's appointments are on the phone's
+ * calendar): the injected storage is wrapped in `sealedKeyValue` (strict). It has no reader yet (see above); when the
+ * live half lands it runs on the person's act, after the agent's boot, so after the content key exists.
  */
+import { sealedKeyValue } from '../../../basis/src/v2/localStoreSeal.js';
 
 const STORAGE_KEY = 'cc.nativeCalendar.eventIdMap';
+const sealedIn = (storage) => sealedKeyValue(storage, { name: 'the calendar id map', strict: true });
 
 /**
  * Pure-fn diff. `prev` and `next` are arrays of `{itemId, dueAt?,
@@ -111,8 +117,8 @@ export async function applyDiff({
   }
 
   if (storage?.setItem) {
-    try { await storage.setItem(STORAGE_KEY, JSON.stringify(next)); }
-    catch { /* swallow — next pass will recompute */ }
+    try { await sealedIn(storage).setItem(STORAGE_KEY, JSON.stringify(next)); }
+    catch { /* swallow — next pass will recompute (or no content key yet) */ }
   }
   return next;
 }
@@ -123,7 +129,7 @@ export async function applyDiff({
 export async function loadEventIdMap({ storage } = {}) {
   if (!storage?.getItem) return {};
   try {
-    const raw = await storage.getItem(STORAGE_KEY);
+    const raw = await sealedIn(storage).getItem(STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
     return (parsed && typeof parsed === 'object') ? parsed : {};

@@ -1649,6 +1649,8 @@ let   CIRCLE_RELAY_URL      = bootRelayUrl({
   stored: resolveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV),
   list:   (() => {
     try {
+      // NOT SEALED on the web, on purpose (ledger L1083): read here, at module load, before the agent exists and so before
+      // the content key does — the relay to boot on. The phone seals the same store (connectionPointsRN.js).
       return createConnectionPoints({ initial: localStorageConnectionPointsIo().load(), save: () => {} }).list();
     } catch { return []; }
   })(),
@@ -2430,7 +2432,8 @@ function buildCircleBot(agent) {
   // Persist the roster to localStorage so v2 Contacten survives a reload
   // (it was in-memory and vanished on refresh). PeerGraph reads through the
   // backend, so a fresh graph over the same store rehydrates automatically.
-  circlePeerGraph = new PeerGraph({ storageBackend: createLocalStoragePeerBackend() });
+  // sealed at rest (the contacts' peer graph); built here, after the agent, so the content key exists
+  circlePeerGraph = new PeerGraph({ storageBackend: createLocalStoragePeerBackend({ storage: sealedKeyValue(globalThis.localStorage, { name: 'the peer graph', strict: true }) }) });
   // Phase-2 · Piece-2 (B2 wiring) — hand the app-owned peer registry to the
   // secure-agent's SHARED RoutingStrategy so the cross-peer send path resolves
   // the transport-appropriate wire address per peer (relay → pubKey, NKN →

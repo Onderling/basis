@@ -21,7 +21,7 @@
   },
   "apps/basis-mobile/src/core/nativeCalendar.js": {
     "count": 1,
-    "note": "debt: cc.nativeCalendar.eventIdMap — which appointments were copied to the phone calendar (ids)"
+    "note": "sealed by its caller: the module wraps the injected storage in sealedKeyValue (strict) before every write (sealedIn)"
   },
   "apps/basis-mobile/src/core/nearbyAllowsStore.js": {
     "count": 4,
@@ -43,10 +43,6 @@
     "count": 1,
     "note": "sealed by its caller: cc.fallbackOffer — both shells hand fallbackOfferStateIo sealedKeyValue"
   },
-  "apps/basis/src/v2/askMatches.js": {
-    "count": 2,
-    "note": "debt: cc.askMatchSkips — which ask posts the person skipped for which people (ids)"
-  },
   "apps/basis/src/v2/circlePinStore.js": {
     "count": 1,
     "note": "debt: cc.circlePinned — the circle ids the person pinned (membership metadata)"
@@ -65,7 +61,7 @@
   },
   "apps/basis/src/v2/connectionPoints.js": {
     "count": 2,
-    "note": "debt: cc.connectionPoints — the relay points per circle (circle ids and relays)"
+    "note": "not sealable: on the WEB — read at module load, before the agent and its content key exist (apps/basis/web/v2/circleApp.js:1654, the boot relay), so the web hands plain localStorage; sealed by its caller on the PHONE (apps/basis-mobile/src/core/connectionPointsRN.js), whose readers all run after the key"
   },
   "apps/basis/src/v2/contactUnread.js": {
     "count": 1,
@@ -85,7 +81,7 @@
   },
   "apps/basis/src/v2/enrollOffer.js": {
     "count": 1,
-    "note": "debt: onderling.enrollOffer — the offer link (relays and circle ids plain; personas and devices sealed by the phrase); the box stashes it sealed (boxStorage)"
+    "note": "not sealable: onderling.enrollOffer is stashed before the enrol ceremony under the throwaway self's content key and read after it, across the key change (apps/basis/src/core/agent/realAgent.js:4261 and :4278); the box stashes it plain too (apps/basis/bin/device-runner.mjs:264). Its personas and devices parts are sealed by the phrase; the relays and circle ids are plain"
   },
   "apps/basis/src/v2/onboardingFlags.js": {
     "count": 2,
@@ -97,7 +93,7 @@
   },
   "apps/basis/src/v2/relayPref.js": {
     "count": 2,
-    "note": "not content: cc.relayUrl — the device's chosen relay"
+    "note": "not sealable: cc.relayUrl is read at module load, before the agent and its content key exist (apps/basis/web/v2/circleApp.js:1649 and :1730; the phone reads it while booting, apps/basis-mobile/src/core/agentBundle.js resolveMobileRelayUrl); it is the device's chosen relay, not a person's content"
   },
   "apps/basis/src/v2/screenClient.js": {
     "count": 1,
@@ -113,7 +109,7 @@
   },
   "apps/basis/src/web/localStoragePeerBackend.js": {
     "count": 1,
-    "note": "debt: cc-peers:* — the circle peer graph (peers' addresses per circle)"
+    "note": "sealed by its caller: both shells hand the peer backend sealedKeyValue (strict) — the web in buildCircleBot (circleApp.js), the phone in bootAgentBundle (agentBundle.js), both after the agent's boot"
   },
   "apps/basis/web/v2/circleApp.js": {
     "count": 12,

@@ -228,7 +228,7 @@ import { feedHouseholdRoster } from '../../../../basis/src/v2/householdRosterPai
 import { recentCircleTurns } from '../../../../basis/src/v2/circleMemory.js';
 import { createMemoryBackend } from '@onderling/pseudo-pod';
 import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
-import { sealedLocalBackend } from '../../../../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
+import { sealedLocalBackend, onShellContentSeal } from '../../../../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { buildCircleEmbedProviders } from '../../../../basis/src/v2/circleEmbedProviders.js';
 import { resolveCircleEmbedder } from '../../../../basis/src/v2/embedPicker.js';
 // Telling someone the circle became theirs. The decision (WHO is told, and whether they have
@@ -612,8 +612,11 @@ export default function CircleLauncherScreen({
   const [userLlmCfg, setUserLlmCfg] = useState({});
   useEffect(() => {
     let alive = true;
-    createUserLlmDefaultStore(asyncStorageUserLlmIo(AsyncStorage)).get().then((v) => { if (alive) setUserLlmCfg(v); }).catch(() => {});
-    return () => { alive = false; };
+    // the setting is sealed (ledger L1083): read once the content key is published — at once when it already is
+    const off = onShellContentSeal(() => {
+      createUserLlmDefaultStore(asyncStorageUserLlmIo(AsyncStorage)).get().then((v) => { if (alive) setUserLlmCfg(v); }).catch(() => {});
+    });
+    return () => { alive = false; off(); };
   }, []);
   const onSaveUserLlm = useCallback(async (cfg) => {
     const err = validateUserLlmConfig(cfg);
@@ -946,7 +949,8 @@ export default function CircleLauncherScreen({
   // (the circle's policy.llmTool + the member's loaded LLM + a configured provider).
   useEffect(() => {
     let alive = true;
-    (async () => {
+    // the own model setting is sealed (ledger L1083): computed once the content key is published (at once if it is)
+    const off = onShellContentSeal(() => { (async () => {
       let userLlm = { mode: CIRCLE_LLM_BASEURL ? 'local' : 'off' };
       try { const v = await createUserLlmDefaultStore(asyncStorageUserLlmIo(AsyncStorage)).get(); if (v) userLlm = v; } catch { /* default */ }
       const r = resolveChatAi({
@@ -955,8 +959,8 @@ export default function CircleLauncherScreen({
         hasProvider: !!CIRCLE_LLM_BASEURL,
       });
       if (alive) setChatAi(r);
-    })();
-    return () => { alive = false; };
+    })(); });
+    return () => { alive = false; off(); };
   }, [selectedPolicy]);
 
 
@@ -4362,10 +4366,13 @@ function CircleDetail({
   const [userLlmDefault, setUserLlmDefault] = useState({ mode: CIRCLE_LLM_BASEURL ? 'local' : 'off' });
   useEffect(() => {
     let alive = true;
-    createUserLlmDefaultStore(asyncStorageUserLlmIo(AsyncStorage)).get()
-      .then((v) => { if (alive && v && v.mode !== 'off') setUserLlmDefault(v); })
-      .catch(() => {});
-    return () => { alive = false; };
+    // sealed (ledger L1083): read once the content key is published (at once if it is)
+    const off = onShellContentSeal(() => {
+      createUserLlmDefaultStore(asyncStorageUserLlmIo(AsyncStorage)).get()
+        .then((v) => { if (alive && v && v.mode !== 'off') setUserLlmDefault(v); })
+        .catch(() => {});
+    });
+    return () => { alive = false; off(); };
   }, []);
 
   // B (per-circle policy) — THIS circle's llmTool is authoritative (same cc.circlePolicy.<id> store the

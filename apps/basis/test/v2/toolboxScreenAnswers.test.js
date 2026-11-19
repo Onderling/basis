@@ -1,5 +1,5 @@
 /**
- * The household bot's toolboxes on the admin's MANAGEMENT SCREEN (ledger L1035; development red on #1405's merge,
+ * The household bot's toolboxes on the admin's MANAGEMENT SCREEN (ledger L1035; development went red when the toolboxes landed,
  * screen-buttons-box): every button there must answer in words. `listTools` says which toolboxes are on, or that none
  * is, in the words the `/toolbox` door uses (one function, `toolboxListLine`); `useTool` is no button on a screen at
  * all: a toolbox is used by its word in the chat.

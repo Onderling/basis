@@ -99,3 +99,75 @@ describe('a sealed store seals only what changed', () => {
     expect(strategy.seals).toBe(3);
   });
 });
+
+/** A strategy over one key: it opens only what it sealed (another key's rows throw, as the group-key open does). */
+function keyedStrategy(tag) {
+  return {
+    seal: (t) => `sealed:${tag}:${Buffer.from(t).toString('base64')}`,
+    open: (t) => {
+      if (!t.startsWith('sealed:')) return t;
+      const [, k, body] = t.split(':');
+      if (k !== tag) throw new Error('sealing: secretbox open failed (wrong key or corrupt envelope)');
+      return Buffer.from(body, 'base64').toString();
+    },
+  };
+}
+
+describe('a row that will not open is kept, not deleted (ledger L1079)', () => {
+  const stored = () => new Map([
+    ['a', keyedStrategy('mine').seal('{"t":"A"}')],
+    ['b', keyedStrategy('mine').seal('{"t":"B"}')],
+    ['c', keyedStrategy('other').seal('{"t":"C"}')],
+  ]);
+
+  it('load, change one row, save: the unopenable row is written back byte for byte, never handed on', async () => {
+    const adapter = memoryAdapter(stored());
+    const warnings = [];
+    const p = sealedPersist(adapter, keyedStrategy('mine'), (m) => warnings.push(m));
+    const map = await p.load();
+    expect([...map.keys()].sort()).toEqual(['a', 'b']);
+    map.set('a', '{"t":"A2"}');
+    await p.save(map);
+    expect(adapter.stored.get('c')).toBe(stored().get('c'));
+    expect(adapter.stored.size).toBe(3);
+    await p.save(map);
+    expect(warnings.filter((w) => w.includes('c:')).length).toBe(1);   // said once, by key
+    expect(warnings.join(' ')).not.toContain('"t":"C"');
+  });
+
+  it('a row the CALLER removes goes; a row the wrapper could not open stays', async () => {
+    const adapter = memoryAdapter(stored());
+    const p = sealedPersist(adapter, keyedStrategy('mine'), () => {});
+    const map = await p.load();
+    map.delete('b');
+    await p.save(map);
+    expect([...adapter.stored.keys()].sort()).toEqual(['a', 'c']);
+  });
+
+  it('the caller writing a row under that key wins, and the kept bytes are forgotten', async () => {
+    const adapter = memoryAdapter(stored());
+    const p = sealedPersist(adapter, keyedStrategy('mine'), () => {});
+    const map = await p.load();
+    map.set('c', '{"t":"mine now"}');
+    await p.save(map);
+    expect(keyedStrategy('mine').open(adapter.stored.get('c'))).toBe('{"t":"mine now"}');
+    map.delete('c');
+    await p.save(map);
+    expect(adapter.stored.has('c')).toBe(false);   // removed by the caller: the old bytes do not come back
+  });
+
+  it('composes with the sealed-row memory: unchanged rows are not resealed, a removed and re-added key is sealed fresh', async () => {
+    let seals = 0;
+    const base = keyedStrategy('mine');
+    const strategy = { seal: (t) => { seals += 1; return base.seal(t); }, open: base.open };
+    const adapter = memoryAdapter(stored());
+    const p = sealedPersist(adapter, strategy, () => {});
+    const map = await p.load();
+    await p.save(map);
+    expect(seals).toBe(0);
+    map.delete('b'); await p.save(map);
+    map.set('b', '{"t":"B"}'); await p.save(map);
+    expect(seals).toBe(1);
+    expect(adapter.stored.get('c')).toBe(stored().get('c'));
+  });
+});

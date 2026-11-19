@@ -1594,6 +1594,14 @@
       "text": "{{name}}: {{op}}",
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
+    "plus_ceiling_off": {
+      "text": "De + staat uit voor deze persona.",
+      "doc": "The persona the + speaks as has it switched off (the ceiling per persona, 0): nothing is read and nothing reaches a model."
+    },
+    "plus_ceiling_refused": {
+      "text": "Dat mag de + niet voor deze persona. Doe het zelf, of verander bij je persona wat de + mag.",
+      "doc": "A line asked for something heavier than this persona lets the + do (its ceiling): refused, whichever way it came in."
+    },
     "plus_line_unread": {
       "text": "Dat kon ik niet lezen. Typ \"help\" om te zien wat ik kan, of vul de velden hieronder in.",
       "doc": "The free line could not be read: the person fills the fields."

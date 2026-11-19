@@ -8,6 +8,8 @@ import { VaultMemory } from '@onderling/vault';
 import { createMemoryBackend } from '@onderling/pseudo-pod';
 import { EventLog } from '../src/eventLog.js';
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
+import { createPlusDoor } from '../src/assistant/plusDoor.js';
+import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
 
 describe('the ceiling of the "+" on the real agent', () => {
   let agent;
@@ -31,5 +33,13 @@ describe('the ceiling of the "+" on the real agent', () => {
     const r = await agent.callSkill('agents', 'setProfileProperty', { id: werk, key: '_plus.ceiling', value: 3 });
     expect(r).toMatchObject({ ok: false, reason: 'reserved-key' });
     expect(await get(werk)).toBe(0);
+
+    // the "+" reads it AS the self, through the call both shells hand it (`callAs` on web, `plusAsSelf` on the phone:
+    // the waist's actAs with the persona's webid), and is off for that persona only
+    const webidOf = (id) => (id && id !== 'default' ? agent.persona(id).chatId.pubKey : null);
+    const readAs = (id) => (app, opId, args) => { const actAs = webidOf(id); return actAs ? agent.callSkill(app, opId, args, { actAs }) : agent.callSkill(app, opId, args); };
+    const door = createPlusDoor({ llm: null, t: (k) => k, lang: 'nl', threads: createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() }), threadId: 'own:me', readAs, circles: async () => [], ownListsOf: async () => [] });
+    expect((await door.read('wat staat er vandaag?', { asSelf: werk })).done).toBe('circle.vandaag.plus_ceiling_off');
+    expect((await door.read('wat staat er vandaag?', { asSelf: 'default' })).done ?? null).not.toBe('circle.vandaag.plus_ceiling_off');
   }, 60_000);
 });

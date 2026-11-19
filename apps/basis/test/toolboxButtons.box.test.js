@@ -113,6 +113,10 @@ describe('a toolbox\'s things as buttons, on the booted box', () => {
 
     // the words, at every door (Fable's ruling on L1035): the list is numbered, and '2' or 'kies 2' picks the second
     // thing of the LAST list shown in this thread; the button only sends the same thing
+    // the shops told apart: a head line per shop, its rows under it, the shop no longer in the row
+    expect(withButtons.text.split('\n')).toEqual(expect.arrayContaining(['Albert Heijn:', 'Jumbo:']));
+    expect(withButtons.text.indexOf('Albert Heijn:')).toBeLessThan(withButtons.text.indexOf('Halfvolle melk 1 L'));
+    expect(withButtons.text.indexOf('Jumbo:')).toBeLessThan(withButtons.text.indexOf('Jumbo halfvolle melk 1 L'));
     expect(withButtons.text).toMatch(/1\D[^\n]*Halfvolle melk 1 L/);
     expect(withButtons.text).toMatch(/2\D[^\n]*Jumbo halfvolle melk 1 L/);
     const typed = await ask('2');

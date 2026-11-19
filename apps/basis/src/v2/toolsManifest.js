@@ -30,7 +30,8 @@ export const toolsManifest = Object.freeze({
         { name: 'input',   kind: 'object', required: false },
       ],
       surfaces: {
-        chat: { reply: 'list', hint: 'Use a tool of one of the toolboxes this household added (see listTools): toolbox = its name, tool = the tool id, input = the tool\'s input (a search: {query}). A list of things comes back to choose from.' },
+        // the things come under a head per shop (`groupBy`, read by the shared renderer; each door paints the heads)
+        chat: { reply: 'list', groupBy: 'seller', hint: 'Use a tool of one of the toolboxes this household added (see listTools): toolbox = its name, tool = the tool id, input = the tool\'s input (a search: {query}). A list of things comes back to choose from.' },
       },
     },
     {

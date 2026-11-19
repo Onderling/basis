@@ -122,12 +122,17 @@ export function renderReply(reply, opts = {}) {
   const shape = reply.shape ?? 'text';
 
   if (shape === 'list') {
-    const items = renderListItems(reply.payload, opts, t);
+    // a list whose op declares a field to group by (`surfaces.chat.groupBy`): each row says its group, and the groups
+    // in the order they first come, so every door paints a head where the group changes
+    const groupBy = opts.opId ? (opts.manifestsByOrigin?.[opts.appOrigin]?.operations ?? []).find((o) => o?.id === opts.opId)?.surfaces?.chat?.groupBy ?? null : null;
+    const items = renderListItems(reply.payload, { ...opts, groupBy }, t);
+    const groups = groupBy ? [...new Set(items.map((i) => i.group).filter((g) => g != null))] : null;
     return {
       kind: 'list',
       messageId, threadId,
       lifecycleState: 'live',     // A2 hybrid — flips 'disabled' on next user msg
       items,
+      ...(groups ? { groups } : {}),
       // the list's own name, when the op gives one (a lists read): the surface shows it above the entries
       ...(typeof reply.payload?.title === 'string' && reply.payload.title ? { title: reply.payload.title } : {}),
       // v0.6 — list-level _sync from the reply itself (vs per-row
@@ -455,6 +460,8 @@ function renderListItems(payload, opts, t) {
     const out = { id, label, buttons };
     if (staleHint) out.staleHint = staleHint;
     if (embed)     out.embed     = embed;
+    // the row's group, when the op declares one (`groupBy`): a door paints a head where it changes
+    if (opts?.groupBy && item && typeof item === 'object' && item[opts.groupBy] != null && item[opts.groupBy] !== '') out.group = String(item[opts.groupBy]);
     // 2026-05-27 — contact rows carry the peer's peer address as
     // `peerAddr` so the [DM] button can target it directly (see
     // realAgent.js listContacts mapper).  Pure pass-through.

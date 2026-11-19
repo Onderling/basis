@@ -180,9 +180,13 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
           if (g) await say(chatId, `${g}:`);
           // the first CARDS_PER_GROUP things of the shop: a card where the box brought a picture, a line where not
           const shown = mine.slice(0, CARDS_PER_GROUP);
-          for (const { it, n } of shown) {
-            if (it.thumb) await bridge.sendPhoto({ chatId, photo: Buffer.from(it.thumb.data, 'base64'), caption: `${n}. ${it.label}`, buttons: buttonsOf(it) });
-            else await say(chatId, `${n}. ${it.label}`, buttonsOf(it).map((b) => ({ ...b, label: `${b.label}: ${n}` })));
+          const asWords = ({ it, n }) => say(chatId, `${n}. ${it.label}`, buttonsOf(it).map((b) => ({ ...b, label: `${b.label}: ${n}` })));
+          for (const one of shown) {
+            if (!one.it.thumb) { await asWords(one); continue; }
+            // a photo Telegram will not take (too large, a bad picture, a hiccup) is that thing's words line with its button;
+            // the rest of the list still comes
+            try { await bridge.sendPhoto({ chatId, photo: Buffer.from(one.it.thumb.data, 'base64'), caption: `${one.n}. ${one.it.label}`, buttons: buttonsOf(one.it) }); }
+            catch (err) { note(chatId, { photoFailed: String(err?.message ?? err).slice(0, 80) }); await asWords(one); }
           }
           // the rest of the shop behind ONE "meer" (Frits): a line like 'Ververs', decided by the gate, to the read of the
           // kept list (`tools.moreThings`, no new fetch); the button names the kept list, the shop and where to go on

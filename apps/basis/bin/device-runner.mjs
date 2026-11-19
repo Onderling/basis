@@ -993,6 +993,8 @@ const hostTick = createHostTick({ onError: (e) => walkLog({ kind: 'tick-error', 
 
 // ── The assistant: its doors (Telegram, the bot's inbox), ONE engine behind them ─────────────────────────────
 let tgRunner = null;
+// the door bridge (Telegram + the in-app inbox), set when the runner is built: a tool call asks it whether its chat shows pictures
+let doorBridge = null;
 if (tgToken || inboxDoor.bridge) {
   const { TelegramBridge } = tgToken ? await import('@onderling/chat-agent/bridges/telegram') : {};
   // Who gets in without a code: the admin named at start and a configured allow-list (the bootstrap). Everyone else
@@ -1415,7 +1417,8 @@ if (tgToken || inboxDoor.bridge) {
   agent.mountAppOps('tools', {
     // a refusal or an empty answer told in the person's own language (`ctx.lang`): the sentence, never the key or an address
     useTool: async (args, ctx) => {
-      const r = await toolboxes.useTool(args);
+      // pictures only for a door that shows them (Telegram); the in-app thread paints words, so nothing is fetched for it
+      const r = await toolboxes.useTool(args, { pictures: doorBridge?.canSendPhoto?.(ctx?.chatId) === true });
       const tp = (k, p) => t(k, p, ctx?.lang ?? undefined);
       if (!r.ok) return { ...r, error: { code: r.code, message: toolboxRefusalText(r, tp) } };
       if (Array.isArray(r.items) && !r.items.length) return { ...r, message: tp('circle.bot.toolbox_none_found', { title: r.title ?? r.name }) };
@@ -1568,7 +1571,7 @@ if (tgToken || inboxDoor.bridge) {
     }, (err) => walkLog({ kind: 'surface-grants', ready: false, error: String(err?.message ?? err).slice(0, 120) }));
   }
   tgRunner = createTelegramRunner({
-    bridge: multiplexBridges([tgBridge, inboxDoor.bridge]),
+    bridge: (doorBridge = multiplexBridges([tgBridge, inboxDoor.bridge])),
     catalogue: doorCatalogue.catalogue,
     manifestsByOrigin: doorCatalogue.manifestsByOrigin,
     // The door's own ops — a person's memory mode and language, the admin's app list, status and users — are

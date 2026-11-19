@@ -127,8 +127,9 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
     /**
      * A member uses a tool of an ON toolbox. Refused before anything leaves when the toolbox is off or not placed, the
      * tool is not one its card offered, or its key is not on the box. A list of things comes back as choices (`items`).
+     * `pictures`: the asking door shows pictures (the box then fetches them); false for a words door.
      */
-    async useTool({ toolbox, tool, input } = {}) {
+    async useTool({ toolbox, tool, input } = {}, { pictures = true } = {}) {
       const n = String(toolbox ?? '').trim();
       const live = (await readOn())[n];
       const placedNow = (await placed()).find((p) => p.name === n);
@@ -141,8 +142,9 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
       if (!r.ok) { log('tools', 'refused', { check: 'call', reason: r.code, ...(r.toolCode ? { toolCode: r.toolCode } : {}) }); return { ...r, name: n }; }
       const list = readItemList(r.output, { source: n });
       if (!list.ok) return { ok: true, name: n, title: live.title, tool, output: r.output };
-      // the pictures, fetched here by the box from the toolbox's own host and handed on as bytes; no door ever fetches one
-      const items = await fetchThumbs(list.items, { endpoint: live.endpoint, key, fetch });
+      // the pictures, fetched here by the box from the toolbox's own host and handed on as bytes; no door ever fetches one.
+      // Only for a door that shows pictures (`pictures`): a words door gets none, so no bytes ride the relay or the keeper
+      const items = pictures ? await fetchThumbs(list.items, { endpoint: live.endpoint, key, fetch }) : list.items.map(({ image, ...x }) => x);
       return { ok: true, name: n, title: live.title, tool, items };
     },
   };

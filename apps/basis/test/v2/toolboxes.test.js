@@ -83,6 +83,15 @@ describe('a placed toolbox, switched on by the admin', () => {
     expect(h.calls.some((c) => String(c.url).startsWith('https://shop.example'))).toBe(false);
   });
 
+  it('for a door that shows no pictures (the in-app thread) the box fetches none: no bytes ride the relay (Fable on the pictures PR)', async () => {
+    const item = (id, image) => ({ '@type': 'ListItem', item: { '@type': 'Product', identifier: id, name: id, image, offers: { price: '1.00' } } });
+    const answer = { operation: 'products.choices', output: { '@type': 'ItemList', itemListElement: [item('a', 'http://boodschappen:3000/img/a.jpg')] } };
+    const h = harness({ answer, images: { 'http://boodschappen:3000/img/a.jpg': [0xff, 0xd8, 0xff, 0xe0, 1, 2] } }); await on(h);
+    const r = await h.ops.useTool({ toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'x' } }, { pictures: false });
+    expect(r.items[0].thumb).toBeUndefined();
+    expect(h.calls.some((c) => String(c.url).endsWith('/img/a.jpg'))).toBe(false);
+  });
+
   it('a toolbox whose key is gone is refused BEFORE any call leaves; a tool it does not offer likewise', async () => {
     const h = harness(); await on(h);
     const before = h.calls.length;

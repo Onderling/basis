@@ -79,4 +79,58 @@ describe('a toolbox\'s things: cards where a door shows pictures, words where it
     // and a card's own button still picks THAT thing (its number in the kept list)
     expect(photos[0].buttons[0].id).toMatch(/\.4$/);
   });
+
+  // a runner over a callSkill that answers useTool with `items`, and moreThings from the same keeper
+  async function runner2(bridge, items) {
+    const keeper = makeChoiceKeeper();
+    const moreThings = makeMoreThings({ keeper, t });
+    const callSkill = async (_app, op, args, ctx) => {
+      if (op === 'useTool') return toolChoicesReply({ ok: true, title: 'Boodschappen', items }, { threadId: ctx?.threadId ?? 'x', keeper, t });
+      if (op === 'moreThings') return moreThings(args, ctx);
+      return { ok: false };
+    };
+    const gateRules = [toolboxGateRule(() => [{ word: 'zoek', toolbox: 'boodschappen', tool: 'products.choices', field: 'query' }])];
+    const r = createTelegramRunner({ bridge, t, collectMs: 0, catalogue: mergeManifests([{ manifest: toolsManifest }]), manifestsByOrigin: { tools: toolsManifest }, callSkill, gateRules });
+    await r.start();
+    const say = async (text) => { await bridge.simulateIncoming({ chatId: '9', text, sender: { bridgeUid: '9' } }); await r.idle(); };
+    return { say, keeper };
+  }
+
+  it('two shops: "meer" of the SECOND shop gives the second shop\'s things, with their own numbers', async () => {
+    const bridge = new InMemoryBridge({ id: 'telegram' });
+    const photos = []; bridge.sendPhoto = async (o) => { photos.push(o); };
+    const items = [...[1, 2, 3, 4].map((i) => ({ label: `AH ${i}`, seller: 'Albert Heijn', thumb: THUMB })), ...[1, 2, 3, 4, 5].map((i) => ({ label: `Jumbo ${i}`, seller: 'Jumbo', thumb: THUMB }))];
+    const { say } = await runner2(bridge, items);
+    await say('zoek melk');
+    const meer = bridge.outbox.flatMap((m) => m.buttons ?? []).filter((b) => String(b.id).startsWith('/meer '));
+    expect(meer).toHaveLength(2);
+    photos.length = 0; bridge.clearOutbox();
+    await say(meer[1].id);
+    expect(photos.map((p) => p.caption)).toEqual(['8. Jumbo 4', '9. Jumbo 5']);
+  });
+
+  it('"meer" for a list no longer kept answers in words, and shows nothing old', async () => {
+    const bridge = new InMemoryBridge({ id: 'telegram' });
+    const photos = []; bridge.sendPhoto = async (o) => { photos.push(o); };
+    const { say } = await runner2(bridge, [1, 2, 3, 4].map((i) => ({ label: `Melk ${i}`, seller: 'Jumbo', thumb: THUMB })));
+    await say('zoek melk');
+    const meer = bridge.outbox.flatMap((m) => m.buttons ?? []).find((b) => String(b.id).startsWith('/meer '));
+    await say('zoek melk');   // a newer list is kept: the older button names a list that is gone
+    photos.length = 0; bridge.clearOutbox();
+    await say(meer.id);
+    expect(photos).toHaveLength(0);
+    expect(bridge.outbox.map((m) => m.text).join('\n')).toContain('circle.bot.toolbox_more_gone');
+  });
+
+  it('a photo that cannot be sent becomes that thing\'s words line with its button; the rest still comes', async () => {
+    const bridge = new InMemoryBridge({ id: 'telegram' });
+    const photos = [];
+    bridge.sendPhoto = async (o) => { if (o.caption.startsWith('1.')) throw new Error('too big'); photos.push(o); };
+    const { say } = await runner2(bridge, [1, 2, 3].map((i) => ({ label: `Melk ${i}`, seller: 'Jumbo', thumb: THUMB })));
+    await say('zoek melk');
+    expect(photos.map((p) => p.caption)).toEqual(['2. Melk 2', '3. Melk 3']);
+    const line = bridge.outbox.find((m) => /^1\. Melk 1/.test(m.text ?? ''));
+    expect(line, 'the first thing in words').toBeTruthy();
+    expect((line.buttons ?? []).length).toBe(1);
+  });
 });

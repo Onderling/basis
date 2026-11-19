@@ -128,3 +128,14 @@ they fit together.
 
 - **onderling / Onderling** — *onderling* is the engineering name (the platform ships as `@onderling/*`, apps as `@onderling-app/*`);
   ***Onderling*** is the working name in public/product material.
+
+## Tools and toolboxes
+
+- **Tool** — one callable function a toolbox offers (`products.choices`). Reached through the one op `tools.useTool`.
+- **Toolbox** — a program that offers tools: it answers when asked, keeps nothing of the circle and acts for nobody
+  (a grocery search). Placed on the box by its operator; switched on by the household's admin (`/toolbox`).
+- **Door** — an input route a person's act comes in through (Basis, Telegram, a screen); it carries a link to a person
+  only when the act must be theirs.
+- **Node** — a machine that is on; doors end at a node, and tools are called from a node.
+- **Companion** — the circle's always-on node with its doors and tools: the household bot.
+

@@ -17,8 +17,8 @@ export function extensionVerbsFor(noun, atom) {
   return [nounWordOf(noun), atom];
 }
 
-/** The first word of every verb a first-party manifest's ops answer to. */
-function firstPartyFirstWords(manifests = []) {
+/** The first word of every verb a first-party manifest's ops answer to (also: the words a door's toolbox may not take). */
+export function firstPartyFirstWords(manifests = []) {
   const out = new Set();
   for (const m of manifests) {
     for (const op of m?.operations ?? []) {

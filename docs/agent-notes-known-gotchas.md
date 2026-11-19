@@ -919,3 +919,19 @@ whatwg-fetch, which does not send a cache mode: on a GET or HEAD with `no-cache`
 URL instead (a new URL each time, so the cache misses). The Community Solid Server ignores an unknown query (measured on
 7.2.0: `/` and `/?_=<ms>` give the same answer), so this works there. A pod server that does NOT ignore an unknown query
 would break on the phone only. Not yet proven on a phone: the DPoP proof with that query on the URL.
+
+## A worktree's APK will not install over the test phone's app (2026-11-19)
+
+The test phone runs Basis signed with the TEST key (`~/.onderling-keys/basis-test.jks`). An APK built in a worktree is
+signed with the debug key, and Android refuses to install it over an app with another signature
+(`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). Uninstalling first would wipe the phone's circles and identity, so don't. Re-sign
+the built APK with the test key instead: `zipalign -p -f 4 in.apk aligned.apk`, then `apksigner sign --ks
+~/.onderling-keys/basis-test.jks --out signed.apk aligned.apk` (zipalign BEFORE apksigner; the other order breaks the
+signature), then `adb install -r signed.apk`.
+
+## `vitest --root apps/basis` from the repo root breaks the tests that read files by a relative path (2026-11-19)
+
+Some basis tests read a sibling app's source relative to the WORKING DIRECTORY (e.g. `contactsHeaderClearsAvatar`
+reads `../basis-mobile/src/screens/v2/fab.js`). Run from the repo root with `--root apps/basis`, they look one level
+too high and fail with `ENOENT`, which reads like a real failure. Run basis tests from `apps/basis` (as CI does):
+`cd apps/basis && npx vitest run <files>`.

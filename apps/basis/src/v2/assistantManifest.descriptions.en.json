@@ -182,5 +182,9 @@
   "assistant-import": {
     "what": "Restore an export.",
     "params": {"file": "which export"}
+  },
+  "assistant-toolbox": {
+    "what": "Show the toolboxes on the box, or switch one on or off.",
+    "params": { "spec": "which toolbox, on or off" }
   }
 }

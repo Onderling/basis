@@ -7,6 +7,12 @@
       "input": "wat je vraagt"
     }
   },
+  "pickThing": {
+    "what": "Een ding dat een toolbox vond op een lijst zetten: de knop eronder.",
+    "params": {
+      "spec": "welk ding, en welke lijst"
+    }
+  },
   "listTools": {
     "what": "Laat zien welke toolboxen aan staan, en met welk woord je ze gebruikt.",
     "params": {

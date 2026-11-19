@@ -15,7 +15,7 @@
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as sodium from 'react-native-libsodium';
-import { installPhoneSignatureEquation } from '../basis/src/v2/signatureEquations.js';
+import { installPhoneSignatureEquation, installPhoneSigning } from '../basis/src/v2/signatureEquations.js';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, Pressable, Text, StyleSheet, BackHandler, AppState } from 'react-native';
 import { flushPendingSaves } from '@onderling/local-store';
@@ -94,6 +94,8 @@ import Constants from 'expo-constants';
 installPhoneSignatureEquation(sodium)
   .then((eq) => console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`))
   .catch(() => { /* tweetnacl stays */ });
+// …and SIGNING + key derivation through the same module (L619): taken only on tweetnacl's exact bytes.
+{ const s = installPhoneSigning(sodium); console.info(`[security] signing: ${s.ok ? s.name : `tweetnacl (${s.reason})`}`); }
 
 export default function App() {
   const [localeReady, setLocaleReady] = useState(false);

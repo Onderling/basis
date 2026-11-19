@@ -375,6 +375,10 @@ export const SEAMS = Object.freeze([
   // option through (`enrolDeviceName: opts.enrolDeviceName`), and a pass-through would satisfy a name-only pattern
   // while no shell supplied a value. The precedent for any seam a bundle forwards.
   { id: 'enrol-names-the-device', pattern: /enrolDeviceName:\s*\(\)\s*=>/, shells: ['web', 'mobile'], why: 'an enrolled device with no typed name reads "another device" on every one of the person\'s other devices' },
+  // THE FIRST FRAME (ledger L1051): before the agent is there a shell paints the default start (`firstFrameTab`, Vandaag),
+  // so a person on the default never sees the app jump to it seconds later. The phone only: the web paints nothing
+  // until its agent is there and opens straight on the start (circleApp's startTabFor); the box has no screen.
+  { id: 'first-frame-tab', pattern: /firstFrameTab\(/, shells: ['mobile'], why: 'the app opens on the circles list and jumps to Vandaag seconds later, under the person\'s finger' },
   // Today's reach card: a device with no relay says so and what works already. The host hands the strip the relay
   // question's own predicate; a shell that does not shows no card, and its person sends into nothing unwarned.
   { id: 'today-knows-no-relay', pattern: /relayKnown:\s*\(\)\s*=>/, shells: ['web', 'mobile'], why: 'a device with no connection point sends into nothing and nothing on Today says so' },
@@ -385,6 +389,10 @@ export const SEAMS = Object.freeze([
   // `useSignatureEquation`): node:crypto on the box, WebCrypto's batch on the web. A shell that does not checks every
   // signature in pure JS (~10 ms on a laptop, ~61 ms on a mid-range phone, against ~0.15 ms).
   { id: 'signature-equation', pattern: /install\w*SignatureEquation\(/, why: 'a shell that installs no fast equation checks every signature in pure JS: seconds of a start on a phone' },
+  // …and SIGNING + key derivation (core `useSigningEquation`, L619): libsodium over JSI on the phone, node:crypto on the
+  // box, taken only on tweetnacl's exact bytes. NOT the web: WebCrypto's Ed25519 is asynchronous and every signing path
+  // is synchronous, so the web signs with tweetnacl (a laptop signs fast enough; the phone is where it cost seconds).
+  { id: 'signing-equation', pattern: /install\w*Signing\(/, shells: ['mobile', 'box'], why: 'a phone that signs and derives keys in pure JS spends part of its start on it (its identities, circle addresses and every greeting it signs)' },
   // NEARBY'S CONVERSATION STREAM AND TAB COUNTS: what the Conversation tab holds in what order (chat lines, question and
   // circle cards by arrival) and how much is new on each tab are decided by shared functions; a painter that sorts or
   // counts by itself drifts from the other shell. Both are painted by Nearby's painter, so the web set includes it.

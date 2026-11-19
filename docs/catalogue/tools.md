@@ -8,8 +8,12 @@ was started 2026-11-18 with the first toolbox, a grocery search.
 ## What a person can do
 
 - **A housemate** types a toolbox's word at the household bot: `zoek halfvolle melk` (with or without a slash). The
-  bot asks the toolbox's tool and answers with what it found, each with its detail line (size, price). Choosing one to
-  put on a list is the next step (choices with buttons).
+  bot asks the toolbox's tool and answers with what it found, each with its detail line (size, price) and a button.
+  The button (`/kies <n>`) puts that thing on the list of the shop that sells it, else on the shopping list, else the
+  bot asks which list; it carries the thing's reference and a quantity of 1, as the person who tapped.
+  The same answer in words, at every door (also Basis's own bot thread, which has no buttons yet): the list is
+  numbered, and `2` or `kies 2` picks the second thing of the LAST list shown in that thread. A number with no list
+  open there is an ordinary line. The same thing again raises its quantity.
 - **A housemate** sees which toolboxes are on, and their words, in `/help` and the welcome.
 - **The household's admin** types `/toolbox`: the toolboxes the box's operator placed, each with its words and whether
   it is on. `/toolbox <naam> aan` shows the toolbox's card (its name, address, words and what it receives) and switches
@@ -30,7 +34,7 @@ was started 2026-11-18 with the first toolbox, a grocery search.
 - The operator's step: `deploy/roles/assistant.yml` (the files in the service's data volume).
 
 <!-- catalogue-ops
-tools: useTool listTools addToolbox removeToolbox
+tools: useTool pickThing listTools addToolbox removeToolbox
 assistant: assistant-toolbox
 -->
 
@@ -41,6 +45,8 @@ assistant: assistant-toolbox
 - `apps/basis/test/v2/toolboxes.test.js` — a placed toolbox is off until the yes; the card before the yes; the key in
   the request's header only and in no reply, refusal, log line or list; no call leaves for a toolbox that is off, not
   offered or without its key; the gate's words read live.
+- `apps/basis/test/v2/toolboxChoices.test.js` — a button per thing; the tap adds that thing (its reference, quantity 1)
+  to the seller's list, else the shopping list, else asks; only from the thread it was shown in.
 - `apps/basis/test/v2/toolboxDoor.test.js` — `/toolbox` at the door: the list, the card with Ja/Nee, the yes from the
   admin's private chat only, off.
 

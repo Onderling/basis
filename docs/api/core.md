@@ -642,6 +642,68 @@ package barrel as `b64decode`.
 
 **Returns:** `Uint8Array` — decoded bytes
 
+## `src/crypto/ed25519Sign.js`
+
+### `ed25519KeyPairFromSeed`
+
+**Kind:** function · **Import:** `ed25519KeyPairFromSeed` from `'@onderling/core'`
+
+```js
+ed25519KeyPairFromSeed(seed)
+```
+
+The Ed25519 key pair of a 32-byte seed.
+
+**Parameters**
+
+- `seed` `Uint8Array`
+
+**Returns:** `{publicKey: Uint8Array, secretKey: Uint8Array}` — secretKey is the 64-byte seed‖public form
+
+### `ed25519Sign`
+
+**Kind:** function · **Import:** `ed25519Sign` from `'@onderling/core'`
+
+```js
+ed25519Sign(msg, secretKey)
+```
+
+A detached Ed25519 signature.
+
+**Parameters**
+
+- `msg` `Uint8Array`
+- `secretKey` `Uint8Array` — 64 bytes, as `ed25519KeyPairFromSeed` gives it
+
+**Returns:** `Uint8Array` — 64 bytes
+
+### `signingEquationName`
+
+**Kind:** function · **Import:** `signingEquationName` from `'@onderling/core'`
+
+```js
+signingEquationName()
+```
+
+Which implementation answers now ('tweetnacl' until a shell installs one). For diagnostics.
+
+### `useSigningEquation`
+
+**Kind:** function · **Import:** `useSigningEquation` from `'@onderling/core'`
+
+```js
+useSigningEquation(eq)
+```
+
+A FASTER IMPLEMENTATION, installed once by the shell. Taken only if it agrees with tweetnacl byte for byte on the
+fixed vectors; otherwise the current one stays and the answer says why. `null` goes back to tweetnacl.
+
+**Parameters**
+
+- `eq` `{name: string, keyPairFromSeed: (seed: Uint8Array) => {publicKey: Uint8Array, secretKey: Uint8Array}, sign: (msg: Uint8Array, secretKey: Uint8Array) => Uint8Array}|null`
+
+**Returns:** `{ok: boolean, name: string, reason?: string}`
+
 ## `src/crypto/ed25519Strict.js`
 
 ### `strictSignatureShapeOk`

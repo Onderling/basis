@@ -16,6 +16,7 @@
 import { readToolboxCard, callTool, readItemList } from './toolboxClient.js';
 import { firstPartyFirstWords } from '@onderling/app-manifest';
 import { GATE_WORDS } from './gateWords.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 const ON_KEY = 'tools.on';
 const NAME = /^[a-z][a-z0-9-]{0,31}$/;
@@ -164,6 +165,24 @@ export function toolboxGateRule(getWords) {
 }
 
 /**
+ * The answer to "which one" in WORDS, at every door (ledger L1035): `2` or `kies 2` (and `kies 2 1`, the list asked
+ * for after it) picks thing 2 of the LAST list of things shown in this thread, as the row's button does: the button
+ * only sends the same thing. A number with no list open here, or past its end, is an ordinary line: the rule does not
+ * take it. The thread is the gate's `ctx.id` (the door's thread), the key the list was kept under.
+ * @param {ReturnType<typeof makeChoiceKeeper>} keeper
+ */
+export function toolChoiceGateRule(keeper) {
+  const command = (text, ctx) => {
+    const m = /^\s*(?:\/?kies\s+)?(\d{1,2})(?:\s+(\d{1,2}))?\s*\.?\s*$/iu.exec(String(text ?? ''));
+    if (!m) return null;
+    const thread = ctx?.id ?? ctx?.threadId ?? null;
+    if (!thread || !keeper?.take?.(thread, m[1])) return null;
+    return { opId: 'pickThing', appOrigin: 'tools', args: { spec: m[2] ? `${m[1]} ${m[2]}` : m[1] } };
+  };
+  return { name: 'tools:pickThing(number)', test: (text, ctx) => Boolean(command(text, ctx)), command };
+}
+
+/**
  * The toolboxes in words, one line per toolbox under a head, or the sentence for none: what `/toolbox` says to the
  * admin (`all`: every PLACED one, on or off; none placed yet), and what `listTools` answers anywhere it is painted (a
  * member: the ones ON; none on right now), so a screen never shows a bare tick.
@@ -217,6 +236,117 @@ export function toolboxWelcomeLine(words, t, lang = 'nl') {
 }
 
 /** The device-log kind of a toolbox call's record (packages/item-store entryKinds: kept like the own record, local). */
+/** How long a thread's last list of things can still be answered with a tap (the box's memory; gone on a restart). */
+export const CHOICE_KEEP = param({ key: 'tools.choiceKeepMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 * 60_000 });
+
+/**
+ * The last list of things shown in each thread, so a button can carry only its number (Telegram caps a button's data
+ * at 64 bytes). The next list in a thread replaces the last; another thread has its own; an old list is gone.
+ * @param {{now?: () => number, keepMs?: number}} [o]
+ */
+export function makeChoiceKeeper({ now = () => Date.now(), keepMs = CHOICE_KEEP } = {}) {
+  const kept = new Map();
+  let seq = 0;
+  return {
+    /**
+     * Keep a thread's list; returns its short tag, which its buttons carry (`<tag>.<n>`), so a button of an OLDER message
+     * never picks from the list kept after it.
+     */
+    keep(threadId, items) {
+      const tag = `${(now() % 46656).toString(36)}${(seq++ % 36).toString(36)}`;
+      if (threadId) kept.set(String(threadId), { at: now(), tag, items: Array.isArray(items) ? items.slice() : [] });
+      return tag;
+    },
+    /**
+     * Thing `n` (1-based) of the thread's last list, or null when there is none, it is old, or `n` was not shown. A
+     * tagged pick (`<tag>.<n>`, a button) must name the kept list; a bare number (typed) means the last list.
+     */
+    take(threadId, pick) {
+      const k = kept.get(String(threadId ?? ''));
+      if (!k || now() - k.at > keepMs) return null;
+      const [tag, n] = String(pick ?? '').includes('.') ? String(pick).split('.') : [null, pick];
+      if (tag !== null && tag !== k.tag) return null;
+      const i = Number(n);
+      return Number.isInteger(i) && i >= 1 && i <= k.items.length ? k.items[i - 1] : null;
+    },
+  };
+}
+
+/** A thing's row: its name, then what tells it apart (its detail) and its price, as given; the shop is the row's head. */
+const thingRow = (x, t) => {
+  const more = [x.detail && x.detail !== x.seller ? x.detail : null, x.price ? `€ ${String(x.price).replace('.', ',')}` : null].filter(Boolean).join(' · ');
+  return more ? t('circle.bot.toolbox_found_row', { label: x.label, more }) : String(x.label ?? '');
+};
+
+/**
+ * A toolbox's list of things as the door paints a list (`useTool` replies a list): a row per thing with its detail.
+ * Each row is a `tool-thing` numbered from 1, so the button the tools manifest declares for it (`pickThing`, the
+ * answer to "which one", ledger L1035) is painted by the shared row buttons: `pickThing:<n>`, well under Telegram's 64
+ * bytes. The list is kept, as the toolbox gave it, for the thread it was shown in. Anything else (a refusal, nothing
+ * found, an answer that is not a list) passes unchanged.
+ * @param {object} r  `useTool`'s answer
+ * @param {{threadId: string, keeper: ReturnType<typeof makeChoiceKeeper>, t: Function}} o
+ */
+export function toolChoicesReply(r, { threadId, keeper, t }) {
+  const found = r?.ok && Array.isArray(r.items) ? r.items : null;
+  if (!found || !found.length) return r;
+  // per shop, in the order the shops first came (the shop is the row's head): kept in that same order, so the number a
+  // row shows is the number a tap or a typed '2' picks
+  const order = [...new Set(found.map((x) => String(x?.seller ?? '')))];
+  const items = order.flatMap((s) => found.filter((x) => String(x?.seller ?? '') === s));
+  const tag = keeper?.keep?.(threadId, items) ?? null;
+  // a row of type `tool-thing`, numbered: the manifest's row button (`tools.pickThing`) is painted on it by the shared
+  // renderer, as on every surface that paints an answer's items
+  return {
+    ...r,
+    title: r.title ?? r.name,
+    // the row's id is its button's data: the kept list's tag and the number (`pickThing:<tag>.<n>`)
+    items: items.map((x, i) => ({ id: tag ? `${tag}.${i + 1}` : String(i + 1), type: 'tool-thing', label: thingRow(x, t), ...(x?.seller ? { seller: String(x.seller) } : {}) })),
+  };
+}
+
+/**
+ * Which list a chosen thing goes on: the list of the shop that sells it (its name holds the seller's, as a shop visit
+ * matches), else the household's shopping list (the template's shopping role), else none: the door asks.
+ * @param {{seller?: string}} thing @param {Array<{label: string}>} lists @param {string|null} shopping
+ */
+export function listForThing(thing, lists, shopping) {
+  const seller = String(thing?.seller ?? '').trim().toLowerCase();
+  const own = seller ? lists.find((l) => String(l.label ?? '').toLowerCase().includes(seller)) : null;
+  if (own) return own.label;
+  return shopping && lists.some((l) => l.label === shopping) ? shopping : null;
+}
+
+/**
+ * `tools.pickThing` — the answer to "which one" after a list of things (`/kies <n>`, or the row's button). Thing `n` of
+ * the list shown in THIS thread goes on a list as the person who tapped: the list of the shop that sells it, else the
+ * shopping list, else the reply asks which list (`/kies <n> <list>`, as quick replies). The thing's reference and
+ * quantity 1 ride along; the same thing again raises the quantity (the lists op says so, here in the person's words).
+ * @param {{keeper: ReturnType<typeof makeChoiceKeeper>, callSkill: Function, shoppingList: () => string|null}} o
+ * @returns {(args: {spec?: string, _match?: string}, ctx: object, t: Function) => Promise<object>}
+ */
+export function makePickThing({ keeper, callSkill, shoppingList = () => null }) {
+  return async (args, ctx, t) => {
+    const [n, m] = String(args?.spec ?? args?._match ?? '').trim().split(/\s+/);
+    const thing = keeper?.take?.(ctx?.threadId ?? ctx?.caller, n) ?? null;
+    if (!thing) return { ok: false, error: { code: 'choice-gone', message: t('circle.bot.toolbox_pick_gone') } };
+    const read = await callSkill('lists', 'listLists', {}, ctx);
+    const lists = (read?.ok && Array.isArray(read.items) ? read.items : []).filter((l) => l?.type === 'list' && l.label);
+    const chosen = m !== undefined ? (lists[Number(m) - 1]?.label ?? null) : listForThing(thing, lists, shoppingList());
+    if (!chosen) {
+      if (!lists.length) return { ok: false, error: { code: 'no-list', message: t('circle.bot.toolbox_pick_no_list') } };
+      return { ok: true, message: t('circle.bot.toolbox_pick_which_list', { label: thing.label }),
+        quickReplies: lists.map((l, i) => ({ label: String(l.label).slice(0, 60), slash: `/kies ${n} ${i + 1}` })) };
+    }
+    const ref = thing.ref && typeof thing.ref.type === 'string' && typeof thing.ref.ref === 'string' ? { type: thing.ref.type, ref: thing.ref.ref } : undefined;
+    // the person's own act at the bot (their tap, or the number they typed): it names its door, so the circle's switches apply
+    const r = await callSkill('lists', 'addToList', { list: chosen, text: thing.label, ...(ref ? { ref } : {}), quantity: 1 }, { ...ctx, door: 'bot' });
+    if (!r?.ok) return { ok: false, error: { code: r?.code ?? 'refused', message: typeof r?.error === 'string' ? r.error : (r?.error?.message ?? t('circle.bot.toolbox_pick_failed')) } };
+    if (r.duplicate) return { ok: true, message: t('circle.lists.quantity_raised', { item: thing.label, list: chosen, quantity: r.quantity }) };
+    return { ok: true, message: t('circle.bot.toolbox_pick_added', { list: chosen, label: thing.label }) };
+  };
+}
+
 export const TOOL_CALL_KIND = 'tool-call';
 
 /**

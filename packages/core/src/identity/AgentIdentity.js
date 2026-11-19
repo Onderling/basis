@@ -29,6 +29,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
 import { verifyEd25519Strict } from '../crypto/ed25519Strict.js';
 import { mnemonicToSeed, seedToMnemonic } from './Mnemonic.js';
+import { ed25519KeyPairFromSeed, ed25519Sign } from '../crypto/ed25519Sign.js';   // signing + derivation behind the port a shell may speed up (L619)
 
 const { convertPublicKey, convertKeyPair } = ed2curve;
 
@@ -135,7 +136,7 @@ export class AgentIdentity {
 
   constructor({ seed, vault, stableId = null, deviceId = null }) {
     this.#vault  = vault;
-    this.#signKP = nacl.sign.keyPair.fromSeed(seed);
+    this.#signKP = ed25519KeyPairFromSeed(seed);
     this.#boxKP  = convertKeyPair(this.#signKP);
     if (!this.#boxKP) throw new Error('Failed to derive Curve25519 keypair from seed');
     this.#stableId = stableId;
@@ -209,7 +210,7 @@ export class AgentIdentity {
     if (!(seedBytes instanceof Uint8Array) || seedBytes.length !== 32) {
       throw new Error('AgentIdentity.pubKeyFromSeed: seedBytes must be a 32-byte Uint8Array');
     }
-    return b64encode(nacl.sign.keyPair.fromSeed(seedBytes).publicKey);
+    return b64encode(ed25519KeyPairFromSeed(seedBytes).publicKey);
   }
 
   // ── Identity ───────────────────────────────────────────────────────────────
@@ -282,7 +283,7 @@ export class AgentIdentity {
    */
   sign(data) {
     if (typeof data === 'string') data = new TextEncoder().encode(data);
-    return nacl.sign.detached(data, this.#signKP.secretKey);
+    return ed25519Sign(data, this.#signKP.secretKey);
   }
 
   /**

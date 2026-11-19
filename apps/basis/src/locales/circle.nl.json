@@ -6190,6 +6190,10 @@
       "text": "Er staat nog geen toolbox klaar op de box. De beheerder van de box zet er een neer met een bestand en een sleutel; daarna zet je hem hier aan.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
+    "toolbox_none_on": {
+      "text": "Er staat nu geen toolbox aan.",
+      "doc": "The household bot's toolboxes a member may use: none is switched on now (listTools, wherever it is painted, a screen too)."
+    },
     "toolbox_list_head": {
       "text": "Toolboxen op de box:",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."

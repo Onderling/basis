@@ -292,6 +292,9 @@ export const SEAMS = Object.freeze([
   // line any other way is how the sheet would come to act in a circle.
   // (the shared "+" door, `createPlusDoor`, reads the line through `plusLineOutcome` itself: a shell composes the door)
   { id: 'plus-line-outcome', pattern: /createPlusDoor\(/, shells: ['web', 'mobile'], why: 'the "+" line makes an own act or refers to a circle, and never acts in one' },
+  // HOW FAR THE "+" GOES PER PERSONA (`plusCeilingRow`, built into each persona by `buildMijViewModel`): the row on the
+  // persona's card in Mij, whose tap writes what the row says (`row.write`: `agents.setPlusCeiling`)
+  { id: 'plus-ceiling-row', pattern: /p\.plusCeiling/, shells: ['web', 'mobile'], why: 'a person sets per persona how far their own "+" goes, on both shells' },
   // THE BOX AND THE "+": every `plus-*` seam names web and the phone only. The box (the always-on household device) does
   // not compose the person's own "+": a declared exception until after the alpha (docs/catalogue/assistant.md,
   // "Decided, not built"); its Telegram door runs the same engine over the household's things.
@@ -396,8 +399,8 @@ export const SEAMS = Object.freeze([
 
 /** A shell is a file SET: the files that together compose the substrate for that surface. */
 export const SHELLS = Object.freeze([
-  { name: 'web',    files: ['apps/basis/web/v2/circleApp.js', 'apps/basis/web/v2/circleNearby.js'] },
-  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/core/phoneInboundWiring.js', 'apps/basis-mobile/src/core/phoneAppOps.js', 'apps/basis-mobile/src/core/phonePodReadBack.js', 'apps/basis-mobile/src/core/phonePodSession.js', 'apps/basis-mobile/src/core/circleMedia.js', 'apps/basis-mobile/src/core/circlePods.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/src/screens/v2/CircleAdminPanelScreen.js', 'apps/basis-mobile/App.js'] },
+  { name: 'web',    files: ['apps/basis/web/v2/circleApp.js', 'apps/basis/web/v2/circleNearby.js', 'apps/basis/web/v2/circleMij.js'] },
+  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/core/phoneInboundWiring.js', 'apps/basis-mobile/src/core/phoneAppOps.js', 'apps/basis-mobile/src/core/phonePodReadBack.js', 'apps/basis-mobile/src/core/phonePodSession.js', 'apps/basis-mobile/src/core/circleMedia.js', 'apps/basis-mobile/src/core/circlePods.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/src/screens/v2/CircleAdminPanelScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMijScreen.js', 'apps/basis-mobile/App.js'] },
   { name: 'box',    files: ['apps/basis/bin/device-runner.mjs', 'apps/basis/src/telegram/runner.js'] },   // the runner is the box's Telegram door
 ]);
 

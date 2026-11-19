@@ -10,7 +10,13 @@ export const PLUS_CEILING_ROW = Object.freeze({
   key: PLUS_CEILING_KEY,
   labelKey: 'circle.mij.plus_ceiling',
   hintKey: 'circle.mij.plus_ceiling_hint',
-  choices: Object.freeze([0, 1, 2, 3].map((value) => Object.freeze({ value, labelKey: `circle.mij.plus_ceiling_${value}` }))),
+  // each key written out, so a reader of the code (and the locale parity lint) finds them
+  choices: Object.freeze([
+    Object.freeze({ value: 0, labelKey: 'circle.mij.plus_ceiling_0' }),
+    Object.freeze({ value: 1, labelKey: 'circle.mij.plus_ceiling_1' }),
+    Object.freeze({ value: 2, labelKey: 'circle.mij.plus_ceiling_2' }),
+    Object.freeze({ value: 3, labelKey: 'circle.mij.plus_ceiling_3' }),
+  ]),
 });
 
 /**

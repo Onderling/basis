@@ -119,7 +119,7 @@ import { ensureHouseholdLists, householdBotApps, templateLists, loadListItems, e
 import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
-import { makeToolboxOps, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords } from '../src/v2/toolboxes.js';
+import { makeToolboxOps, toolboxListLine, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords } from '../src/v2/toolboxes.js';
 import { wrapCallSkillWithEgressGate, isExternalEgressOp } from '../src/core/agent/egressGate.js';   // what leaves for a toolbox, and its record   // a circle's toolboxes (L1035): the key from the operator's config
 import { toolsManifest } from '../src/v2/toolsManifest.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -1416,7 +1416,11 @@ if (tgToken || inboxDoor.bridge) {
       if (!r.ok) return { ...r, error: { code: r.code, message: toolboxRefusalText(r, tp) } };
       return Array.isArray(r.items) && !r.items.length ? { ...r, message: tp('circle.bot.toolbox_none_found', { title: r.title ?? r.name }) } : r;
     },
-    listTools: (args) => toolboxes.listTools(args),
+    // which toolboxes are on, in words wherever it is painted (a screen too, never a bare tick): `/toolbox`'s own wording
+    listTools: async (args, ctx) => {
+      const r = await toolboxes.listTools(args);
+      return { ...r, message: toolboxListLine(r?.toolboxes ?? [], (k, p) => t(k, p, ctx?.lang ?? undefined), { all: Boolean(args?.all) }) };
+    },
     addToolbox: (args) => toolboxes.addToolbox(args), removeToolbox: (args) => toolboxes.removeToolbox(args),
   }, toolsManifest);
   const doorCall = withAssistantOps({

@@ -31,7 +31,7 @@ import { decodeContactCard } from '@onderling-app/pinboard/lib/contactCard';
 import { readDayAndTime } from '../forms/parseDate.js';
 import { replyLine } from './replyLine.js';
 import { THREAD_LANGS } from './botThreads.js';
-import { toolboxRefusalText } from './toolboxes.js';
+import { toolboxRefusalText, toolboxListLine } from './toolboxes.js';
 
 /** How many entries of one part the week overview shows before it says how many more there are. */
 export const WEEK_OVERVIEW_MAX_ITEMS = param({ key: 'assistant.weekOverviewMaxItems', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15 });
@@ -1093,12 +1093,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const say = (r) => toolboxRefusalText(r, tp);
     if (!words.length) {
       const r = await callSkill('tools', 'listTools', { all: true }, ctx);
-      const rows = r?.toolboxes ?? [];
-      if (!rows.length) return { ok: true, message: tp('circle.bot.toolbox_none') };
-      return { ok: true, message: [tp('circle.bot.toolbox_list_head'), ...rows.map((b) => tp('circle.bot.toolbox_row', {
-        title: b.title, name: b.name, state: tp(b.on ? 'circle.bot.toolbox_state_on' : 'circle.bot.toolbox_state_off'),
-        words: b.words?.length ? ` · ${b.words.map((w) => `${w.word} <…>`).join(', ')}` : '',
-      }))].join('\n') };
+      return { ok: true, message: toolboxListLine(r?.toolboxes ?? [], tp, { all: true }) };
     }
     const [name, verb, answer] = [words[0].toLowerCase(), String(words[1] ?? '').toLowerCase(), String(words[2] ?? '').toLowerCase()];
     if (verb === 'uit' || verb === 'off') {

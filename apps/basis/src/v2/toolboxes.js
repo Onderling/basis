@@ -163,6 +163,22 @@ export function toolboxGateRule(getWords) {
   return { name: 'tools:useTool(word)', test: (text) => Boolean(command(text)), command };
 }
 
+/**
+ * The toolboxes in words, one line per toolbox under a head, or the sentence for none: what `/toolbox` says to the
+ * admin (`all`: every PLACED one, on or off; none placed yet), and what `listTools` answers anywhere it is painted (a
+ * member: the ones ON; none on right now), so a screen never shows a bare tick.
+ * @param {Array<{name: string, title?: string, on?: boolean, words?: Array<{word: string}>}>} rows @param {Function} tp
+ * @param {{all?: boolean}} [o]
+ */
+export function toolboxListLine(rows, tp, { all = false } = {}) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) return tp(all ? 'circle.bot.toolbox_none' : 'circle.bot.toolbox_none_on');
+  return [tp('circle.bot.toolbox_list_head'), ...list.map((b) => tp('circle.bot.toolbox_row', {
+    title: b.title ?? b.name, name: b.name, state: tp(b.on ? 'circle.bot.toolbox_state_on' : 'circle.bot.toolbox_state_off'),
+    words: b.words?.length ? ` · ${b.words.map((w) => `${w.word} <…>`).join(', ')}` : '',
+  }))].join('\n');
+}
+
 /** The door's words for a toolbox refusal code (`circle.bot.toolbox_*`), the same from `/toolbox` and from a tool's use. */
 const REFUSAL_KEY = Object.freeze({
   'toolbox-not-placed': 'toolbox_not_placed', 'toolbox-no-key': 'toolbox_no_key', 'toolbox-off': 'toolbox_is_off',

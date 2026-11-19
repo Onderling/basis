@@ -6185,6 +6185,10 @@
       "text": "No toolbox is placed on the box yet. The box's operator places one with a file and a key; then you switch it on here.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
+    "toolbox_none_on": {
+      "text": "No toolbox is on right now.",
+      "doc": "The household bot's toolboxes a member may use: none is switched on now (listTools, wherever it is painted, a screen too)."
+    },
     "toolbox_list_head": {
       "text": "Toolboxes on the box:",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."

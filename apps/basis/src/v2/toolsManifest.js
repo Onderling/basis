@@ -46,7 +46,9 @@ export const toolsManifest = Object.freeze({
       // (the admin's private chat) switches it on. A placed toolbox is off until then.
       id: 'addToolbox', visibility: 'trusted', verb: 'add-toolbox',
       stepUp: 'private-door',
-      writes: { scope: 'device', what: 'control' },
+      // a CIRCLE's control (5): a toolbox decides where the circle's questions go; scope is the widest place an op
+      // affects, not where its record is kept (the box's vault)
+      writes: { scope: 'circle', what: 'control' },
       params: [
         { name: 'name',    kind: 'string',  required: true, schema: { minLength: 1 } },
         { name: 'confirm', kind: 'boolean', required: false },
@@ -56,7 +58,9 @@ export const toolsManifest = Object.freeze({
     {
       id: 'removeToolbox', visibility: 'trusted', verb: 'remove-toolbox',
       stepUp: 'private-door',
-      writes: { scope: 'device', what: 'control' },
+      // a CIRCLE's control (5): a toolbox decides where the circle's questions go; scope is the widest place an op
+      // affects, not where its record is kept (the box's vault)
+      writes: { scope: 'circle', what: 'control' },
       params: [{ name: 'name', kind: 'string', required: true, schema: { minLength: 1 } }],
       surfaces: {},
     },

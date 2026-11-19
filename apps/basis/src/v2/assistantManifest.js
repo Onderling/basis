@@ -335,7 +335,9 @@ export const assistantManifest = {
       verb:   'toolbox',
       visibility: 'trusted',
       stepUp: 'private-door',
-      writes: { scope: 'device', what: 'control' },
+      // a CIRCLE's control (5): a toolbox decides where the circle's questions go; scope is the widest place an op
+      // affects, not where its record is kept (the box's vault)
+      writes: { scope: 'circle', what: 'control' },
       params: [{ name: 'spec', kind: 'string', required: false }],
       surfaces: { slash: { command: '/toolbox', body: 'argline' } },
     },

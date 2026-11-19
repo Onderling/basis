@@ -10,11 +10,13 @@ import { opWeight, isGenericOpId } from '@onderling/app-manifest';
 import { BOT_OP_MAP } from '../src/v2/botOpMap.js';
 import { catalogueManifests } from '../src/v2/manifestSources.js';
 import { assistantManifest } from '../src/v2/assistantManifest.js';
+import { toolsManifest } from '../src/v2/toolsManifest.js';
 import { synthesizeGenericOps } from '../src/genericOpSynth.js';
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotUsers } from '../src/v2/botUsers.js';
+import { HOUSEHOLD_IN_APP_KEY } from '../src/v2/botSettings.js';
 
-const MANIFESTS = [...catalogueManifests(), assistantManifest];
+const MANIFESTS = [...catalogueManifests(), assistantManifest, toolsManifest];
 const rowOf = (q) => {
   const id = q.includes('.') && !isGenericOpId(q) ? q.slice(q.indexOf('.') + 1) : q;
   for (const m of MANIFESTS) { const o = [...(m.operations ?? []), ...synthesizeGenericOps(m)].find((x) => x.id === id); if (o) return { m, o }; }
@@ -69,12 +71,47 @@ describe('an exception runs only from the person\'s own private chat', () => {
     await users.admit({ channel: 'telegram', uid: '42', displayName: 'Ann' });
     return withAssistantOps({ callSkill: async () => ({ params: [] }), t, refusal: async () => null, threads: { langOf: () => null }, admin: { users: async () => users.list() } });
   }
-  it('from a group chat each one is refused before it runs', async () => {
+  // the three whose handler keeps the effect and the secret private by itself (Fable 2026-11-19): asked in a group, the
+  // screen link goes to the private chat and the group is told so; the in-app invite and the screen's yes refuse a group
+  // with their own line
+  const PRIVATE_BY_ITSELF = ['assistant-screen', 'assistant-inapp', 'assistant-screen-confirm'];
+  it('from a group chat each one is refused before it runs (the door\'s check)', async () => {
     const call = await door();
-    for (const op of EXCEPTIONS) {
+    for (const op of EXCEPTIONS.filter((x) => !PRIVATE_BY_ITSELF.includes(x))) {
       const r = await call('assistant', op, {}, { caller: 'telegram:42', threadId: 'telegram:42', chatId: '-100777' });
       expect(r?.error?.code, op).toBe('not-private');
     }
+  });
+  it('the three that answer a group privately: no secret reaches the group, and the yes is refused there', async () => {
+    const privately = [];
+    const m = new Map();
+    const store = { get: async (id) => m.get(id) ?? null, put: async (row) => { m.set(row.id, { ...row }); return row; }, list: async () => [...m.values()], hide: async () => {} };
+    const users = createBotUsers({ store });
+    await users.admit({ channel: 'telegram', uid: '42', displayName: 'Ann' });
+    const secret = 'https://basis.example/#scherm=SECRET';
+    const call = withAssistantOps({
+      callSkill: async (_app, op) => ({ params: op === 'list-user-params' ? [{ key: HOUSEHOLD_IN_APP_KEY, value: 'on' }] : [] }), t: (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k), refusal: async () => null, threads: { langOf: () => null },
+      admin: {
+        householdInApp: { inviteFor: async () => ({ ok: true, uri: 'onderling://join#SECRET-INVITE' }) },
+        users: async () => users.list(),
+        screens: { start: async (_p, text) => { privately.push(text(secret, 10)); return { ok: true, until: Date.now() + 600_000 }; }, list: async () => [], confirm: async (_p, _a, o) => (o?.isPrivate ? { ok: true } : { ok: false, reason: 'not-private' }) },
+        sendPrivately: async (_p, text) => { privately.push(String(text)); return { ok: true }; },
+      },
+    });
+    const inGroup = { caller: 'telegram:42', threadId: 'telegram:42', chatId: '-100777' };
+    const answered = {};
+    for (const op of ['assistant-screen', 'assistant-inapp']) {
+      const r = await call('assistant', op, { answer: 'ja' }, inGroup);
+      expect(JSON.stringify(r ?? {}), `${op}: the group sees no secret`).not.toContain('#scherm=');
+      answered[op] = r;
+    }
+    expect(answered['assistant-screen']).toMatchObject({ ok: true, message: 'circle.bot.screen_sent_privately' });
+    expect(privately.some((x) => x.includes('#scherm=SECRET')), 'the link went to the private chat').toBe(true);
+    // the in-app invite: refused with its own line (the handler's check), never the invite
+    expect(answered['assistant-inapp']).toMatchObject({ ok: false, error: { code: 'not-private', message: 'circle.bot.link_not_private' } });
+    const yes = await call('assistant', 'assistant-screen-confirm', { answer: '123456' }, inGroup);
+    expect(yes).toMatchObject({ ok: false, error: { code: 'not-private' } });
+    expect(JSON.stringify(yes ?? {}), 'the yes says its own line, not the door\'s').not.toContain('kring_not_private');
   });
   it('from the private chat none is refused for that', async () => {
     const call = await door();

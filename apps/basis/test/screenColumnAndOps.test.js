@@ -52,8 +52,9 @@ describe('the door\'s screen ops', () => {
     drop: async (_p, n) => (n === 1 ? { ok: true } : { ok: false, reason: 'no-such-screen' }),
     dropAll: async (p) => { dropped.push(p); return 2; },
   };
-  const call = withAssistantOps({ callSkill: async () => ({ ok: true }), threads, t, refusal: async () => null, admin: { screens, revoke: async () => ({ id: 'telegram:2', displayName: 'Bert' }) } });
-  const as = (op, args = {}) => call('assistant', op, args, { caller: 'telegram:1', threadId: 'telegram:1' });
+  const call = withAssistantOps({ callSkill: async () => ({ ok: true }), threads, t, refusal: async () => null, admin: { screens, users: async () => [{ id: 'telegram:1', channel: 'telegram', uid: '1', role: 'admin' }], revoke: async () => ({ id: 'telegram:2', displayName: 'Bert' }) } });
+  // from the person's own private chat (the door's check reads the person's row and the chat it came from)
+  const as = (op, args = {}) => call('assistant', op, args, { caller: 'telegram:1', threadId: 'telegram:1', chatId: '1' });
 
   it('/scherm sends the link privately and says so where it was asked; /schermen lists, drops one, says when there is none', async () => {
     const r = await as('assistant-screen');

@@ -16,6 +16,12 @@ import { upcoming } from './intentions.js';
 import { assistantManifest } from './assistantManifest.js';
 /** The ops beyond a role's weight at the bot, each named with its reason on its row (`botException`). */
 const BOT_EXCEPTIONS = new Set(assistantManifest.operations.filter((o) => o.botException).map((o) => o.id));
+/**
+ * The exceptions whose handler itself keeps the EFFECT and any secret in the person's private chat (Fable 2026-11-19):
+ * asked in a group, the screen link is sent privately and the group is told so; the in-app invite and the screen's yes
+ * refuse a group with their own line. The door's private check covers the other exceptions.
+ */
+const PRIVATE_BY_ITSELF = new Set(['assistant-screen', 'assistant-inapp', 'assistant-screen-confirm']);
 import { createIntentionBook } from './intentionBook.js';
 import { createOwnDevicesStore } from './ownDevicesStore.js';
 import { WEEK_OVERVIEW_OP, weekOverviewOn, switchWeekOverview } from './weekOverviewRows.js';
@@ -179,8 +185,9 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (refused) return { ok: false, error: { code: refused.code ?? String(refused), message: t('circle.bot.admin_only') }, refusal: refused };
     }
     // an op beyond the role's weight at the bot (`botException` on its row: a person's own screen, identity link, the
-    // household in their own app) runs only from the person's OWN private chat; never in a group, never from a screen
-    if (BOT_EXCEPTIONS.has(op) && !(await fromPrivateDoor(caller ?? ctx?.threadId, ctx))) {
+    // household in their own app) has its effect, and any secret, only in the person's OWN private chat: never in a
+    // group, never from a screen (the three that answer a group privately by themselves are `PRIVATE_BY_ITSELF`)
+    if (BOT_EXCEPTIONS.has(op) && !PRIVATE_BY_ITSELF.has(op) && !(await fromPrivateDoor(caller ?? ctx?.threadId, ctx))) {
       return { ok: false, error: { code: 'not-private', message: t('circle.bot.kring_not_private') } };
     }
     try {

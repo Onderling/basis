@@ -811,6 +811,10 @@ Each one produced an APK that did not carry the code it was built to test.
 - **A release build fails at `:app:collectReleaseDependencies` with "Java heap space"** (2026-11-13): on a machine
   short of memory, the Gradle daemons left by earlier builds (one per worktree) hold gigabytes. `./gradlew --stop`
   in the worktree's `android/` freed ~7.6 GB and the next build went through.
+- **A release build fails at once in `settings.gradle` line 2: `Cannot run program "node" … Failed to exec spawn
+  helper`** (2026-11-20): a Gradle daemon left from an earlier build (after a JDK or system update) can no longer
+  start child processes. Not the code and not node: `./gradlew --stop` in that worktree's `android/`, then build
+  again (it went through on the next try).
 - **`mk-worktree.sh` stops part-way with "cp: cannot create hard link … Too many links"** (2026-11-13): every worktree
   hardlinks the same `node_modules`, and ext4 allows a file about 65,000 links, so with ~45 worktrees the most-shared
   files reach the cap. The copy stops at the first such file (an old demo app's), the script exits under `set -e`, and

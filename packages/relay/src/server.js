@@ -413,7 +413,7 @@ export async function startRelay(opts = {}) {
 
     // THE STATIC FILES NEVER LEAVE THEIR ROOT (the independent read of 2026-11-20): the path is decoded first, no segment
     // may start with a dot (a dotfile, or `..`), and both the resolved path and the file it really is (a link followed)
-    // must be the root or INSIDE it — with a separator: `/srv/site-secret` starts with `/srv/site` too.
+    // must be the root or INSIDE it — with a separator: a sibling folder named `site-secret` starts with `site` too.
     let pathname;
     try { pathname = decodeURIComponent(String(req.url ?? '').split('?')[0]); }
     catch { res.writeHead(400); res.end('Bad request'); return; }

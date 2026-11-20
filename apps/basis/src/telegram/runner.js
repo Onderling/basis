@@ -33,7 +33,6 @@ import { createLastReads } from '../v2/lastRead.js';
 import { telegramPlain } from './telegramPlain.js';
 import { scrubSecrets } from '@onderling/logger';
 import { modelDownClass } from '../v2/modelWatch.js';
-import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { redactPairingSecrets } from '../v2/connectionPairing.js';
 
 /** The line a person gets when the model did not answer, by cause class. */

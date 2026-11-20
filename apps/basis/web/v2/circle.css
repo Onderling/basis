@@ -12,8 +12,8 @@
 .circle-page {
   max-width: 640px;
   margin: 0 auto;
-  /* bottom clears the fixed tab bar AND the floating "+" above it (.cc-fab: bottom 76 + 56 tall + 16 room) — the
-     phone's FAB_CLEARANCE (theme.js) is the same number, pinned by fitness/fabClearance.test.js */
+  /* bottom clears the fixed tab bar AND the opened "+"'s round buttons above it (76 + 56 tall + 16 room) — the
+     phone's FAB_CLEARANCE (fab.js) is the same number, pinned by fitness/fabClearance.test.js */
   padding: 18px 16px 148px;
 }
 
@@ -1601,7 +1601,7 @@
 .circle-tabbar.is-dial-open .circle-tabbar__tab { opacity: .45; }
 /* the round buttons around the "+", each a thumb-reach above it, each with its word */
 .circle-plusdial { position: absolute; left: 0; right: 0; bottom: calc(100% + 16px); z-index: 2; display: flex; justify-content: center; gap: 28px; pointer-events: none; }
-.circle-plusdial__btn { pointer-events: auto; width: 64px; height: 64px; border-radius: 50%; border: 0; background: var(--paper); color: var(--ink); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
+.circle-plusdial__btn { pointer-events: auto; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--paper); color: var(--ink); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
 .circle-plusdial__btn:hover { color: var(--accent-ink); }
 .circle-vandaag-plus__section h4 { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; }
 

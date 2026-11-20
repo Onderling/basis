@@ -81,7 +81,7 @@ export function PlusDialButtons({ plus }) {
     <View style={styles.dialRow} pointerEvents="box-none" testID="plus-dial">
       {(plus.dial?.around ?? []).map((b) => (
         <Pressable key={b.id} onPress={() => plus.onPress?.(b.id)} accessibilityRole="button" accessibilityLabel={t(b.labelKey)}
-          testID={`plus-dial-${b.id}`} style={styles.dialBtn}>
+          testID={`plus-dial-${b.id}`} style={styles.dialSpot}>
           <Text style={styles.dialWord}>{t(b.labelKey)}</Text>
         </Pressable>
       ))}
@@ -112,7 +112,7 @@ const makeStyles = (theme) => StyleSheet.create({
   plusSign: { color: theme.color.accentContrast, fontSize: 26, lineHeight: 28 },
   plusWord: { color: theme.color.accentContrast, fontSize: 12, fontWeight: '700' },
   dialRow: { position: 'absolute', left: 0, right: 0, bottom: FAB.bottom, flexDirection: 'row', justifyContent: 'center', gap: 28 },
-  dialBtn: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.paper, elevation: 6 },
+  dialSpot: { width: FAB.size, height: FAB.size, borderRadius: FAB.size / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.paper, elevation: 6 },
   dialWord: { color: theme.color.ink, fontSize: 12, fontWeight: '700' },
   badge: { minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, textAlign: 'center', fontSize: 11, fontWeight: '700', lineHeight: 18, backgroundColor: theme.color.accent, color: theme.color.white, overflow: 'hidden' },
 });

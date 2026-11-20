@@ -186,7 +186,7 @@ function readSlots(slots, field) {
     if (!PARAM.test(p) || p === field || !s.values || typeof s.values !== 'object' || Array.isArray(s.values)) continue;
     const values = {};
     for (const [value, phrases] of Object.entries(s.values).slice(0, 50)) {
-      const clean = [...new Set((Array.isArray(phrases) ? phrases : []).slice(0, 50).map((x) => String(x ?? '').toLowerCase().replace(/\s+/g, ' ').trim()).filter((x) => x && x.length <= 40))];
+      const clean = [...new Set((Array.isArray(phrases) ? phrases : []).slice(0, 50).map((x) => String(x ?? '').normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim()).filter((x) => x && x.length <= 40))];
       if (value && clean.length) values[value] = clean;
     }
     if (Object.keys(values).length) out.push({ param: p, ...(s.list === true ? { list: true } : {}), values });
@@ -207,15 +207,19 @@ const NOT_IN_WORD = '[\\p{L}\\p{N}]';
  * @returns {{rest: string, filled: Record<string, string|string[]>}}
  */
 export function takeSlots(line, slots) {
-  let rest = String(line ?? '').replace(/\s+/g, ' ').trim();
+  // one form for what was typed and what was placed (a combining accent typed is the precomposed one written)
+  let rest = String(line ?? '').normalize('NFC').replace(/\s+/g, ' ').trim();
   const filled = {};
-  const phrases = (Array.isArray(slots) ? slots : []).flatMap((s) => Object.entries(s?.values ?? {}).flatMap(([value, ps]) => (Array.isArray(ps) ? ps : []).map((p) => ({ slot: s, value, phrase: String(p ?? '').trim() }))))
+  const phrases = (Array.isArray(slots) ? slots : []).flatMap((s) => Object.entries(s?.values ?? {}).flatMap(([value, ps]) => (Array.isArray(ps) ? ps : []).map((p) => ({ slot: s, value, phrase: String(p ?? '').normalize('NFC').trim() }))))
     .filter((p) => p.phrase)
     .sort((a, b) => b.phrase.length - a.phrase.length);
   if (!phrases.length) return { rest, filled };
+  // a sentence's marks at either end ('bij ah?', 'bij Albert Heijn.') never hide a phrase
+  const edges = (s) => s.replace(/^[\s?.!,]+|[\s?.!,]+$/gu, '');
+  rest = edges(rest) || rest;
   const fill = ({ slot, value }) => {
-    if (slot.list) { const had = Array.isArray(filled[slot.param]) ? filled[slot.param] : []; if (!had.includes(value)) filled[slot.param] = [...had, value]; }
-    else if (!(slot.param in filled)) filled[slot.param] = value;
+    if (slot.list) { const had = Object.hasOwn(filled, slot.param) ? filled[slot.param] : []; if (!had.includes(value)) filled[slot.param] = [...had, value]; }
+    else if (!Object.hasOwn(filled, slot.param)) filled[slot.param] = value;
   };
   for (let changed = true; changed;) {
     changed = false;
@@ -225,7 +229,8 @@ export function takeSlots(line, slots) {
       const tail = lead ? null : new RegExp(`(?<!${NOT_IN_WORD})${body}$`, 'iu').exec(rest);
       const hit = lead ?? tail;
       if (!hit) continue;
-      const left = (lead ? rest.slice(hit[0].length) : rest.slice(0, hit.index)).trim();
+      // a comma between the phrase and the question ('melk, bij jumbo') goes with the phrase
+      const left = edges(lead ? rest.slice(hit[0].length) : rest.slice(0, hit.index));
       if (!left) continue;
       rest = left; fill(p); changed = true;
       break;

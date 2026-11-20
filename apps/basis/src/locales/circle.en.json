@@ -6268,8 +6268,12 @@
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
     "toolbox_card": {
-      "text": "{{title}} is placed at {{url}}.\nWords: {{words}}.\n{{receives}}\nSwitch it on?",
-      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+      "text": "{{title}} is placed at {{url}}.\nWords: {{words}}.{{slots}}\n{{receives}}\nSwitch it on?",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035). {{slots}}: one toolbox_card_slot line per slot, each starting on a new line, or empty."
+    },
+    "toolbox_card_slot": {
+      "text": "With {{word}}, these phrases fill {{param}}: {{phrases}}.",
+      "doc": "One line of the /toolbox card per slot of a word: the tool parameter and, per value, the phrases that fill it (e.g. 'ah: bij albert heijn / bij ah; jumbo: bij jumbo')."
     },
     "toolbox_receives_question": {
       "text": "It receives the words of a question, and nothing about who asks.",

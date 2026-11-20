@@ -44,6 +44,25 @@ describe('a toolbox word\'s slots: phrases that fill a tool parameter', () => {
     expect(takeSlots('melk bij ah', plain)).toEqual({ rest: 'melk', filled: { store: 'ah' } });
   });
 
+  it('punctuation at either end, or a comma before the phrase, does not hide a slot', () => {
+    expect(input('zoek hagelslag bij ah?')).toEqual({ query: 'hagelslag', stores: ['ah'] });
+    expect(input('zoek hagelslag bij Albert Heijn.')).toEqual({ query: 'hagelslag', stores: ['ah'] });
+    expect(input('zoek hagelslag bij Albert Heijn!')).toEqual({ query: 'hagelslag', stores: ['ah'] });
+    expect(input('zoek melk, bij jumbo')).toEqual({ query: 'melk', stores: ['jumbo'] });
+    expect(input('zoek bij jumbo, pindakaas')).toEqual({ query: 'pindakaas', stores: ['jumbo'] });
+  });
+
+  it('text typed with combining accents matches a phrase written precomposed (NFC)', () => {
+    const slots = [{ param: 'stores', list: true, values: { cafe: ['bij het café'] } }];
+    expect(takeSlots('koffie bij het café', slots)).toEqual({ rest: 'koffie', filled: { stores: ['cafe'] } });
+  });
+
+  it('a param named like an Object prototype key is filled all the same', () => {
+    const slots = [{ param: 'constructor', values: { a: ['bij a'] } }, { param: 'toString', values: { b: ['bij b'] } }];
+    expect(takeSlots('melk bij a', slots).filled).toEqual({ constructor: 'a' });
+    expect(takeSlots('melk bij b', slots).filled).toEqual({ toString: 'b' });
+  });
+
   it('a line that is ONLY a phrase stays the query (nothing would be left to ask)', () => {
     expect(input('zoek bij ah')).toEqual({ query: 'bij ah' });
   });

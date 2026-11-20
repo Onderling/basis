@@ -1143,6 +1143,11 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       ok: true,
       message: tp('circle.bot.toolbox_card', {
         title: r.title, url: r.url, words: r.words.map((w) => `${w.word} <…>`).join(', '),
+        // per word with slots, the parameter and the phrases it listens for: a changed slot ends the yes, so the yes
+        // is to what is shown
+        slots: r.words.flatMap((w) => (w.slots ?? []).map((s) => `\n${tp('circle.bot.toolbox_card_slot', {
+          word: w.word, param: s.param, phrases: Object.entries(s.values ?? {}).map(([v, ps]) => `${v}: ${ps.join(' / ')}`).join('; '),
+        })}`)).join(''),
         receives: tp(r.receives?.includes('list-refs') ? 'circle.bot.toolbox_receives_list' : 'circle.bot.toolbox_receives_question'),
       }),
       quickReplies: [{ slash: `/toolbox ${name} aan ja`, label: tp('circle.bot.toolbox_yes') }, { slash: `/toolbox ${name} aan nee`, label: tp('circle.bot.toolbox_no') }],

@@ -1,7 +1,7 @@
 /**
- * THE GEAR ON MIJ (2026-10-23). Mij's header has a gear: Instellingen. Its home lists the declared groups and then
- * "Per kring"; Weergave holds the theme, the language, where the app opens, how the bot shows actions, the week
- * overview (a real switch), notifications and the assistant — and Mij has no door to an old My data page.
+ * THE SETTINGS BUTTON (regrouped 2026-11-20). Its home lists the declared groups and then "Per kring"; Weergave holds
+ * the theme, the language, where the app opens and the "+"'s middle; Meldingen the notifications and the week overview
+ * (a real switch); Assistent the own model and how the bot shows actions.
  * "Per kring" lists the person's circles, each opening that circle's own settings.
  *
  *   PEER_TEST_PORT=5273 npx playwright test --project=no-relay test-browser/settings-weergave.spec.js
@@ -23,18 +23,27 @@ test('the gear opens Instellingen; Weergave holds the appearance settings, Per k
   await expect(page.locator('.cc-settings__per-circle'), 'Per kring is the last row').toBeVisible();
 
   await page.locator('.cc-settings__group--appearance').click();
-  for (const id of ['theme', 'language', 'notifications']) {
+  for (const id of ['theme', 'language', 'start-screen']) {
     await expect(page.locator(`[data-section="${id}"]`), id).toBeVisible({ timeout: 15_000 });
   }
-  // 'How the bot shows actions' is about a bot that ACTS; Help only answers. A fresh profile has Help as its only bot,
-  // so the section is not offered at all (the shared predicate showsBotActionsSetting, both shells, ruled 2026-11-07).
-  await expect(page.locator('[data-section="bot-actions"]'), 'no bot setting while the only bot is Help').toHaveCount(0);
-  const week = page.locator('.cc-profile__week-toggle');
-  if (await week.count()) await expect(week, 'the week overview is a switch').toHaveAttribute('role', 'switch');
+  await expect(page.locator('[data-section="notifications"]'), 'notifications moved to Meldingen').toHaveCount(0);
 
   // a setting changes live: dark theme
   await page.locator('[data-section="theme"] button', { hasText: /donker|dark/i }).first().click();
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme ?? '')).toBe('dark');
+
+  // Meldingen: notifications and the week overview (a real switch)
+  await page.locator('.cc-mydata__back').first().click();
+  await page.locator('.cc-settings__group--notifications').click();
+  await expect(page.locator('[data-section="notifications"]'), 'notifications').toBeVisible({ timeout: 15_000 });
+  const week = page.locator('.cc-profile__week-toggle');
+  if (await week.count()) await expect(week, 'the week overview is a switch').toHaveAttribute('role', 'switch');
+  // Assistent: the own model; 'How the bot shows actions' is about a bot that ACTS, and a fresh profile has Help as its
+  // only bot, so that section is not offered (the shared predicate showsBotActionsSetting, both shells, ruled 2026-11-07)
+  await page.locator('.cc-mydata__back').first().click();
+  await page.locator('.cc-settings__group--assistant').click();
+  await expect(page.locator('[data-section="assistant"]'), 'the own model').toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('[data-section="bot-actions"]'), 'no bot setting while the only bot is Help').toHaveCount(0);
 
   // back to the home, then Per kring: the circles, each a door to its own settings
   await page.locator('.cc-mydata__back').first().click();

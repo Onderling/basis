@@ -4,10 +4,9 @@
  * the result with its own block painter, below the declared Me actions — no shell lists a section of Me by hand.
  */
 import { basisManifest } from '../../manifest.js';
-import { materializeScreen, MIJ_READINGS } from './userScreenBlocks.js';
+import { materializeScreen } from './userScreenBlocks.js';
 
-export { MIJ_READINGS };
-export { identityLineWords, agentRowWords } from './mijWords.js';
+export { availabilityWords, agentRowWords } from './mijWords.js';
 
 /** The declared Mij blocks, each with a stable id. */
 export function mijBlocks(manifest = basisManifest) {
@@ -16,7 +15,7 @@ export function mijBlocks(manifest = basisManifest) {
 }
 
 /**
- * Vandaag's top (above "Nieuw voor jou"): the declared `todayBlocks` — the availability words and "Wacht op jou" — each
+ * Vandaag's top (above "Nieuw voor jou"): the declared `todayBlocks` ("Wacht op jou"), each
  * with a stable id. The materializer fills them when the shell asks for Vandaag's top (`hostOps.todayTop`).
  */
 export function todayTopBlocks(manifest = basisManifest) {
@@ -29,8 +28,7 @@ export function todayTopBlocks(manifest = basisManifest) {
  * @param {object} a
  * @param {object} a.hostOps   the shell's sources: `callSkill`, `circles`, `eventLog`, `seenAt`, `myRefs`, `selfIn(circleId)`
  *   (who "mine" is in each circle — a persona's circle is the persona's),
- *   and for the identity line `availability` (the stored record) and `online` (this device reached its relays), for
- *   the agents block `deviceId` (this device)
+ *   and for the agents block `deviceId` (this device)
  * @returns {Promise<Array<object>>}
  */
 export async function mijScreenBlocks({ hostOps = {} } = {}) {

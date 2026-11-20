@@ -29,7 +29,7 @@
 import { awaitingItems } from './awaiting.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { acrossCircles } from './acrossCircles.js';
-import { presenterFor, nounsDeclaring } from './declaredPresenters.js';
+import { presenterFor } from './declaredPresenters.js';
 import { primaryActionFor } from './rowPrimary.js';
 import { materializeOnboarding } from './onboardingStrip.js';
 import { encodeGenericOpId } from '@onderling/app-manifest';
@@ -44,13 +44,12 @@ import { SOMEONE_LABEL_KEY } from './personLabel.js';
 import { normalizeRulesDoc, isRulesEmpty, rulesDocFromAnswer } from './circleRules.js';
 import { materializeBlock as _materializeCircleBlock } from './circleRecipeBlocks.js';
 import { buildTilePreviews } from './circleTilePreviews.js';
-import { notificationRows, FOR_YOU_KEYS } from './notifications.js';
+import { notificationRows, FOR_YOU_KEYS, isAddressedToMe, newsKindOf } from './notifications.js';
 import { NOTIFY_WINDOW_DAYS } from './readMarks.js';
 import { policyFor } from './notifyBanner.js';
 import { tileCircles } from './helpContact.js';
 import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
 import { isPairCircleId } from './pairCircleId.js';
-import { normalizeAvailability, isPushSuppressed } from './memberAvailability.js';
 import { linkedBotsOf } from './identityLink.js';
 import { bookRowsOf } from './contactsSource.js';
 import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
@@ -101,8 +100,8 @@ export async function materializeScreen({ screen, hostOps = {}, mutedCircleIds =
   })));
   // "Nieuw voor jou" at the top of the page the shell asks it for (Vandaag), and only when it holds rows: never an
   // empty block. Not a block of the stored page: what is new is not something a person places or removes.
-  // Vandaag's top, in this order: what the manifest declares for it (`todayBlocks`: the availability words, "Wacht op
-  // jou"), then "Nieuw voor jou". Not blocks of the stored page, and none shown empty.
+  // Vandaag's top, in this order: what the manifest declares for it (`todayBlocks`: "Wacht op jou"), then "Nieuw voor
+  // jou". Not blocks of the stored page, and none shown empty.
   const top = [];
   if (hostOps.forYou === true && Array.isArray(hostOps.todayTop)) {
     const filled = await Promise.all(hostOps.todayTop.map((block) => materializeOneBlock({ block, activeCircleIds, allCircleIds, hostOps: ops, screenIsAll: isAllCircles(screen) })));
@@ -152,13 +151,11 @@ async function settingActorLabels(rows, { callSkill, selfIn = null, t = null } =
 /** The person's news window in days (the register's value), else its default: the projection's own fallback. */
 const windowDaysOf = (d) => (Number.isFinite(d) && d > 0 ? d : NOTIFY_WINDOW_DAYS);
 
-/**
- * The row kinds that are ordinary conversation in a circle: a line, an item. "Nieuw voor jou" on Vandaag leaves them
- * to "Kringen met nieuws" (`addressedOnly`), so nothing shows in both; what is addressed to the person (a direct
- * message, something assigned, an ask, joined or removed, a changed setting) stays. The banner reads every kind.
+/*
+ * `addressedOnly`: "Nieuw voor jou" on Vandaag keeps only what is addressed to the person (`isAddressedToMe`, the one rule
+ * per row kind); ordinary conversation in a circle is counted in "Kringen met nieuws", so nothing shows in both. The
+ * banner reads every kind.
  */
-export const CIRCLE_CONVERSATION_KINDS = Object.freeze(['line', 'item']);
-
 export function forYouRows(hostOps = {}, { muted = new Set(), fold = true, addressedOnly = false } = {}) {
   const nowMs = typeof hostOps.now === 'function' ? hostOps.now() : Date.now();
   // EVERY persona's circles, ticked or not (a reply to a persona you are not in must not go unnoticed); muted stay
@@ -193,7 +190,8 @@ export function forYouRows(hostOps = {}, { muted = new Set(), fold = true, addre
     fold,
     actorLabel: typeof hostOps.actorLabel === 'function' ? hostOps.actorLabel : null,
     // the person's table (`notify.policy.<kind>`): off = not a row here either
-    keepKind: (kind) => policyFor(kind, hostOps.notifyPolicyOf) !== 'off' && !(addressedOnly && CIRCLE_CONVERSATION_KINDS.includes(kind)),
+    keepKind: (kind) => policyFor(kind, hostOps.notifyPolicyOf) !== 'off',
+    keepRow: addressedOnly ? isAddressedToMe : null,
   });
 }
 
@@ -248,12 +246,9 @@ async function materializeOneBlock({ block, activeCircleIds: pageCircleIds, host
       case 'onboarding':
         return materializeOnboarding(block, hostOps);
 
-      // Me's own blocks: the name with the readings its config names, and the person's agents and devices
+      // Me's own blocks: the name, and the person's agents and devices
       case 'awaiting':
         return await materializeAwaiting(block, hostOps);
-      // Vandaag's availability words: a tap opens the availability screen
-      case 'availability':
-        return materializeAvailability(block, hostOps);
       case 'identityLine':
         return await materializeIdentityLine(block, activeCircleIds, hostOps);
       case 'agents':
@@ -276,16 +271,25 @@ async function materializeOneBlock({ block, activeCircleIds: pageCircleIds, host
  * `seenAt: null` is "the marks are not known yet" (sealed, not loaded): the block lists no circle and does not say
  * "nothing new" either (`content.marksNotKnown`), never everything as new.
  */
-function materializeCirclesUnread(block, activeCircleIds, { eventLog, circles, seenAt = {}, myRefs = [], t = null, readIds = null } = {}) {
+function materializeCirclesUnread(block, activeCircleIds, { eventLog, circles, seenAt = {}, myRefs = [], t = null, readIds = null, forYou = false, now = null, notifyWindowDays = null } = {}) {
   const limit = clampInt(block.config?.limit, 1, 50, 5);
   const base = { blockId: block.id, type: 'circlesUnread', titleKey: 'circle.recipe.block.circlesUnread' };
   if (!eventLog?.query || activeCircleIds.length === 0) return { ...base, status: 'empty', content: { items: [] } };
   if (seenAt === null) return { ...base, status: 'empty', content: { items: [], marksNotKnown: true } };
   const wanted = new Set(activeCircleIds);
   const inPage = (circles ?? []).filter((c) => c?.id && wanted.has(c.id));
-  const previews = buildTilePreviews({ events: eventLog.query({ excludeMuted: true }), circles: inPage, seenAt: seenAt ?? {}, myRefs: myRefs ?? [], t, readIds });
+  // Beside "Nieuw voor jou" (Vandaag, `forYou`): the same read rule — read on any device, inside the news window, not
+  // this device's last look — and what is addressed to the person left to that block (`isAddressedToMe`), so a thing
+  // is in one block only and a mark clears it there
+  const nowMs = typeof now === 'function' ? now() : Date.now();
+  const beside = forYou === true
+    ? { seenAt: {}, since: nowMs - windowDaysOf(notifyWindowDays) * 86_400_000, skip: (e) => isAddressedToMe({ kind: newsKindOf(e) }) }
+    : { seenAt: seenAt ?? {} };
+  const previews = buildTilePreviews({ events: eventLog.query({ excludeMuted: true }), circles: inPage, myRefs: myRefs ?? [], t, readIds, ...beside });
   const items = inPage
-    .map((c) => ({ circleId: c.id, name: c.name ?? null, unread: previews[c.id]?.unread ?? 0, kinds: previews[c.id]?.kinds ?? [], subtitle: previews[c.id]?.subtitle ?? null, ts: previews[c.id]?.ts ?? 0 }))
+    .map((c) => ({ circleId: c.id, name: c.name ?? null, unread: previews[c.id]?.unread ?? 0, kinds: previews[c.id]?.kinds ?? [], subtitle: previews[c.id]?.subtitle ?? null, ts: previews[c.id]?.ts ?? 0,
+      // what opening the circle marks read (the same ids the tile marks)
+      unreadIds: previews[c.id]?.unreadIds ?? [] }))
     .filter((r) => r.unread > 0)
     .sort((a, b) => b.ts - a.ts)
     .slice(0, limit);
@@ -297,19 +301,11 @@ function materializeCirclesUnread(block, activeCircleIds, { eventLog, circles, s
 }
 
 /**
- * The readings an identity line may show, each answering one thing about now. `open` and `next` name no noun: they
- * cover whatever nouns DECLARE the facets they read (`mine` + `done`; a scheduled moment, `order: 'asc'`).
+ * The identity line: the person's (or the persona's) name, nothing else. Its readings went on 2026-11-20 (the
+ * availability to the persona button's ring and the panel's row, the counts dropped: Vandaag says what is new and open).
  */
-export const MIJ_READINGS = Object.freeze(['availability', 'online', 'unread', 'open', 'next']);
-
-/**
- * The identity line: the person's name and the readings the block's config names, in that order. A reading whose
- * source the shell did not hand (availability, online) or that has nothing to say (no appointment coming) is left out
- * — never a guess.
- */
-async function materializeIdentityLine(block, activeCircleIds, hostOps = {}) {
+async function materializeIdentityLine(block, _activeCircleIds, hostOps = {}) {
   const { callSkill } = hostOps;
-  const want = (Array.isArray(block.config?.readings) ? block.config.readings : []).filter((r) => MIJ_READINGS.includes(r));
   // the self Mij shows (the switcher's one ticked persona): its own name; the default is the person's profile name
   const self = hostOps.mijSelf && hostOps.mijSelf.id && hostOps.mijSelf.id !== 'default' ? hostOps.mijSelf : null;
   let name = self ? (self.name ?? null) : null;
@@ -319,56 +315,7 @@ async function materializeIdentityLine(block, activeCircleIds, hostOps = {}) {
       name = prof?.entry?.displayName || prof?.entry?.handle || null;
     } catch { /* nameless: the painter says "Mij" */ }
   }
-  const now = typeof hostOps.now === 'function' ? hostOps.now() : Date.now();
-  const readings = [];
-  for (const key of want) {
-    if (key === 'availability') {
-      const r = availabilityReading(hostOps.availability, now);
-      if (r) readings.push(r);
-    } else if (key === 'online') {
-      const on = typeof hostOps.online === 'function' ? hostOps.online() : hostOps.online;
-      if (typeof on === 'boolean') readings.push({ key, on });
-    } else if (key === 'unread') {
-      const r = materializeCirclesUnread({ id: block.id, config: { limit: 50 } }, activeCircleIds, hostOps);
-      if (r.content?.marksNotKnown) continue;   // the marks not known yet: no count rather than a wrong one
-      readings.push({ key, count: (r.content?.items ?? []).reduce((n, row) => n + (row.unread ?? 0), 0) });
-    } else if (key === 'open') {
-      // what is mine and not done, over every noun declaring both
-      let count = 0; let answered = false;
-      for (const noun of nounsDeclaring((p) => Boolean(p.mine && p.done))) {
-        const r = await materializeItems({ id: block.id, config: { noun, scope: 'mine', limit: 200, openOnly: true } }, activeCircleIds, hostOps);
-        if (r.status !== 'error') { answered = true; count += (r.content?.items ?? []).length; }
-      }
-      if (answered) readings.push({ key, count });
-    } else if (key === 'next') {
-      // the soonest thing still to come, over every noun whose moment is scheduled — the circles' and my own
-      let next = null;
-      for (const noun of nounsDeclaring((p) => p.order === 'asc')) {
-        const r = await materializeItems({ id: block.id, config: { noun, scope: 'all', horizonDays: 30, limit: 20 } }, activeCircleIds, hostOps);
-        const row = (r.content?.items ?? []).find((x) => x.when && x.when >= now);
-        if (row && (!next || row.when < next.when)) next = row;
-      }
-      if (next) readings.push({ key, title: next.label, when: next.when, circleName: next.circleName ?? '' });
-    }
-  }
-  return { blockId: block.id, type: 'identityLine', status: 'ok', content: { name, readings } };
-}
-
-/** The availability reading of a stored record at `now`: available · quiet until … · away (until …); null without one. */
-function availabilityReading(record, now) {
-  if (!record) return null;
-  const a = normalizeAvailability(record);
-  if (a.holiday.active && isPushSuppressed({ ...a, quietHours: { ...a.quietHours, enabled: false } }, new Date(now))) return { key: 'availability', state: 'away', until: a.holiday.until };
-  if (isPushSuppressed(a, new Date(now))) return { key: 'availability', state: 'quiet', until: a.quietHours.to };
-  return { key: 'availability', state: 'available' };
-}
-
-/** Vandaag's availability block: the words of now, and where a tap goes (the availability screen). Empty without a record. */
-function materializeAvailability(block, hostOps = {}) {
-  const now = typeof hostOps.now === 'function' ? hostOps.now() : Date.now();
-  const reading = availabilityReading(hostOps.availability, now);
-  const base = { blockId: block.id, type: 'availability', titleKey: 'circle.availability.title' };
-  return reading ? { ...base, status: 'ok', content: { reading, open: { kind: 'open-availability' } } } : { ...base, status: 'empty', content: {} };
+  return { blockId: block.id, type: 'identityLine', status: 'ok', content: { name } };
 }
 
 /**

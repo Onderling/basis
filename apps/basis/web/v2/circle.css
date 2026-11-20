@@ -1715,6 +1715,11 @@
 /* THE PERSONA BUTTON and, left of it, the settings button: top right on every tab (personaButton.js) */
 .cc-persona-button { display: flex; align-items: center; gap: 6px; }
 .cc-persona-button__settings { font-size: 18px; line-height: 1; }
+/* the availability ring around the persona button: its colour (a theme token) is set from availabilityRing; its label
+   names the state */
+.cc-persona-button__button[data-availability] { border-radius: 50%; }
+/* the persona panel's availability row: the state in words, a tap to change it */
+.cc-persona-panel__availability { display: block; width: 100%; margin-bottom: 10px; text-align: left; }
 /* the persona panel behind it: one tab per persona when there are several, then the short view */
 .cc-persona-panel__tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .cc-persona-panel__tab.is-active { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }

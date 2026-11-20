@@ -68,9 +68,13 @@ describe('Vandaag', () => {
     expect(blockOpensWhole(onboarding)).toBe(false);
     expect(blockOpensWhole({ type: 'tasks', status: 'ok' })).toBe(true);
   });
+  it('Vandaag\'s declared top ("Wacht op jou") has no "meer": it is no block of the page to open whole', () => {
+    expect(blockOpensWhole({ type: 'awaiting', status: 'ok' })).toBe(false);
+  });
   it('the persona button is named "Persona", not "Aanpassen"', () => {
     const host = document.createElement('div');
-    renderPersonaButton(host, { avatar: { initials: '?' }, t: (k) => nl.persona_button[k.replace('circle.persona_button.', '')]?.text ?? k, onOpen: () => {} });
-    expect(host.querySelector('button')?.getAttribute('aria-label')).toBe('Persona');
+    renderPersonaButton(host, { avatar: { initials: '?' }, t: (k, v) => (nl.persona_button[k.replace('circle.persona_button.', '')]?.text ?? k).replace('{{state}}', v?.state ?? ''), onOpen: () => {} });
+    // with the availability its ring shows, so the colour is never the only signal
+    expect(host.querySelector('.cc-persona-button__button')?.getAttribute('aria-label')).toMatch(/^Persona, /);
   });
 });

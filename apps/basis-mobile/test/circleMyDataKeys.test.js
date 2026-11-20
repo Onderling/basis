@@ -11,7 +11,7 @@ import { sharedCircleLocale } from '@onderling-app/basis';
 
 // `close` left this set on 2026-08-31: four blocks each carried their own "Close"/"Sluiten", so the
 // screen now reads the one `common.close` in the shared host block. The section's OWN words stay here.
-const KEYS = ['keys', 'view_mnemonic', 'restore', 'mnemonic_title', 'mnemonic_warn', 'mnemonic_none'];
+const KEYS = ['view_mnemonic', 'restore', 'mnemonic_title', 'mnemonic_warn', 'mnemonic_none'];
 
 describe('mobile My-data key-management locale (shared circle source)', () => {
   for (const lang of ['en', 'nl']) {

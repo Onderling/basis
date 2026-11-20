@@ -33,8 +33,12 @@ describe('the screens under Me', () => {
     expect(read('CircleAdvancedScreen.js')).toMatch(/onBack/);
     const launcher = read('CircleLauncherScreen.js');
     expect(launcher).toMatch(/<CircleAdvancedScreen[^>]*onBack=\{\(\) => setView\('settingsHome'\)\}/);
-    // availability is a door in the Verbinding settings, and Vandaag's availability words: back to where it came from
-    expect(launcher).toMatch(/availabilityFromRef\.current === 'screens'[\s\S]{0,120}onTab\('screens'\)[\s\S]{0,80}setSettingsGroupId\('connection'\); setView\('settingsGroup'\);/);
+    // availability opens only from the persona panel's row (it left Verbinding and then Vandaag, 2026-11-20): back to the
+    // tab the panel was opened over
+    expect(launcher).toMatch(/<CircleAvailabilityScreen[\s\S]{0,400}onBack=\{\(\) => onTab\(lastTabRef\.current \?\? 'screens'\)\}/);
+    expect(launcher).not.toMatch(/availabilityFromRef/);
+    // the copy-log screen's door sits on the settings home: its back goes there
+    expect(launcher).toMatch(/<LogReportScreen onBack=\{\(\) => setView\('settingsHome'\)\} \/>/);
   });
 
   it('Availability paints its field text in ink, and its placeholders in the soft ink', () => {

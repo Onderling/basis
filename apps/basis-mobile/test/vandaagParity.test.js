@@ -34,7 +34,8 @@ describe('Vandaag on the phone', () => {
     expect(view).not.toMatch(/blockEmpty: *\{ backgroundColor: theme\.color\.paper2/);
   });
   it('the persona button: named the persona button, and the settings button beside it', () => {
-    expect(launcher).toMatch(/accessibilityLabel=\{t\('circle\.persona_button\.label'\)\} testID="persona-button"/);
+    // named with the availability its ring shows (PersonaButton.js), so the colour is never the only signal
+    expect(read('PersonaButton.js')).toMatch(/accessibilityLabel=\{personaButtonLabel\(availability, \{ connected, t \}\)\} testID="persona-button"/);
     expect(launcher).toMatch(/accessibilityLabel=\{t\('circle\.persona_button\.settings'\)\} testID="settings-button"/);
     expect(PERSONA_BUTTON_CLEARANCE).toBeGreaterThan(PERSONA_BUTTON.top + PERSONA_BUTTON.size);
   });

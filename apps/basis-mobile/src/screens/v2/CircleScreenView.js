@@ -33,7 +33,8 @@ import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import FaceView from './FaceView.js';
 import { t } from '../../core/localisation.js';
-import { identityLineWords, agentRowWords } from '../../../../basis/src/v2/mijWords.js';
+import { agentRowWords } from '../../../../basis/src/v2/mijWords.js';
+import { awaitingTitle } from '../../../../basis/src/v2/awaiting.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { whereTag } from '../../../../basis/src/v2/rowWhere.js';
 import { typedRowOp } from '../../../../basis/src/v2/rowPrimary.js';
@@ -142,7 +143,6 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
     case 'forYou':       body = renderForYou(block, onAction, styles); break;
     case 'circlesUnread': body = renderCirclesUnread(block, onAction, styles); break;
     case 'awaiting':      body = renderAwaiting(block, onAction, styles); break;
-    case 'availability':  body = renderAvailability(block, onAction, styles); break;
     case 'onboarding':   body = <OnboardingCards block={block} onAction={onAction} styles={styles} />; break;
     case 'identityLine': body = renderIdentityLine(block, onAction, styles); break;
     case 'agents':       body = renderAgents(block, onAction, styles); break;
@@ -222,28 +222,13 @@ function renderAwaiting(block, onAction, styles) {
   const items = block.content?.items ?? [];
   return (
     <View>
-      <Text style={styles.blockTitle}>{t('circle.recipe.block.awaiting')}</Text>
+      <Text style={styles.blockTitle}>{awaitingTitle(items, { t })}</Text>
       {items.map((it) => (
         <Pressable key={`${it.kind}-${it.circleId ?? ''}`} style={styles.noticeRow} testID={`awaiting-${it.kind}-${it.circleId ?? 'here'}`}
           disabled={typeof onAction !== 'function'} onPress={() => onAction?.({ ...it.open })}>
           <Text style={styles.noticeText}>{t(it.labelKey, { count: it.count, name: it.name ?? '' })}</Text>
         </Pressable>
       ))}
-    </View>
-  );
-}
-
-// Vandaag's availability words (web parity: circleScreen.js renderAvailability): one row, a tap opens the availability
-// screen. The words are the shared reading words.
-function renderAvailability(block, onAction, styles) {
-  const words = identityLineWords({ readings: block.content?.reading ? [block.content.reading] : [] }, { t, locale: dateLocaleOf(t) }).join(' · ');
-  return (
-    <View>
-      <Text style={styles.blockTitle}>{t(block.titleKey ?? 'circle.availability.title')}</Text>
-      <Pressable style={styles.noticeRow} testID="vandaag-availability" accessibilityRole="button"
-        disabled={typeof onAction !== 'function' || !block.content?.open} onPress={() => onAction?.({ ...block.content.open })}>
-        <Text style={styles.noticeText}>{words}</Text>
-      </Pressable>
     </View>
   );
 }
@@ -302,9 +287,8 @@ function renderCirclesUnread(block, onAction, styles) {
 }
 
 // Me's identity line: the name as the page's title, "Edit" beside it (`onAction({ kind: 'edit-me' })`, the person's
-// own editor), the readings below in one line, worded by the shared helper. Web parity: circleScreen.js.
+// own editor). Web parity: circleScreen.js.
 function renderIdentityLine(block, onAction, styles) {
-  const words = identityLineWords(block.content, { t, locale: dateLocaleOf(t) });
   return (
     <View>
       <View style={styles.identityHead}>
@@ -315,7 +299,6 @@ function renderIdentityLine(block, onAction, styles) {
           </Pressable>
         ) : null}
       </View>
-      {words.length ? <Text style={styles.noticeText} testID="mij-readings">{words.join(' · ')}</Text> : null}
     </View>
   );
 }

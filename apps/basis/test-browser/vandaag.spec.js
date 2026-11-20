@@ -9,8 +9,13 @@ import { test, expect } from '@playwright/test';
 
 test.setTimeout(90_000);
 
-const blockTypes = (page) => page.locator('.circle-screen__block').evaluateAll((els) => els.map((e) => e.dataset.blockType));
-const blockIds = (page) => page.locator('.circle-screen__block').evaluateAll((els) => els.map((e) => e.dataset.blockId));
+// the stored page's blocks: not Vandaag's declared top ("Wacht op jou", "Nieuw voor jou"), which a person does not place
+// or move
+const TOP = ['awaiting', 'forYou'];
+const pageBlocks = (page, field) => page.locator('.circle-screen__block')
+  .evaluateAll((els, [f, top]) => els.filter((e) => !top.includes(e.dataset.blockType)).map((e) => e.dataset[f]), [field, TOP]);
+const blockTypes = (page) => pageBlocks(page, 'blockType');
+const blockIds = (page) => pageBlocks(page, 'blockId');
 
 test('opens on Vandaag; a block moved in "Pas aan" stays moved after a reload', async ({ page }) => {
   const errs = [];
@@ -51,7 +56,7 @@ test('"meer" opens one block whole, and back returns to the page', async ({ page
   await expect(more).toBeVisible({ timeout: 20_000 });
   await more.click();
   await expect(page.locator('.circle-vandaag__back')).toBeVisible();
-  await expect(page.locator('.circle-screen__block')).toHaveCount(1);
+  await expect.poll(() => blockIds(page), { timeout: 10_000 }).toHaveLength(1);
   await page.locator('.circle-vandaag__back').click();
   await expect.poll(() => blockTypes(page), { timeout: 20_000 }).toHaveLength(4);
 });

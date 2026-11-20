@@ -21,7 +21,7 @@ import { settingsGroupForAction } from '../../../../basis/src/v2/settingsHome.js
  * @param {object} p
  * @param {Function} p.callSkill   the targeted 3-arg waist
  * @param {object} [p.sources]   what the blocks read beside the waist: `{ eventLog, circles, seenAt, myRefs,
- *   availabilityStore, relays: () => rows, deviceId: () => id, selfIn: (circleId) => webid }`
+ *   deviceId: () => id, selfIn: (circleId) => webid }`
  */
 export default function CircleProfileScreen({ callSkill, sources = {}, head = null, landedByTab = null, onSettingsGroup = null, onEditMe, onMeAction }) {
   const theme = useTheme();
@@ -35,16 +35,11 @@ export default function CircleProfileScreen({ callSkill, sources = {}, head = nu
     (async () => {
       if (typeof callSkill !== 'function') return;
       const readMij = async () => {
-      const relays = (() => { try { return sources.relays?.() ?? []; } catch { return []; } })();
-      const availability = await Promise.resolve().then(() => sources.availabilityStore?.get?.()).catch(() => null);
       const b = await mijScreenBlocks({ hostOps: {
         callSkill, eventLog: sources.eventLog ?? null, circles: sources.circles ?? [],
         seenAt: sources.seenAt ?? {}, myRefs: sources.myRefs ?? [],
         ...(typeof sources.selfIn === 'function' ? { selfIn: sources.selfIn } : {}),
         ...(sources.mijSelf ? { mijSelf: sources.mijSelf } : {}),
-        availability,
-        // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)
-        online: relays.length ? relays.some((r) => r.connected) : undefined,
         deviceId: (() => { try { return sources.deviceId?.() ?? null; } catch { return null; } })(),
         deviceName: (() => { try { return sources.deviceName?.() ?? null; } catch { return null; } })(),
       } }).catch(() => []);

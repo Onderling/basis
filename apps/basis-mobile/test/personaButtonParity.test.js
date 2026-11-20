@@ -23,7 +23,7 @@ describe('the persona button — parity', () => {
     expect(fnOf(mobileHost, 'WithTabBar')).toMatch(/<PersonaButton\b/);
     const sites = mobileHost.match(/<WithTabBar\b[^>]*>/g) ?? [];
     expect(sites.length).toBeGreaterThan(0);
-    for (const s of sites) expect(s, s).toMatch(/avatar=\{personaButton\}/);
+    for (const s of sites) expect(s, s).toMatch(/avatar=\{personaButtonRinged\}/);   // the button with its availability ring's record
   });
   it('a tap opens the persona panel over the tab; its "Aanpassen" opens the editor, and closing that reloads the button', () => {
     expect(webHost).toMatch(/onOpen: \(\) => showPersonaPanel\(\)/);

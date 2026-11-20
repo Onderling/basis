@@ -25,7 +25,7 @@ test('a device with two selves pairs a screen as the self chosen in the form', a
   expect(werk, 'Werk was made').toBeTruthy();
 
   await page.locator('.cc-persona-button__settings').click();
-  await page.locator('.cc-settings__group--devices-keys').click();
+  await page.locator('.cc-settings__group--devices').click();
   const form = page.locator('[data-section="connection-add"]').first();
   await expect(form).toBeVisible({ timeout: 15_000 });
 

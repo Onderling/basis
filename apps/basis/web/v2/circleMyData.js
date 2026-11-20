@@ -27,6 +27,10 @@ export function renderCircleMyData(container, {
   t,
   onBack,
   onSignIn,
+  // Disconnect the pod (the `signout` op, through the waist); shown when signed in
+  onSignOut = null,
+  // A bot's `/koppel` link, pasted: `onLinkBot(text)` opens the identity-link sheet, false when it is no bot's link
+  onLinkBot = null,
   // the pod provider field: its default and the known providers (podAuth's list)
   podIssuerDefault = null, podIssuers = [],
   onViewMnemonic,
@@ -115,11 +119,8 @@ export function renderCircleMyData(container, {
   relayUrl,               // in-app relay setting: the saved URL ('' / null = unset ⇒ env fallback)
   relayEnvUrl,            // the build-time env relay URL, shown as the placeholder fallback
   onSaveRelay,            // (url) => Promise<{ok, effective, error?}> — persist + live-reconnect the transport
-  onOpenRelayPanel,       // Objective D / Surface 4:  => void — open the set-relay op in the docked
-                          // side-panel (openPagePanel). When provided, the relay row is an entry button that
-                          // routes through the generic panel instead of the bespoke inline form below.
-  // The doors a group's sections open (availability, connection points, the log report): the view each opens → what
-  // opens it here. A door without one is omitted.
+  // The doors a group's sections open (connection points): the view each opens → what opens it here. A door without
+  // one is omitted.
   doors = {},
   // the person's own week overview (a card of the coming week on Saturday morning): `{ on, onToggle }`; on null while
   // it loads or switches; absent = no switch (no clock here)
@@ -308,18 +309,6 @@ export function renderCircleMyData(container, {
         container.appendChild(holder);
       }
     },
-    'availability': () => {
-      if (typeof doors.availability === 'function') {
-        const sec = section(tr('circle.profile.availability'));
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'cc-settings__row cc-settings__door--availability';
-        b.textContent = tr('circle.profile.availability');
-        b.addEventListener('click', () => doors.availability());
-        sec.appendChild(b);
-        container.appendChild(sec);
-      }
-    },
     'connection-points': () => {
       if (typeof doors.points === 'function') {
         const sec = section(tr('circle.nearbyScreen.points_open'));
@@ -421,29 +410,9 @@ export function renderCircleMyData(container, {
       if (dataLocation.relayOperator || dataLocation.relayUrl) {
         relaySec.appendChild(kv(tr('circle.mydata.relay'), [dataLocation.relayOperator, dataLocation.relayUrl].filter(Boolean).join(' · ')));
       }
-      // In-app relay setting — point the no-server cross-device relay at a reachable server WITHOUT a rebuild.
-      // Objective D / Surface 4: when the host wires `onOpenRelayPanel`, the edit is routed through the
-      // generic docked side-panel (openPagePanel's simple-form for the `set-relay` op) instead of the bespoke
-      // inline field. The button is the entry point; the panel builds the form from set-relay's params + dispatches.
-      if (typeof onOpenRelayPanel === 'function') {
-        const row = document.createElement('div');
-        row.className = 'cc-mydata__relay-edit';
-        const current = document.createElement('span');
-        current.className = 'cc-mydata__relay-note';
-        current.textContent = tr('circle.mydata.relay_current', { url: relayUrl || relayEnvUrl || tr('circle.mydata.relay_off') });
-        const open = document.createElement('button');
-        open.type = 'button';
-        open.className = 'cc-btn cc-btn--quiet cc-mydata__relay-open';
-        open.textContent = tr('circle.mydata.relay_open');
-        open.addEventListener('click', () => onOpenRelayPanel());
-        const hint = document.createElement('p');
-        hint.className = 'cc-mydata__relay-hint';
-        hint.textContent = tr('circle.mydata.relay_hint');
-        row.appendChild(current);
-        row.appendChild(open);
-        relaySec.appendChild(row);
-        relaySec.appendChild(hint);
-      } else if (typeof onSaveRelay === 'function') {
+      // In-app relay setting — point the no-server cross-device relay at a reachable server WITHOUT a rebuild. Edited
+      // here, inline, as the phone edits it (the two shells were levelled 2026-11-20; it once opened a side panel here).
+      if (typeof onSaveRelay === 'function') {
         const row = document.createElement('div');
         row.className = 'cc-mydata__relay-edit';
         const input = document.createElement('input');
@@ -1090,41 +1059,60 @@ export function renderCircleMyData(container, {
         container.appendChild(sec);
       }
     },
-    'keys': () => {
-      // ── key management (S5) ─────────────────────────────────────────────────────
-      // Back up / reveal recovery phrase / restore. Each is gated on its callback so
-      // the section only appears where the host wired the (existing) wizard/skill.
-      const acts = [
-        ['cc-mydata__mnemonic', 'circle.mydata.view_mnemonic',  onViewMnemonic],
-        ['cc-mydata__restore',  'circle.mydata.restore',        onRestore],
-        // Add-a-device: run the enroll-device ceremony ON THIS device (the phrase is typed here,
-        // never on a device that already has authority).
-        ['cc-mydata__enroll',   'circle.mydata.enroll_device',  onEnroll],
-        // After a restore (or any time): which of the person's personas this device also gets — the phrase is typed here.
-        ['cc-mydata__receive-personas', 'circle.mydata.receive_personas', onReceivePersonas],
-        // The recovery file: the circle list sealed to the phrase — the pod-less way back.
-        ['cc-mydata__recovery-export', 'circle.mydata.recovery_export', onExportRecovery],
-        ['cc-mydata__recovery-import', 'circle.mydata.recovery_import', onImportRecovery],
-        // The replace ceremony: after a restore, retire every other device in one act.
-        ['cc-mydata__replace', 'circle.mydata.replace_device', onReplaceDevice],
-        // A companion node of your own: claim it with the line it prints in its log.
-        ['cc-mydata__claim-companion', 'circle.companionClaim.button', onClaimCompanion],
-        // The member's choice of which device others deliver to first (their primary contact address).
-        ['cc-mydata__primary', 'circle.mydata.make_primary', onMakePrimary],
-      ].filter(([, , fn]) => typeof fn === 'function');
-      if (acts.length) {
-        const keys = section(tr('circle.mydata.keys'));
-        for (const [cls, key, fn] of acts) {
-          const b = document.createElement('button');
-          b.type = 'button';
-          b.className = `cc-mydata__action ${cls}`;
-          b.textContent = tr(key);
-          b.addEventListener('click', () => fn());
-          keys.appendChild(b);
-        }
-        container.appendChild(keys);
-      }
+    // ── Apparaten: the device acts, each a button of its own (gated on its callback: the section only appears where the
+    // host wired the existing ceremony) ──────────────────────────────────────────────────────────────────────────────
+    // Add-a-device: run the enroll-device ceremony ON THIS device (the phrase is typed here, never on a device that
+    // already has authority).
+    'device-add': () => actionSection([['cc-mydata__enroll', 'circle.mydata.enroll_device', onEnroll]]),
+    // The replace ceremony: after a restore, retire every other device in one act.
+    'device-replace': () => actionSection([['cc-mydata__replace', 'circle.mydata.replace_device', onReplaceDevice]]),
+    // The member's choice of which device others deliver to first (their primary contact address).
+    'device-primary': () => actionSection([['cc-mydata__primary', 'circle.mydata.make_primary', onMakePrimary]]),
+    // A companion node of your own: claim it with the line it prints in its log.
+    'companion-claim': () => actionSection([['cc-mydata__claim-companion', 'circle.companionClaim.button', onClaimCompanion]]),
+    // A household bot's `/koppel` link, pasted: link this person's Basis identity to their row there. The host opens
+    // the identity-link sheet (the same one an arriving `#koppel-bot=` link opens); false = not a bot's link.
+    'bot-link': () => {
+      if (typeof onLinkBot !== 'function') return;
+      const sec = actionSection([['cc-mydata__link-bot', 'circle.identityLink.open', () => {
+        form.hidden = !form.hidden;
+        if (!form.hidden) input.focus?.();
+      }]]);
+      const form = document.createElement('div');
+      form.className = 'cc-mydata__link-bot-form';
+      form.hidden = true;
+      const hint = document.createElement('p');
+      hint.className = 'cc-mydata__hint';
+      hint.textContent = tr('circle.identityLink.paste_link');
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'cc-mydata__link-bot-input';
+      input.setAttribute('aria-label', tr('circle.identityLink.paste_link'));
+      const go = document.createElement('button');
+      go.type = 'button';
+      go.className = 'cc-btn cc-btn--quiet cc-mydata__link-bot-go';
+      go.textContent = tr('circle.identityLink.open');
+      const note = document.createElement('p');
+      note.className = 'cc-mydata__hint cc-mydata__link-bot-note';
+      go.addEventListener('click', () => {
+        const text = input.value.trim();
+        if (!text) return;
+        note.textContent = onLinkBot(text) === false ? tr('circle.identityLink.not_a_link') : '';
+        if (!note.textContent) { input.value = ''; form.hidden = true; }
+      });
+      form.append(hint, input, go, note);
+      sec.appendChild(form);
     },
+    // ── Herstel: the way back, in a group of its own ────────────────────────────────────────────────────────────────
+    'recovery-phrase': () => actionSection([['cc-mydata__mnemonic', 'circle.mydata.view_mnemonic', onViewMnemonic]]),
+    'restore': () => actionSection([['cc-mydata__restore', 'circle.mydata.restore', onRestore]]),
+    // The recovery file: the circle list sealed to the phrase — the pod-less way back.
+    'recovery-file': () => actionSection([
+      ['cc-mydata__recovery-export', 'circle.mydata.recovery_export', onExportRecovery],
+      ['cc-mydata__recovery-import', 'circle.mydata.recovery_import', onImportRecovery],
+    ]),
+    // After a restore (or any time): which of the person's personas this device also gets — the phrase is typed here.
+    'personas-receive': () => actionSection([['cc-mydata__receive-personas', 'circle.mydata.receive_personas', onReceivePersonas]]),
     'storage': () => {
       // ── where your data lives ─────────────────────────────────────────────────
       const storage = section(tr('circle.mydata.storage'));
@@ -1176,19 +1164,16 @@ export function renderCircleMyData(container, {
         storage.appendChild(signIn);
       }
       if (dataLocation.podRoot) storage.appendChild(kv(tr('circle.mydata.pod_root'), dataLocation.podRoot));
-      container.appendChild(storage);
-    },
-    'log-report': () => {
-      if (typeof doors.logReport === 'function') {
-        const sec = section(tr('circle.profile.logReport'));
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'cc-settings__row cc-settings__door--log-report';
-        b.textContent = tr('circle.profile.logReport');
-        b.addEventListener('click', () => doors.logReport());
-        sec.appendChild(b);
-        container.appendChild(sec);
+      // signed in: the way out again (the phone has had it since the pod moved under the gear)
+      if (podStatus.signedIn && typeof onSignOut === 'function') {
+        const out = document.createElement('button');
+        out.type = 'button';
+        out.className = 'cc-btn cc-btn--quiet cc-mydata__signout';
+        out.textContent = tr('circle.mydata.pod_signout');
+        out.addEventListener('click', () => onSignOut());
+        storage.appendChild(out);
       }
+      container.appendChild(storage);
     },
   };
   container.classList.add('cc-settings-group');
@@ -1200,6 +1185,23 @@ export function renderCircleMyData(container, {
   return container;
 
   // ── helpers ──
+  /** A section of one act or two (the button says what it does, so no heading); nothing when no act is wired. */
+  function actionSection(acts) {
+    const wired = acts.filter(([, , fn]) => typeof fn === 'function');
+    if (!wired.length) return null;
+    const s = document.createElement('section');
+    s.className = 'cc-mydata__section cc-mydata__section--acts';
+    for (const [cls, key, fn] of wired) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `cc-mydata__action ${cls}`;
+      b.textContent = tr(key);
+      b.addEventListener('click', () => fn());
+      s.appendChild(b);
+    }
+    container.appendChild(s);
+    return s;
+  }
   function section(titleText) {
     const s = document.createElement('section');
     s.className = 'cc-mydata__section';

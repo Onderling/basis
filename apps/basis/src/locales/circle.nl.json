@@ -6352,7 +6352,7 @@
       "doc": "A \"meer\" tapped after its list of things was replaced or went old: nothing to page; search again (ledger L1035)."
     },
     "toolbox_found_row": {
-      "text": "{{label}} \u00b7 {{more}}",
+      "text": "{{label}} · {{more}}",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
     "toolbox_pick_button": {
@@ -7060,10 +7060,6 @@
       "text": "Locatie wissen",
       "doc": "S2 — clear the saved location."
     },
-    "availability": {
-      "text": "Beschikbaarheid →",
-      "doc": "S2 — open the availability/quiet-hours screen."
-    },
     "sharedWithMe": {
       "text": "Met mij gedeeld →",
       "doc": "Nav label (Mij sub-screen) opening the personal, cross-circle inbox of sealed copies peers shared privately to this device."
@@ -7156,26 +7152,6 @@
       "text": "stil tot {{until}}",
       "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
     },
-    "reading_online": {
-      "text": "online",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. This device is connected at its relays."
-    },
-    "reading_offline": {
-      "text": "offline",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. This device is not connected at its relays."
-    },
-    "reading_unread": {
-      "text": "{{count}} ongelezen",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
-    },
-    "reading_open": {
-      "text": "{{count}} open",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. What is the person's and still open, across circles — over every noun that declares whose it is and when it is done."
-    },
-    "reading_next": {
-      "text": "straks: {{title}} {{when}}",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. The soonest thing still to come, over every noun whose moment is scheduled."
-    },
     "agent_here": {
       "text": "dit apparaat",
       "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
@@ -7207,6 +7183,14 @@
     "no_name_yet": {
       "text": "Nog geen naam",
       "doc": "Me's title while the person has no handle — never the tab's own word in its place."
+    },
+    "reading_available_connected": {
+      "text": "beschikbaar, verbonden",
+      "doc": "The persona button ring and panel row: available, and this device is connected at one of its relays (presenceWords)."
+    },
+    "reading_available_offline": {
+      "text": "beschikbaar, niet verbonden",
+      "doc": "The persona button ring and panel row: available, but this device is not connected at any relay (presenceWords)."
     }
   },
   "blocked": {
@@ -7347,10 +7331,6 @@
     "usage": {
       "text": "Gebruik",
       "doc": "S5 — usage metrics section."
-    },
-    "keys": {
-      "text": "Sleutels & back-up",
-      "doc": "S5 — key-management section heading."
     },
     "view_mnemonic": {
       "text": "Herstelzin tonen",
@@ -7622,7 +7602,7 @@
       "doc": "My data → keys: the member's CHOICE of which device others deliver to first (sync-policy §12, 2026-09-16). Announces this device's address in every circle with the primary flag; a boot announce never moves the slot."
     },
     "make_primary_no_point": {
-      "text": "Directe berichten komen nu op dit apparaat binnen ({{count}} kringen ingelicht). Het kan je kringwijzigingen nog niet ondertekenen: typ er één keer je herstelzin op (Instellingen → Apparaten & sleutels).",
+      "text": "Directe berichten komen nu op dit apparaat binnen ({{count}} kringen ingelicht). Het kan je kringwijzigingen nog niet ondertekenen: typ er één keer je herstelzin op (Instellingen → Herstel).",
       "doc": "After the main-device tap on a device without the circle root: direct messages land here, but it cannot be the point that signs the spine."
     },
     "make_primary_done": {
@@ -8523,7 +8503,7 @@
     },
     "plus_ceiling": {
       "text": "Wat de + voor me mag doen",
-      "doc": "mij#personas \u2014 a persona card: heading of how far the person's own + goes for this persona (the ceiling, _plus.ceiling)."
+      "doc": "mij#personas — a persona card: heading of how far the person's own + goes for this persona (the ceiling, _plus.ceiling)."
     },
     "plus_ceiling_0": {
       "text": "Niets. De + staat uit voor deze persona.",
@@ -8724,6 +8704,36 @@
     "driver_remove": {
       "text": "Haal {{what}} weg",
       "doc": "Mij → a driver chip's remove button (aria label): what is taken off."
+    },
+    "awaiting_kind": {
+      "vote": {
+        "text": "stemmen",
+        "doc": "The \"Wacht op jou\" block title: the word for the vote kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "rsvp": {
+        "text": "uitnodigingen",
+        "doc": "The \"Wacht op jou\" block title: the word for the rsvp kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "task": {
+        "text": "taken",
+        "doc": "The \"Wacht op jou\" block title: the word for the task kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "question": {
+        "text": "vragen",
+        "doc": "The \"Wacht op jou\" block title: the word for the question kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "other": {
+        "text": "andere verzoeken",
+        "doc": "The \"Wacht op jou\" block title: ONE word for device offers and shared copies together, last in the order (awaitingTitle)."
+      }
+    },
+    "awaiting_title_separator": {
+      "text": ", ",
+      "doc": "The \"Wacht op jou\" block title: between the kinds before the last."
+    },
+    "awaiting_title_last": {
+      "text": "{{list}} en {{last}}",
+      "doc": "The \"Wacht op jou\" block title: the kinds before the last ({{list}}) and the last one ({{last}})."
     }
   },
   "attach": {
@@ -8886,7 +8896,7 @@
     "offer_title": "Toevoeg-code",
     "offer_hint": "Scan of plak deze code op het nieuwe apparaat en typ daar de herstelzin. De code is geen geheim — de herstelzin blijft de enige sleutel.",
     "offer_error": "Code maken lukte niet (dit apparaat zit nog in geen enkele kring).",
-    "offer_no_seal": "Dit apparaat kan nog geen code tonen: het is toegevoegd voordat het herstelzegel bestond. Typ er één keer je herstelzin op (Instellingen → Apparaten & sleutels) en probeer het dan opnieuw.",
+    "offer_no_seal": "Dit apparaat kan nog geen code tonen: het is toegevoegd voordat het herstelzegel bestond. Typ er één keer je herstelzin op (Instellingen → Herstel) en probeer het dan opnieuw.",
     "offer_paste_label": "Code van je huidige apparaat (optioneel)",
     "personas_title": "Welke persona's krijgt dit apparaat?",
     "personas_hint": "Alleen wat je aanvinkt komt op dit apparaat. Een apparaat dat minder vertrouwd is, geef je er beter minder.",
@@ -11041,6 +11051,10 @@
       "notify_policy_ask": {
         "text": "Melding: mijn open vraag in de ruimte",
         "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_role": {
+        "text": "Melding: mijn rol in een kring veranderde",
+        "doc": "A setting's label (projected from the parameter register)."
       }
     },
     "opt": {
@@ -11244,7 +11258,10 @@
     "no_circles": "Je zit nog in geen enkele kring.",
     "connection": "Verbinding",
     "my_data": "Mijn gegevens",
-    "devices_keys": "Apparaten & sleutels",
+    "notifications": "Meldingen",
+    "assistant": "Assistent",
+    "devices": "Apparaten",
+    "recovery": "Herstel",
     "back": {
       "text": "← Instellingen",
       "doc": "Back link from a settings group (and the Advanced screen) to the settings home."
@@ -11290,6 +11307,10 @@
     "removed": {
       "text": "Je bent verwijderd uit {{circle}}",
       "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "role": {
+      "text": "{{circle}}: {{change}}",
+      "doc": "'Nieuw voor jou': my role in a circle changed (made admin, or no longer); {{change}} is the membership notice's own sentence."
     },
     "many": {
       "text": "{{count}} nieuwe dingen bij {{name}}",
@@ -11433,19 +11454,23 @@
     }
   },
   "persona_button": {
-    "label": {
-      "text": "Persona",
-      "doc": "The persona button's spoken name, top right on every tab (the persona's picture or initials): it opens the persona panel over the tab."
-    },
     "settings": {
       "text": "Instellingen",
       "doc": "The settings button's spoken name (the gear beside the persona button, on every tab): it opens the settings home."
+    },
+    "label_with_state": {
+      "text": "Persona, {{state}}",
+      "doc": "The persona button's spoken name with the availability its coloured ring shows ({{state}}, the shared reading words), so the colour is never the only signal."
     }
   },
   "persona_panel": {
     "close": {
       "text": "Sluiten",
       "doc": "The persona panel (behind the persona button): its close button."
+    },
+    "availability_row": {
+      "text": "{{state}} · tik om te wijzigen",
+      "doc": "The persona panel: the one availability row, the state now ({{state}}, the shared reading words) and that a tap changes it; a tap opens the availability screen."
     }
   },
   "back_to": {

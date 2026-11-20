@@ -31,7 +31,8 @@ import { featureActionLabelKey } from '../../src/v2/circleTabs.js';
 import { pickRowText } from '../../src/v2/rowText.js';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType, newsKindIcons } from '../../src/v2/embedChips.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
-import { identityLineWords, agentRowWords } from '../../src/v2/mijWords.js';
+import { agentRowWords } from '../../src/v2/mijWords.js';
+import { awaitingTitle } from '../../src/v2/awaiting.js';
 import { dateLocaleOf } from '../../src/v2/whenWords.js';
 import { whereTag } from '../../src/v2/rowWhere.js';
 import { nounHeading } from '../../src/v2/nounNames.js';
@@ -180,7 +181,6 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
     case 'forYou':       renderForYou(section, block, tr, onAction);       break;
     case 'circlesUnread': renderCirclesUnread(section, block, tr, onAction); break;
     case 'awaiting':      renderAwaiting(section, block, tr, onAction); break;
-    case 'availability':  renderAvailability(section, block, tr, onAction); break;
     case 'onboarding':   renderOnboarding(section, block, tr, onAction); break;
     case 'identityLine': renderIdentityLine(section, block, tr, onAction); break;
     case 'agents':       renderAgents(section, block, tr, onAction);       break;
@@ -249,7 +249,7 @@ function renderPhoto(section, block, _tr) {
 function renderAwaiting(section, block, tr, onAction) {
   const title = document.createElement('h3');
   title.className = 'circle-screen__block-title';
-  title.textContent = tr('circle.recipe.block.awaiting');
+  title.textContent = awaitingTitle(block.content?.items, { t: tr });   // the kinds in it now, not an appeal
   section.appendChild(title);
   for (const it of block.content?.items ?? []) {
     const b = document.createElement('button');
@@ -261,21 +261,6 @@ function renderAwaiting(section, block, tr, onAction) {
     if (typeof onAction === 'function') b.addEventListener('click', () => onAction({ ...it.open }));
     section.appendChild(b);
   }
-}
-
-// Vandaag's availability words (beschikbaar · stil tot … · weg tot …): one button, a tap opens the availability screen.
-// The words are the shared reading words, as the identity line said them.
-function renderAvailability(section, block, tr, onAction) {
-  const title = document.createElement('h3');
-  title.className = 'circle-screen__block-title';
-  title.textContent = tr(block.titleKey ?? 'circle.availability.title');
-  section.appendChild(title);
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'cc-btn cc-btn--quiet circle-screen__availability';
-  b.textContent = identityLineWords({ readings: block.content?.reading ? [block.content.reading] : [] }, { t: tr, locale: dateLocaleOf(tr) }).join(' · ');
-  if (typeof onAction === 'function' && block.content?.open) b.addEventListener('click', () => onAction({ ...block.content.open }));
-  section.appendChild(b);
 }
 
 // "Nieuw voor jou": what came in for the person, each row a tap to its source and a ✕ to set it aside (both mark it
@@ -373,7 +358,7 @@ function renderCirclesUnread(section, block, tr, onAction) {
 }
 
 // Me's identity line: the name as the page's title, the door to the person's own editor beside it
-// (`onAction({ kind: 'edit-me' })`), and the readings below it in one line, worded by the shared helper.
+// (`onAction({ kind: 'edit-me' })`).
 function renderIdentityLine(section, block, tr, onAction) {
   const head = document.createElement('div');
   head.className = 'circle-screen__identity-head';
@@ -391,13 +376,6 @@ function renderIdentityLine(section, block, tr, onAction) {
     head.appendChild(edit);
   }
   section.appendChild(head);
-  const words = identityLineWords(block.content, { t: tr, locale: dateLocaleOf(tr) });
-  if (words.length) {
-    const line = document.createElement('p');
-    line.className = 'circle-screen__identity-readings';
-    line.textContent = words.join(' · ');
-    section.appendChild(line);
-  }
 }
 
 // Me's agents and devices: one sentence a row, read-only; a tap opens My data (`onAction({ kind: 'open-my-data' })`),

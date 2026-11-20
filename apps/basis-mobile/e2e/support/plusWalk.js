@@ -57,10 +57,10 @@ async function requestsReach(model, n, ms = 20_000) {
   return model.requests.length;
 }
 
-/** The own model, set as a person sets it: the settings button → Weergave → the assistant section, preset Local. */
+/** The own model, set as a person sets it: the settings button → Assistent → the own model, preset Local. */
 async function setOwnModel(phonePort) {
   await tapSoon(by.id('settings-button'), 15_000);
-  await tapSoon(by.id('settings-group-appearance'), 15_000);
+  await tapSoon(by.id('settings-group-assistant'), 15_000);
   await waitFor(element(by.id('user-llm-preset-local-ollama'))).toBeVisible()
     .whileElement(by.id('circle-settings-group')).scroll(400, 'down');
   // a tap right after a scroll can land nowhere (measured on the Samsung 2026-11-17: the preset stayed off): tap until the

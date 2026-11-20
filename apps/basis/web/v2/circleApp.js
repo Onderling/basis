@@ -203,6 +203,7 @@ import { plusSuggestionPool, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plus
 import { circleListsFor } from '../../src/v2/circleGate.js';
 import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderPersonaButton } from './personaButton.js';
+import { connectedAtRelay } from '../../src/v2/mijWords.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
 import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../src/v2/personaSet.js';
 import { renderPersonaSwitcher } from './personaSwitcher.js';
@@ -1921,6 +1922,8 @@ const screenPairing = () => (_screenPairing ??= createAppScreenPairing({
   callSkill: (app, op, args) => circleHouseholdAgent.callSkill(app, op, args),
   relays: () => { try { return (circleHouseholdAgent?.relays?.list?.() ?? []).map((r) => r?.url).filter(Boolean); } catch { return []; } },
 }));
+// the identity-link sheet for a pasted bot link (set where the agent's identity links are wired; null before)
+let _openBotLink = null;
 let circleHouseholdAgent = null; // OBJ-2 — the real household agent (createRealHouseholdAgent); module-level
                                  // so showSettings (a sibling fn, NOT nested in buildCircleBot) can read its
                                  // no-pod sync hooks (householdSelfAddr / addCirclePeer). Was referenced
@@ -3097,6 +3100,9 @@ function runPlusTarget(button) {
 // THE PERSONA BUTTON — top-right on every tab: the persona's picture or initials; a tap opens the person's own editor.
 // Loaded once (and again after the editor closes); every tab repaints the one element.
 let _personaButton = null;          // { name, initials, picture } from the shared loader
+let _availabilityNow = null;        // the stored availability: the persona button's ring and the panel's row say it
+// …with the connection: the relay fact the connection points list shows (connected at one of this device's relays)
+const connectedNow = () => { try { return connectedAtRelay(_peerAgent?.relays?.list?.() ?? []); } catch { return false; } };
 let _personaButtonUrl = null;       // the picture, opened with this device's own opener
 let _personaButtonEl = null;
 // THE SWITCHER'S SET: this device's selves (`personasHere`) and which of them the app shows (the screens book's
@@ -3133,7 +3139,7 @@ function paintPersonaButton() {
   }
   placePersonaButton();
   // the persona button opens the persona panel over the tab; the settings button beside it, the settings home
-  renderPersonaButton(_personaButtonEl, { avatar: _personaButton, pictureUrl: _personaButtonUrl, t,
+  renderPersonaButton(_personaButtonEl, { avatar: _personaButton, pictureUrl: _personaButtonUrl, availability: _availabilityNow, connected: connectedNow(), t,
     onOpen: () => showPersonaPanel(), onSettings: () => showSettingsHome({ from: _activeTab }) });
 }
 async function refreshPersonaButton() {
@@ -3147,6 +3153,7 @@ async function refreshPersonaButton() {
     const resolve = makeCirclePictureResolver(opener);
     _personaButtonUrl = _personaButton.picture && resolve ? (await Promise.resolve(resolve(_personaButton.picture)).catch(() => null)) : null;
   } catch { /* the initials stand */ }
+  _availabilityNow = await Promise.resolve().then(() => availabilityStore.get()).catch(() => null);
   paintPersonaButton();
 }
 // the switcher: tick selves (an op on the book: logged, undoable), "alle", or open a self's own editor
@@ -4728,11 +4735,9 @@ async function materializeVandaag() {
       ...forYouHostOps(),
       // the circles-with-news block counts what the circle tiles count
       seenAt: readSeenAt(),
-      // on top (the shared projection): the declared `todayBlocks` — the availability words, "Wacht op jou" — then
-      // "Nieuw voor jou"
+      // on top (the shared projection): the declared `todayBlocks` ("Wacht op jou"), then "Nieuw voor jou"
       forYou: true,
       todayTop: todayTopBlocks(),
-      availability: await Promise.resolve().then(() => availabilityStore.get()).catch(() => null),
       // "Wacht op jou": the votes open in each circle (the same fold the settings banner reads), a device offer here,
       // what was shared with the person
       openProposals: (cid) => openPolicyProposals(mijGov ??= shellGovernance(), cid),
@@ -5015,12 +5020,11 @@ function showVandaagCustomise() {
 // what a block on the person's pages asks for: a circle with news opens that circle, as its launcher tile does
 function onScreenAction(action) {
   if (action?.kind === 'open-circle' && action.circleId) showDetail(action.circleId);
-  // "Wacht op jou": a vote opens that circle's proposals (its settings, where the open votes are), as on the phone; a device offer the devices group;
-  // what was shared, its list. The availability words open the availability screen, which comes back to Vandaag.
-  else if (action?.kind === 'open-proposals' && action.circleId) showSettings(action.circleId);   // the circle's settings, where its open votes are (the phone's openProposals)
+  // "Wacht op jou": a vote opens that circle's OPEN VOTES, where it is cast in one tap (the decisions view; Frits
+  // 2026-11-20), as on the phone; a device offer the devices group; what was shared, its list.
+  else if (action?.kind === 'open-votes' && action.circleId) showGovernance(action.circleId);
   else if (settingsGroupForAction(action)) showMyData({ group: settingsGroupForAction(action) });
   else if (action?.kind === 'open-shared-with-me') showSharedWithMe();
-  else if (action?.kind === 'open-availability') showAvailability({ onDone: showScreens });
   // "Nieuw voor jou": opening a row is reading it (on every device), and it goes to the thing itself
   else if (action?.kind === 'for-you-open' && action.row) {
     const marked = readMarks.markRows([action.row]).catch(() => {});
@@ -5096,6 +5100,9 @@ async function showPersonaPanel(selected = null) {
   _panelClose = shut;
   card.parentElement?.addEventListener('click', (e) => { if (e.target === card.parentElement) shut(); });   // a touch outside closes
   const body = renderPersonaPanel(card, { model, t,
+    // the availability row: the state in words, a tap to change it; saved, the ring follows and the tab is back
+    availability: _availabilityNow, connected: connectedNow(),
+    onAvailability: () => { shut(); showAvailability({ onDone: () => { refreshPersonaButton(); backToTab(); } }); },
     onTab: (id) => showPersonaPanel(id),
     onShowAs: () => { shut(); showPersonaSwitcher(); },
     onClose: shut,
@@ -5213,7 +5220,7 @@ async function showBlocked() {
 function showLogReport() {
   hideTabBar();
   const { text, n } = logReportView({ version: APP_VERSION || null, at: Date.now() });
-  renderLogReport(rootEl, { text, n, t, onBack: () => showMyData({ group: 'my-data' }) });   // its door is in Mijn gegevens
+  renderLogReport(rootEl, { text, n, t, onBack: () => showSettingsHome() });   // its door is at the foot of the settings home
 }
 
 // A settings group's screen (from Instellingen, the gear on Mij): the group's declared sections, painted by the one
@@ -5459,28 +5466,6 @@ async function showMyData(opts) {
     // form's "Saved." confirmation; the chatAi status note refreshes on the next open.
     return null;
   };
-  // Objective D / Surface 4 — route the relay-URL editor through the generic
-  // docked side-panel (openPagePanel's simple-form). The `set-relay` manifest op is
-  // the FORM CONTRACT (params url · clear + surfaces.page); dispatch resolves to
-  // applyRelayUrl — the circle shell's live in-app relay setting. (agent.callSkill
-  // has no 'basis' builtin route in this shell, so the op binds to its real
-  // handler right here, at the waist.) The panel builds + validates the form, shows
-  // errors on {ok:false}, closes on success, and offers "← back to chat".
-  const setRelayOp = basisManifest.operations.find((o) => o.id === 'set-relay');
-  const openRelayPanel = () => {
-    if (!setRelayOp) return;
-    const panel = ensurePagePanel();
-    // Localise the panel title via the op's labelKey without mutating the shared
-    // manifest (openPagePanel's simple-form reads surfaces.page.title verbatim).
-    const pg = setRelayOp.surfaces.page;
-    const op = { ...setRelayOp, surfaces: { ...setRelayOp.surfaces, page: { ...pg, title: (pg.labelKey && t(pg.labelKey)) || pg.title } } };
-    openPagePanel({
-      container: panel, doc: document, op, appOrigin: 'basis',
-      callSkill: async (_origin, _opId, args) => applyRelayUrl(args?.clear ? '' : String(args?.url ?? '')),
-      onClose: () => {}, onDispatched: () => rerender(), t,
-      backTo: { returnTo: getActiveCircle() || 'chat', label: t('circle.mydata.back'), onNavigate: () => {} },
-    });
-  };
   // what this person used most, per circle, on this device (the counter behind "Veel gebruikt"); shown and forgettable
   const frequentRows = () => usageRows(actionFrequency.snapshot(), {
     names: { ...Object.fromEntries((circlesCache ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t,
@@ -5510,8 +5495,11 @@ async function showMyData(opts) {
       onWipe: () => circleHouseholdAgent.wipeOwnActions(),
     } : null,
     // the doors a group's sections open, and the week switch
-    doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked, logReport: showLogReport },
+    doors: { points: showConnectionPoints },
     weekOverview,
+    // disconnect the pod (the `signout` op, through the waist), then read the state again; a bot's /koppel link, pasted
+    onSignOut: () => Promise.resolve(rawCallSkill('basis', 'signout', {})).catch(() => null).then(() => again()),
+    onLinkBot: typeof _openBotLink === 'function' ? _openBotLink : null,
     onSignIn, podIssuerDefault: podAuth.resolveIssuer()?.url ?? null, podIssuers: podAuth.KNOWN_ISSUERS, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, thisDeviceId: circleHouseholdAgent?.myDeviceId?.() ?? null, deviceName: browserDeviceName(globalThis.navigator?.userAgent), onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
@@ -5578,9 +5566,9 @@ async function showMyData(opts) {
     // explicit deletion, taking effect NOW in the conversation they are looking at. Returns the real count.
     onPurgeMessages: (days) => eventLog.purgeConversation({ olderThanMs: daysToMs(normalizeRetentionDays(days)) }),
     surfacePref: circleSurfacePref.get(), onSetSurfacePref: showBotActions ? onSetSurfacePref : null, appLang: currentLang(), onSetAppLang, themePref: getThemePref(), onSetTheme: (v) => { if (setThemePref(v)) rerender(); }, chatAi, userLlm: userLlmCfg, onSaveUserLlm, validateUserLlm: validateUserLlmConfig,
-    // in-app relay setting (no rebuild): the field shows the saved setting; env is the placeholder fallback.
-    // Objective D / Surface 4: onOpenRelayPanel routes editing into the docked side-panel (openPagePanel).
-    relayUrl: resolveRelayUrl(localStorageRelayIo().load(), ''), relayEnvUrl: CIRCLE_RELAY_ENV, onSaveRelay: applyRelayUrl, onOpenRelayPanel: openRelayPanel,
+    // in-app relay setting (no rebuild): the field shows the saved setting; env is the placeholder fallback. Edited
+    // inline, as on the phone (the set-relay op's own handler, `applyRelayUrl`)
+    relayUrl: resolveRelayUrl(localStorageRelayIo().load(), ''), relayEnvUrl: CIRCLE_RELAY_ENV, onSaveRelay: applyRelayUrl,
     // The personal history mirror — live health from the agent + the switch through the one
     // kind-gated write (the agent starts/stops the sink LIVE on the flip).
     // where the app opens on this device (a user param; the same write as every setting)
@@ -5716,6 +5704,8 @@ async function showSettingsHome({ from } = {}) {
       if (d?.target?.kind === 'nav' && d.target.to === 'help') { openHelpDoor(); return; }
       // the introduction's seven cards again (the manifest's settings door; phone twin: setIntroOpen)
       if (d?.target?.kind === 'nav' && d.target.to === 'intro') { openIntroDeck(); return; }
+      // "Meld een probleem" beside Feedback geven: this device's log to copy
+      if (d?.target?.kind === 'nav' && d.target.to === 'logReport') { showLogReport(); return; }
       if (d?.target?.kind !== 'op') return;
       // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed
       rawCallSkill('basis', d.target.opId, { screen: 'settingsHome' })
@@ -7339,7 +7329,8 @@ function showImageModal(src, { pending = false } = {}) {
 }
 
 // availability/quiet-hours/hopping (the former Mij body), now a sub-screen of Mij.
-async function showAvailability({ onDone = () => showMyData({ group: 'connection' }) } = {}) {
+// opened from the persona panel's availability row (it left Verbinding and Vandaag, 2026-11-20): done returns to the tab
+async function showAvailability({ onDone = () => showScreens() } = {}) {
   let working = await availabilityStore.get();
   const rerender = () => renderCircleAvailability(rootEl, {
     availability: working,
@@ -10116,6 +10107,13 @@ async function boot() {
       // statement itself rides the lane table (`agent.identityLinks`), which makes the bot a contact in the book
       let identityLinkSheet = null;
       const identityLinkViewFor = (link) => agent.identityLinks?.view(link) ?? { bot: { ok: false } };
+      // …and the same sheet from a link pasted under Instellingen → Apparaten ("Een bot koppelen"): false = no bot's link
+      _openBotLink = agent.identityLinks ? (link) => {
+        const view = identityLinkViewFor(String(link ?? '').trim());
+        if (!view.bot.ok) return false;
+        identityLinkSheet = openIdentityLinkSheet(view);
+        return true;
+      } : null;
       agent.identityLinks?.onLinked?.((e) => { if (!e?.unlinked) identityLinkSheet?.linked(); });
       const peerMessageRouter = makePeerRouter({
         handlers: {

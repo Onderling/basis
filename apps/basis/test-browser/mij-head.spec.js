@@ -50,7 +50,7 @@ test('a registry change while a screen behind Mij is open does not paint Mij ove
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
   await page.waitForTimeout(4000);
   await page.locator('.cc-persona-button__settings').click();
-  await page.locator('.cc-settings__group--devices-keys').click();
+  await page.locator('.cc-settings__group--devices').click();
   const myData = page.locator('.cc-mydata__claim-companion').first();
   await expect(myData, 'the devices-and-keys screen is open').toBeVisible({ timeout: 20_000 });
   await page.evaluate(() => window.onderlingCall('agents', 'setProfileProperty', { id: 'default', key: 'woont', value: 'daar' }));

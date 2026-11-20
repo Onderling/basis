@@ -1703,8 +1703,10 @@ contract, and every surface is a projection of it.*
 with the "+"'s place and buttons in `plus` (`src/v2/plusDial.js`). Top right on every tab sit the **persona button**,
 which opens the persona panel over the tab (the declared `meActions` and `meBlocks`, one tab per persona when there
 are several; `src/v2/personaPanel.js`), and beside it the **settings button**, which opens the settings home from
-anywhere and returns to the tab it came from. What Me said about now (the availability words, "Wacht op jou") is on
-Vandaag's top (`todayBlocks`).
+anywhere and returns to the tab it came from. What Me said about now moved: "Wacht op jou" is first on Vandaag's top
+(`todayBlocks`), titled by the kinds in it now ("Stemmen en uitnodigingen", `awaitingTitle`), hidden when empty; the person's presence is a coloured ring around the persona button (`availabilityRing`: away > quiet > available and
+connected > available but not connected, the connection being the relay fact `connectedAtRelay`; existing theme tokens;
+the button's label names the state) and one row in the persona panel, the state in words and a tap to change it.
 
 **One declaration, six projections.** An app's manifest declares its operations once; pure projectors
 turn that declaration into the chat tool, the slash command, the deterministic gate verbs, the attach

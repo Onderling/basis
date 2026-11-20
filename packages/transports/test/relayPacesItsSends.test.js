@@ -24,8 +24,9 @@ async function waitFor(pred, ms = 20_000) {
 /** A relay with the real relay's rate rule: a token bucket per connection on `send` frames, OVER_RATE past it. */
 function ratedRelay({ perSec = 30, burst = 60 } = {}) {
   const wss = new WebSocketServer({ port: 0 });
-  const state = { sends: [], refused: 0 };
+  const state = { sends: [], refused: 0, sockets: [] };
   wss.on('connection', (ws) => {
+    state.sockets.push(ws);
     const open = new Map();
     let tokens = burst; let at = Date.now();
     const take = () => { const now = Date.now(); tokens = Math.min(burst, tokens + ((now - at) * perSec) / 1000); at = now; if (tokens >= 1) { tokens -= 1; return true; } return false; };
@@ -90,4 +91,23 @@ describe('the relay transport paces its own sends', () => {
     await waitFor(() => relay.sends.length >= 301, 30_000);
     expect(relay.refused, 'nothing refused on the way').toBe(0);
   }, 60_000);
+
+  it('frames waiting for a token when the socket drops are refused, as a send while offline is; none is written after the reconnect', async () => {
+    relay = ratedRelay();
+    await connected();
+    const to = 'z'.repeat(43);
+    // the burst (50) goes at once; the next 60 wait for tokens
+    const sends = Array.from({ length: 110 }, (_, n) => tx.sendOneWay(to, { n }).then(() => 'sent', (err) => `refused: ${err?.message ?? err}`));
+    await waitFor(() => relay.sends.length >= 50, 5_000);
+    for (const ws of relay.sockets) ws.terminate();
+    const outcomes = await Promise.race([Promise.all(sends), new Promise((r) => setTimeout(() => r(null), 5_000))]);
+    expect(outcomes, 'every waiting send ended within 5 s of the drop').not.toBeNull();
+    const refused = outcomes.filter((o) => o.startsWith('refused'));
+    expect(refused.length, 'the frames waiting for a token were refused').toBe(60);
+    expect(refused.every((o) => /not connected/i.test(o)), refused[0]).toBe(true);
+    await waitFor(() => tx.connected, 10_000);
+    await new Promise((r) => setTimeout(r, 1_500));
+    const late = relay.sends.filter((x) => x.n >= 50);
+    expect(late.length, 'nothing that was refused is written after the reconnect').toBe(0);
+  }, 40_000);
 });

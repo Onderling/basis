@@ -344,6 +344,7 @@ export class RelayTransport extends Transport {
     this.#stopped = true;
     this.#knownPeers.clear();
     this.#settleAllBinds(new Error('Relay: transport disconnected before the address was acknowledged'));
+    this.#refusePaced();
     // A refused frame still waiting for its re-send will not get one: said, never dropped silently.
     if (this.#overRateTimer) { clearTimeout(this.#overRateTimer); this.#overRateTimer = null; }
     for (const held of this.#overRateQueue.splice(0)) this.#reportUndelivered(held.id, 'over-rate', held.to);
@@ -424,14 +425,17 @@ export class RelayTransport extends Transport {
     this.#paceTimer = setTimeout(() => this.#drainPaced(), wait);
   }
 
+  /** Everything waiting for a token is refused with the error a send made while offline gets (`_put`'s own). */
+  #refusePaced() {
+    if (this.#paceTimer) { clearTimeout(this.#paceTimer); this.#paceTimer = null; }
+    const waiting = [...this.#waitingForeground.splice(0), ...this.#waitingBackground.splice(0)];
+    for (const w of waiting) { try { w.reject(new Error('Relay: not connected')); } catch { /* the caller is gone */ } }
+  }
+
   /** Send what waits as tokens allow: a person's sends first, then the background; in order within each. */
   #drainPaced() {
     this.#paceTimer = null;
-    if (this.#stopped) {
-      for (const w of [...this.#waitingForeground.splice(0), ...this.#waitingBackground.splice(0)]) w.reject(new Error('Relay: transport stopped'));
-      return;
-    }
-    if (!this.connected) { this.#paceTimer = setTimeout(() => this.#drainPaced(), this.#overRate.delayMs); return; }
+    if (this.#stopped || !this.connected) { this.#refusePaced(); return; }
     while ((this.#waitingForeground.length || this.#waitingBackground.length) && this.#takeToken()) {
       const w = this.#waitingForeground.length ? this.#waitingForeground.shift() : this.#waitingBackground.shift();
       try { this.#writeSend(w.to, w.envelope, 1); w.resolve(); } catch (err) { w.reject(err); }
@@ -836,6 +840,9 @@ export class RelayTransport extends Transport {
       // Anything waiting on an ack from THIS socket will never get one; the alias stays in the
       // replay set and is re-proved on the next connect, but the caller is told now.
       this.#settleAllBinds(new Error('Relay: socket closed before the address was acknowledged'));
+      // …and a frame waiting for a token on it ends as a send made while offline does: refused, so each caller's own
+      // hold or retry decides — never written later on another socket behind the caller's back
+      this.#refusePaced();
       if (this.#stopped) return;
       // Immediately reset the connect promise so any concurrent _put calls will
       // wait for the new connection rather than using the stale resolved promise.

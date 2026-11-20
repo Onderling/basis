@@ -139,7 +139,7 @@ export const TOOLBOX_TICKET_UPGRADE_KEY = 'screens.toolbox-ticket-v1';
  */
 export async function endPreTicketToolboxGrants({ listGrants, revokeView, notify = null, marker, grantTtlMs, now = Date.now }) {
   let mark = null;
-  try { mark = JSON.parse((await marker.get(TOOLBOX_TICKET_UPGRADE_KEY)) ?? 'null'); } catch { mark = null; }
+  try { mark = parseUntrustedJson((await marker.get(TOOLBOX_TICKET_UPGRADE_KEY)) ?? 'null'); } catch { mark = null; }
   if (mark?.done) return { ran: false, ended: 0, told: 0 };
   const started = typeof mark?.started === 'number' ? mark.started : now();
   if (typeof mark?.started !== 'number') await marker.set(TOOLBOX_TICKET_UPGRADE_KEY, JSON.stringify({ started }));

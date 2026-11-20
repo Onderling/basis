@@ -58,6 +58,7 @@ export function renderCircleLauncher(container, {
   // A save the person made that was refused because the value it would replace could not be opened (L1115), and the
   // "try again" a start failure may offer (`bootFailureNotice`): a fresh start of the app.
   storedRefusal = false,
+  onDismissStoredRefusal = null,
   onRetryBoot = null,
   // The circles an admin removed this person from (`loadRemovedCircles`): tiles of their own, marked, read-only, until
   // the person closes them from inside the circle. No context menu — pin, mute and leave mean nothing there.
@@ -106,6 +107,15 @@ export function renderCircleLauncher(container, {
     const n = storedValueRefusedNotice();
     refused.textContent = tr(n.key, n.params);
     container.appendChild(refused);
+    // said once: the person dismisses it, and it does not come back this session
+    if (typeof onDismissStoredRefusal === 'function') {
+      const ok = document.createElement('button');
+      ok.type = 'button';
+      ok.className = 'cc-btn cc-btn--quiet circle-launcher__refusal-ok';
+      ok.textContent = tr('circle.stored_value_unreadable_ok');
+      ok.addEventListener('click', () => onDismissStoredRefusal());
+      container.appendChild(ok);
+    }
   }
   if (!circles.length && !bootFailure) {
     const empty = document.createElement('div');

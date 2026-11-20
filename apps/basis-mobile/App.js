@@ -146,8 +146,11 @@ export default function App() {
   const [bootFailure, setBootFailure] = useState(null);
   const [bootAttempt, setBootAttempt] = useState(0);
   const retryBoot = useCallback(() => { setBootError(null); setBootFailure(null); setBootAttempt((n) => n + 1); }, []);
+  // said once a session: dismissed, it does not come back
   const [storedRefusal, setStoredRefusal] = useState(false);
-  useEffect(() => onStoredValueRefused(() => setStoredRefusal(true)), []);
+  const storedRefusalSaid = useRef(false);
+  useEffect(() => onStoredValueRefused(() => { if (!storedRefusalSaid.current) setStoredRefusal(true); }), []);
+  const dismissStoredRefusal = useCallback(() => { storedRefusalSaid.current = true; setStoredRefusal(false); }, []);
 
   // Shared EventLog: boot-time agent events + ChatScreen's inbound peer
   // events land in one log so /logs shows everything.
@@ -202,7 +205,7 @@ export default function App() {
   if (!fallbackOfferRef.current) {
     fallbackOfferRef.current = createFallbackOffer({
       // Its memory across restarts: a declined offer stays declined for its cooldown, not until the next boot.
-      io: fallbackOfferStateIo(sealedKeyValue(AsyncStorage, { name: 'the fallback offer' })),
+      io: fallbackOfferStateIo(sealedKeyValue(AsyncStorage, { name: 'the fallback offer', overwritable: true })),   // a remembered 'no': lost, the offer is simply made again (L1115)
       onOffer: (payload) => {
         const sink = circleBotSinkRef.current;
         if (sink) { sink(payload); fallbackOfferRef.current.decline(); }
@@ -464,7 +467,7 @@ export default function App() {
         } catch { /* a clear that cannot run never blocks a launch */ }
 
         const deviceLogIo = backendSnapshotIo(
-          sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-device-log' })),
+          sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-device-log' }), { scope: 'cc-device-log' }),
         );
         const SEED_FLAG = 'cc.firstBootSeeded.v1';
         const alreadySeeded = await AsyncStorage.getItem(SEED_FLAG).catch(() => null) === '1';
@@ -710,6 +713,7 @@ export default function App() {
           bootFailure={bootFailure}
           onRetryBoot={retryBoot}
           storedRefusal={storedRefusal}
+          onDismissStoredRefusal={dismissStoredRefusal}
           deliveryStateMap={deliveryStateMapRef.current}
           registerCircleBotSink={registerCircleBotSink}
           onAcceptFallback={acceptFallbackOffer}

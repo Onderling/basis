@@ -7,7 +7,9 @@ export const SCREEN_CLIENT_VERSION: string;
 /** Every refusal's code. `grant-expired` is one code for a grant that ran out and one taken away: pair again. */
 export type ScreenClientCode =
   | 'not-paired' | 'grant-expired' | 'rate-limited' | 'no-connection' | 'timeout' | 'aborted' | 'op-not-allowed'
-  | 'toolbox-unreachable' | 'toolbox-not-yours' | 'answer-too-large' | 'tool-error' | 'not-found' | 'failed';
+  | 'toolbox-unreachable' | 'toolbox-not-yours' | 'answer-too-large' | 'tool-error' | 'not-found' | 'failed'
+  /** this page's own key in this browser is there but will not read: `signOut()`, then pair again */
+  | 'key-unreadable';
 export const SCREEN_CLIENT_CODES: readonly ScreenClientCode[];
 
 /** How long a call waits without its own `timeoutMs` (30 000). */

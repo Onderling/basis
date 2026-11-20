@@ -93,6 +93,15 @@ it('a circle act the plain reading runs at once answers with what the run said, 
   expect(threads.memory.recent('own:me').at(-1)).toContain('melk staat op Boodschappen');
 });
 
+it('a line with a pairing offer or a screen start link is remembered with their bodies cut, never as typed', async () => {
+  const threads = threadsOf();
+  const { d } = door({ threads });
+  await d.read('koppel onderling-connect://SECRETticket123 en #scherm-nieuw=SECRETstart456');
+  const kept = threads.memory.recent('own:me').join(' ');
+  expect(kept).toContain('onderling-connect://…');
+  expect(kept).not.toMatch(/SECRETticket123|SECRETstart456/);
+});
+
 describe('a model\'s proposal never widens the "+"', () => {
   it('a field the act does not declare (a circle named) is dropped; a circle named for a list write is dropped too', async () => {
     const { d, callSkill } = door({ interpret: async () => ({ opId: 'addEvent', args: { title: 'kapper', when: '2026-11-17T10:00', circleId: 'kring' } }) });

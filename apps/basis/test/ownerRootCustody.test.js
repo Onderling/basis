@@ -66,3 +66,12 @@ describe('ensureOwnerRoot — keystore-first custody', () => {
     expect(again.toMnemonic()).toBe(root.toMnemonic());             // survives a "process restart"
   });
 });
+
+describe('ensureOwnerRoot — a legacy phrase that cannot be read is not absent (L1115)', () => {
+  it('a failed read throws key-unreadable; no new root is made', async () => {
+    const rootKeyStore = new RootKeyStoreVault({ vault: new VaultMemory() });
+    const legacyVault = { get: async () => { throw new Error('storage read failed'); }, delete: async () => {} };
+    await expect(ensureOwnerRoot({ rootKeyStore, legacyVault })).rejects.toMatchObject({ code: 'key-unreadable', what: 'legacy-phrase' });
+    expect(await rootKeyStore.getSeed()).toBeFalsy();
+  });
+});

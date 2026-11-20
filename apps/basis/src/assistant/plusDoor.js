@@ -39,6 +39,7 @@ import { renderGate } from '@onderling/app-manifest';
 import { readDayAndTime } from '../forms/parseDate.js';
 import { createComposerCommands } from '../v2/composerCommands.js';
 import { loadOwnItems, cutToSelf } from './ownItems.js';
+import { redactPairingSecrets } from '../v2/connectionPairing.js';
 
 /**
  * The answer when no own model is set and the plain reading did not take the line: no model is set, what works without
@@ -553,7 +554,8 @@ export function createPlusDoor({
       // a turn ended: the read it made lives one turn more, an older one goes
       if (thread) PLUS_LAST_READS.turnEnded(thread);
       if (memory && thread) {
-        memory.remember(thread, 'you', String(line ?? '').trim());
+        // a pairing offer or a screen start link carries a one-use ticket: the thread keeps the line with it cut
+        memory.remember(thread, 'you', redactPairingSecrets(String(line ?? '').trim()));
         const said = plusAnswerLine({ error: r?.error ?? null, done: r?.done ?? null, circleCard: r?.card ?? null, ownActId: r?.actId ?? null, t });
         // only the model's reply is the assistant's words; a read, an act, a card, help or an error is the system speaking
         // (the household bot's rule, `aroundTurn`): the model then reads it as a result, never as something it said

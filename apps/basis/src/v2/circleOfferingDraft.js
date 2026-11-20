@@ -8,7 +8,7 @@ import { sealedJsonIo } from './localStoreSeal.js';
 const keyOf = (circleId) => `cc.circleSkill.${circleId}`;
 
 export function circleOfferingDraftIo(storage) {
-  const io = sealedJsonIo(storage);
+  const io = sealedJsonIo(storage, { name: 'the offering draft', said: true });
   return {
     load: (circleId) => io.load(keyOf(circleId)),
     save: async (circleId, draft) => { try { await io.save(keyOf(circleId), draft); } catch { /* no content key yet */ } },

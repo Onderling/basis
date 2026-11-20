@@ -7679,6 +7679,10 @@
       "text": "That is not a pairing code.",
       "doc": "Refusal: wrong kind of code pasted."
     },
+    "connection_offer_toolbox-page": {
+      "text": "This page belongs to a toolbox. Connect it from the household's bot: type /scherm and the toolbox's name there, and open the page from that link.",
+      "doc": "Apparaten & sleutels (ledger L1113): a toolbox page's offer pasted into the app is refused; it pairs with the bot from /scherm <toolbox>."
+    },
     "connection_offer_unreadable": {
       "text": "This pairing code is damaged — copy it again.",
       "doc": "Refusal: unreadable/truncated."

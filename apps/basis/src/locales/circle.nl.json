@@ -7681,6 +7681,10 @@
       "text": "Dit is geen koppelcode.",
       "doc": "Refusal: verkeerd soort code geplakt."
     },
+    "connection_offer_toolbox-page": {
+      "text": "Deze pagina hoort bij een toolbox. Koppel hem via de bot van het huishouden: typ daar /scherm en de naam van de toolbox, en open de pagina vanuit die link.",
+      "doc": "Apparaten & sleutels (ledger L1113): a toolbox page's offer pasted into the app is refused; it pairs with the bot from /scherm <toolbox>."
+    },
     "connection_offer_unreadable": {
       "text": "Deze koppelcode is beschadigd — kopieer hem opnieuw.",
       "doc": "Refusal: onleesbaar/afgekapt."

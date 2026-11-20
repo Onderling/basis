@@ -238,12 +238,14 @@ export async function bootAppCircle({ relayUrl, circleId, handles, pod = null, o
  * (`seed-alpha-size.mjs`) starts here too.
  * @param {{relayUrl: string, handles: string[], pod?: object|null, circleId?: string, onUndelivered?: (handle: string, info: object) => void}} a
  */
-export async function bootPeople({ relayUrl, handles, pod = null, circleId = null, onUndelivered = null }) {
+export async function bootPeople({ relayUrl, handles, pod = null, circleId = null, onUndelivered = null, agentOptsFor = null }) {
   const people = await Promise.all(
     handles.map((h) => {
       // a shell hands its give-up consumers to the secure agent (`makeGiveUpConsumers`); a script that counts what the
-      // relay gave up on hears it here, per sender
+      // relay gave up on hears it here, per sender. `agentOptsFor(handle)`: what a shell keeps on its disk for one person
+      // (the vaults, the stores, the device log), so a test can restart that person on the same disk
       const agentOpts = {
+        ...(typeof agentOptsFor === 'function' ? (agentOptsFor(h) ?? {}) : {}),
         ...(pod ? { provisionCircleMedium: mediumFor(h, pod, circleId) } : {}),
         ...(typeof onUndelivered === 'function' ? { secureAgentOpts: { onUndelivered: (info) => onUndelivered(h, info) } } : {}),
       };

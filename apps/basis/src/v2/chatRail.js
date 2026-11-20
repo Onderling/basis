@@ -417,7 +417,8 @@ export function owedChatStatements({ eventLog, circleId, myRef, ttlMs = 24 * 60 
   try { entries = eventLog.query({}) ?? []; } catch { return []; }
   const receipted = new Set();
   for (const e of entries) {
-    if (e?.type === 'delivery-state' && typeof e?.payload?.msgId === 'string') receipted.add(e.payload.msgId);
+    // a RECEIPT ends the owed re-fan; an 'on-its-way' entry (who still waits for an address) is not one
+    if (e?.type === 'delivery-state' && e?.payload?.state === 'stored' && typeof e?.payload?.msgId === 'string') receipted.add(e.payload.msgId);
   }
   const now = Date.now();
   return entries
@@ -427,4 +428,45 @@ export function owedChatStatements({ eventLog, circleId, myRef, ttlMs = 24 * 60 
     .filter((e) => !receipted.has(e.id))
     .map((e) => ({ msgId: e.id, ts: e.ts ?? 0, statement: e.payload.statement }))
     .reverse();   // the log is most-recent-first; re-fan oldest-first
+}
+
+/** The delivery-state entry that says who a line of mine still waits for (a member without an address yet): `{ msgId, state, waiting, reached, of }`. */
+export const ON_ITS_WAY = 'on-its-way';
+
+/**
+ * WHO A LINE STILL WAITS FOR — per RECIPIENT, as a projection of the one log (no second store). A fan that ends
+ * with members it had no address for writes a silent `delivery-state` entry `{ msgId, state: 'on-its-way', waiting:
+ * [member refs], reached, of }`; every later fan of the same line (the re-tell when an address lands) writes the next
+ * one, and the NEWEST entry per line is the answer — an empty `waiting` ends it. One receipt from someone else says
+ * nothing about who still waits, so receipts do not end it; the hold's 24 h do. This is the re-tell's memory across a
+ * restart: the device seeds its re-tell from it when it opens the circle.
+ *
+ * @param {object} a
+ * @param {{query: Function}} a.eventLog
+ * @param {string} a.circleId
+ * @param {string} a.myRef
+ * @param {number} [a.ttlMs]
+ * @returns {Array<{ msgId: string, ts: number, statement: object, waiting: string[], reached: number, of: number }>} oldest-first
+ */
+export function awaitingChatRecipients({ eventLog, circleId, myRef, ttlMs = 24 * 60 * 60 * 1000 } = {}) {
+  if (typeof eventLog?.query !== 'function' || !circleId || !myRef) return [];
+  let entries = [];
+  try { entries = eventLog.query({}) ?? []; } catch { return []; }
+  const newest = new Map();   // msgId → the newest on-its-way payload (the log is most-recent-first)
+  for (const e of entries) {
+    const p = e?.type === 'delivery-state' ? e.payload : null;
+    if (p?.state === ON_ITS_WAY && typeof p.msgId === 'string' && !newest.has(p.msgId)) newest.set(p.msgId, p);
+  }
+  if (!newest.size) return [];
+  const now = Date.now();
+  return entries
+    .filter((e) => e && e.type === CHAT_LANE && e.payload?.circleId === circleId && e.payload?.statement?.body && newest.has(e.id))
+    .filter((e) => (now - (e.ts ?? 0)) <= ttlMs)
+    .filter((e) => e.payload.statement.body?.payload?.authorRef === myRef)
+    .map((e) => {
+      const p = newest.get(e.id);
+      return { msgId: e.id, ts: e.ts ?? 0, statement: e.payload.statement, waiting: (p.waiting ?? []).filter((w) => typeof w === 'string' && w), reached: Number(p.reached) || 0, of: Number(p.of) || 0 };
+    })
+    .filter((x) => x.waiting.length > 0)
+    .reverse();
 }

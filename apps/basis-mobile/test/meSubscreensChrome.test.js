@@ -33,8 +33,9 @@ describe('the screens under Me', () => {
     expect(read('CircleAdvancedScreen.js')).toMatch(/onBack/);
     const launcher = read('CircleLauncherScreen.js');
     expect(launcher).toMatch(/<CircleAdvancedScreen[^>]*onBack=\{\(\) => setView\('settingsHome'\)\}/);
-    // availability opens only from Vandaag's availability words (it left the Verbinding settings, 2026-11-20): back to Vandaag
-    expect(launcher).toMatch(/<CircleAvailabilityScreen[\s\S]{0,400}onBack=\{\(\) => \{[\s\S]{0,160}onTab\('screens'\);\s*\}\}/);
+    // availability opens only from the persona panel's row (it left Verbinding and then Vandaag, 2026-11-20): back to the
+    // tab the panel was opened over
+    expect(launcher).toMatch(/<CircleAvailabilityScreen[\s\S]{0,400}onBack=\{\(\) => onTab\(lastTabRef\.current \?\? 'screens'\)\}/);
     expect(launcher).not.toMatch(/availabilityFromRef/);
     // the copy-log screen's door sits on the settings home: its back goes there
     expect(launcher).toMatch(/<LogReportScreen onBack=\{\(\) => setView\('settingsHome'\)\} \/>/);

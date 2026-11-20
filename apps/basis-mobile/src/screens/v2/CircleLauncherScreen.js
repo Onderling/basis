@@ -303,6 +303,7 @@ import CircleRulesConsentScreen from './CircleRulesConsentScreen.js';
 import CircleTabBar, { PlusDialButtons } from './CircleTabBar.js';
 import { plusDialFor, plusPress, PLUS_MIDDLE_KEY } from '../../../../basis/src/v2/plusDial.js';
 import CircleScreenView from './CircleScreenView.js';
+import PersonaButton from './PersonaButton.js';
 import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
@@ -491,7 +492,7 @@ function WithTabBar({ active, onSelect, badges, avatar = null, onAvatar = null, 
       <View style={{ flex: 1 }}>{children}</View>
       {/* the persona button, top-right on every tab: the persona's picture or initials; a tap opens the persona panel over
           the tab. Left of it, the settings button: the settings home from anywhere (web twin: personaButton.js) */}
-      {avatar ? <PersonaButton avatar={avatar} onPress={onAvatar} /> : null}
+      {avatar ? <PersonaButton avatar={avatar} availability={avatar.availability ?? null} onPress={onAvatar} /> : null}
       {avatar && typeof onSettings === 'function' ? <SettingsButton onPress={onSettings} /> : null}
       {overlay}
       {/* THE "+" is docked in the tab bar (manifest `plus`, shared plusDial.js). Open, the screen is dimmed: a touch on it
@@ -504,20 +505,6 @@ function WithTabBar({ active, onSelect, badges, avatar = null, onAvatar = null, 
       {plusSheet}
       <CircleTabBar active={active} onSelect={onSelect} badges={badges} hasMesh={hasMesh} plus={plus} />
     </View>
-  );
-}
-
-function PersonaButton({ avatar, onPress }) {
-  const theme = useTheme();
-  const insets = useSafeAreaInsets();
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={t('circle.persona_button.label')} testID="persona-button"
-      style={{ position: 'absolute', top: (insets?.top ?? 0) + PERSONA_BUTTON.top, right: PERSONA_BUTTON.right, width: PERSONA_BUTTON.size, height: PERSONA_BUTTON.size, borderRadius: PERSONA_BUTTON.size / 2, overflow: 'hidden',
-        backgroundColor: theme.color.accent, alignItems: 'center', justifyContent: 'center' }}>
-      {avatar.uri
-        ? <Image source={{ uri: avatar.uri }} style={{ width: PERSONA_BUTTON.size, height: PERSONA_BUTTON.size }} accessibilityLabel={avatar.name ?? ''} />
-        : <Text style={{ color: theme.color.white, fontWeight: '700', fontSize: 13 }}>{avatar.initials ?? '?'}</Text>}
-    </Pressable>
   );
 }
 
@@ -1103,6 +1090,16 @@ export default function CircleLauncherScreen({
   const availabilityStore = useMemo(() => makeAvailabilityStoreRN(AsyncStorage, {
     getPodWriter: () => sessionToPodWriterRN(sessionRef?.current ?? null),
   }), []);
+  // the stored availability the persona button's ring and the panel's row say (read again on every view change: it comes
+  // back from the availability screen)
+  const [availabilityNow, setAvailabilityNow] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    Promise.resolve().then(() => availabilityStore.get()).then((r) => { if (alive) setAvailabilityNow(r ?? null); }).catch(() => {});
+    return () => { alive = false; };
+  }, [view, availabilityStore]);
+  // the persona button with the ring's record (every tab bar hands this one)
+  const personaButtonRinged = useMemo(() => (personaButton ? { ...personaButton, availability: availabilityNow } : null), [personaButton, availabilityNow]);
   // What the persona panel's and Vandaag's declared blocks read beside the waist (the agents list, "Wacht op jou")
   // the governance binding, for Mij's reads (made further down; read through a ref when Mij asks, after render)
   const govPolicyRef = useRef(null);
@@ -1399,7 +1396,6 @@ export default function CircleLauncherScreen({
     const active = getActiveScreen(screensBook);
     if (!active) return [];
     const screen = open ? (expandedPage(active, open) ?? active) : active;
-    const availability = await Promise.resolve().then(() => availabilityStore.get()).catch(() => null);
     return materializeScreen({
       screen,
       // The TARGETED 3-arg waist: materializers call `callSkill('calendar', 'listEvents', …)`.
@@ -1411,11 +1407,9 @@ export default function CircleLauncherScreen({
         // the log, the circles, the switcher's set, whose rows are mine, what is read: what Today's blocks and
         // "Nieuw voor jou" (and the banner) read, one function (web parity: `forYouHostOps`)
         ...forYouHostOpsNow(),
-        // on top (the shared projection; web parity): the declared `todayBlocks` — the availability words, "Wacht op
-        // jou" — then "Nieuw voor jou"
+        // on top (the shared projection; web parity): the declared `todayBlocks` ("Wacht op jou"), then "Nieuw voor jou"
         forYou: true,
         todayTop: todayTopBlocks(),
-        availability,
         openProposals: mijSources.openProposals, pendingDeviceOffer: mijSources.pendingDeviceOffer, sharedWithMeCount: mijSources.sharedWithMeCount,
         // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
         introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags),
@@ -1475,7 +1469,8 @@ export default function CircleLauncherScreen({
     ? { mijSelf: { ...panelModel.mijSelf, deviceId: bundle?.agent?.persona?.(panelModel.mijSelf.id)?.enrolledDevice?.deviceId ?? null } }
     : { mijSelf: undefined }) }), [mijSources, panelModel.mijSelf?.id, bundle]);   // eslint-disable-line react-hooks/exhaustive-deps
   const personaPanelSheet = (
-    <PersonaPanelSheet visible={panelOpen} model={panelModel}
+    <PersonaPanelSheet visible={panelOpen} model={panelModel} availability={availabilityNow}
+      onAvailability={() => { setPanelOpen(false); setView('availability'); }}
       onTab={(id) => setPanelSelf(id)}
       onShowAs={() => { setPanelOpen(false); setSwitcherOpen(true); }}
       onClose={() => setPanelOpen(false)}>
@@ -1750,6 +1745,8 @@ export default function CircleLauncherScreen({
 
   // a tile's proposals badge leads to where a proposal is answered: the circle's settings
   const openProposals = useCallback((c) => { setSelected(c); setView('settings'); }, []);
+  // the vote chip on Vandaag: straight to the circle's open votes, cast in one tap (Frits 2026-11-20; web: showGovernance)
+  const openVotes = useCallback((c) => { setSelected(c); setView('governance'); }, []);
   const openCircle = useCallback(async (c) => {
     setActiveCircle(c.id);
     // bump the seenAt marker so the unread badge clears on the next launcher render (sealed; an open before the marks
@@ -2460,7 +2457,7 @@ export default function CircleLauncherScreen({
     // when there is more than one; "Pas aan" opens the customise sheet (every control a screen op). Web: circleApp.js.
     const active = getActiveScreen(screensBook);
     return (
-      <WithTabBar avatar={personaButton} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="screens" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={personaButtonRinged} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="screens" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         {/* clear the status bar: the day's header sat under the clock */}
         <View style={{ flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper }}>
           {/* the day this page is about, above everything: a day, not a list (web twin: circle-vandaag__day) */}
@@ -2496,12 +2493,11 @@ export default function CircleLauncherScreen({
               onMore={expandedBlockId ? null : setExpandedBlockId}
               onAction={(a) => {
                 if (a?.kind === 'open-circle') { const c = circles.find((x) => x.id === a.circleId); if (c) openCircle(c); }
-                // "Wacht op jou" (web parity: onScreenAction): a vote opens that circle's proposals, a device offer the
-                // devices group, what was shared its list; the availability words open the availability screen
-                else if (a?.kind === 'open-proposals') { const c = circles.find((x) => x.id === a.circleId); if (c) openProposals(c); }
+                // "Wacht op jou" (web parity: onScreenAction): a vote opens that circle's OPEN VOTES (the decisions view,
+                // where it is cast in one tap), a device offer the devices group, what was shared its list
+                else if (a?.kind === 'open-votes') { const c = circles.find((x) => x.id === a.circleId); if (c) openVotes(c); }
                 else if (settingsGroupForAction(a)) { setSettingsGroupId(settingsGroupForAction(a)); setView('settingsGroup'); }
                 else if (a?.kind === 'open-shared-with-me') setView('sharedWithMe');
-                else if (a?.kind === 'open-availability') setView('availability');
                 // "Nieuw voor jou": opening a row is reading it (on every device), and it goes to the thing itself
                 else if (a?.kind === 'for-you-open' && a.row) {
                   readMarks.markRows([a.row]).catch(() => {});
@@ -2551,7 +2547,7 @@ export default function CircleLauncherScreen({
   // its only undo, in a place a person can find without being any circle's admin.
   if (view === 'blocked') {
     return (
-      <WithTabBar avatar={personaButton} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={personaButtonRinged} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <CircleBlockedScreen callSkill={bundle?.callSkill} circles={circles} onBack={() => setView('contacten')} />
       </WithTabBar>
     );
@@ -2559,7 +2555,7 @@ export default function CircleLauncherScreen({
   // This device's log, to copy — a My data sub-view (web parity: showLogReport); nothing is sent from it.
   if (view === 'logReport') {
     return (
-      <WithTabBar avatar={personaButton} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={personaButtonRinged} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <LogReportScreen onBack={() => setView('settingsHome')} />
       </WithTabBar>
     );
@@ -2567,7 +2563,7 @@ export default function CircleLauncherScreen({
   // Share my contact — a Mij sub-view (web parity: showShareMyContact); back returns to profile.
   if (view === 'shareContact') {
     return (
-      <WithTabBar avatar={personaButton} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={personaButtonRinged} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <ShareMyContactScreen callSkill={bundle?.callSkill} onBack={() => onTab(lastTabRef.current)}
           backLabel={t('circle.back_to', { place: t(settingsBackFor(lastTabRef.current, basisManifest).labelKey) })} />
       </WithTabBar>
@@ -2577,7 +2573,7 @@ export default function CircleLauncherScreen({
   // op + the settable params, from the shared projections; back returns to profile.
   if (view === 'advanced') {
     return (
-      <WithTabBar avatar={personaButton} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={personaButtonRinged} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <CircleAdvancedScreen manifestsByOrigin={buildManifestsByOrigin()} callSkill={bundle?.callSkill} onBack={() => setView('settingsHome')} />
       </WithTabBar>
     );
@@ -2590,7 +2586,7 @@ export default function CircleLauncherScreen({
   // built from the encapsulated identity secret). A null opener makes a row tap a deny-safe no-op.
   if (view === 'sharedWithMe') {
     return (
-      <WithTabBar avatar={personaButton} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={personaButtonRinged} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <SharedWithMeScreen
           received={sharedWithMeList}
           opener={bundle?.sharedWithMeOpener ?? null}
@@ -2610,7 +2606,7 @@ export default function CircleLauncherScreen({
   // The person's settings behind the settings button (web parity: showSettingsHome / showSettingsCircleChooser).
   if (view === 'settingsHome') {
     return (
-      <WithTabBar avatar={personaButton} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={personaButtonRinged} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <SettingsHomeScreen onBack={() => onTab(settingsBackFor(settingsFromRef.current, basisManifest).tab)}
           backLabel={t('circle.back_to', { place: t(settingsBackFor(settingsFromRef.current, basisManifest).labelKey) })}
           onAdvanced={developerOn ? () => setView('advanced') : undefined}
@@ -2634,14 +2630,14 @@ export default function CircleLauncherScreen({
   if (view === 'settingsGroup') {
     const group = settingsGroupFor(basisManifest, settingsGroupId);
     return (
-      <WithTabBar avatar={personaButton} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={personaButtonRinged} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         {myDataScreen({ only: group ? group.sections.map((sec) => sec.id) : [], groupTitle: group ? t(group.labelKey) : null, onBack: () => setView('settingsHome') })}
       </WithTabBar>
     );
   }
   if (view === 'settingsCircles') {
     return (
-      <WithTabBar avatar={personaButton} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={personaButtonRinged} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <CircleSettingsChooserScreen circles={circles ?? []} onBack={() => setView('settingsHome')}
           onOpenCircle={(c) => { setSelected(c); setView('settings'); }} />
       </WithTabBar>
@@ -2649,14 +2645,11 @@ export default function CircleLauncherScreen({
   }
   if (view === 'availability') {
     return (
-      <WithTabBar avatar={personaButton} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={personaButtonRinged} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <CircleAvailabilityScreen
           store={availabilityStore}
-          // opened from Vandaag's availability words (it left the Verbinding settings): back to Vandaag, whose head reads them again
-          onBack={() => {
-            vandaagHead.current?.invalidate();
-            onTab('screens');
-          }}
+          // opened from the persona panel's availability row: back to the tab it came from (the ring reads it again)
+          onBack={() => onTab(lastTabRef.current ?? 'screens')}
         />
       </WithTabBar>
     );
@@ -2666,7 +2659,7 @@ export default function CircleLauncherScreen({
     if (contactThread) {
       // the 1:1 thread has no "+": its composer is the act, and the button would float over its send button
       return (
-        <WithTabBar avatar={personaButton} onAvatar={openPersonaPanel} onSettings={openSettings} plusSheet={plusSheet} overlay={screenOverlay} active="contacten" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+        <WithTabBar avatar={personaButtonRinged} onAvatar={openPersonaPanel} onSettings={openSettings} plusSheet={plusSheet} overlay={screenOverlay} active="contacten" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
           <ContactThreadScreen
             deliveryStateMap={deliveryStateMap}
             bundle={bundle}
@@ -2684,7 +2677,7 @@ export default function CircleLauncherScreen({
       );
     }
     return (
-      <WithTabBar avatar={personaButton} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="contacten" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={personaButtonRinged} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="contacten" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <ContactsScreen bundle={bundle} unread={contactUnread}
           helpAvailable={circles.some((c) => c.id === HELP_CIRCLE_ID)}
           onOpen={(c) => { const target = contactOpenTarget(c); if (target.kind === 'circle') { const hc = circles.find((x) => x.id === target.circleId); if (hc) openCircle(hc); } else openContactThread(c); }}
@@ -2818,7 +2811,7 @@ export default function CircleLauncherScreen({
     // On a device with no discovering transport the surface is honest about it rather than silent:
     // the banner says "unavailable" instead of the screen looking like an empty room.
     return (
-      <WithTabBar avatar={personaButton} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="nearby" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={personaButtonRinged} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="nearby" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <NearbyScreenHost
           bundle={bundle}
           heldSelves={heldSelves}
@@ -3062,7 +3055,7 @@ export default function CircleLauncherScreen({
 
   const listPaint = launcherListPaint({ loading, settled: launcherSettled, count: circles.length, bootError });
   return (
-    <WithTabBar avatar={personaButton} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="circles" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+    <WithTabBar avatar={personaButtonRinged} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="circles" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
       <View style={styles.page} testID="circle-launcher">
         {/* no "← chat" button (no chat shell to navigate to). */}
         <Text style={styles.title}>{t('circle.title')}</Text>

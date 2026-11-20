@@ -25,22 +25,24 @@ describe('circle availability screen (M3)', () => {
       .withTimeout(60_000);
   });
 
-  // Availability opens from Vandaag's availability block (it left Instellingen → Verbinding, 2026-11-20); its Save and
-  // its back return to Vandaag.
+  // Availability opens from the persona panel's row (it left Verbinding and Vandaag, 2026-11-20); its Save and its back
+  // return to the tab the panel was opened over (Vandaag here).
   async function openAvailability() {
     await waitFor(element(by.id('circle-tab-screens'))).toBeVisible().withTimeout(10_000);
     await element(by.id('circle-tab-screens')).tap();
-    await waitFor(element(by.id('vandaag-availability'))).toBeVisible().withTimeout(15_000);
-    await element(by.id('vandaag-availability')).tap();
+    await waitFor(element(by.id('persona-button'))).toBeVisible().withTimeout(15_000);
+    await element(by.id('persona-button')).tap();
+    await waitFor(element(by.id('persona-panel-availability'))).toBeVisible().withTimeout(15_000);
+    await element(by.id('persona-panel-availability')).tap();
     // The loading state carries the same `circle-availability` id — wait for the loaded form (its holiday switch).
     await waitFor(element(by.id('holiday-active'))).toBeVisible().withTimeout(15_000);
   }
 
-  it('opens Availability from Vandaag, toggles holiday, Saves back to Vandaag', async () => {
+  it('opens Availability from the persona panel, toggles holiday, Saves back; the ring turns to away', async () => {
     await openAvailability();
     await element(by.id('holiday-active')).tap();
     await element(by.id('circle-availability-save')).tap();
-    await waitFor(element(by.id('vandaag-availability'))).toBeVisible().withTimeout(10_000);
+    await waitFor(element(by.id('persona-button-ring-away'))).toBeVisible().withTimeout(10_000);
   });
 
   it('the Circles tab returns from Availability to the launcher', async () => {

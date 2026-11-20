@@ -46,6 +46,13 @@ was started 2026-11-18 with the first toolbox, a grocery search.
   the page, each only if the housemate's own role holds it; the question lists them in words. Basis's own screen keeps
   the role's whole column. A page paired before this was ended once at the upgrade, and its housemate told how to
   reconnect.
+- **A housemate** opens a toolbox's page that the BOX serves itself: when the operator placed the page's files on the
+  box, the link `/scherm <toolbox>` sends also carries an entry in its query (`?e=`), made with the ticket and as
+  short-lived. The box's page server (localhost only; the operator's https server in front is what the home network
+  reaches) spends it once into a cookie for that toolbox's path (`HttpOnly; Secure; SameSite=Strict`, 30 days, this
+  device) and serves the page's files; without a live entry or cookie it answers a refusal page in words that says to
+  ask the bot for a link. A housemate who is revoked, or a toolbox switched off, ends the cookies at once. The entry
+  and the cookie only open the files; what the page may DO is still its paired grant.
 - **The household's admin** types `/toolbox`: the toolboxes the box's operator placed, each with its words and whether
   it is on. `/toolbox <naam> aan` shows the toolbox's card (its name, address, words and what it receives) and switches
   it on after their yes, in their own private chat only. `/toolbox <naam> uit` switches it off.
@@ -65,6 +72,11 @@ was started 2026-11-18 with the first toolbox, a grocery search.
 - The door command: `/toolbox` (`assistant-toolbox` in `apps/basis/src/v2/assistantManifest.js`, `toolboxOp` in
   `apps/basis/src/v2/assistantOps.js`).
 - The operator's step: `deploy/roles/assistant.yml` (the files in the service's data volume).
+- A page served from the box: `apps/basis/src/v2/toolboxPages.js` (`createPageEntries`, the sealed store of entries and
+  cookies; `createToolboxPages`, the localhost page server), composed in `apps/basis/bin/device-runner.mjs`
+  (`toolbox-pages.json` in the data dir; port `tools.pagePort`, or `ONDERLING_TOOLBOX_PAGE_PORT`). The page's files:
+  `<data-dir>/toolboxes/<name>/page/`, its placed `page` the front server's address ending in `/<name>/`. The entry in
+  the link: `toolboxStart` in `apps/basis/src/v2/botScreens.js`.
 
 <!-- catalogue-ops
 tools: useTool pickThing moreThings listTools addToolbox removeToolbox
@@ -85,6 +97,12 @@ assistant: assistant-toolbox
   same link twice, is refused in words), holds `useTool` and the placed ops only, `useTool` answers, another toolbox
   gives `toolbox-not-yours`, an op it does not hold `op-not-allowed`. `apps/basis/test/v2/botScreens.test.js` — the
   grant's scope, the ticket (one use, the person's own, in time, its toolbox), the upgrade's one pass. `apps/basis/test/v2/screenClient.test.js` — codes, states, pairing, storage per toolbox, sign-out.
+- `apps/basis/test/v2/toolboxPages.test.js` — the page server over real http: localhost only and only while a toolbox
+  with a page is on; no entry or cookie refused in words; an entry spent once into a path-scoped cookie; another
+  toolbox's entry, an old one, a revoked person's cookie refused; nothing outside the page folder (`..`, encoded
+  slashes, dot files, a link out, other types, no listing); no other method; no secret in a log line or the store.
+  `apps/basis/test/toolboxPage.box.test.js` — the same on the booted box: a housemate admitted by invite gets the link,
+  enters once, and is out after `/revoke`; the listener closes when the toolbox is switched off.
 - `apps/basis/test/v2/toolboxDoor.test.js` — `/toolbox` at the door: the list, the card with Ja/Nee, the yes from the
   admin's private chat only, off.
 - `apps/basis/test/v2/toolboxSlots.test.js` — a word's slot phrases fill a tool parameter, only as whole words at the
@@ -94,6 +112,9 @@ assistant: assistant-toolbox
 
 ## Decided, not built
 
+- The https server in front of the box's page server (its certificate, its one port on the home network, one name or
+  port per toolbox so each page has an origin of its own): the operator's, not built here.
+
 - A toolbox's key handed over from the admin's own app, sealed over the relay (after the alpha; for the alpha the key
   is the operator's).
 - A link from Basis's own app to a toolbox's page (the bot's `/scherm <toolbox>` link is built; a button in the app is
@@ -102,3 +123,4 @@ assistant: assistant-toolbox
 ## Decisions that bind this area
 
 - `docs/decisions.md` 2026-11-18: a circle uses an outside toolbox.
+- `docs/decisions.md` 2026-11-20: a toolbox's page may be served from the box itself.

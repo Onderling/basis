@@ -38,7 +38,7 @@ import ActStateBar from './src/rn/ActStateBar.js';
 // Two maps would mean receipts advancing a state no bubble reads.
 import { createAppDeliveryMap } from '../basis/src/v2/deliveryState.js';
 import { onStoredValueRefused } from '../basis/src/v2/localStoreSeal.js';
-import { checkPhraseForThisDevice, startDeviceOver, readStartOverMark, cancelStartOver } from '../basis/src/v2/startOver.js';
+import { checkPhraseForThisDevice, startDeviceOver, readStartOverMark, cancelStartOver, cancelStartOverAsks } from '../basis/src/v2/startOver.js';
 import * as FileSystem from 'expo-file-system';
 import { makeSecureStoreRootKeyStore } from './src/core/secureStoreRootKeyStore.js';
 import { wipePhone as wipePhoneWith, confirmStartOver, confirmCancelCleared } from './src/core/startOverPhone.js';
@@ -404,18 +404,19 @@ export default function App() {
     const r = await startDeviceOver({
       phrase: checked.phrase, fingerprint: checked.fingerprint, markerVault: markerVaultOver(AsyncStorage), wipe: wipePhone,
       restore: (p) => restoreFromMnemonic({ mnemonic: p, asyncStorage: AsyncStorage, secureStore: SecureStore }),
-    });
+    }).catch(() => ({ ok: false, code: 'storage' }));
     if (!r.ok) return r;
     try { await markWelcomeDismissed(AsyncStorage); } catch { /* non-fatal */ }
     setBootError(null); setBootFailure(null); setStartOverMark(null);
     setFirstRun('dismissed');   // the boot runs again, on the restored device
     return r;
   }, [startOverMark]);
-  // Cancel. No start-over under way: back to the app, nothing changed. One cut short: the mark goes, nothing more is
-  // cleared; when the device was already cleared, it says first that it starts as a NEW identity (then the welcome).
+  // Cancel. No start-over under way: back to the app, nothing changed. One cut short (any mark: a stop inside the clear
+  // leaves no sure sign how far it got): it says first that this device may already be cleared and may start as a NEW
+  // identity; on yes the mark goes, nothing more is cleared. What Cancel asks is `cancelStartOverAsks`'s.
   const cancelStartOverPage = useCallback(async () => {
-    if (!startOverMark) { setFirstRun('dismissed'); return; }
-    if (startOverMark.stage === 'cleared' && !(await confirmCancelCleared(t))) return;
+    if (!cancelStartOverAsks(startOverMark)) { setFirstRun('dismissed'); return; }
+    if (!(await confirmCancelCleared(t))) return;
     try { await cancelStartOver(markerVaultOver(AsyncStorage)); } catch { /* the next start asks again */ }
     const cleared = startOverMark.stage === 'cleared';
     setStartOverMark(null);

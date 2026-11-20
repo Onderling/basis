@@ -68,6 +68,19 @@ export async function readStartOverMark(markerVault) {
   return { stage: m?.stage === 'marked' ? 'marked' : 'cleared', fingerprint: typeof m?.fingerprint === 'string' ? m.fingerprint : null };
 }
 
+/**
+ * What "Cancel" must ask first, the same in every shell: `null` (no start-over under way: back, nothing changed), or
+ * `'may-be-cleared'` for ANY mark. A stage of 'marked' does not prove nothing was cleared: a kill inside the clear
+ * leaves 'marked' over a half-cleared device (the custody marker gone, the key door still holding a delegation seed,
+ * which the next boot would read as a root). So the person is told this device may already be cleared and may start
+ * as a new identity, and confirms.
+ * @param {{stage: string}|null} mark  `readStartOverMark`'s answer
+ * @returns {null|'may-be-cleared'}
+ */
+export function cancelStartOverAsks(mark) {
+  return mark ? 'may-be-cleared' : null;
+}
+
 /** "Cancel" on a start-over cut short: the mark goes, nothing more is cleared. */
 export async function cancelStartOver(markerVault) {
   await markerVault.delete(START_OVER_PENDING_KEY);
@@ -85,11 +98,18 @@ export async function cancelStartOver(markerVault) {
  * @param {(phrase: string) => Promise<{ok: boolean, code?: string}>} a.restore  the ordinary restore of that phrase
  * @returns {Promise<{ok: boolean, code?: string}>}
  */
-export async function startDeviceOver({ phrase, fingerprint = null, markerVault, wipe, restore }) {
+export async function startDeviceOver({ phrase, fingerprint = null, markerVault, canClear = null, wipe, restore }) {
+  // a shell that cannot clear all of what it keeps (a browser that cannot list its databases) says so before anything
+  // is touched: per-circle stores left behind would stay sealed under a key that is gone
+  if (canClear) {
+    let can;
+    try { can = await canClear(); } catch { can = { ok: false, code: 'storage' }; }
+    if (!can?.ok) return { ok: false, code: can?.code ?? 'storage' };
+  }
   const mark = (stage) => markerVault.set(START_OVER_PENDING_KEY, JSON.stringify({ at: new Date().toISOString(), stage, fingerprint }));
-  await mark('marked');
+  try { await mark('marked'); } catch { return { ok: false, code: 'storage' }; }
   try { await wipe(); } catch (e) { return { ok: false, code: e?.code === 'blocked' ? 'blocked' : 'storage' }; }
-  await mark('cleared');
+  try { await mark('cleared'); } catch { return { ok: false, code: 'storage' }; }
   const r = await restore(phrase);
   if (r?.ok) await markerVault.delete(START_OVER_PENDING_KEY);
   return r?.ok ? { ok: true } : { ok: false, code: r?.code ?? 'storage' };

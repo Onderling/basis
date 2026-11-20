@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { Bootstrap } from '@onderling/core';
 import { RootKeyStoreMemory } from '@onderling/vault';
 import {
-  checkPhraseForThisDevice, startDeviceOver, readStartOverMark, cancelStartOver, wipeKeyValueStorage, deleteDatabases,
+  checkPhraseForThisDevice, startDeviceOver, readStartOverMark, cancelStartOver, cancelStartOverAsks, wipeKeyValueStorage, deleteDatabases,
   START_OVER_PENDING_KEY,
 } from '../../src/v2/startOver.js';
 import { isBasisStorageKey, isBasisDatabase } from '../../src/v2/basisStorageNames.js';
@@ -115,7 +115,7 @@ describe('mark, clear, restore, unmark (L1115)', () => {
         wipe: async () => { await wipeKeyValueStorage(s, MARK); kill('wipe'); },
         restore: async () => { kill('restore'); return { ok: true }; },
       });
-      if (killAt === 'wipe') expect(await run).toEqual({ ok: false, code: 'storage' });
+      if (killAt === 'wipe' || killAt === 'mark') expect(await run).toEqual({ ok: false, code: 'storage' });
       else await expect(run).rejects.toThrow(`killed at ${killAt}`);
       const mark = await readStartOverMark(markerVault);
       expect(mark).toMatchObject({ fingerprint: 'fp', stage: killAt === 'restore' ? 'cleared' : 'marked' });
@@ -124,6 +124,40 @@ describe('mark, clear, restore, unmark (L1115)', () => {
       expect(again).toEqual({ ok: true });
       expect(await readStartOverMark(markerVault)).toBe(null);
     }
+  });
+
+  it('a delegation device killed after the key-value clear: the mark still says "marked", and cancel ASKS first', async () => {
+    // the custody marker went with the key-value clear, the key door still holds the delegation seed: a cancel with no
+    // word would let the next boot read that seed as a root. So any mark makes cancel ask.
+    const s = asyncStorage({ [CUSTODY]: delegationMarker({ fingerprint: 'fp' }), 'cc-chat-id:content-at-rest-key': 'broken' });
+    const markerVault = markerVaultOver(s);
+    const run = startDeviceOver({ phrase: 'p', fingerprint: 'fp', markerVault, wipe: async () => { await wipeKeyValueStorage(s, MARK); throw new Error('killed inside the wipe'); }, restore: async () => ({ ok: true }) });
+    expect(await run).toEqual({ ok: false, code: 'storage' });
+    expect(s.m.has(CUSTODY)).toBe(false);
+    const mark = await readStartOverMark(markerVault);
+    expect(mark.stage).toBe('marked');
+    expect(cancelStartOverAsks(mark)).toBe('may-be-cleared');
+    expect(cancelStartOverAsks({ stage: 'cleared', fingerprint: null })).toBe('may-be-cleared');
+    expect(cancelStartOverAsks(null)).toBe(null);
+  });
+
+  it('the first mark write fails: nothing cleared, a code, no throw', async () => {
+    const s = asyncStorage({ 'cc-chat-id:x': 'y' });
+    const markerVault = { ...markerVaultOver(s), set: async () => { throw new Error('quota'); } };
+    let wiped = false;
+    const r = await startDeviceOver({ phrase: 'p', markerVault, wipe: async () => { wiped = true; }, restore: async () => ({ ok: true }) });
+    expect(r).toEqual({ ok: false, code: 'storage' });
+    expect(wiped).toBe(false);
+  });
+
+  it('a shell that cannot clear all of it says so BEFORE the mark: nothing is touched', async () => {
+    const s = asyncStorage({ 'cc-chat-id:x': 'y' });
+    const markerVault = markerVaultOver(s);
+    let wiped = false;
+    const r = await startDeviceOver({ phrase: 'p', markerVault, canClear: async () => ({ ok: false, code: 'cannot-list' }), wipe: async () => { wiped = true; }, restore: async () => ({ ok: true }) });
+    expect(r).toEqual({ ok: false, code: 'cannot-list' });
+    expect(wiped).toBe(false);
+    expect(await readStartOverMark(markerVault)).toBe(null);
   });
 
   it('a restore that fails keeps the mark at "cleared": the device does not come up as a fresh identity unasked', async () => {

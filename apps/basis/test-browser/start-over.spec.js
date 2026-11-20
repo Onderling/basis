@@ -65,6 +65,8 @@ test.describe('start this device over from your phrase', () => {
     const marked = await storageNow(A.page);
     expect(marked.keys.filter((k) => k.startsWith('cc-chat-id:')).length, 'nothing was cleared by the mark').toBeGreaterThan(0);
     await A.page.locator('[data-testid="start-over-cancel"]').click();
+    // any mark: cancel says first that the device may already be cleared, and asks
+    await A.page.locator('[data-testid="start-over-cancel-yes"]').click();
     await A.page.waitForFunction(() => typeof window.onderlingCall === 'function', null, { timeout: 60_000 });
     const cancelled = await storageNow(A.page);
     expect(cancelled.keys).not.toContain(MARK);

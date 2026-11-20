@@ -66,7 +66,7 @@ import { createSettingsPodMedium } from '../../src/v2/settingsPodMedium.js';
 import { inviteDeepLink } from '../../src/v2/inviteDeepLink.js';
 import { alphaViewMode, isAlphaTab, ALPHA_FALLBACK_TAB } from '../../src/v2/alphaSurface.js';
 import { runPendingForget, markerVaultOver, circleIdsFrom } from '../../src/v2/enrolForgets.js';
-import { checkPhraseForThisDevice, startDeviceOver, readStartOverMark, cancelStartOver, wipeKeyValueStorage, deleteDatabases, restorePhraseWithoutAgent, START_OVER_PENDING_KEY } from '../../src/v2/startOver.js';
+import { checkPhraseForThisDevice, startDeviceOver, readStartOverMark, cancelStartOver, cancelStartOverAsks, wipeKeyValueStorage, deleteDatabases, restorePhraseWithoutAgent, START_OVER_PENDING_KEY } from '../../src/v2/startOver.js';
 import { isBasisStorageKey, isBasisDatabase, BASIS_DB_NAMES } from '../../src/v2/basisStorageNames.js';
 import { pickRootKeyStore } from '../../src/core/agent/ownerRootCustody.js';
 import { makeBrowserVault } from '@onderling/secure-agent';
@@ -9623,9 +9623,14 @@ function openStartOverPage() {
 async function wipeThisBrowser() {
   await wipeKeyValueStorage(window.localStorage, START_OVER_MARK_KEY, { isOurs: isBasisStorageKey });
   try { await wipeKeyValueStorage(window.sessionStorage, START_OVER_MARK_KEY, { isOurs: isBasisStorageKey }); } catch { /* none */ }
-  let listed = [];
-  try { listed = ((await globalThis.indexedDB?.databases?.()) ?? []).map((d) => d?.name).filter(isBasisDatabase); } catch { /* not listable: the fixed names */ }
-  if (globalThis.indexedDB) await deleteDatabases(globalThis.indexedDB, [...new Set([...listed, ...BASIS_DB_NAMES])]);
+  // `canClearThisBrowser` made sure the databases can be listed: a per-circle store is found only through the listing
+  const listed = ((await globalThis.indexedDB.databases()) ?? []).map((d) => d?.name).filter(isBasisDatabase);
+  await deleteDatabases(globalThis.indexedDB, [...new Set([...listed, ...BASIS_DB_NAMES])]);
+}
+// Before anything is touched: a browser that cannot list its databases would leave the per-circle stores behind, sealed
+// under a key that is gone, so the start-over stops with a word instead.
+async function canClearThisBrowser() {
+  return typeof globalThis.indexedDB?.databases === 'function' ? { ok: true } : { ok: false, code: 'cannot-list' };
 }
 function showStartOver({ mark = null } = {}) {
   const root = document.getElementById('circle-root') ?? document.body;
@@ -9653,25 +9658,25 @@ function showStartOver({ mark = null } = {}) {
       el('button', { type: 'button', class: 'cc-btn cc-btn--danger', 'data-testid': 'start-over-yes', onclick: async () => {
         said.textContent = t('circle.start_over.working');
         const r = await startDeviceOver({
-          phrase: checked.phrase, fingerprint: checked.fingerprint, markerVault, wipe: wipeThisBrowser,
+          phrase: checked.phrase, fingerprint: checked.fingerprint, markerVault, canClear: canClearThisBrowser, wipe: wipeThisBrowser,
           restore: (p) => restorePhraseWithoutAgent({ mnemonic: p, rootKeyStore: rootKeyStore(), chatVault: makeBrowserVault('cc-chat-id:'), markerVault: makeBrowserVault('cc-owner-root:') }),
         }).catch(() => ({ ok: false, code: 'storage' }));
         if (r.ok) { window.location.reload(); return; }
-        said.textContent = t(r.code === 'blocked' ? 'circle.start_over.error_blocked' : 'circle.start_over.error_storage');
+        said.textContent = t({ blocked: 'circle.start_over.error_blocked', 'cannot-list': 'circle.start_over.error_cannot_list' }[r.code] ?? 'circle.start_over.error_storage');
       } }, t('circle.start_over.confirm_yes')),
       el('button', { type: 'button', class: 'cc-btn cc-btn--quiet', onclick: () => { confirm.remove(); said.textContent = t('circle.start_over.not_confirmed'); } }, t('circle.start_over.confirm_no')));
     page.append(confirm);
   } }, t('circle.start_over.submit'));
-  // Cancel. With no start-over under way: back to the app, nothing changed. With one cut short: the mark goes and
-  // nothing more is cleared; when it was already cleared, say first that this device starts as a NEW identity.
+  // Cancel. With no start-over under way: back to the app, nothing changed. With one cut short (any mark: a stop inside
+  // the clear leaves no sure sign how far it got): say first that this device may already be cleared and may start as a
+  // NEW identity; on yes the mark goes and nothing more is cleared. What Cancel asks is `cancelStartOverAsks`'s.
   const back = el('button', { type: 'button', class: 'cc-btn cc-btn--quiet', 'data-testid': 'start-over-cancel', onclick: async () => {
-    if (!mark) { window.location.reload(); return; }
-    if (mark.stage !== 'cleared') { await cancelStartOver(markerVault).catch(() => {}); window.location.reload(); return; }
+    if (!cancelStartOverAsks(mark)) { window.location.reload(); return; }
     page.querySelector('.start-over__cancel')?.remove();
     page.append(el('div', { class: 'start-over__cancel' },
       el('h3', {}, t('circle.start_over.cancel_cleared_title')),
       el('p', {}, t('circle.start_over.cancel_cleared_body')),
-      el('button', { type: 'button', class: 'cc-btn cc-btn--danger', onclick: async () => { await cancelStartOver(markerVault).catch(() => {}); window.location.reload(); } }, t('circle.start_over.cancel_cleared_yes')),
+      el('button', { type: 'button', class: 'cc-btn cc-btn--danger', 'data-testid': 'start-over-cancel-yes', onclick: async () => { await cancelStartOver(markerVault).catch(() => {}); window.location.reload(); } }, t('circle.start_over.cancel_cleared_yes')),
       el('button', { type: 'button', class: 'cc-btn cc-btn--quiet', onclick: (e) => e.currentTarget.parentElement.remove() }, t('circle.start_over.cancel_cleared_no'))));
   } }, t('circle.start_over.confirm_no'));
   page.append(go, back);

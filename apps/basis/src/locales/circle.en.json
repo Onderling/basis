@@ -9814,8 +9814,8 @@
       "doc": "Start this device over (ledger L1115): cancel on a start-over cut short AFTER the device was cleared."
     },
     "cancel_cleared_body": {
-      "text": "This device was already cleared. Without your phrase it starts as a new person, with none of your circles. You can still restore your phrase later.",
-      "doc": "Start this device over (ledger L1115): cancel on a start-over cut short AFTER the device was cleared: it comes up as a new identity."
+      "text": "Starting over stopped halfway here, so this device may already be cleared, in part or in full. Without your phrase it may start as a new person, with none of your circles. You can still restore your phrase later.",
+      "doc": "Start this device over (ledger L1115): cancel on ANY start-over cut short: a stop inside the clear leaves no sure sign of how far it got, so the device may come up as a new identity."
     },
     "cancel_cleared_yes": {
       "text": "Start as a new person",
@@ -9832,6 +9832,10 @@
     "error_blocked": {
       "text": "Basis is open in another tab. Close the other tabs and try again: nothing more was removed.",
       "doc": "Web: the start-over page (ledger L1115): a database delete was blocked by another tab; the start-over stopped, its mark kept."
+    },
+    "error_cannot_list": {
+      "text": "This browser cannot list what Basis keeps here, so it cannot remove all of it. Nothing was removed. Use another browser, or clear this site's data in the browser's settings and then restore your phrase.",
+      "doc": "Web: the start-over page (ledger L1115): the browser has no indexedDB.databases(), so per-circle stores could not be found; refused before anything was touched."
     }
   },
   "boot_failed": {

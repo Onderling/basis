@@ -14,10 +14,17 @@ was started 2026-11-18 with the first toolbox, a grocery search.
   The same answer in words, at every door (also Basis's own bot thread, which has no buttons yet): the list is
   numbered, and `2` or `kies 2` picks the second thing of the LAST list shown in that thread. A number with no list
   open there is an ordinary line. The same thing again raises its quantity.
-  Where a door shows pictures (Telegram), the box fetches each thing's picture from the toolbox's own host and each
-  thing comes as a photo card with its number and button, at most 3 per shop; the rest of that shop sits behind one
-  button, "Meer van <winkel> (n)" (`/meer`, `tools.moreThings`), which shows the next ones from the list already
-  fetched, each with its own number. A door without pictures shows the whole list in words.
+  Where a door shows pictures (Telegram), the box fetches the pictures from the toolbox's own host for the things that
+  are shown as cards first (the first 3 per shop; what is left of the 10 per answer goes to the rest in order), and per
+  shop come ONE album of those cards' pictures side by side, each captioned with its number, and ONE message under it:
+  the shop, the numbered lines, a "Kies <n>" button per card and one "Meer van <winkel> (n)" (`/meer`,
+  `tools.moreThings`), which shows the next ones from the list already fetched, each with its own number. A shop with
+  fewer than two pictures gets the message alone (an album of one is refused by Telegram, and one photo alone is drawn
+  at the width of the chat). A door without pictures shows the whole list in words.
+  The operator's words may carry SLOTS (`slots` on a word in the placed file): phrases that fill a parameter of the
+  tool, so `zoek hagelslag bij Albert Heijn` asks for `hagelslag` with `stores: ["ah"]`. A phrase counts only as whole
+  words at the start or end of the question, longest first; Basis knows no shop, the phrases and values are the
+  toolbox's.
 - **A housemate** sees which toolboxes are on, and their words, in `/help` and the welcome.
 - **A toolbox's own page** (a static page in the housemate's browser, paired as one of their screens) searches by
   calling `tools.useTool` through the household bot over the relay, as that housemate. The screen holds the op but the
@@ -80,6 +87,10 @@ assistant: assistant-toolbox
   grant's scope, the ticket (one use, the person's own, in time, its toolbox), the upgrade's one pass. `apps/basis/test/v2/screenClient.test.js` — codes, states, pairing, storage per toolbox, sign-out.
 - `apps/basis/test/v2/toolboxDoor.test.js` — `/toolbox` at the door: the list, the card with Ja/Nee, the yes from the
   admin's private chat only, off.
+- `apps/basis/test/v2/toolboxSlots.test.js` — a word's slot phrases fill a tool parameter, only as whole words at the
+  start or end, longest first; `apps/basis/test/telegram/toolboxCardsOrWords.test.js` — an album per shop and one
+  message with the lines and buttons, no album for fewer than two pictures; `apps/basis/test/toolboxButtons.box.test.js`
+  — the same on the booted box through a Bot API of our own (`sendMediaGroup`), and a slot reaching the toolbox.
 
 ## Decided, not built
 

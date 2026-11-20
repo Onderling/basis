@@ -16,11 +16,11 @@ const CARD = { name: 'Boodschappen', supportedInterfaces: [{ url: 'http://boodsc
 const PLACED = { name: 'boodschappen', url: 'http://boodschappen:3000', words: [{ word: 'zoek', tool: 'products.choices', field: 'query' }] };
 const t = (k, p) => `${k}${p ? ` ${JSON.stringify(p)}` : ''}`;
 
-function door() {
+function door(placed = PLACED) {
   const vault = new Map();
   const tools = makeToolboxOps({
     store: { get: async (k) => vault.get(k) ?? null, set: async (k, v) => { vault.set(k, v); } },
-    placedOf: async () => [PLACED], keyOf: async () => KEY,
+    placedOf: async () => [placed], keyOf: async () => KEY,
     fetch: async () => ({ ok: true, status: 200, json: async () => CARD }),
   });
   const callSkill = async (app, op, args) => (app === 'tools' ? tools[op](args) : null);
@@ -34,6 +34,18 @@ function door() {
 }
 
 describe('/toolbox at the door', () => {
+  it('the card shows a word\'s slots (the parameter and the phrases per value), so the yes covers what is shown', async () => {
+    const placed = { ...PLACED, words: [{ ...PLACED.words[0], slots: [{ param: 'stores', list: true, values: { ah: ['bij albert heijn', 'bij ah'], jumbo: ['bij jumbo'] } }] }] };
+    const { say, tools } = door(placed); await tools.load();
+    const ask = await say('boodschappen aan');
+    expect(ask.message).toContain('circle.bot.toolbox_card_slot');
+    // (the test's t() writes a key with its params as JSON; the slot line sits inside the card's params)
+    expect(ask.message).toMatch(/toolbox_card_slot.*zoek.*stores.*ah: bij albert heijn \/ bij ah; jumbo: bij jumbo/);
+    // a word without slots adds no line
+    const plain = door(); await plain.tools.load();
+    expect((await plain.say('boodschappen aan')).message).not.toContain('toolbox_card_slot');
+  });
+
   it('no argument: the placed toolboxes, each with its words and on/off', async () => {
     const { say, tools } = door(); await tools.load();
     const r = await say('');

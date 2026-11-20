@@ -326,15 +326,18 @@ export class TelegramBridge {
   }
 
   /**
-   * A picture as a photo message of its own: the BYTES the caller holds (never a URL for Telegram to fetch), a caption,
-   * buttons under it.
-   * @param {{chatId: string|number, photo: Uint8Array, caption?: string, buttons?: Array<{id: string, label: string}>}} o
+   * Pictures side by side as ONE album (`sendMediaGroup`): the BYTES the caller holds (never a URL for Telegram to
+   * fetch), a caption each. Telegram takes 2 to
+   * 10 pictures in an album and puts no buttons on one: the caller sends those in a message of its own.
+   * @param {{chatId: string|number, pictures: Array<{photo: Uint8Array, caption?: string}>}} o
    */
-  async sendPhoto({ chatId, photo, caption = '', buttons } = /** @type {any} */ ({})) {
+  async sendAlbum({ chatId, pictures } = /** @type {any} */ ({})) {
     if (!this.#bot) throw new Error('TelegramBridge: not started');
-    const extra = { ...(caption ? { caption } : {}) };
-    if (Array.isArray(buttons) && buttons.length) extra.reply_markup = { inline_keyboard: layoutButtons(buttons) };
-    await this.#bot.telegram.sendPhoto(chatId, { source: Buffer.from(photo), filename: 'thing.jpg' }, extra);
+    const list = (Array.isArray(pictures) ? pictures : []).slice(0, 10);
+    if (list.length < 2) throw new Error('TelegramBridge: an album holds 2 to 10 pictures');
+    await this.#bot.telegram.sendMediaGroup(chatId, list.map((p, i) => ({
+      type: 'photo', media: { source: Buffer.from(p.photo), filename: `thing-${i + 1}.jpg` }, ...(p.caption ? { caption: String(p.caption).slice(0, 1024) } : {}),
+    })));
   }
 
   /**

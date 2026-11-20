@@ -41,7 +41,7 @@ describe('ensureContentKey: mint only when nothing is stored (L1115)', () => {
     vault.failReads = 1;
     const err = await ensureContentKey(vault).catch((e) => e);
     expect(err).toBeInstanceOf(ContentKeyUnreadable);
-    expect(err.code).toBe('content-key-unreadable');
+    expect(err.code).toBe('key-unreadable');
     expect(isContentKeyUnreadable(err)).toBe(true);
     expect(vault.writes).toBe(0);
     expect(vault._m.get(CONTENT_AT_REST_VAULT_KEY)).toBe('the-old-key');
@@ -150,7 +150,8 @@ describe('a strict store never writes over a value it could not open (L1115)', (
 describe('what the launcher says (L1115)', () => {
   it('an unreadable content key: its own words and "try again"; anything else: the reason', () => {
     expect(bootFailureNotice(new ContentKeyUnreadable())).toEqual({ key: 'circle.boot_content_unreadable', params: {}, retry: true });
-    expect(bootFailureNotice({ code: 'content-key-unreadable' })?.retry).toBe(true);
+    expect(bootFailureNotice({ code: 'key-unreadable' })?.retry).toBe(true);
+    expect(bootFailureNotice({ code: 'AGENT_WIRING_FAILED', cause: new ContentKeyUnreadable() })?.retry).toBe(true);
     expect(bootFailureNotice(new Error('boom'))).toEqual({ key: 'circle.boot_failed', params: { reason: 'boom' }, retry: false });
     expect(bootFailureNotice('as text')?.params.reason).toBe('as text');
     expect(bootFailureNotice(null)).toBe(null);

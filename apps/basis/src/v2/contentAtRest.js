@@ -34,6 +34,7 @@
  */
 import { groupKeyStrategy } from '@onderling/pod-client';
 import { seedToString } from '@onderling/vault';
+import { KeyUnreadable, isKeyUnreadable } from '../core/agent/keyUnreadable.js';
 
 /** The reserved vault entry holding this device's content key. */
 export const CONTENT_AT_REST_VAULT_KEY = 'content-at-rest-key';
@@ -51,23 +52,15 @@ function randomContentKey() {
 /**
  * The content key is stored but could not be read (ledger L1115): the vault entry would not decrypt, the storage
  * failed at start, or what is stored is not a key. NOT "nothing stored": a new key here would make every sealed row on
- * this device unreadable and let the stores write their defaults over what they could not open. So nothing is minted
- * and nothing is written; the boot stops before any content store starts, and the shell says so in words (try again,
- * then restore from the phrase). `code` is what a shell reads (`isContentKeyUnreadable`), never the message.
+ * this device unreadable and let the stores write their defaults over what they could not open. One of the family
+ * `KeyUnreadable` (core/agent/keyUnreadable.js): the shells read its code, `isContentKeyUnreadable` / `isKeyUnreadable`.
  */
-export class ContentKeyUnreadable extends Error {
-  constructor(cause) {
-    super('The content key on this device could not be read; nothing was changed');
-    this.name = 'ContentKeyUnreadable';
-    this.code = 'content-key-unreadable';
-    if (cause !== undefined) this.cause = cause;
-  }
+export class ContentKeyUnreadable extends KeyUnreadable {
+  constructor(cause) { super('content-key', cause); this.name = 'ContentKeyUnreadable'; }
 }
 
-/** True for a ContentKeyUnreadable, also one that crossed a realm or a bundle boundary (by its code). */
-export function isContentKeyUnreadable(err) {
-  return err instanceof ContentKeyUnreadable || err?.code === 'content-key-unreadable';
-}
+/** True for any key this device could not read at the start, also through a wrapping error's `cause`. */
+export const isContentKeyUnreadable = isKeyUnreadable;
 
 /**
  * Read this device's content key from the sealed vault, minting and storing it ONLY when the vault answered that

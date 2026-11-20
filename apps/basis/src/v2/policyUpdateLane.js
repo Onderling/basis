@@ -29,6 +29,7 @@ import { judgePolicyChain, judgeWithProposals, proposalsOn } from './governanceR
 import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES } from './circlePolicy.js';
 import { processRefusalLog } from './refusalLog.js';
 import { sealedKeyValue } from './localStoreSeal.js';
+import { noteKeptPolicyChanges } from './keptPolicyChanges.js';
 
 export const POLICY_UPDATE_KIND = 'policy-update';
 
@@ -206,7 +207,8 @@ export async function applyPolicyUpdates({ rail, circleId, membersOf = null, adm
   }
   let present = false;
   try { present = rail.storedStatements(circleId).some((s) => s?.body?.kind === POLICY_UPDATE_KIND); } catch { present = false; }
-  if (!present) return { applied: false };
+  // no settings change held for the circle: known, and empty (the content judge has nothing to judge by)
+  if (!present) { noteKeptPolicyChanges(rail.deviceLog, circleId, []); return { applied: false }; }
   let bodies = [];
   try { bodies = (await rail.readVerifiedBodies(circleId))?.bodies ?? []; } catch { return { applied: false }; }
   let members = [];
@@ -226,6 +228,8 @@ export async function applyPolicyUpdates({ rail, circleId, membersOf = null, adm
     (proposals, need) => judgePolicyChain({ bodies: changes, members, proposals, merge: denyWinsMerge, need }),
     () => proposalsOn({ rail, circleId, policy, members }),
   );
+  // the kept changes are what every content statement of this circle is judged by on this device (`contentJudge.js`)
+  noteKeptPolicyChanges(rail.deviceLog, circleId, kept);
   const won = foldPolicyUpdates(kept, { admins });
   // every refusal says why (L857): a settings change the circle's rule did not allow
   for (let i = 0; i < skipped.length; i += 1) processRefusalLog().note({ tag: 'gate', lane: 'governance', check: 'settings', reason: 'not allowed by the circle rule' });

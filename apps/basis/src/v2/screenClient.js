@@ -17,7 +17,7 @@ import { SCREEN_PAIRING_TTL_MS } from './screenDoor.js';
 import { createSecureAgent, makeBrowserVault } from '@onderling/secure-agent';
 
 /** The client's version: the page can say which one it was built against. */
-export const SCREEN_CLIENT_VERSION = '0.1.0';
+export const SCREEN_CLIENT_VERSION = '0.2.0';   // 0.2.0 (L1113): the link's one-use ticket goes back in the offer
 
 /**
  * Every refusal's code. `grant-expired` is ONE code for a grant that ran out AND one that was taken away (`/schermen los`,
@@ -76,7 +76,8 @@ function prefixed(storage, prefix) {
  * A screen client for one toolbox's page. Nothing runs until a method is called.
  * @param {object} a
  * @param {string} a.toolbox  the toolbox this page belongs to (the bot pairs it for that toolbox only)
- * @param {string} a.bot      the bot's screen start link (`…#scherm-start=…`), given once
+ * @param {string} a.bot      the link the bot sent for this toolbox's page (`/scherm <toolbox>`: `…#scherm-nieuw=…` with a one-use
+ *   ticket); the page passes its own address (`location.href`) when it was opened from that link (L1113)
  * @param {string} [a.label]  how the person's chat names this page ('boodschappen op de laptop')
  * @param {Storage} [a.storage]  where the grant and the key are kept (default: this browser's localStorage)
  * @param {(o: {vaultPrefix: string}) => Promise<object>} [a.makeAgent]  the browser agent (default: a relay secure agent)
@@ -87,6 +88,14 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
   if (typeof toolbox !== 'string' || !toolbox.trim()) throw new TypeError('createScreenClient: toolbox (its name) required');
   const name = toolbox.trim();
   const start = parseScreenStartLink(String(bot ?? ''));
+  // the page was opened from the bot's link: its one-use ticket leaves the address bar once read (L1113), so a copied
+  // or bookmarked address carries none; done here so no page author can forget it
+  try {
+    const loc = globalThis.location;
+    if (start.ok && start.ticket && loc && typeof loc.href === 'string' && loc.href === String(bot) && globalThis.history?.replaceState) {
+      globalThis.history.replaceState(null, '', `${loc.pathname}${loc.search}`);
+    }
+  } catch { /* an address that cannot be rewritten keeps its fragment; the ticket is one use either way */ }
   const keyPrefix = `onderling.screen.${name}.`;
   const vaultPrefix = `onderling-screen:${name}:`;
   const store = prefixed(storage, keyPrefix);
@@ -157,7 +166,8 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
     async startPairing() {
       if (!start.ok) throw Object.assign(new Error('createScreenClient: bot is not a screen start link'), { code: 'not-paired' });
       view = null;
-      const r = await viewFor('pair').connect({ label: label ?? name, toolbox: name });
+      // the ticket of the link `/scherm <toolbox>` sent (L1113): handed back in the offer; a link without one cannot pair
+      const r = await viewFor('pair').connect({ label: label ?? name, toolbox: name, ...(start.ticket ? { ticket: start.ticket } : {}) });
       return { paste: `/koppel-scherm ${r.offer}`, code: r.code, expiresAt: now() + SCREEN_PAIRING_TTL_MS };
     },
 

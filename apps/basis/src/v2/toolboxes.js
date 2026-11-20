@@ -21,6 +21,8 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 const ON_KEY = 'tools.on';
 const NAME = /^[a-z][a-z0-9-]{0,31}$/;
 const WORD = /^[a-zà-ÿ][a-zà-ÿ0-9-]{0,23}$/;
+/** An op of the household's door as a placed file names it: `app.op`. */
+const OP_ID = /^[a-z][a-zA-Z0-9-]{0,31}\.[a-zA-Z][a-zA-Z0-9-]{0,63}$/;
 
 /** A placed file as the operator wrote it, or null when it is not one (a bad name, address or words). */
 function readPlaced(p) {
@@ -35,7 +37,12 @@ function readPlaced(p) {
       // what the word does, in a person's words per language (the operator's: 'zoekt producten'), for /help and the welcome
       ...(w.says && typeof w.says === 'object' ? { says: Object.fromEntries(Object.entries(w.says).filter(([, v]) => typeof v === 'string' && v.trim())) } : {}),
     }));
-  return { name, url: String(p.url), words };
+  // A TOOLBOX'S PAGE (L1113): the address where the operator placed its page (`page`, https only), and the ops of the
+  // household's door that page may use beside `tools.useTool` for this toolbox (`ops`, `app.op`, the OPERATOR's words:
+  // never read from the toolbox's own card). A page's grant is useTool + these, cut to the person's own role column.
+  const ops = [...new Set((Array.isArray(p?.ops) ? p.ops : []).map((o) => String(o ?? '').trim()).filter((o) => OP_ID.test(o) && o !== 'tools.useTool'))];
+  const page = /^https:\/\/[^\s/]+/.test(String(p?.page ?? '')) ? String(p.page) : null;
+  return { name, url: String(p.url), words, ...(ops.length ? { ops } : {}), ...(page ? { page } : {}) };
 }
 
 /**
@@ -46,8 +53,8 @@ function readPlaced(p) {
  * @param {Function} [a.fetch]
  * @param {(...a: unknown[]) => void} [a.log]   codes only
  */
-/** What the admin's yes covered: the placed address and words, as one comparable string (a change means a new yes). */
-const shownOf = (p) => JSON.stringify({ url: p.url, words: p.words });
+/** What the admin's yes covered: the placed address and words (and a page's address and ops), as one comparable string (a change means a new yes). */
+const shownOf = (p) => JSON.stringify({ url: p.url, words: p.words, ...(p.ops ? { ops: p.ops } : {}), ...(p.page ? { page: p.page } : {}) });
 /** The origin of a URL, or null. */
 const originOf = (u) => { try { return new URL(u).origin; } catch { return null; } };
 
@@ -69,6 +76,15 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
     async load() { await remember(await readOn()); },
     /** The words that reach a tool now (ON toolboxes only): `{word, tool, field?, toolbox, title}`. No key, no address. */
     wordsNow: () => words,
+    /**
+     * A toolbox's page, for the screen door (L1113): `{page, ops}` of a toolbox that is ON now and has a placed page,
+     * else null. `ops` are the operator's; the door cuts them to the person's role column.
+     */
+    pageOf: async (name) => {
+      const n = String(name ?? '').trim(); const live = (await readOn())[n]; const p = (await placed()).find((x) => x.name === n);
+      if (!live || !p || live.shown !== shownOf(p) || !p.page) return null;
+      return { page: p.page, ops: p.ops ?? [] };
+    },
     /** Is this toolbox on now (the egress gate asks before a call leaves)? */
     isOn: async (name) => {
       const n = String(name ?? '').trim(); const live = (await readOn())[n]; const p = (await placed()).find((x) => x.name === n);

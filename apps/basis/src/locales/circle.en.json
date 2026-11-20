@@ -6005,6 +6005,15 @@
     "value_delete": "delete",
     "value_own": "their own",
     "screen_confirm_toolbox": "{{label}} wants to connect for the toolbox {{toolbox}}.",
+    "screen_confirm_toolbox_ops": "It may then do this, as you:",
+    "screen_toolbox_needs_link": "The page of the toolbox {{toolbox}} connects only from the link the bot sends you. Type /scherm {{toolbox}} and open the page from that link (it works once, for a short while).",
+    "screen_toolbox_link": "The page of the toolbox {{toolbox}}: {{link}}\nOpen it on the device you want to use; it works once, for {{minutes}} minutes. Then pick the code the page shows.",
+    "screen_toolbox_no_page": "The toolbox {{toolbox}} has no page here (or it is not on).",
+    "screen_toolbox_grant_ended": "The page of the toolbox {{toolbox}} was disconnected: a toolbox's page now connects only from the link the bot sends, and may do only what its toolbox needs. Type /scherm {{toolbox}} to connect it again.",
+    "screen_paste_remembered": "I sent you a link to connect a screen by pasting its code.",
+    "screen_toolbox_link_remembered": "I sent you the link to the page of the toolbox {{toolbox}}.",
+    "screen_paste_needs_link": "That connect code does not come from a link I sent you (or the link was used or ran out). Type /scherm for a new one and make the code on that page.",
+    "screen_confirm_toolbox_use": "• use the toolbox {{toolbox}}",
     "screen_toolbox_not_on": "The toolbox {{toolbox}} is not on in this household, so its page cannot connect. Ask the admin to switch it on (/toolbox).",
     "toolbox_not_yours": "This page may only use its own toolbox, not {{toolbox}}.",
     "screen_confirm_question": "A screen wants to connect as you. Which code does that screen show? Tap that code. If you do not see it, or did not do this yourself: tap \"None of these\".",
@@ -6117,7 +6126,7 @@
       }
     },
     "admission_failed": "Letting you in went wrong on the bot's side. Try again in a few minutes; if it still fails, ask the admin.",
-    "screen_paste_link": "Open this on the screen you want to connect (in your own browser): {{link}}\nTap \"Make a connect code\" there, copy the line that appears and send it here. No secret goes through this chat this way.",
+    "screen_paste_link": "Open this on the screen you want to connect (in your own browser): {{link}}\nTap \"Make a connect code\" there, copy the line that appears and send it here. The link works once, for {{minutes}} minutes.",
     "screen_paste_usage": "Paste the screen's connect code: /koppel-scherm onderling-connect://…",
     "screen_paste_asked": "Received. I am asking you now which code that screen shows.",
     "settings_confirm": "This changes it for everyone in the house. Are you sure?",
@@ -7667,6 +7676,10 @@
     "connection_offer_not-a-connect-uri": {
       "text": "That is not a pairing code.",
       "doc": "Refusal: wrong kind of code pasted."
+    },
+    "connection_offer_toolbox-page": {
+      "text": "This page belongs to a toolbox. Connect it from the household's bot: type /scherm and the toolbox's name there, and open the page from that link.",
+      "doc": "Apparaten & sleutels (ledger L1113): a toolbox page's offer pasted into the app is refused; it pairs with the bot from /scherm <toolbox>."
     },
     "connection_offer_unreadable": {
       "text": "This pairing code is damaged — copy it again.",

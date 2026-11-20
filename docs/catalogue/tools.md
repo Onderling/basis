@@ -37,11 +37,22 @@ was started 2026-11-18 with the first toolbox, a grocery search.
   `screenClient.d.ts`). The page is bound to its own toolbox: it pairs only for a toolbox that is on, and calls only that
   one (`toolbox-not-yours` otherwise). Every refusal has a fixed code and a call never throws; a grant that ran out and one taken
   away are one code, `grant-expired` (pair again).
+  **How the page is reached and what it may do (L1113).** The housemate types `/scherm <toolbox>`; the bot sends, in
+  their own private chat only, a link to the page where the operator placed it, carrying a one-use ticket (short-lived,
+  bound to that housemate and that toolbox). The page hands the ticket back in its offer; the bot reads the toolbox from
+  the ticket, never from the page's own words, and then asks the housemate for the code as for any screen. A toolbox
+  offer without a ticket, with a used, expired or someone else's ticket, or naming another toolbox, is refused in words
+  before anything is asked. The grant is `tools.useTool` for that toolbox plus the household ops the OPERATOR placed for
+  the page, each only if the housemate's own role holds it; the question lists them in words. Basis's own screen keeps
+  the role's whole column. A page paired before this was ended once at the upgrade, and its housemate told how to
+  reconnect.
 - **The household's admin** types `/toolbox`: the toolboxes the box's operator placed, each with its words and whether
   it is on. `/toolbox <naam> aan` shows the toolbox's card (its name, address, words and what it receives) and switches
   it on after their yes, in their own private chat only. `/toolbox <naam> uit` switches it off.
 - **The box's operator** places a toolbox: two files on the box (its name, address and words; its key). No chat line
-  ever carries an address, a tool id or a key.
+  ever carries an address, a tool id or a key. A toolbox with a page names it in the same file: `page` (its https
+  address) and `ops` (the household ops the page may use beside the toolbox, `app.op`). A change to any of these is a
+  new card for the admin's yes.
 
 ## Where
 
@@ -70,8 +81,10 @@ assistant: assistant-toolbox
 - `apps/basis/test/v2/toolboxChoices.test.js` — a button per thing; the tap adds that thing (its reference, quantity 1)
   to the seller's list, else the shopping list, else asks; only from the thread it was shown in.
 - `apps/basis/test/screenClient.box.test.js` — the built screen client against the real box over the real relay: it
-  pairs for its toolbox, `useTool` answers, another toolbox gives `toolbox-not-yours`, an op it does not hold
-  `op-not-allowed`. `apps/basis/test/v2/screenClient.test.js` — codes, states, pairing, storage per toolbox, sign-out.
+  pairs for its toolbox only from the link `/scherm <toolbox>` sends (a page from Basis's own start address, or the
+  same link twice, is refused in words), holds `useTool` and the placed ops only, `useTool` answers, another toolbox
+  gives `toolbox-not-yours`, an op it does not hold `op-not-allowed`. `apps/basis/test/v2/botScreens.test.js` — the
+  grant's scope, the ticket (one use, the person's own, in time, its toolbox), the upgrade's one pass. `apps/basis/test/v2/screenClient.test.js` — codes, states, pairing, storage per toolbox, sign-out.
 - `apps/basis/test/v2/toolboxDoor.test.js` — `/toolbox` at the door: the list, the card with Ja/Nee, the yes from the
   admin's private chat only, off.
 - `apps/basis/test/v2/toolboxSlots.test.js` — a word's slot phrases fill a tool parameter, only as whole words at the
@@ -83,8 +96,8 @@ assistant: assistant-toolbox
 
 - A toolbox's key handed over from the admin's own app, sealed over the relay (after the alpha; for the alpha the key
   is the operator's).
-- A link from Basis to a toolbox's own page. (A tool call from a screen and the screen client as one file are built;
-  see "What a person can do".)
+- A link from Basis's own app to a toolbox's page (the bot's `/scherm <toolbox>` link is built; a button in the app is
+  not).
 
 ## Decisions that bind this area
 

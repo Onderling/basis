@@ -6,7 +6,7 @@
  * code pick gives the same person — the same ops, acting as them.
  */
 import { describe, it, expect } from 'vitest';
-import { createBotScreens } from '../src/v2/botScreens.js';
+import { createBotScreens, parseScreenStartLink } from '../src/v2/botScreens.js';
 import { verifyTelegramLaunch, telegramLaunchHash, launchDataFrom } from '../src/v2/telegramLaunch.js';
 import { screenCode } from '../src/v2/screenDoor.js';
 import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
@@ -28,7 +28,7 @@ async function launchData({ id = 42, ageS = 5, chatType = null, token = TOKEN, q
 function bot({ admitted = ['telegram:42'] } = {}) {
   const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
   const grants = []; const revoked = []; const told = []; const refused = [];
-  const asked = [];
+  const asked = []; const privately = [];
   const deps = {
     threads,
     isAdmitted: async (p) => admitted.includes(p),
@@ -39,7 +39,7 @@ function bot({ admitted = ['telegram:42'] } = {}) {
     notify: async (person, key) => { told.push([person, key]); },
     ask: async (person, q) => { asked.push([person, q]); return { ok: true }; },
     tellRefused: async (k) => { refused.push(k); },
-    sendPrivately: async () => ({ ok: true }),
+    sendPrivately: async (person, text) => { privately.push({ person, text }); return { ok: true }; },
     where: () => ({ appUrl: 'https://onderling.org/basis', botAddress: 'BOT', relayUrl: null }),
     verifyLaunch: (initData) => verifyTelegramLaunch(initData, { botToken: TOKEN, now: () => NOW }),
     personOfTelegram: async (id) => (admitted.includes(`telegram:${id}`) ? `telegram:${id}` : null),
@@ -47,7 +47,9 @@ function bot({ admitted = ['telegram:42'] } = {}) {
     now: () => NOW,
   };
   const screens = createBotScreens(deps);
-  return { screens, deps, threads, grants, revoked, told, refused, asked };
+  // the paste route's one-use ticket, from the admin's /scherm (L1113: a pasted offer pairs only with one)
+  const pasteTicket = async (person) => { await screens.startPaste(person, (l) => l); return parseScreenStartLink(privately.at(-1).text).ticket; };
+  return { screens, deps, threads, grants, revoked, told, refused, asked, pasteTicket };
 }
 
 describe('the launch data', () => {
@@ -133,14 +135,14 @@ describe('a screen launched inside Telegram', () => {
     await viaLaunch.screens.launched({ from: 'K1', viewPubKey: 'K1', nonce: 'n1', initData: await launchData() });
     const viaPick = bot();
     viaPick.threads.setScreenNonce('telegram:42', null);
-    await viaPick.screens.pasted('telegram:42', { viewPubKey: 'K1', nonce: 'n1', label: 'Telegram-scherm' });
+    await viaPick.screens.pasted('telegram:42', { viewPubKey: 'K1', nonce: 'n1', label: 'Telegram-scherm', ticket: await viaPick.pasteTicket('telegram:42') });
     await viaPick.screens.confirm('telegram:42', await screenCode('K1', 'n1'), { isPrivate: true });
     expect(viaLaunch.grants).toEqual(viaPick.grants);
   });
 
   it('a launch pasted into the chat is not a launch: the paste route asks for the code as always', async () => {
     const b = bot();
-    await b.screens.pasted('telegram:42', { viewPubKey: 'K1', nonce: 'n1', initData: await launchData() });
+    await b.screens.pasted('telegram:42', { viewPubKey: 'K1', nonce: 'n1', initData: await launchData(), ticket: await b.pasteTicket('telegram:42') });
     expect(b.asked).toHaveLength(1);
     expect(b.grants).toEqual([]);
   });

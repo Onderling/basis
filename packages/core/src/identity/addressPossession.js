@@ -59,14 +59,23 @@ export function newAddressChallenge() {
 }
 
 /**
- * The canonical message a holder signs. Binds the ADDRESS being claimed to THIS nonce, so a proof
- * cannot be lifted onto a different address or replayed against a different challenge.
+ * The canonical message a holder signs. Binds the ADDRESS being claimed to THIS nonce AND to the RELAY the device
+ * dialled (the host of its ws(s) address, which TLS proves to the device), so a proof cannot be lifted onto a different
+ * address, replayed against a different challenge, or carried by a hostile relay to an honest one: a relay passing on
+ * an honest relay's challenge gets an answer naming ITSELF, which the honest relay refuses (the independent read,
+ * 2026-11-20).
  * @param {string} address
  * @param {string} nonce
+ * @param {string} relay  the relay's name as the device dialled it (`relayNameOf(url)`)
  * @returns {string}
  */
-export function addressPossessionMessage(address, nonce) {
-  return `onderling-address-possession-v1|${String(address)}|${String(nonce)}`;
+export function addressPossessionMessage(address, nonce, relay) {
+  return `onderling-address-possession-v2|${String(relay ?? '')}|${String(address)}|${String(nonce)}`;
+}
+
+/** A relay's name as a device dials it: the host (with its port) of the ws(s) address; `localhost` for a local socket. */
+export function relayNameOf(url) {
+  try { return new URL(String(url)).host || 'localhost'; } catch { return 'localhost'; }
 }
 
 /**
@@ -76,8 +85,8 @@ export function addressPossessionMessage(address, nonce) {
  * @param {string} nonce
  * @returns {string} base64url Ed25519 signature
  */
-export function signAddressPossession(identity, address, nonce) {
-  return b64encode(identity.sign(addressPossessionMessage(address, nonce)));
+export function signAddressPossession(identity, address, nonce, relay) {
+  return b64encode(identity.sign(addressPossessionMessage(address, nonce, relay)));
 }
 
 /**
@@ -107,20 +116,24 @@ export function circleAddressSigner(derivationSeed, circleId) {
  * @param {string} nonce
  * @returns {string} base64url Ed25519 signature
  */
-export function signAddressPossessionFromSeed(derivationSeed, circleId, address, nonce) {
-  return circleAddressSigner(derivationSeed, circleId)(addressPossessionMessage(address, nonce));
+export function signAddressPossessionFromSeed(derivationSeed, circleId, address, nonce, relay) {
+  return circleAddressSigner(derivationSeed, circleId)(addressPossessionMessage(address, nonce, relay));
 }
 
 /**
  * Verify a presented proof against the address itself — deny-by-default: anything missing,
- * malformed or unparseable is `false`, never a throw the caller might treat as "unknown".
- * @param {{address?: string, nonce?: string, proof?: string}} a
+ * malformed or unparseable is `false`, never a throw the caller might treat as "unknown". The relay the proof names
+ * must be one this verifier answers to (`isOwnRelayName`), or the proof is refused whatever its signature.
+ * @param {{address?: string, nonce?: string, proof?: string, relay?: string, isOwnRelayName?: (name: string) => boolean}} a
  * @returns {boolean}
  */
-export function verifyAddressPossession({ address, nonce, proof } = {}) {
+export function verifyAddressPossession({ address, nonce, proof, relay, isOwnRelayName } = {}) {
   if (typeof address !== 'string' || !address) return false;
   if (typeof nonce   !== 'string' || !nonce)   return false;
   if (typeof proof   !== 'string' || !proof)   return false;
-  try { return AgentIdentity.verify(addressPossessionMessage(address, nonce), proof, address); }
+  if (typeof relay   !== 'string' || !relay)   return false;
+  if (typeof isOwnRelayName !== 'function') return false;
+  try { if (isOwnRelayName(relay) !== true) return false; } catch { return false; }
+  try { return AgentIdentity.verify(addressPossessionMessage(address, nonce, relay), proof, address); }
   catch { return false; }
 }

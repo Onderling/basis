@@ -41,7 +41,7 @@
  * Uses `ws` in Node.js; falls back to globalThis.WebSocket in browsers.
  */
 import {
-  Transport, addressPossessionMessage, signAddressPossession, b64encode,
+  Transport, addressPossessionMessage, signAddressPossession, b64encode, relayNameOf,
 } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { parseUntrustedJson } from '@onderling/core';
@@ -589,7 +589,7 @@ export class RelayTransport extends Transport {
     }
     this.#proved.add(address);
     this.#proofsInFlight.set(address, (this.#proofsInFlight.get(address) ?? 0) + 1);
-    if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'register-proof', address, nonce, proof }));
+    if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'register-proof', address, nonce, proof, relay: relayNameOf(this.#relayUrl) }));
   }
 
   /**
@@ -599,12 +599,12 @@ export class RelayTransport extends Transport {
    */
   async #signFor(address, nonce) {
     if (address === this.address && this.identity) {
-      return signAddressPossession(this.identity, address, nonce);
+      return signAddressPossession(this.identity, address, nonce, relayNameOf(this.#relayUrl));
     }
     const sign = this.#signers.get(address);
     if (typeof sign !== 'function') return null;
     // The adapter builds the message; the caller only holds the key. See `Transport.addAddress`.
-    const sig = await sign(addressPossessionMessage(address, nonce));
+    const sig = await sign(addressPossessionMessage(address, nonce, relayNameOf(this.#relayUrl)));
     return typeof sig === 'string' ? sig : (sig ? b64encode(sig) : null);
   }
 

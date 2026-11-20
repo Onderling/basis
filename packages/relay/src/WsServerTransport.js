@@ -91,7 +91,7 @@ export class WsServerTransport extends Transport {
       this.#wss.once('error', reject);
     });
 
-    this.#wss.on('connection', ws => this.#onConnection(ws));
+    this.#wss.on('connection', (ws, req) => this.#onConnection(ws, req));
   }
 
   async stop() {
@@ -114,7 +114,7 @@ export class WsServerTransport extends Transport {
 
   // ── Private ───────────────────────────────────────────────────────────────
 
-  #onConnection(ws) {
+  #onConnection(ws, req = null) {
     let peerAddress = null;
     // Every address this socket has registered. `peerAddress` stays the socket's PRIMARY identity (the
     // most recent registration, used for the peer-connected/disconnected events); this set is what sender
@@ -152,7 +152,9 @@ export class WsServerTransport extends Transport {
           ws.send(JSON.stringify({ type: 'error', message: 'CHALLENGE_EXPIRED', address }));
           return;
         }
-        if (!verifyAddressPossession({ address, nonce, proof })) {
+        // the proof must name the relay this connection dialled (its Host): one answered for another relay is refused
+        const dialled = typeof req?.headers?.host === 'string' && req.headers.host ? req.headers.host : 'localhost';
+        if (!verifyAddressPossession({ address, nonce, proof, relay: msg.relay, isOwnRelayName: (n) => n === dialled })) {
           ws.send(JSON.stringify({ type: 'error', message: 'PROOF_INVALID', address }));
           return;
         }

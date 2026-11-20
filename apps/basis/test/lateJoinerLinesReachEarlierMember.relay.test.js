@@ -7,7 +7,11 @@
  * limit from about the sixth join (its fan per join grows with the circle: the membership fan, the re-tells to the
  * newcomer, the address propagation), the refused frames are re-sent paced, and the late joiners' address
  * announcements land only after the lines: a late joiner's line goes to 'no-address' for everyone but the founder, and
- * an earlier member's line misses the late joiners. Three members is green (no over-rate); this size is red.
+ * an earlier member's line misses the late joiners. Three members was green (no over-rate); this size was red.
+ *
+ * The fix: a re-tell to a member whose address arrived after the fan goes to THAT member, not to the whole circle again
+ * (membershipLateRecipient.js, `only`). Measured here at 12 members: 503 frames refused as over-rate before, 0 after;
+ * at 14 members and 200 lines, 0 of 4935 and every line held.
  *
  * The shape is the seed's own calls (bootPeople, the founder's invites); P is helped by nothing the product does not do
  * at a join: it registers its circle address, as the app does after every join, and no harness key binding.
@@ -19,12 +23,28 @@ import { bootPeople, rosterOf, untilTrue } from '../../e2e-journeys/journeys/_ap
 import { createCircle, joinExistingCircle, bindCircleAddresses, sendCircleChat } from './support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../src/v2/householdRosterPairing.js';
 import { CHAT_LANE } from '../src/v2/chatManifest.js';
+import { createRequire } from 'node:module';
+
+// the relay's OWN copy of `ws` (it resolves its own; the app's copy never sees a relay frame)
+const fromHere = createRequire(import.meta.url);
+const WebSocket = createRequire(fromHere.resolve('@onderling/relay'))('ws');
+
+// how often the relay refused a frame as over its rate, over the whole run (test-only: counted where the in-process
+// relay sends the refusal). The ruling's acceptance prints it; 0 is the aim
+let overRate = 0;
+let framesSeen = 0;   // every frame the wrap saw: 0 would mean it is not the relay's socket class (a probe that names its branch)
+const wsSend = WebSocket.prototype.send;
+WebSocket.prototype.send = function countOverRate(data, ...rest) {
+  framesSeen += 1;
+  if (typeof data === 'string' && data.includes('"OVER_RATE"')) overRate += 1;
+  return wsSend.call(this, data, ...rest);
+};
 
 const GROUP = 'late-joiner-lines';
 const MEMBERS = Number(process.env.LATE_JOINER_MEMBERS ?? 12);
 const LINES = Number(process.env.LATE_JOINER_LINES ?? MEMBERS + 1);   // by default one line from each writer
 let relay = null;
-afterAll(async () => { await relay?.stop?.(); });
+afterAll(async () => { await relay?.stop?.(); WebSocket.prototype.send = wsSend; });
 
 const heldBy = (node) => new Set(node.chatEventLog.query({}).filter((e) => e?.type === CHAT_LANE && e?.payload?.circleId === GROUP).map((e) => e.id));
 
@@ -55,6 +75,7 @@ describe('lines of a member who joins after you', () => {
     }
     const want = Array.from({ length: LINES }, (_, i) => `${GROUP}-m${i}`);
     await untilTrue(() => want.every((id) => heldBy(P).has(id)), 20000, 250);
+    console.info(`[late-joiner] ${MEMBERS} members, ${LINES} lines: the relay refused ${overRate} frame(s) as over-rate (of ${framesSeen} frames seen)`);
     const held = heldBy(P);
     const missingByWriter = {};
     for (const [i, id] of want.entries()) if (!held.has(id)) missingByWriter[`w${i % writers.length}`] = (missingByWriter[`w${i % writers.length}`] ?? 0) + 1;

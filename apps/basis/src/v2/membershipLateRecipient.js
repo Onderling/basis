@@ -88,14 +88,20 @@ export function makeLateRecipientRetell({ retell, now = Date.now, windowMs = LAT
       list.push({ statement, reached: new Set((reached ?? []).filter(Boolean)), at: now(), ...(typeof ownRetell === 'function' ? { retell: ownRetell } : {}), ...(typeof meta?.msgId === 'string' ? { msgId: meta.msgId } : {}) });
       byCircle.set(circleId, list);
     },
-    /** The roster's member addresses now; every remembered statement is told again to the circle if one is new to it. */
-    async rosterAddresses(circleId, addresses = []) {
+    /**
+     * The roster's member addresses now; every remembered statement is told again to the members whose address is new to
+     * it — to THEM, not to the circle (`webidsOf(addresses)` names them; the retell gets `{ only }`). A retell to the whole
+     * circle made a join cost every member every remembered statement: the founder's fan grew with the square of the
+     * circle and ran its socket over the relay's rate. Without `webidsOf` the retell goes to the circle, as before.
+     */
+    async rosterAddresses(circleId, addresses = [], { webidsOf = null } = {}) {
       let told = 0;
       for (const e of prune(circleId)) {
         const fresh = (addresses ?? []).filter((a) => a && !e.reached.has(a));
         if (!fresh.length) continue;
         for (const a of fresh) e.reached.add(a);
-        try { await (e.retell ?? retell)(circleId, e.statement); told += 1; } catch { /* the catch-up remains */ }
+        const only = typeof webidsOf === 'function' ? [...new Set(webidsOf(fresh) ?? [])].filter(Boolean) : null;
+        try { await (e.retell ?? retell)(circleId, e.statement, only?.length ? { only } : {}); told += 1; } catch { /* the catch-up remains */ }
       }
       return told;
     },

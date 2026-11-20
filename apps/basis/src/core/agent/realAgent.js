@@ -3223,7 +3223,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   const LATE_TOLD_FANS = new Set(['broadcastCircleItems', 'broadcastCircleChatStatement']);
   /** The members of a circle a fan had no address for, past the re-tell window (bound with the membership rail below). */
   const unreachableMembersRef = { current: null };
-  // A LINE THAT WAITS FOR A MEMBER WITHOUT AN ADDRESS: msgId → the member refs it still waits for, the RAM mirror
+  // A LINE THAT WAITS FOR A MEMBER WITHOUT AN ADDRESS: msgId → { refs: the member refs it still waits for, of }, the RAM mirror
   // of the log's `on-its-way` entries (awaitingChatRecipients); bound with the membership rail below
   const waitingByMsg = new Map();
   const chatFanEndedRef = { current: null };   // (circleId, msgId, fanResult) → writes who still waits
@@ -6302,20 +6302,30 @@ export async function createRealHouseholdAgent(opts = {}) {
       // the window is the param's; a walk may shorten it to see the "not reachable yet" line without waiting minutes
       ...(Number.isFinite(opts.lateRecipientWindowMs) ? { windowMs: opts.lateRecipientWindowMs } : {}),
       // a line whose recipient still waits for an address is kept while the log says so, not for a window
-      keep: (_circleId, msgId) => (waitingByMsg.get(msgId)?.size ?? 0) > 0,
-      retell: (circleId, statement) => callSkill('pinboard', 'broadcastCircleMembership', {
-        groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
+      keep: (_circleId, msgId) => (waitingByMsg.get(msgId)?.refs?.size ?? 0) > 0,
+      retell: (circleId, statement, { only = null } = {}) => callSkill('pinboard', 'broadcastCircleMembership', {
+        groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(), ...(only ? { only } : {}),
       }).then((r) => { console.info(`[membership-fan] ${statement.body.kind} ${String(statement.body.hash).slice(0, 8)} in ${String(circleId).slice(0, 8)}: retold to a member who arrived after the fan — sent ${r?.sent ?? 0}/${r?.attempted ?? 0}`); return r; }),
     });
     // the current members' circle addresses on this device's roster (never this device's own)
+    async function rosterRowsOf(circleId) {
+      return (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members ?? [];
+    }
+    function addressesOfRow(m, circleId = null) {
+      const mine = circleId ? circleAddressFor(circleId) : null;
+      return (Array.isArray(m?.circleAddresses) ? m.circleAddresses : [m?.circleAddress]).filter((x) => x && x !== mine);
+    }
     async function rosterAddressesOf(circleId) {
       const mine = circleAddressFor(circleId);
-      const rows = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members ?? [];
-      return rows.flatMap((m) => (Array.isArray(m?.circleAddresses) ? m.circleAddresses : [m?.circleAddress])).filter((x) => x && x !== mine);
+      return (await rosterRowsOf(circleId)).flatMap((m) => addressesOfRow(m)).filter((x) => x !== mine);
     }
     function tellLateRecipients(circleId) {
       if (!circleId || !lateRecipients.holds(circleId)) return;
-      rosterAddressesOf(circleId).then((addresses) => lateRecipients.rosterAddresses(circleId, addresses))
+      rosterRowsOf(circleId).then((rows) => {
+        const byAddress = new Map();
+        for (const m of rows) for (const a of addressesOfRow(m, circleId)) if (m?.webid) byAddress.set(a, m.webid);
+        return lateRecipients.rosterAddresses(circleId, [...byAddress.keys()], { webidsOf: (fresh) => fresh.map((a) => byAddress.get(a)) });
+      })
         .catch(() => { /* best-effort: the catch-up remains */ });
     }
     tellLateRecipientsRef.current = (circleId) => tellLateRecipients(circleId);
@@ -6334,24 +6344,28 @@ export async function createRealHouseholdAgent(opts = {}) {
     chatFanEndedRef.current = (circleId, msgId, out) => {
       const outcomes = Array.isArray(out?.outcomes) ? out.outcomes : null;
       if (!outcomes) return;
-      const waiting = [...new Set(outcomes.filter((o) => o?.outcome === 'no-address' && o?.webid).map((o) => o.webid))];
-      const prev = waitingByMsg.get(msgId);
-      if (!waiting.length && !prev) return;
-      if (prev && prev.size === waiting.length && waiting.every((w) => prev.has(w))) return;   // nothing changed: no new entry
-      const reached = outcomes.filter((o) => o?.outcome === 'written' || String(o?.outcome ?? '').startsWith('held')).length;
-      opts.deviceLog?.appendSilentEntry?.({ circleId, kind: 'delivery-state', payload: { msgId, state: ON_ITS_WAY, waiting, reached, of: outcomes.length } });
-      if (waiting.length) { waitingByMsg.set(msgId, new Set(waiting)); lateRecipients.noAddress(circleId, waiting); }
+      // a re-tell goes to the late members ALONE (`only`), so its outcomes name only them: who still waits is the earlier
+      // set, plus whom this fan found without an address, minus whom it now sent to; `of` is the first fan's
+      const sentTo = new Set(outcomes.filter((o) => o?.webid && (o.outcome === 'written' || String(o.outcome ?? '').startsWith('held'))).map((o) => o.webid));
+      const noAddress = outcomes.filter((o) => o?.outcome === 'no-address' && o?.webid).map((o) => o.webid);
+      const prev = waitingByMsg.get(msgId) ?? null;
+      if (!noAddress.length && !prev) return;
+      const waiting = [...new Set([...(prev?.refs ?? []), ...noAddress])].filter((w) => !sentTo.has(w));
+      if (prev && prev.refs.size === waiting.length && waiting.every((w) => prev.refs.has(w))) return;   // nothing changed: no new entry
+      const of = prev?.of ?? outcomes.length;
+      opts.deviceLog?.appendSilentEntry?.({ circleId, kind: 'delivery-state', payload: { msgId, state: ON_ITS_WAY, waiting, reached: Math.max(0, of - waiting.length), of } });
+      if (waiting.length) { waitingByMsg.set(msgId, { refs: new Set(waiting), of }); lateRecipients.noAddress(circleId, waiting); }
       else waitingByMsg.delete(msgId);
     };
     seedWaitingRef.current = (circleId) => {
       const owed = awaitingChatRecipients({ eventLog: opts.deviceLog, circleId, myRef: circleSelfRef(circleId) });
       for (const o of owed) {
-        waitingByMsg.set(o.msgId, new Set(o.waiting));
+        waitingByMsg.set(o.msgId, { refs: new Set(o.waiting), of: o.of });
         // remembered as reached by NOBODY, without a roster read here: the next tell (any roster change, an address
         // landing) finds every address new and tells the line to the circle once — every receiver dedupes it — and
         // that fan writes who still waits
-        lateRecipients.fanned(circleId, o.statement, [], (cid, st) => callSkill('pinboard', 'broadcastCircleChatStatement', {
-          groupId: cid, event: st, msgId: o.msgId, ts: Date.now(),
+        lateRecipients.fanned(circleId, o.statement, [], (cid, st, { only = null } = {}) => callSkill('pinboard', 'broadcastCircleChatStatement', {
+          groupId: cid, event: st, msgId: o.msgId, ts: Date.now(), ...(only ? { only } : {}),
         }), { msgId: o.msgId });
         lateRecipients.noAddress(circleId, o.waiting);
       }
@@ -8459,7 +8473,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // send passes here (the web composer's fan-out, the box's bot, the lanes' emitters) — and told again, by the same op
       // as the circle, when a member it could not reach yet has an address (`tellLateRecipients` below)
       if (LATE_TOLD_FANS.has(realOpId) && typeof realArgs?.groupId === 'string' && realArgs?.event?.body?.hash) {
-        await rememberFanRef.current?.(realArgs.groupId, realArgs.event, (cid, st) => callSkill('pinboard', realOpId, { ...realArgs, groupId: cid, event: st, ts: Date.now() }),
+        await rememberFanRef.current?.(realArgs.groupId, realArgs.event, (cid, st, { only = null } = {}) => callSkill('pinboard', realOpId, { ...realArgs, groupId: cid, event: st, ts: Date.now(), ...(only ? { only } : {}) }),
           realOpId === 'broadcastCircleChatStatement' && typeof realArgs.msgId === 'string' ? { msgId: realArgs.msgId } : null);
       }
       const out = await runPinboard();

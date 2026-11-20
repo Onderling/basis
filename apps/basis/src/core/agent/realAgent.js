@@ -6753,11 +6753,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       .finally(() => siblingCarry.carry({ subtype: 'circle-governance-broadcast', circleId, event: statement, msgId: `policy:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
     // where my membership chain in the circle stood (the line the receivers judge my earlier removals and role changes by)
     membershipUpToFor: (circleId) => authorChainTip(circleId, circleAddressFor(circleId)),
-    // where the content lanes stood on this device (the line the receivers judge content by: contentLine.js)
-    contentUpToFor: (circleId) => ({
-      items: frontier((itemsRail?.storedStatements?.(circleId) ?? []).map((s) => s.body)),
-      chat: frontier((chatRail?.storedStatements?.(circleId) ?? []).map((s) => s.body)),
-    }),
+    // where the content lanes stood on this device (the line the receivers judge content by: contentLine.js). A lane this
+    // device cannot read gives no line (null), and the emitter then fails the change rather than state an empty one.
+    contentUpToFor: (circleId) => {
+      if (typeof itemsRail?.storedStatements !== 'function' || typeof chatRail?.storedStatements !== 'function') return null;
+      return {
+        items: frontier(itemsRail.storedStatements(circleId).map((s) => s.body)),
+        chat: frontier(chatRail.storedStatements(circleId).map((s) => s.body)),
+      };
+    },
   });
   /**
    * THE circle-scoped send — every piece of circle traffic leaves through it: the chat/noticeboard fan

@@ -76,7 +76,8 @@ function prefixed(storage, prefix) {
  * A screen client for one toolbox's page. Nothing runs until a method is called.
  * @param {object} a
  * @param {string} a.toolbox  the toolbox this page belongs to (the bot pairs it for that toolbox only)
- * @param {string} a.bot      the bot's screen start link (`…#scherm-start=…`), given once
+ * @param {string} a.bot      the link the bot sent for this toolbox's page (`/scherm <toolbox>`: `…#scherm-nieuw=…` with a one-use
+ *   ticket); the page passes its own address (`location.href`) when it was opened from that link (L1113)
  * @param {string} [a.label]  how the person's chat names this page ('boodschappen op de laptop')
  * @param {Storage} [a.storage]  where the grant and the key are kept (default: this browser's localStorage)
  * @param {(o: {vaultPrefix: string}) => Promise<object>} [a.makeAgent]  the browser agent (default: a relay secure agent)
@@ -157,7 +158,8 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
     async startPairing() {
       if (!start.ok) throw Object.assign(new Error('createScreenClient: bot is not a screen start link'), { code: 'not-paired' });
       view = null;
-      const r = await viewFor('pair').connect({ label: label ?? name, toolbox: name });
+      // the ticket of the link `/scherm <toolbox>` sent (L1113): handed back in the offer; a link without one cannot pair
+      const r = await viewFor('pair').connect({ label: label ?? name, toolbox: name, ...(start.ticket ? { ticket: start.ticket } : {}) });
       return { paste: `/koppel-scherm ${r.offer}`, code: r.code, expiresAt: now() + SCREEN_PAIRING_TTL_MS };
     },
 

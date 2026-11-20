@@ -4,12 +4,12 @@
  * lists and drops them; revoking the person drops them all.
  */
 import { describe, it, expect } from 'vitest';
-import { createBotScreens, parseScreenLink } from '../../src/v2/botScreens.js';
+import { createBotScreens, parseScreenLink, parseScreenStartLink, endPreTicketToolboxGrants } from '../../src/v2/botScreens.js';
 import { screenCode, codeChoices, screenLabel, SCREEN_PAIRING_TTL_MS } from '../../src/v2/screenDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
 import { EventLog } from '../../src/eventLog.js';
 
-function setup({ tellRefused = null, toolboxesOn = ['boodschappen'] } = {}) {
+function setup({ tellRefused = null, toolboxesOn = ['boodschappen'], pageOps = ['lists.addToList', 'lists.removeFromList'] } = {}) {
   let clock = 1_000_000;
   const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore(), now: () => clock });
   const grants = [];
@@ -26,6 +26,7 @@ function setup({ tellRefused = null, toolboxesOn = ['boodschappen'] } = {}) {
     sendPrivately: async (person, text) => { if (!reachable) return { ok: false, reason: 'no-private-chat' }; privately.push({ person, text }); return { ok: true }; },
     columnOf: async (p) => (p === 'telegram:1' ? ['lists.addToList', 'assistant.assistant-overview', 'tools.useTool'] : []),
     toolboxOn: async (name) => toolboxesOn.includes(name),
+    toolboxPage: async (name) => (toolboxesOn.includes(name) ? { page: `https://${name}.example/page`, ops: pageOps } : null),
     grant: async (g) => { grants.push(g); return { ok: true }; },
     revokeView: async (v) => { const i = grants.findIndex((g) => g.viewPubKey === v); if (i < 0) return false; grants.splice(i, 1); return true; },
     listGrants: async () => grants.map((g) => ({ viewPubKey: g.viewPubKey, label: g.label, ops: g.ops, actingAs: g.actingAs })),
@@ -236,7 +237,7 @@ describe('the paste route (/koppel-scherm)', () => {
     const { encodeScreenStartLink, parseScreenStartLink } = await import('../../src/v2/botScreens.js');
     const start = encodeScreenStartLink('https://basis.example/app', { botAddress: 'BOT', relayUrl: 'wss://r', botName: '@b' });
     expect(start).toContain('#scherm-nieuw=');
-    expect(parseScreenStartLink(start)).toEqual({ ok: true, botAddress: 'BOT', relayUrl: 'wss://r', botName: '@b' });
+    expect(parseScreenStartLink(start)).toEqual({ ok: true, botAddress: 'BOT', relayUrl: 'wss://r', botName: '@b', ticket: null, toolbox: null });
     expect(JSON.stringify(parseScreenStartLink(start))).not.toMatch(/"n"|nonce/);
     const ctx = setup();
     expect(await ctx.screens.pasted('telegram:1', { viewPubKey: '', nonce: 'x' })).toMatchObject({ ok: false, reason: 'not-an-offer' });
@@ -267,16 +268,25 @@ describe('a refusal to a screen is registered as the one answer to its offer, be
   });
 });
 
+/** `/scherm <toolbox>`: the page link the bot sends privately, and the ticket it carries. */
+const pageTicket = async (ctx, toolbox = 'boodschappen', person = 'telegram:1') => {
+  const r = await ctx.screens.toolboxStart(person, toolbox, (link) => `open ${link}`);
+  if (!r.ok) return { r, ticket: null };
+  const link = /https?:\/\/\S+/.exec(ctx.privately.at(-1).text)[0];
+  return { r, link, ticket: parseScreenStartLink(link).ticket };
+};
+
 describe('a toolbox\'s page pairs for ITS toolbox only (ledger L1049)', () => {
   it('an offer naming a toolbox that is not on is refused in words; nothing is asked', async () => {
     const ctx = setup({ toolboxesOn: [] });
     expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', label: 'boodschappenpagina', toolbox: 'boodschappen' })).toMatchObject({ ok: false, reason: 'toolbox-not-on' });
     expect(ctx.asked).toEqual([]);
   });
-  it('the question names the toolbox; the grant records it and holds useTool', async () => {
+  it('the question names the toolbox and the ops; the grant records it and holds useTool', async () => {
     const ctx = setup();
-    await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', label: 'boodschappenpagina', toolbox: 'boodschappen' });
-    expect(ctx.asked.at(-1)).toMatchObject({ toolbox: 'boodschappen', label: 'boodschappenpagina' });
+    const { ticket } = await pageTicket(ctx);
+    await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', label: 'boodschappenpagina', toolbox: 'boodschappen', ticket });
+    expect(ctx.asked.at(-1)).toMatchObject({ toolbox: 'boodschappen', label: 'boodschappenpagina', ops: ['lists.addToList', 'tools.useTool'] });
     expect((await ctx.screens.confirm('telegram:1', await screenCode('P', 'n1'), { isPrivate: true })).ok).toBe(true);
     expect(ctx.grants.at(-1)).toMatchObject({ viewPubKey: 'P', toolbox: 'boodschappen' });
     expect(ctx.grants.at(-1).ops).toContain('tools.useTool');
@@ -290,3 +300,85 @@ describe('a toolbox\'s page pairs for ITS toolbox only (ledger L1049)', () => {
   });
 });
 
+describe('a toolbox page\'s grant is its toolbox and the operator\'s ops, no more; its toolbox is the ticket\'s (ledger L1113)', () => {
+  it('SCOPE: the grant is useTool + the placed ops cut to the role column, never the whole column', async () => {
+    const ctx = setup();
+    const { ticket } = await pageTicket(ctx);
+    await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', toolbox: 'boodschappen', ticket });
+    expect((await ctx.screens.confirm('telegram:1', await screenCode('P', 'n1'), { isPrivate: true })).ok).toBe(true);
+    // 'lists.removeFromList' is placed but not in the person's column: not granted; the assistant op is in the column
+    // but not placed: not granted
+    expect([...ctx.grants.at(-1).ops].sort()).toEqual(['lists.addToList', 'tools.useTool']);
+  });
+
+  it('PROOF: a toolbox offer without a ticket is refused; nothing is asked', async () => {
+    const ctx = setup();
+    expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', toolbox: 'boodschappen' })).toMatchObject({ ok: false, reason: 'toolbox-needs-ticket' });
+    expect(ctx.asked).toEqual([]);
+  });
+
+  it('PROOF: the toolbox is the ticket\'s; an offer naming another toolbox is refused', async () => {
+    const ctx = setup({ toolboxesOn: ['boodschappen', 'bank'] });
+    const { ticket } = await pageTicket(ctx, 'boodschappen');
+    expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', toolbox: 'bank', ticket })).toMatchObject({ ok: false, reason: 'toolbox-ticket-mismatch' });
+    expect(ctx.asked).toEqual([]);
+  });
+
+  it('a ticket alone names the toolbox (a page that does not say its own name)', async () => {
+    const ctx = setup();
+    const { ticket } = await pageTicket(ctx);
+    await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', ticket });
+    expect(ctx.asked.at(-1)).toMatchObject({ toolbox: 'boodschappen' });
+  });
+
+  it('a ticket is used once, is the person\'s own, and runs out', async () => {
+    const ctx = setup();
+    ctx.admitted.add('telegram:2');
+    const a = await pageTicket(ctx);
+    expect((await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', ticket: a.ticket })).ok).toBe(true);
+    expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'P2', nonce: 'n2', ticket: a.ticket })).toMatchObject({ ok: false, reason: 'toolbox-ticket-unknown' });
+    const b = await pageTicket(ctx);
+    expect(await ctx.screens.pasted('telegram:2', { viewPubKey: 'P3', nonce: 'n3', ticket: b.ticket })).toMatchObject({ ok: false, reason: 'toolbox-ticket-unknown' });
+    const c = await pageTicket(ctx);
+    ctx.tick(SCREEN_PAIRING_TTL_MS + 1);
+    expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'P4', nonce: 'n4', ticket: c.ticket })).toMatchObject({ ok: false, reason: 'toolbox-ticket-expired' });
+  });
+
+  it('the page link is the operator\'s placed address, sent privately; a toolbox without a page or not on gives none', async () => {
+    const ctx = setup();
+    const { r, link } = await pageTicket(ctx);
+    expect(r.ok).toBe(true);
+    expect(link.startsWith('https://boodschappen.example/page')).toBe(true);
+    expect(parseScreenStartLink(link)).toMatchObject({ ok: true, botAddress: 'BOT', toolbox: 'boodschappen' });
+    expect((await pageTicket(ctx, 'bank')).r).toMatchObject({ ok: false, reason: 'toolbox-no-page' });
+  });
+
+  it('Basis\'s own screen keeps the role column', async () => {
+    const ctx = setup();
+    await ctx.screens.pasted('telegram:1', { viewPubKey: 'Q', nonce: 'n2' });
+    expect((await ctx.screens.confirm('telegram:1', await screenCode('Q', 'n2'), { isPrivate: true })).ok).toBe(true);
+    expect([...ctx.grants.at(-1).ops].sort()).toEqual(['assistant.assistant-overview', 'lists.addToList']);
+  });
+});
+
+describe('the upgrade ends the toolbox pages\' grants made before tickets, once, and says so (ledger L1113)', () => {
+  it('a toolbox grant is ended and its person told; Basis\'s own screen stays; the second start does nothing', async () => {
+    const grants = [
+      { viewPubKey: 'P', toolbox: 'boodschappen', actingAs: 'telegram:1', ops: ['lists.addToList', 'tools.useTool'] },
+      { viewPubKey: 'Q', actingAs: 'telegram:1', ops: ['lists.addToList'] },
+    ];
+    const told = []; const m = new Map();
+    const a = {
+      listGrants: async () => grants.slice(),
+      revokeView: async (v) => { const i = grants.findIndex((g) => g.viewPubKey === v); if (i < 0) return false; grants.splice(i, 1); return true; },
+      notify: (person, key, params) => { told.push({ person, key, params }); },
+      marker: { get: async (k) => m.get(k) ?? null, set: async (k, v) => { m.set(k, v); } },
+    };
+    expect(await endPreTicketToolboxGrants(a)).toEqual({ ran: true, ended: 1 });
+    expect(grants.map((g) => g.viewPubKey)).toEqual(['Q']);
+    expect(told).toEqual([{ person: 'telegram:1', key: 'circle.bot.screen_toolbox_grant_ended', params: { toolbox: 'boodschappen' } }]);
+    grants.push({ viewPubKey: 'R', toolbox: 'boodschappen', actingAs: 'telegram:1', ops: ['tools.useTool'] });
+    expect(await endPreTicketToolboxGrants(a)).toEqual({ ran: false, ended: 0 });
+    expect(grants.map((g) => g.viewPubKey)).toEqual(['Q', 'R']);
+  });
+});

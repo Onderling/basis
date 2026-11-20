@@ -68,7 +68,7 @@ import { makeLateRecipientRetell } from '../../v2/membershipLateRecipient.js'; /
 import { makeItemsRail, makeItemsEmitter, routeItemsMirror, ITEMS_CATCHUP_SUBTYPES, OWN_ITEMS_CATCHUP_SUBTYPES, ITEMS_BROADCAST } from '../../v2/itemsRail.js';
 import { makeFrontierReplay } from '../../v2/frontierReplay.js'; // the content re-root — item snapshots ride the device log
 import { healRestoreList } from '../../v2/restoreListHeal.js'; // a circle missed on the restore list is written at the next boot
-import { makeChatRail, makeChatEmitter, owedChatStatements, CHAT_CATCHUP_SUBTYPES, CHAT_STATEMENT_BROADCAST } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
+import { makeChatRail, makeChatEmitter, owedChatStatements, awaitingChatRecipients, ON_ITS_WAY, CHAT_CATCHUP_SUBTYPES, CHAT_STATEMENT_BROADCAST } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { GOV_CATCHUP_BATCH } from '../../v2/governanceCatchUp.js'; // the governance catch-up's reply subtype (the rate-limit exemption set)
 
 /** The person's own device map carried between their devices (a self's delegation records). */
@@ -1526,9 +1526,18 @@ export async function createRealHouseholdAgent(opts = {}) {
   // therefore cannot silently break the hold promise: what was still owed goes out again, receivers'
   // rails dedup what they already have, and receipt-keyed removal stops the copies that arrive.
   const reFannedCircles = new Set();
+  // (circleId) → the re-tell learns, from the log, what a restart still owes across it; bound with the membership rail
+  // further down — a circle opened before that is kept in `pending` and seeded when it binds
+  const seedWaitingRef = { current: null, pending: new Set() };
   function reFanOwedChat(circleId) {
-    if (!opts.deviceLog || !chatRail || reFannedCircles.has(circleId)) return;
+    if (!opts.deviceLog || reFannedCircles.has(circleId)) return;
+    // A circle is wired at boot BEFORE this factory has built its chat rail and composed its API (further down): a send
+    // made then waits on a roster read that is not served until the API exists. Such an early open waits in `pending`
+    // and runs once both are there — until 2026-11-20 it returned here, marked done, and the restart's re-fan never ran
+    if (!chatRail || !apiComposed) { seedWaitingRef.pending.add(circleId); return; }
     reFannedCircles.add(circleId);
+    // …and a line some members got while others had no address yet: the re-tell is seeded from the log
+    try { seedWaitingRef.current?.(circleId); } catch { /* best-effort: the member's own catch-up remains */ }
     try {
       for (const owed of owedChatStatements({ eventLog: opts.deviceLog, circleId, myRef: circleSelfRef(circleId) })) {
         callSkill('pinboard', 'broadcastCircleChatStatement', {
@@ -3214,6 +3223,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   const LATE_TOLD_FANS = new Set(['broadcastCircleItems', 'broadcastCircleChatStatement']);
   /** The members of a circle a fan had no address for, past the re-tell window (bound with the membership rail below). */
   const unreachableMembersRef = { current: null };
+  // A LINE THAT WAITS FOR A MEMBER WITHOUT AN ADDRESS: msgId → { refs: the member refs it still waits for, of }, the RAM mirror
+  // of the log's `on-its-way` entries (awaitingChatRecipients); bound with the membership rail below
+  const waitingByMsg = new Map();
+  const chatFanEndedRef = { current: null };   // (circleId, msgId, fanResult) → writes who still waits
   /** The point runs a sibling's KEY act: a current member only (its own roster fold), never a key the act brought. */
   const rotatesAwaitingRoot = [];   // rotations past this point's own address, until it takes the next root
   /** Rotate a circle's key past addresses of this person's that are gone, as the point: through the circle's key PRODUCER
@@ -6288,19 +6301,31 @@ export async function createRealHouseholdAgent(opts = {}) {
     const lateRecipients = makeLateRecipientRetell({
       // the window is the param's; a walk may shorten it to see the "not reachable yet" line without waiting minutes
       ...(Number.isFinite(opts.lateRecipientWindowMs) ? { windowMs: opts.lateRecipientWindowMs } : {}),
-      retell: (circleId, statement) => callSkill('pinboard', 'broadcastCircleMembership', {
-        groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
+      // a line whose recipient still waits for an address is kept while the log says so, not for a window
+      keep: (_circleId, msgId) => (waitingByMsg.get(msgId)?.refs?.size ?? 0) > 0,
+      retell: (circleId, statement, { only = null } = {}) => callSkill('pinboard', 'broadcastCircleMembership', {
+        groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(), ...(only ? { only } : {}),
       }).then((r) => { console.info(`[membership-fan] ${statement.body.kind} ${String(statement.body.hash).slice(0, 8)} in ${String(circleId).slice(0, 8)}: retold to a member who arrived after the fan — sent ${r?.sent ?? 0}/${r?.attempted ?? 0}`); return r; }),
     });
     // the current members' circle addresses on this device's roster (never this device's own)
+    async function rosterRowsOf(circleId) {
+      return (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members ?? [];
+    }
+    function addressesOfRow(m, circleId = null) {
+      const mine = circleId ? circleAddressFor(circleId) : null;
+      return (Array.isArray(m?.circleAddresses) ? m.circleAddresses : [m?.circleAddress]).filter((x) => x && x !== mine);
+    }
     async function rosterAddressesOf(circleId) {
       const mine = circleAddressFor(circleId);
-      const rows = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members ?? [];
-      return rows.flatMap((m) => (Array.isArray(m?.circleAddresses) ? m.circleAddresses : [m?.circleAddress])).filter((x) => x && x !== mine);
+      return (await rosterRowsOf(circleId)).flatMap((m) => addressesOfRow(m)).filter((x) => x !== mine);
     }
     function tellLateRecipients(circleId) {
       if (!circleId || !lateRecipients.holds(circleId)) return;
-      rosterAddressesOf(circleId).then((addresses) => lateRecipients.rosterAddresses(circleId, addresses))
+      rosterRowsOf(circleId).then((rows) => {
+        const byAddress = new Map();
+        for (const m of rows) for (const a of addressesOfRow(m, circleId)) if (m?.webid) byAddress.set(a, m.webid);
+        return lateRecipients.rosterAddresses(circleId, [...byAddress.keys()], { webidsOf: (fresh) => fresh.map((a) => byAddress.get(a)) });
+      })
         .catch(() => { /* best-effort: the catch-up remains */ });
     }
     tellLateRecipientsRef.current = (circleId) => tellLateRecipients(circleId);
@@ -6308,9 +6333,49 @@ export async function createRealHouseholdAgent(opts = {}) {
     // hold yet is reached nowhere — not held — so an item or a chat line fanned in that moment never reached them (the
     // household bot writing in a circle it had just joined). Each is remembered like a membership statement and told
     // again, by its own lane's broadcast as the circle, when that member's address lands; never at the global key.
-    rememberFanRef.current = (circleId, statement, retell) => rosterAddressesOf(circleId)
-      .then((known) => lateRecipients.fanned(circleId, statement, known, retell))
+    rememberFanRef.current = (circleId, statement, retell, meta = null) => rosterAddressesOf(circleId)
+      .then((known) => lateRecipients.fanned(circleId, statement, known, retell, meta))
       .catch(() => { /* remembering is best-effort: the member's own catch-up remains */ });
+    // A LINE SOME MEMBERS GOT WHILE OTHERS HAD NO ADDRESS YET: the fan says, on the log, whom the line
+    // still waits for — a silent `delivery-state` entry per change, never a store. The re-tell (a fan of the whole
+    // circle again, deduped by every receiver) writes the next one; an empty `waiting` ends it. One receipt from
+    // someone else ends nothing here. A restart reads it back (`seedWaitingRef`), so the late member is not lost with
+    // the process.
+    chatFanEndedRef.current = (circleId, msgId, out) => {
+      const outcomes = Array.isArray(out?.outcomes) ? out.outcomes : null;
+      if (!outcomes) return;
+      // a re-tell goes to the late members ALONE (`only`), so its outcomes name only them: who still waits is the earlier
+      // set, plus whom this fan found without an address, minus whom it now sent to; `of` is the first fan's
+      const sentTo = new Set(outcomes.filter((o) => o?.webid && (o.outcome === 'written' || String(o.outcome ?? '').startsWith('held'))).map((o) => o.webid));
+      const noAddress = outcomes.filter((o) => o?.outcome === 'no-address' && o?.webid).map((o) => o.webid);
+      const prev = waitingByMsg.get(msgId) ?? null;
+      if (!noAddress.length && !prev) return;
+      const waiting = [...new Set([...(prev?.refs ?? []), ...noAddress])].filter((w) => !sentTo.has(w));
+      if (prev && prev.refs.size === waiting.length && waiting.every((w) => prev.refs.has(w))) return;   // nothing changed: no new entry
+      const of = prev?.of ?? outcomes.length;
+      opts.deviceLog?.appendSilentEntry?.({ circleId, kind: 'delivery-state', payload: { msgId, state: ON_ITS_WAY, waiting, reached: Math.max(0, of - waiting.length), of } });
+      if (waiting.length) { waitingByMsg.set(msgId, { refs: new Set(waiting), of }); lateRecipients.noAddress(circleId, waiting); }
+      else waitingByMsg.delete(msgId);
+    };
+    seedWaitingRef.current = (circleId) => {
+      const owed = awaitingChatRecipients({ eventLog: opts.deviceLog, circleId, myRef: circleSelfRef(circleId) });
+      for (const o of owed) {
+        waitingByMsg.set(o.msgId, { refs: new Set(o.waiting), of: o.of });
+        // remembered as reached by NOBODY, without a roster read here: the next tell (any roster change, an address
+        // landing) finds every address new and tells the line to the circle once — every receiver dedupes it — and
+        // that fan writes who still waits
+        // …and the re-tell goes to the members this line still WAITS for, never to the others whose address is merely new
+        // to this fresh memory (they hold it already): one whole-circle fan per waiting line at a start would be the burst
+        // the narrowing removed
+        lateRecipients.fanned(circleId, o.statement, [], async (cid, st, { only = null } = {}) => {
+          const waits = waitingByMsg.get(o.msgId)?.refs ?? new Set();
+          const to = (only ?? [...waits]).filter((w) => waits.has(w));
+          if (!to.length) return { sent: 0, attempted: 0, outcomes: [] };
+          return callSkill('pinboard', 'broadcastCircleChatStatement', { groupId: cid, event: st, msgId: o.msgId, ts: Date.now(), only: to });
+        }, { msgId: o.msgId });
+        lateRecipients.noAddress(circleId, o.waiting);
+      }
+    };
     // NOT REACHABLE YET (Frits, 2026-11-02): a current member the fan had no address for, still without one after the
     // re-tell window, is said on their row — and said once in this device's log (the box has no row to paint)
     const saidUnreachable = new Set();
@@ -8414,9 +8479,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       // send passes here (the web composer's fan-out, the box's bot, the lanes' emitters) — and told again, by the same op
       // as the circle, when a member it could not reach yet has an address (`tellLateRecipients` below)
       if (LATE_TOLD_FANS.has(realOpId) && typeof realArgs?.groupId === 'string' && realArgs?.event?.body?.hash) {
-        await rememberFanRef.current?.(realArgs.groupId, realArgs.event, (cid, st) => callSkill('pinboard', realOpId, { ...realArgs, groupId: cid, event: st, ts: Date.now() }));
+        await rememberFanRef.current?.(realArgs.groupId, realArgs.event, (cid, st, { only = null } = {}) => callSkill('pinboard', realOpId, { ...realArgs, groupId: cid, event: st, ts: Date.now(), ...(only ? { only } : {}) }),
+          realOpId === 'broadcastCircleChatStatement' && typeof realArgs.msgId === 'string' ? { msgId: realArgs.msgId } : null);
       }
       const out = await runPinboard();
+      // a chat line's fan that left members without an address — or a re-tell that reached them — is said on the log
+      if (realOpId === 'broadcastCircleChatStatement' && typeof realArgs?.groupId === 'string' && typeof realArgs?.msgId === 'string') {
+        try { chatFanEndedRef.current?.(realArgs.groupId, realArgs.msgId, out); } catch { /* the fan itself stands */ }
+      }
       rosterReads.afterWrite(realOpId);
       // a write that may have grown a roster (an address announced, a seed recorded): a statement this device fanned
       // before that member's address was known is told to them now (only circles with one remembered — cheap otherwise)
@@ -10932,6 +11002,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   apiComposed = true;
   for (const cid of rostersToRead) scheduleRosterRead(cid);
   rostersToRead.clear();
+  // the circles opened before the chat rail and the API existed: what a restart still owes them goes out now
+  { const early = [...seedWaitingRef.pending]; seedWaitingRef.pending.clear(); for (const cid of early) reFanOwedChat(cid); }
   runRosterLine();
   selfAgent = api;
   return api;

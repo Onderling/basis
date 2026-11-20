@@ -3520,6 +3520,12 @@ function CircleDetail({
     deliveryTick;
     return deliveryStateMapRef.current.reasonOf?.(msgId) ?? null;
   }, [deliveryTick]);
+  // who a circle line still waits for, `{ sent, of }` (the map's `waitingOf`): the chip says how many it was sent to
+  const deliveryWaitingFor = useCallback((msgId) => {
+    // eslint-disable-next-line no-unused-expressions
+    deliveryTick;
+    return deliveryStateMapRef.current.waitingOf?.(msgId) ?? null;
+  }, [deliveryTick]);
   const [composerText, setComposerText] = useState('');
   // The "+" — mobile had no attach affordance at all, so a phone could not put a photo or an
   // appointment in a conversation by any route. Same projected entries as web, narrowed the same way.
@@ -5088,6 +5094,7 @@ function CircleDetail({
           renderBubblesWithDayDividers(rows, t, {
             deliveryStateFor,
             deliveryReasonFor,
+            deliveryWaitingFor,
             localActor: 'me',
             onRetryDelivery,
             onBubbleButton,
@@ -5431,6 +5438,7 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
     && (row?.type === 'chat-message' || row?.event?.type === 'chat-message');
   const deliveryState = isLocalChat ? deliveryStateFor(row.id) : null;
   const deliveryReason = isLocalChat && typeof deliveryOpts?.deliveryReasonFor === 'function' ? deliveryOpts.deliveryReasonFor(row.id) : null;
+  const deliveryWaiting = isLocalChat && typeof deliveryOpts?.deliveryWaitingFor === 'function' ? deliveryOpts.deliveryWaitingFor(row.id) : null;
   // Bulletin restyle (web parity) — my own chat messages align right on --me-bg
   // (no border); everyone else's + the bot's stay left on --bot-bg + --bot-line.
   // Same gate the delivery icon uses: a locally-authored chat-message.
@@ -5578,7 +5586,7 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
       ) : null}
       {/* Delivery state: the ONE chip (rn/DeliveryChip.js) that the contact thread's own bubbles paint too, over the
           SHARED presentation table (deliverySettings.js) the web bubble reads. */}
-      <DeliveryChip state={deliveryState} reason={deliveryReason} rowId={row.id} onRetry={onRetryDelivery} />
+      <DeliveryChip state={deliveryState} reason={deliveryReason} waiting={deliveryWaiting} rowId={row.id} onRetry={onRetryDelivery} />
     </View>
   );
 }

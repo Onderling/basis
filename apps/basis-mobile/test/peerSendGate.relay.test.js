@@ -49,7 +49,7 @@ describe('the send gate: what the device knows decides the route', () => {
     const lines = text.split('\n').filter((l) => l.includes('agent/send.decision') && l.includes('"kind":"circle-member"'));
     expect(lines.length, `no circle-member decision in the copy-log text; decision lines: ${text.split('\n').filter((l) => l.includes('send.decision')).slice(-5).join(' | ')}`).toBeGreaterThanOrEqual(1);
     const rec = JSON.parse(lines.at(-1).slice(lines.at(-1).indexOf('{')));
-    expect(rec).toMatchObject({ kind: 'circle-member', scope: 'circle', reason: 'roster-hit', chosen: 'relay', outcome: 'delivered' });
+    expect(rec).toMatchObject({ kind: 'circle-member', scope: 'circle', reason: 'roster-hit', chosen: 'relay', outcome: 'written' });
     expect(text).not.toContain(annaInCircle.slice(0, 16));
     expect(text).not.toContain(G);
     expect(text).not.toContain('ws://');

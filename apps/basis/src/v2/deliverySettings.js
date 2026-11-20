@@ -21,7 +21,7 @@
  */
 import { CHAT_KIND } from './conversationKinds.js';
 import {
-  DELIVERY, DELIVERY_LABELS, DELIVERY_REASON_LABELS, isDeliveryState, shouldSendReceipt, receiveReceipt, RECEIPT_MESSAGE,
+  DELIVERY, DELIVERY_TERMINAL, DELIVERY_LABELS, DELIVERY_REASON_LABELS, DELIVERY_WAITING_ENTRY, DELIVERY_WAITING_LABEL, isDeliveryState, shouldSendReceipt, receiveReceipt, RECEIPT_MESSAGE,
 } from './deliveryState.js';
 
 /** Both settings, with their defaults. Only an explicit boolean changes one. */
@@ -156,10 +156,16 @@ export const DELIVERY_PRESENTATION = Object.freeze({
 });
 
 /** How to draw one state, or null when it should not appear. Pairs with `deliveryLabelFor`. */
-export function deliveryPresentation(state, { mine = true, reason = null } = {}) {
+export function deliveryPresentation(state, { mine = true, reason = null, waiting = null } = {}) {
   if (!mine || !isDeliveryState(state)) return null;
   const p = DELIVERY_PRESENTATION[state];
   if (!p?.show) return null;
+  // WHO IT STILL WAITS FOR (the map's `waitingOf`): while some recipients wait for an address, the bubble says how many
+  // it was sent to, in place of the rung's words; a failure's words win over it, and the rung's return once nobody waits.
+  // The shape (glyph, tone, retry) stays the state's: the side fact changes the words, never the claim.
+  if (waiting && waiting.of > 0 && !DELIVERY_TERMINAL.includes(state)) {
+    return { state, glyph: p.glyph, tone: p.tone, retryable: p.retryable, labelKey: DELIVERY_WAITING_LABEL, labelVars: { reached: waiting.sent, of: waiting.of } };
+  }
   // why it failed, in its own words, when the delivery map knows (`reasonOf`); the shape stays the state's
   const reasonKey = typeof reason === 'string' ? (DELIVERY_REASON_LABELS[reason] ?? null) : null;
   // `tone` is a NAME, not a colour value: the shells map it to their own palette, so web and mobile cannot
@@ -398,10 +404,10 @@ export function makeReceiptReceiver({ deliveryMap, eventLog, listCircleMembers, 
  * @param {{get: Function, set: Function}} a.deliveryMap
  * @param {string} a.localActor   the actor label this shell stamps on its OWN sends
  * @param {number} [a.ttlMs]      how far back a send can still be "owed" (the hold TTL)
- * @returns {{ seeded: number, stored: number }}
+ * @returns {{ seeded: number, stored: number, waiting: number, stop: () => void }}  `stop` ends the follow of the log
  */
 export function rehydrateDeliveryState({ eventLog, deliveryMap, localActor, ttlMs = 24 * 60 * 60 * 1000 } = {}) {
-  if (typeof eventLog?.query !== 'function' || typeof deliveryMap?.set !== 'function') return { seeded: 0, stored: 0 };
+  if (typeof eventLog?.query !== 'function' || typeof deliveryMap?.set !== 'function') return { seeded: 0, stored: 0, waiting: 0, stop: () => {} };
   let entries = [];
   try { entries = eventLog.query({}) ?? []; } catch { entries = []; }
   const now = Date.now();
@@ -420,7 +426,34 @@ export function rehydrateDeliveryState({ eventLog, deliveryMap, localActor, ttlM
       stored += 1;
     }
   }
-  return { seeded, stored };
+  // 3. WHO A LINE STILL WAITS FOR — the side fact, from the NEWEST `on-its-way` entry per line I sent (the log is
+  //    most-recent-first), and FOLLOWED from here on: the re-tell that reaches the rest writes the next entry, and the
+  //    bubble's words follow it on every shell that rehydrates (the one projection, never a copy per shell).
+  let waiting = 0;
+  const seen = new Set();
+  for (const e of entries) {
+    const msgId = waitingEntryMsgId(e);
+    if (!msgId || seen.has(msgId)) continue;
+    seen.add(msgId);
+    if (deliveryMap.get(msgId) == null || (now - (e.ts ?? 0)) > ttlMs) continue;
+    if (applyWaiting(deliveryMap, e.payload)) waiting += 1;
+  }
+  const stop = typeof eventLog.subscribe === 'function' && typeof deliveryMap.setWaiting === 'function'
+    ? eventLog.subscribe((e) => {
+      const msgId = waitingEntryMsgId(e);
+      if (msgId && deliveryMap.get(msgId) != null) applyWaiting(deliveryMap, e.payload);
+    })
+    : () => {};
+  return { seeded, stored, waiting, stop };
+}
+
+const waitingEntryMsgId = (e) => (e?.type === 'delivery-state' && e?.payload?.state === DELIVERY_WAITING_ENTRY && typeof e.payload.msgId === 'string' ? e.payload.msgId : null);
+/** `{ sent, of }` while someone waits, cleared when nobody does. `sent` is the fan's count of sends — never receipts. */
+function applyWaiting(deliveryMap, payload) {
+  if (typeof deliveryMap?.setWaiting !== 'function') return false;
+  const waits = Array.isArray(payload?.waiting) && payload.waiting.length > 0;
+  deliveryMap.setWaiting(payload.msgId, waits ? { sent: Number(payload.reached) || 0, of: Number(payload.of) || 0 } : null);
+  return waits;
 }
 
 export function applyReceipt(payload, fromAddress, deliveryMap, { isRecipient = null } = {}) {

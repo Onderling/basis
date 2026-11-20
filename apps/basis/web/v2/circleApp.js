@@ -8360,6 +8360,7 @@ function showCircle(id, circle, policy) {
       // Locally-sent bubbles read this to decide which icon to render.
       deliveryStateFor: (msgId) => deliveryStateMap.get(msgId),
       deliveryReasonFor: (msgId) => deliveryStateMap.reasonOf(msgId),
+      deliveryWaitingFor: (msgId) => deliveryStateMap.waitingOf?.(msgId) ?? null,
       localActor: LOCAL_ACTOR,
       // δ.2 — retry on the failed icon tap.  Re-fires the SAME msgId
       // (idempotent receiver-side dedup).  Looks up the original text
@@ -8647,6 +8648,7 @@ function showCircle(id, circle, policy) {
     paintDelivery: (msgId, state) => paintDeliveryChip(rootEl, msgId, state, {
       tr: t,
       reason: deliveryStateMap.reasonOf(msgId),
+      waiting: deliveryStateMap.waitingOf?.(msgId) ?? null,
       onRetryDelivery: (retryId) => {
         const evt = eventLog.query({ excludeMuted: true }).find((e) => e.id === retryId);
         const text = evt?.payload?.text;

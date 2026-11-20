@@ -22,6 +22,8 @@ const chatScreen = read('../src/screens/ChatScreen.js');
 const launcher   = read('../src/screens/v2/CircleLauncherScreen.js');
 const appJs      = read('../App.js');
 const webShell   = read('../../basis/web/v2/circleApp.js');
+const webView    = read('../../basis/web/v2/circleView.js');
+const mobileChip = read('../src/rn/DeliveryChip.js');
 
 describe('circle chat — no inbox, card-fan parity (web ≡ mobile)', () => {
   it('no shell constructs a chat inbox — live chat lands at the chat rail only', () => {
@@ -51,5 +53,18 @@ describe('circle chat — no inbox, card-fan parity (web ≡ mobile)', () => {
     // And the mobile retry re-fans the ORIGINAL card, exactly like web's retry.
     expect(launcher).toMatch(/broadcastFanOut\(\{\s*msgId,\s*text,\s*ts,\s*card/);
     expect(webShell).toMatch(/broadcastFanOut\(\{\s*msgId,\s*text,\s*ts,\s*card/);
+  });
+
+  it('BOTH shells hand a circle bubble who its line still waits for, and word it with the label\'s variables', () => {
+    // the side fact beside the delivery state (the map's `waitingOf`): one shell without it shows the rung's words
+    // while the other says 'Sent to N of M; the rest follows' — the same line, two answers
+    expect(webShell).toMatch(/deliveryWaitingFor: \(msgId\) => deliveryStateMap\.waitingOf/);
+    expect(webShell).toMatch(/waiting: deliveryStateMap\.waitingOf/);   // the in-place repaint too
+    expect(launcher).toMatch(/waitingOf\?\.\(msgId\)/);
+    expect(launcher).toMatch(/<DeliveryChip [^>]*waiting=\{deliveryWaiting\}/);
+    expect(webView).toMatch(/deliveryPresentation\(state, \{ reason, waiting \}\)/);
+    expect(mobileChip).toMatch(/deliveryPresentation\(state, \{ reason, waiting \}\)/);
+    expect(webView).toMatch(/tr\(p\.labelKey, p\.labelVars\)/);
+    expect(mobileChip).toMatch(/t\(p\.labelKey, p\.labelVars\)/);
   });
 });

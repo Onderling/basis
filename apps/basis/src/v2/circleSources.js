@@ -11,7 +11,7 @@
 
 import { HELP_CIRCLE_ID } from './helpCircle.js';
 
-export function circleSourcesFromAgent({ callSkill, circlesStore, helpCircleName, unnamedCircleName } = {}) {
+export function circleSourcesFromAgent({ callSkill, circlesStore, helpCircleName, unnamedCircleName, policyStore = null } = {}) {
   const call = async (opId, args) => {
     if (typeof callSkill !== 'function') return null;
     return callSkill(opId, args ?? {});
@@ -25,6 +25,8 @@ export function circleSourcesFromAgent({ callSkill, circlesStore, helpCircleName
   const nameless = (id) => (typeof unnamedCircleName === 'function' ? unnamedCircleName() : unnamedCircleName) || id;
 
   return {
+    // the circles' policy store: loading the list reads each circle's conversation kinds for every reader (`loadCircles`)
+    policyStore,
     fetchTasksCircles: async () => {
       const res = await call('getMyCircles');
       return Array.isArray(res?.circles) ? res.circles : [];

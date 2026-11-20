@@ -31,6 +31,7 @@ import { isKeyLike } from './personLabel.js';
 import { isItemLanding } from './itemLanding.js';
 import { landedTimeOf } from '../eventLog.js';
 import { itemKindChip } from './embedChips.js';
+import { knownConversationKindsOf, showsInConversation } from './conversationKinds.js';
 import { param, PARAM_SCOPE, PARAM_KIND, entryKind, LANE } from '@onderling/item-store';
 
 // Parameter register (#36) — tile subtitle render cap (scope:device, kind:internal). `param()` returns 60.
@@ -99,6 +100,8 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRe
     // statement) never speaks on the tile
     const landing = isItemLanding(event);
     if (!landing && entryKind(event.type).lane !== LANE.HUMAN) continue;
+    // …and a line of a kind this circle's conversation has off does not speak on the tile either (the one filter)
+    if (!landing && !showsInConversation(event, knownConversationKindsOf(cid))) continue;
 
     // First touch sets subtitle + ts (sorted newest-first).
     if (entry.subtitle === null && entry.ts === 0) {
@@ -157,6 +160,8 @@ export function unreadOnAnyDevice({ id, landedAt } = {}, { readIds = null, since
 export function countsAsUnread(event, { myRefs = [] } = {}) {
   if (!event || typeof event !== 'object') return false;
   if (!isItemLanding(event) && entryKind(event.type).lane !== LANE.HUMAN) return false;
+  // a kind the circle's conversation has off is not news (the circle's kinds bind on every reader, not only the thread)
+  if (!isItemLanding(event) && !showsInConversation(event, knownConversationKindsOf(eventCircleId(event)))) return false;
   const actor = event.actor ?? event.payload?.actor ?? null;
   if (actor === 'bot' && event.payload?.scope === 'self') return false;
   return !(actor && myRefs.includes(actor));

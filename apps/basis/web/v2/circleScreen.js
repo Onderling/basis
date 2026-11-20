@@ -180,6 +180,7 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
     case 'forYou':       renderForYou(section, block, tr, onAction);       break;
     case 'circlesUnread': renderCirclesUnread(section, block, tr, onAction); break;
     case 'awaiting':      renderAwaiting(section, block, tr, onAction); break;
+    case 'availability':  renderAvailability(section, block, tr, onAction); break;
     case 'onboarding':   renderOnboarding(section, block, tr, onAction); break;
     case 'identityLine': renderIdentityLine(section, block, tr, onAction); break;
     case 'agents':       renderAgents(section, block, tr, onAction);       break;
@@ -260,6 +261,21 @@ function renderAwaiting(section, block, tr, onAction) {
     if (typeof onAction === 'function') b.addEventListener('click', () => onAction({ ...it.open }));
     section.appendChild(b);
   }
+}
+
+// Vandaag's availability words (beschikbaar · stil tot … · weg tot …): one button, a tap opens the availability screen.
+// The words are the shared reading words, as the identity line said them.
+function renderAvailability(section, block, tr, onAction) {
+  const title = document.createElement('h3');
+  title.className = 'circle-screen__block-title';
+  title.textContent = tr(block.titleKey ?? 'circle.availability.title');
+  section.appendChild(title);
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'cc-btn cc-btn--quiet circle-screen__availability';
+  b.textContent = identityLineWords({ readings: block.content?.reading ? [block.content.reading] : [] }, { t: tr, locale: dateLocaleOf(tr) }).join(' · ');
+  if (typeof onAction === 'function' && block.content?.open) b.addEventListener('click', () => onAction({ ...block.content.open }));
+  section.appendChild(b);
 }
 
 // "Nieuw voor jou": what came in for the person, each row a tap to its source and a ✕ to set it aside (both mark it

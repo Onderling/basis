@@ -17,15 +17,14 @@ test('a device with two selves pairs a screen as the self chosen in the form', a
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('/');
-  await expect(page.locator('[data-tab="mij"]').first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.cc-persona-button__button')).toBeVisible({ timeout: 30_000 });
   await page.waitForFunction(() => typeof window.onderlingCall === 'function', null, { timeout: 60_000 });
 
   // a second self on this device
   const werk = await page.evaluate(async () => (await window.onderlingCall('agents', 'createProfile', { name: 'Werk' }))?.id ?? null);
   expect(werk, 'Werk was made').toBeTruthy();
 
-  await page.locator('[data-tab="mij"]').first().click();
-  await page.locator('.cc-profile__gear').click();
+  await page.locator('.cc-persona-button__settings').click();
   await page.locator('.cc-settings__group--devices-keys').click();
   const form = page.locator('[data-section="connection-add"]').first();
   await expect(form).toBeVisible({ timeout: 15_000 });

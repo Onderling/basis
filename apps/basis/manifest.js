@@ -1116,21 +1116,12 @@ export const basisManifest = {
                //   threads are managed via the chat UI, not a section
 
   /**
-   * Nav-chrome (D / Surface 1) — the top-level TAB BAR.  These four tabs
-   * (screens · circles · contacten · mij) WERE hardcoded IDENTICALLY in
-   * both shells (web `web/v2/circleTabBar.js` + mobile
-   * `src/screens/v2/CircleTabBar.js`) — invariant #3 violated by
-   * construction (same ids + same locale keys in two files).  Declared
-   * ONCE here, the shells project the bar from `renderWeb(manifest).tabs`
-   * (via `src/v2/tabProjection.js`) so web ≡ mobile by construction.
-   *
-   *   screens · circles · contacten — app-nav roots that map to NO op
-   *     (the shell owns the surface): `target: {kind:'nav', to}`.
-   *   mij — the existing `me` op (its `surfaces.page` already backs the
-   *     "Mij" profile screen): `target: {kind:'op', opId:'me'}`.
-   *
-   * Ids + locale keys preserved EXACTLY (screens/circles/contacten/mij ·
-   * circle.tab.*), so behaviour is unchanged.
+   * Nav-chrome (D / Surface 1) — the top-level TAB BAR.  The tabs WERE hardcoded IDENTICALLY in both shells (web
+   * `web/v2/circleTabBar.js` + mobile `src/screens/v2/CircleTabBar.js`) — invariant #3 violated by construction.
+   * Declared ONCE here, the shells project the bar from `renderWeb(manifest).tabs` (via `src/v2/plusDial.js`
+   * `barSlots`, with the "+" from `plus` below) so web ≡ mobile by construction. Every tab is an app-nav root that
+   * maps to NO op (the shell owns the surface): `target: {kind:'nav', to}`. The `me` op's page is the persona panel,
+   * reached by the persona button, not a tab.
    */
   // THE RULE for every nav-chrome row (tabs · actions · meActions): `nav` is for a VIEW no op backs (a screen, a list,
   // back); an act an op performs targets the OP — never a nav row with the same meaning. That is what makes a button, a
@@ -1142,9 +1133,10 @@ export const basisManifest = {
     { id: 'contacten', labelKey: 'circle.tab.contacten', target: { kind: 'nav', to: 'contacten' } },
     // Nearby — the room this device is in (mDNS / BLE). The screen existed on both shells with no door
     // (found 2026-08-30, story 8); a tab for now, declared here so both shells get it from one line. After Contacten
-    // (Frits 2026-11-19, ledger L1051): Vandaag · Kringen · Contacten · In de buurt · Mij.
+    // (Frits 2026-11-19): Vandaag · Kringen · + · Contacten · In de buurt.
     { id: 'nearby',    labelKey: 'circle.tab.nearby',    target: { kind: 'nav', to: 'nearby' } },
-    { id: 'mij',       labelKey: 'circle.tab.mij',       target: { kind: 'op',  opId: 'me' } },
+    // NO Mij tab (Frits 2026-11-20): the `me` view is the persona panel behind the persona button, top right on every
+    // tab (`src/v2/personaPanel.js`); what Me said about now is on Vandaag (`todayBlocks` below).
   ],
 
   /**
@@ -1157,8 +1149,7 @@ export const basisManifest = {
    */
   meActions: [
     { id: 'share-contact', labelKey: 'circle.profile.share_contact', target: { kind: 'nav', to: 'shareContact' } },
-    // Scan IS the scanQr op — one door with `/scan-qr` (its openQrScanner seam: mobile the camera, web the paste prompt).
-    { id: 'scan',          labelKey: 'circle.profile.scan',          target: { kind: 'op',  opId: 'scanQr' } },
+    // NOT Scan: it is in the "+" only (`plus.dial`), the scanQr op — one door with `/scan-qr`.
     // NOT the assistant: the "+" button is the one way into the person's conversation (Frits 2026-11-16: a second door
     // from Me confused more than it helped)
   ],
@@ -1254,17 +1245,30 @@ export const basisManifest = {
   ],
 
   /**
-   * Me is ONE declared screen: below the actions above, these blocks, in order — filled by the one screen materializer
-   * (`mijScreenBlocks`) and painted by each shell's block painter. No shell lists a section of Me by hand.
-   *   identityLine — the person's name, and the readings named here (each answers one thing about now)
-   *   awaiting     — what is waiting for the person: a vote open to them, an appointment to answer, a device offer —
-   *                  each a chip that opens where it lives (computed from the tabs' own reads; nothing acts here)
-   *   agents       — this person's devices, companions and linked bots, one row each (read-only; a tap opens My data)
+   * Me — the PERSONA PANEL behind the persona button (top right on every tab): ONE declared short view. Below the
+   * actions above, these blocks, in order — filled by the one screen materializer (`mijScreenBlocks`) and painted by
+   * each shell's block painter. No shell lists a section of the panel by hand.
+   *   identityLine — the person's (or the persona's) name with "Aanpassen" (the editor), and the readings named here
+   *   agents       — this person's devices, companions and linked bots, one row each (read-only; a tap opens the
+   *                  devices settings group)
    */
   meBlocks: [
-    { type: 'identityLine', config: { readings: ['availability', 'online', 'unread', 'open', 'next'] } },
-    { type: 'awaiting',     config: {} },
+    // the name and "Aanpassen" only: the readings went (the availability to Vandaag; the counts were dropped)
+    { type: 'identityLine', config: { readings: [] } },
     { type: 'agents',       config: {} },
+  ],
+
+  /**
+   * Vandaag's top, above "Nieuw voor jou": what Me used to say about now (Frits 2026-11-20). Materialized by the same
+   * screen materializer and painted by each shell's block painter; not blocks of the stored page (a person does not
+   * place or remove them), and a block with nothing to say is not shown.
+   *   availability — the availability words (beschikbaar · stil tot … · weg tot …), a tap opens the availability screen
+   *   awaiting     — "Wacht op jou": a vote open to the person, an appointment to answer, a device offer, what was
+   *                  shared with them — each a chip that opens where it lives
+   */
+  todayBlocks: [
+    { type: 'availability', config: {} },
+    { type: 'awaiting',     config: {} },
   ],
 
   /**

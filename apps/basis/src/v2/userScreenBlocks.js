@@ -101,15 +101,23 @@ export async function materializeScreen({ screen, hostOps = {}, mutedCircleIds =
   })));
   // "Nieuw voor jou" at the top of the page the shell asks it for (Vandaag), and only when it holds rows: never an
   // empty block. Not a block of the stored page: what is new is not something a person places or removes.
+  // Vandaag's top, in this order: what the manifest declares for it (`todayBlocks`: the availability words, "Wacht op
+  // jou"), then "Nieuw voor jou". Not blocks of the stored page, and none shown empty.
+  const top = [];
+  if (hostOps.forYou === true && Array.isArray(hostOps.todayTop)) {
+    const filled = await Promise.all(hostOps.todayTop.map((block) => materializeOneBlock({ block, activeCircleIds, allCircleIds, hostOps: ops, screenIsAll: isAllCircles(screen) })));
+    top.push(...filled.filter((b) => b?.status === 'ok'));
+  }
   if (hostOps.forYou === true) {
-    let rows = forYouRows({ ...hostOps, selfIn: ops.selfIn }, { muted });
+    // only what is addressed to the person: ordinary conversation in a circle is counted in "Kringen met nieuws"
+    let rows = forYouRows({ ...hostOps, selfIn: ops.selfIn }, { muted, addressedOnly: true });
     // a setting row names who changed it: read the roster of just those circles (through the waist), label through
     // the reveal ladder, read the rows again with the names
     const named = await settingActorLabels(rows, { callSkill: hostOps.callSkill, selfIn: ops.selfIn, t: hostOps.t });
-    if (named) rows = forYouRows({ ...hostOps, selfIn: ops.selfIn, actorLabel: named }, { muted });
-    if (rows.length > 0) blocks.unshift({ blockId: 'for-you', type: 'forYou', status: 'ok', titleKey: FOR_YOU_KEYS.title, content: { items: rows } });
+    if (named) rows = forYouRows({ ...hostOps, selfIn: ops.selfIn, actorLabel: named }, { muted, addressedOnly: true });
+    if (rows.length > 0) top.push({ blockId: 'for-you', type: 'forYou', status: 'ok', titleKey: FOR_YOU_KEYS.title, content: { items: rows } });
   }
-  return blocks;
+  return [...top, ...blocks];
 }
 
 /**
@@ -144,7 +152,14 @@ async function settingActorLabels(rows, { callSkill, selfIn = null, t = null } =
 /** The person's news window in days (the register's value), else its default: the projection's own fallback. */
 const windowDaysOf = (d) => (Number.isFinite(d) && d > 0 ? d : NOTIFY_WINDOW_DAYS);
 
-export function forYouRows(hostOps = {}, { muted = new Set(), fold = true } = {}) {
+/**
+ * The row kinds that are ordinary conversation in a circle: a line, an item. "Nieuw voor jou" on Vandaag leaves them
+ * to "Kringen met nieuws" (`addressedOnly`), so nothing shows in both; what is addressed to the person (a direct
+ * message, something assigned, an ask, joined or removed, a changed setting) stays. The banner reads every kind.
+ */
+export const CIRCLE_CONVERSATION_KINDS = Object.freeze(['line', 'item']);
+
+export function forYouRows(hostOps = {}, { muted = new Set(), fold = true, addressedOnly = false } = {}) {
   const nowMs = typeof hostOps.now === 'function' ? hostOps.now() : Date.now();
   // EVERY persona's circles, ticked or not (a reply to a persona you are not in must not go unnoticed); muted stay
   // out. With more than one persona on the device each row carries the persona it is for, so the shell paints its face.
@@ -178,7 +193,7 @@ export function forYouRows(hostOps = {}, { muted = new Set(), fold = true } = {}
     fold,
     actorLabel: typeof hostOps.actorLabel === 'function' ? hostOps.actorLabel : null,
     // the person's table (`notify.policy.<kind>`): off = not a row here either
-    keepKind: (kind) => policyFor(kind, hostOps.notifyPolicyOf) !== 'off',
+    keepKind: (kind) => policyFor(kind, hostOps.notifyPolicyOf) !== 'off' && !(addressedOnly && CIRCLE_CONVERSATION_KINDS.includes(kind)),
   });
 }
 
@@ -236,6 +251,9 @@ async function materializeOneBlock({ block, activeCircleIds: pageCircleIds, host
       // Me's own blocks: the name with the readings its config names, and the person's agents and devices
       case 'awaiting':
         return await materializeAwaiting(block, hostOps);
+      // Vandaag's availability words: a tap opens the availability screen
+      case 'availability':
+        return materializeAvailability(block, hostOps);
       case 'identityLine':
         return await materializeIdentityLine(block, activeCircleIds, hostOps);
       case 'agents':
@@ -305,11 +323,8 @@ async function materializeIdentityLine(block, activeCircleIds, hostOps = {}) {
   const readings = [];
   for (const key of want) {
     if (key === 'availability') {
-      if (!hostOps.availability) continue;
-      const a = normalizeAvailability(hostOps.availability);
-      if (a.holiday.active && isPushSuppressed({ ...a, quietHours: { ...a.quietHours, enabled: false } }, new Date(now))) readings.push({ key, state: 'away', until: a.holiday.until });
-      else if (isPushSuppressed(a, new Date(now))) readings.push({ key, state: 'quiet', until: a.quietHours.to });
-      else readings.push({ key, state: 'available' });
+      const r = availabilityReading(hostOps.availability, now);
+      if (r) readings.push(r);
     } else if (key === 'online') {
       const on = typeof hostOps.online === 'function' ? hostOps.online() : hostOps.online;
       if (typeof on === 'boolean') readings.push({ key, on });
@@ -337,6 +352,23 @@ async function materializeIdentityLine(block, activeCircleIds, hostOps = {}) {
     }
   }
   return { blockId: block.id, type: 'identityLine', status: 'ok', content: { name, readings } };
+}
+
+/** The availability reading of a stored record at `now`: available · quiet until … · away (until …); null without one. */
+function availabilityReading(record, now) {
+  if (!record) return null;
+  const a = normalizeAvailability(record);
+  if (a.holiday.active && isPushSuppressed({ ...a, quietHours: { ...a.quietHours, enabled: false } }, new Date(now))) return { key: 'availability', state: 'away', until: a.holiday.until };
+  if (isPushSuppressed(a, new Date(now))) return { key: 'availability', state: 'quiet', until: a.quietHours.to };
+  return { key: 'availability', state: 'available' };
+}
+
+/** Vandaag's availability block: the words of now, and where a tap goes (the availability screen). Empty without a record. */
+function materializeAvailability(block, hostOps = {}) {
+  const now = typeof hostOps.now === 'function' ? hostOps.now() : Date.now();
+  const reading = availabilityReading(hostOps.availability, now);
+  const base = { blockId: block.id, type: 'availability', titleKey: 'circle.availability.title' };
+  return reading ? { ...base, status: 'ok', content: { reading, open: { kind: 'open-availability' } } } : { ...base, status: 'empty', content: {} };
 }
 
 /**

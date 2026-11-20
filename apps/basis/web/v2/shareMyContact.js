@@ -22,7 +22,7 @@
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { CONTACT_QR } from '../../src/v2/contactCardLink.js';
 
-export function renderShareMyContact(container, { payload = null, link = null, qr = null, linkState = null, onWithdraw = null, t, onBack } = {}) {
+export function renderShareMyContact(container, { payload = null, link = null, qr = null, linkState = null, onWithdraw = null, t, onBack, backLabel = null } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'shareMyContact.js');
   container.innerHTML = '';
@@ -31,7 +31,7 @@ export function renderShareMyContact(container, { payload = null, link = null, q
   const back = document.createElement('button');
   back.type = 'button';
   back.className = 'cc-share__back cc-btn cc-btn--quiet';
-  back.textContent = tr('circle.back_me');   // the one 'back to Me' key every screen under Me uses
+  back.textContent = backLabel ?? tr('circle.back_to', { place: tr('circle.tab.vandaag') });   // the tab it was opened on
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);
 

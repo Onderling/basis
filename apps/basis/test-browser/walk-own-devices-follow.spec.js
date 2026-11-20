@@ -24,7 +24,7 @@ const myCircles = async (page) => ((await call(page, 'pinboard', 'listMyCircles'
 const bookRow = async (page, webid) => ((await call(page, 'pinboard', 'listContacts', {}))?.contacts ?? []).find((c) => c.webid === webid) ?? null;
 const hasPair = async (page) => (await myCircles(page)).some((id) => String(id).startsWith('pair-'));
 async function nameMe(page, name) {
-  await page.locator('[data-tab="mij"]').first().click(); await page.waitForTimeout(1200);
+  await page.locator('.cc-persona-button__button').click(); await page.waitForTimeout(1200);
   await page.locator('.circle-screen__identity-edit').click(); await page.locator('.cc-profile__display').fill(name); await page.locator('.cc-profile__save').click(); await page.waitForTimeout(1500); await page.locator('.cc-screen-panel__close').click();
 }
 async function openThread(page, contactId) {
@@ -91,7 +91,7 @@ test('one person, two devices: the put-away mark, the contact lens and a delete 
     B.page.on('dialog', (d) => d.dismiss().catch(() => {}));
     await gotoCircles(B.page); await nameMe(B.page, 'Bea');
     const bId = (await call(B.page, 'pinboard', 'whoAmI'))?.webid;
-    await B.page.locator('[data-tab="mij"]').first().click(); await B.page.waitForTimeout(1200);
+    await B.page.locator('.cc-persona-button__button').click(); await B.page.waitForTimeout(1200);
     await B.page.locator('.cc-profile__share-contact').click();
     const link = await B.page.locator('.cc-share__link input').inputValue();
     await gotoCircles(B.page);

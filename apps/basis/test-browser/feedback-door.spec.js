@@ -21,8 +21,7 @@ test('Instellingen → Feedback geven opens the thread, prefilled', async ({ pag
   test.skip(!WITH_CARD, 'a build with a feedback card (VITE_SEEDED_CONTACT_CARD)');
   await page.goto('/');
   await page.waitForFunction(() => typeof window.onderlingCall === 'function', null, { timeout: 60_000 });
-  await page.locator('[data-tab="mij"]').first().click();
-  await page.locator('.cc-profile__gear').click();
+  await page.locator('.cc-persona-button__settings').click();
   acceptOffer(page);
   await page.locator('.cc-settings__door-row--feedback').click();
   await expect(composer(page)).toHaveValue(/^\[instellingen · .+\] $/, { timeout: 20_000 });
@@ -63,8 +62,7 @@ test('a build WITHOUT a card: the door stays and says so, honestly', async ({ pa
   test.skip(WITH_CARD, 'the build carries a card');
   await page.goto('/');
   await page.waitForFunction(() => typeof window.onderlingCall === 'function', null, { timeout: 60_000 });
-  await page.locator('[data-tab="mij"]').first().click();
-  await page.locator('.cc-profile__gear').click();
+  await page.locator('.cc-persona-button__settings').click();
   let said = null;
   page.once('dialog', (d) => { said = d.message(); d.dismiss().catch(() => {}); });
   await page.locator('.cc-settings__door-row--feedback').click();
@@ -90,8 +88,7 @@ test('offered, never seeded: a boot and a reload add nobody; a no adds nothing; 
   // the door asks; no → nothing added, nothing opened
   let said = null;
   page.once('dialog', (d) => { said = d.message(); d.dismiss().catch(() => {}); });
-  await page.locator('[data-tab="mij"]').first().click();
-  await page.locator('.cc-profile__gear').click();
+  await page.locator('.cc-persona-button__settings').click();
   await page.locator('.cc-settings__door-row--feedback').click();
   await expect.poll(() => said, { timeout: 20_000, message: 'the door did not ask first' }).toMatch(/Feedback/);
   expect(said, 'the offer says who receives what').toMatch(/contact card|contactkaart/);

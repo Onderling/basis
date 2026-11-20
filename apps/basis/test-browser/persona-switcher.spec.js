@@ -1,6 +1,6 @@
 /**
- * THE HEADER SWITCHER, ON A REAL SCREEN (2026-10-15). With a second persona on the device, the avatar opens the
- * switcher: untick yourself and Kringen shows only the persona's circles, the avatar is the persona's, the "+" writes
+ * THE SWITCHER, ON A REAL SCREEN (2026-10-15). With a second persona on the device, the persona panel (behind the
+ * persona button) has a tab per persona and the "Laat zien als" door to the switcher: untick yourself and Kringen shows only the persona's circles, the avatar is the persona's, the "+" writes
  * as it; "Alle" brings everything back. The set is a page change (an op on the screens book).
  *
  *   PEER_TEST_PORT=5273 npx playwright test --project=no-relay test-browser/persona-switcher.spec.js
@@ -27,7 +27,10 @@ test('the switcher narrows what the app shows to the ticked selves, and "Alle" b
   await expect(tiles.first(), 'the default self has its circle').toBeVisible({ timeout: 20_000 });
   const before = await tiles.count();
 
-  await page.locator('.cc-header-avatar__button').click();
+  await page.locator('.cc-persona-button__button').click();
+  await expect(page.locator('.cc-persona-panel__tab'), 'a tab per persona, the general self first').toHaveCount(2);
+  await expect(page.locator('.cc-persona-panel__tab').first()).toHaveAttribute('data-self', 'default');
+  await page.locator('.cc-persona-panel__show-as').click();
   await expect(page.locator('.cc-persona-switcher__row'), 'one row per self').toHaveCount(2);
   await page.locator('.cc-persona-switcher__row[data-self="default"] .cc-persona-switcher__tick').click();
   await expect(page.locator('.cc-persona-switcher__row[data-self="default"] .cc-persona-switcher__tick')).toHaveAttribute('aria-pressed', 'false');
@@ -36,12 +39,14 @@ test('the switcher narrows what the app shows to the ticked selves, and "Alle" b
   await page.locator('.cc-persona-switcher__close').click();
 
   await expect(tiles, 'Kringen shows only the persona\'s circles (it has none yet)').toHaveCount(0, { timeout: 15_000 });
-  await expect(page.locator('.cc-header-avatar__initials'), 'the avatar is the persona\'s').toHaveText('W');
-  await page.locator('[data-tab="mij"]').first().click();
-  await expect(page.locator('[data-block-type="identityLine"] .cc-profile__title'), 'Mij is the persona\'s').toHaveText('Werk', { timeout: 20_000 });
-  await page.locator('[data-tab="circles"]').first().click();
+  await expect(page.locator('.cc-persona-button__initials'), 'the avatar is the persona\'s').toHaveText('W');
+  await page.locator('.cc-persona-button__button').click();
+  await expect(page.locator('[data-block-type="identityLine"] .cc-profile__title'), 'the panel opens on the persona shown').toHaveText('Werk', { timeout: 20_000 });
+  // its tab for the general self shows the person's own
+  await page.locator('.cc-persona-panel__tab[data-self="default"]').click();
+  await expect(page.locator('.cc-persona-panel__tab[data-self="default"]')).toHaveAttribute('aria-selected', 'true', { timeout: 15_000 });
 
-  await page.locator('.cc-header-avatar__button').click();
+  await page.locator('.cc-persona-panel__show-as').click();
   await page.locator('.cc-persona-switcher__all').click();
   await page.locator('.cc-persona-switcher__close').click();
   await expect(tiles).toHaveCount(before, { timeout: 15_000 });

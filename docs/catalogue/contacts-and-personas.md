@@ -20,7 +20,7 @@ catalogue's baseline and moves here as it is written up.
   Switched off after a member already wrote: answered, they are a contact and let on; never answered, their next
   message is a request without a card, shown by their name in the circle, and accepting it moves the messages into the
   thread without a book row (the row comes when the person answers).
-  Both choices are on each persona's card in Mij (web and phone), each saying what it does.
+  Both choices are on each persona's card in the persona's editor (the persona button → Aanpassen, web and phone), each saying what it does.
 - Ignore a request: it stays, marked, later messages still land on it, and it can still be accepted. The sender sees
   nothing different.
 - Never lose a message at the door: a message the request cannot hold as it came (no card, a card naming someone else,

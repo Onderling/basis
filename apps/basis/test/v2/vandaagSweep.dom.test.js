@@ -3,14 +3,14 @@
  * Vandaag and its customise sheet, as the interface sweep left them (mobile twin: apps/basis-mobile/test/vandaagParity.test.js):
  * the time ranges speak one label set, every control has a heading, the sheet's Done sits at the top, "Remove" is not
  * alarm-red, the onboarding card has one button ("Lees meer") and a text link ("Begrepen") and no "meer" under it, an
- * empty block is a line of text, and the header avatar is named "Profiel".
+ * empty block is a line of text, and the persona button is named "Persona".
  */
 import { describe, it, expect } from 'vitest';
 import { HORIZON_PRESETS, WITHIN_PRESETS, CONTROL_TITLES, customiseModel } from '../../src/v2/vandaag.js';
 import { blockOpensWhole } from '../../src/v2/blockTitle.js';
 import { renderVandaagCustomise } from '../../web/v2/vandaagCustomise.js';
 import { renderCircleScreen } from '../../web/v2/circleScreen.js';
-import { renderHeaderAvatar } from '../../web/v2/headerAvatar.js';
+import { renderPersonaButton } from '../../web/v2/personaButton.js';
 import en from '../../src/locales/circle.en.json' with { type: 'json' };
 import nl from '../../src/locales/circle.nl.json' with { type: 'json' };
 
@@ -68,9 +68,9 @@ describe('Vandaag', () => {
     expect(blockOpensWhole(onboarding)).toBe(false);
     expect(blockOpensWhole({ type: 'tasks', status: 'ok' })).toBe(true);
   });
-  it('the header avatar is named "Profiel", not "Aanpassen"', () => {
+  it('the persona button is named "Persona", not "Aanpassen"', () => {
     const host = document.createElement('div');
-    renderHeaderAvatar(host, { avatar: { initials: '?' }, t: (k) => nl.profile[k.replace('circle.profile.', '')]?.text ?? k, onOpen: () => {} });
-    expect(host.querySelector('button')?.getAttribute('aria-label')).toBe('Profiel');
+    renderPersonaButton(host, { avatar: { initials: '?' }, t: (k) => nl.persona_button[k.replace('circle.persona_button.', '')]?.text ?? k, onOpen: () => {} });
+    expect(host.querySelector('button')?.getAttribute('aria-label')).toBe('Persona');
   });
 });

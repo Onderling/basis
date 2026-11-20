@@ -18,7 +18,7 @@ test('a choice and a switch change the register\'s value through the projected c
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
   const on = await page.evaluate(async () => window.onderlingCall('params', 'set-param', { key: 'app.developer', value: true }));
   expect(on?.ok, JSON.stringify(on)).toBe(true);
-  await page.locator('[data-tab="mij"]').first().click();
+  await page.locator('.cc-persona-button__button').click();
   await page.locator('.cc-profile__advanced').click();
   await expect(page.locator('.cc-settings__group[data-scope="device"]')).toBeVisible({ timeout: 20_000 });
   // labels, not raw keys, name the rows; the key stays small beside them

@@ -14,7 +14,7 @@ test('a goal is added and taken off, an interest added — each read back from t
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('/');
   await page.waitForFunction(() => typeof window.onderlingCall === 'function', null, { timeout: 60_000 });
-  await page.locator('[data-tab="mij"]').first().click();
+  await page.locator('.cc-persona-button__button').click();
   await page.locator('.circle-screen__identity-edit').click();
   await expect(page.locator('.cc-mij__row--drivers')).toHaveCount(3, { timeout: 20_000 });
 

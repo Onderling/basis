@@ -32,7 +32,7 @@ unfolded), poked by each shell on a log append and a stored direct message; the 
 
 - **One news projection**: `apps/basis/src/v2/circleTilePreviews.js` (`buildTilePreviews`): human-lane lines plus
   item landings, from others, newer than this device's seen-mark by when they ARRIVED here (`landedAt`), and in no
-  read set. The tiles, Today's news (`userScreenBlocks.js`) and Mij read it. The contact badges:
+  read set. The tiles and Today's news (`userScreenBlocks.js`) read it. Today's "Nieuw voor jou" holds only what is addressed to the person (a direct message, something assigned, an ask, joined or removed, a changed setting); ordinary circle conversation is counted in "Kringen met nieuws" (`CIRCLE_CONVERSATION_KINDS`), so nothing shows in both. The banner reads every kind. The contact badges:
   `apps/basis/src/v2/contactUnread.js` (inbound turns by `receivedAt`).
 - **Arrival times**: the device log stamps `landedAt` at the first append of an id (`apps/basis/src/eventLog.js`,
   `landedTimeOf`); an inbound direct message is stored with `receivedAt` (`packages/item-store/src/addressedDeliver.js`).

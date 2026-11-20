@@ -48,26 +48,26 @@ describe('the "+" is declared once, in the manifest', () => {
 
 describe('the bar: the tabs and the "+" in one row, from the declaration', () => {
   it('the "+" docks in the middle: two tabs on its left', () => {
-    expect(slotIds(barSlots(basisManifest, { hasMesh: false }))).toEqual(['screens', 'circles', '+', 'contacten', 'mij']);
-    expect(slotIds(barSlots(basisManifest, { hasMesh: true }))).toEqual(['screens', 'circles', 'contacten', '+', 'nearby', 'mij']);
+    expect(slotIds(barSlots(basisManifest, { hasMesh: false }))).toEqual(['screens', 'circles', '+', 'contacten']);
+    expect(slotIds(barSlots(basisManifest, { hasMesh: true }))).toEqual(['screens', 'circles', '+', 'contacten', 'nearby']);
   });
 
   it('moving the "+" is a data change: "bar-end" puts it last', () => {
     const m = { ...basisManifest, plus: { ...basisManifest.plus, place: 'bar-end' } };
-    expect(slotIds(barSlots(m, { hasMesh: false }))).toEqual(['screens', 'circles', 'contacten', 'mij', '+']);
+    expect(slotIds(barSlots(m, { hasMesh: false }))).toEqual(['screens', 'circles', 'contacten', '+']);
   });
 
   it('a screen without the "+" (a 1:1 thread) asks for the bar without it', () => {
-    expect(slotIds(barSlots(basisManifest, { hasMesh: false, plus: false }))).toEqual(['screens', 'circles', 'contacten', 'mij']);
+    expect(slotIds(barSlots(basisManifest, { hasMesh: false, plus: false }))).toEqual(['screens', 'circles', 'contacten']);
   });
 
   it('a manifest that declares no "+" gets a bar without one', () => {
     const { plus, ...noPlus } = basisManifest;
-    expect(slotIds(barSlots(noPlus, { hasMesh: false }))).toEqual(['screens', 'circles', 'contacten', 'mij']);
+    expect(slotIds(barSlots(noPlus, { hasMesh: false }))).toEqual(['screens', 'circles', 'contacten']);
   });
 
   it('a middle of three keeps two on the left: Vandaag · Kringen · + · Contacten', () => {
-    const m = { ...basisManifest, tabs: basisManifest.tabs.filter((x) => x.id !== 'mij') };
+    const m = basisManifest;   // the web's three tabs
     expect(slotIds(barSlots(m, { hasMesh: false }))).toEqual(['screens', 'circles', '+', 'contacten']);
   });
 });

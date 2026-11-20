@@ -54,7 +54,7 @@ async function closePanel(page) {
 /** Open Mij's persona panel (the picture input and the per-circle table live there). */
 async function openPersonaPanel(page) {
   await closePanel(page);
-  await page.locator('[data-tab="mij"]').first().click(); await page.waitForTimeout(1500);
+  await page.locator('.cc-persona-button__button').click(); await page.waitForTimeout(1500);
   await page.locator('.circle-screen__identity-edit').first().click(); await page.waitForTimeout(2000);
 }
 /** Press this circle's share / stop-sharing button in Mij's table. Names the branch it took. */

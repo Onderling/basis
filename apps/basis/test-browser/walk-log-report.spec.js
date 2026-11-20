@@ -17,8 +17,7 @@ test('Mijn gegevens shows the log as text, Copy copies exactly it, Back returns'
     A = await bootPeer(browser, 'A');
     await A.page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await gotoCircles(A.page);
-    await A.page.locator('[data-tab="mij"]').first().click();
-    await A.page.locator('.cc-profile__gear').click();
+    await A.page.locator('.cc-persona-button__settings').click();
     await A.page.locator('.cc-settings__group--my-data').click();
     const door = A.page.locator('.cc-settings__door--log-report').first();
     await expect(door, 'Mijn gegevens offers the copy-log door').toBeVisible({ timeout: 30_000 });

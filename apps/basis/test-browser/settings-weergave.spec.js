@@ -14,11 +14,10 @@ test('the gear opens Instellingen; Weergave holds the appearance settings, Per k
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('/');
-  await expect(page.locator('[data-tab="mij"]').first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.cc-persona-button__button')).toBeVisible({ timeout: 30_000 });
   await page.waitForFunction(() => typeof window.onderlingCall === 'function', null, { timeout: 60_000 });
 
-  await page.locator('[data-tab="mij"]').first().click();
-  await page.locator('.cc-profile__gear').click();
+  await page.locator('.cc-persona-button__settings').click();
   const rows = page.locator('.cc-settings__row');
   await expect(rows.first(), 'the home lists the groups').toBeVisible({ timeout: 15_000 });
   await expect(page.locator('.cc-settings__per-circle'), 'Per kring is the last row').toBeVisible();
@@ -42,11 +41,10 @@ test('the gear opens Instellingen; Weergave holds the appearance settings, Per k
   await page.locator('.cc-settings__per-circle').click();
   await expect(page.locator('.cc-settings__circle, .cc-settings__fact').first()).toBeVisible({ timeout: 15_000 });
 
-  // back, back: the home, then Mij — which has no door to an old My data page
+  // back, back: the home, then the tab the settings button was tapped on
   await page.locator('.cc-mydata__back').first().click();
   await expect(page.locator('.cc-settings__per-circle')).toBeVisible({ timeout: 15_000 });
   await page.locator('.cc-mydata__back').first().click();
-  await expect(page.locator('.cc-profile__gear')).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator('.cc-profile__mydata'), 'Mij has no My data door: the gear is the one way in').toHaveCount(0);
+  await expect(page.locator('.circle-tabbar__tab.is-active'), 'back on the tab it was opened from').toBeVisible({ timeout: 15_000 });
   expect(errs).toEqual([]);
 });

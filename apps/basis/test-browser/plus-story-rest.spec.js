@@ -44,7 +44,7 @@ const asked = (page) => page.evaluate(() => window.__onderlingTestModel.requests
 const historyOf = (req) => JSON.stringify((req?.messages ?? []).slice(0, -1));
 /** tick exactly one self in the header switcher */
 const only = async (page, selfId) => {
-  await page.locator('.cc-header-avatar__button').click();
+  await page.locator('.cc-persona-button__button').click();
   const tick = (id) => page.locator(`.cc-persona-switcher__row[data-self="${id}"] .cc-persona-switcher__tick`);
   if ((await tick(selfId).getAttribute('aria-pressed')) !== 'true') await tick(selfId).click();
   for (const row of await page.locator('.cc-persona-switcher__row').all()) {

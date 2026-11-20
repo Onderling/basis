@@ -16,12 +16,11 @@ test('Settings → Help opens the Help circle; Me has no second door to the "+"'
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
 
   // Me has no Assistant door: the "+" button is the one way into the conversation (Frits 2026-11-16)
-  await page.locator('[data-tab="mij"]').first().click();
+  await page.locator('.cc-persona-button__button').click();
   await expect(page.locator('.cc-profile__assistant')).toHaveCount(0);
 
   // Settings → Help: the Help circle opens (its conversation, where the bot answers)
-  await page.locator('[data-tab="mij"]').first().click();
-  await page.locator('.cc-profile__gear').click();
+  await page.locator('.cc-persona-button__settings').click();
   await page.locator('.cc-settings__door-row--help').click();
   await expect(page.locator('.circle-view__composer-input'), 'a circle conversation opened').toBeVisible({ timeout: 20_000 });
   await expect(page.locator('body')).toContainText(/Help|Hulp/);

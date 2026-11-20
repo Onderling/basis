@@ -140,7 +140,7 @@ export function renderCircleMyData(container, {
     const back = document.createElement('button');
     back.type = 'button';
     back.className = 'cc-mydata__back';
-    back.textContent = tr('circle.mydata.back');
+    back.textContent = tr('circle.settings_home.back');   // a group's back is the settings home
     back.addEventListener('click', () => onBack());
     header.appendChild(back);
   }

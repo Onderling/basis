@@ -59,7 +59,7 @@ test.describe('a newcomer who arrives by a link is not stopped by the doors', ()
     await page.goto('/');
     await door(page, 'continue').click({ timeout: 20_000 });
     await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
-    await page.locator('[data-tab="mij"]').first().click();
+    await page.locator('.cc-persona-button__button').click();
     await page.locator('.cc-profile__share-contact').click();
     const link = await page.locator('.cc-share__link input').inputValue();
     expect(link).toMatch(/#contact=/);

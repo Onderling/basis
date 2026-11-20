@@ -1,6 +1,6 @@
 /**
  * SHARE MY CONTACT, ON REAL SCREENS (2026-09-19, Frits: "it is supposed to simply link to the website, including
- * the contact"). A opens Mij → "Mijn contact delen", reads the LINK the panel offers; B — a fresh app — opens that
+ * the contact"). A opens the persona panel → "Deel mijn kaart", reads the LINK the panel offers; B — a fresh app — opens that
  * link and finds A in Contacten, named; B writes to A; A's Contacten shows B's message, painted. No circle anywhere:
  * this is how two people who met outside the app reach each other.
  *
@@ -13,7 +13,7 @@ import { bootPeer, teardown, gotoCircles, log, sendDirectMessage, waitForContact
 const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
 
-test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees it', async ({ browser }) => {
+test('A shares a link from the persona panel; B opens it, has A as a contact, writes; A sees it', async ({ browser }) => {
   test.setTimeout(240_000);
   let A = null; let B = null;
   try {
@@ -26,8 +26,9 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     await A.page.locator('.cc-profile__save').click();
     await A.page.waitForTimeout(1500);
     await A.page.locator('.cc-screen-panel__close').click();
-    // ── Mij → share my contact: the panel with the QR, the code, the link ──────────────────────────
-    await A.page.locator('.cc-profile__share-contact').click();
+    // ── the persona panel → share my contact (Mij left the tab bar): the panel with the QR, the code, the link ─────
+    await A.page.locator('.cc-persona-button__button').click();
+    await A.page.locator('.cc-persona-panel .cc-profile__share-contact').click();
     await expect(A.page.locator('.cc-share__title')).toBeVisible();
     expect(await A.page.locator('canvas.cc-share__qr').count(), 'the QR is painted').toBe(1);
     expect(await A.page.locator('canvas.cc-share__qr').getAttribute('data-encodes'), 'the QR is the LINK — a phone camera opens it').toBe('link');
@@ -37,7 +38,7 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     expect(link, 'the link is THIS app\'s url with the contact and the link\'s one-time token in the fragment').toMatch(/^http:\/\/localhost:\d+\/#contact=[A-Za-z0-9_-]+&t=[A-Za-z0-9_-]{22}$/);
     expect(await A.page.locator('.cc-share__state').textContent(), 'the panel says the link is not used yet').toMatch(/Nog niet gebruikt|Not used yet/);
     const aId = (await A.page.evaluate(async () => window.onderlingCall('pinboard', 'whoAmI', {})))?.webid;
-    await A.page.locator('.cc-share__back').click();   // back to Mij — the panel is a sub-screen without the tab bar
+    await A.page.locator('.cc-share__back').click();   // back to the tab the panel was opened over (a sub-screen without the tab bar)
     await A.page.waitForTimeout(800);
     log('STEP1 A shares', 'PASS', `link ${link.slice(0, 40)}…`);
 
@@ -69,7 +70,7 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     log('STEP2 B opens the link', 'PASS', 'Anna is a contact on B');
 
     // ── B writes to Anna; A's screen shows it ─────────────────────────────────────────────────────
-    // B names itself first, as a tester does under Mij: the first message carries B's card, so A's row for B reads "Bea".
+    // B names itself first, as a tester does in the persona panel: the first message carries B's card, so A's row for B reads "Bea".
     await B.page.locator('.cc-persona-button__button').click(); await B.page.waitForTimeout(1200);
     await B.page.locator('.circle-screen__identity-edit').click(); await B.page.locator('.cc-profile__display').fill('Bea'); await B.page.locator('.cc-profile__save').click(); await B.page.waitForTimeout(1500); await B.page.locator('.cc-screen-panel__close').click();
     await gotoCircles(B.page);
@@ -200,18 +201,18 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     expect(bRoster.founderAddress, 'B holds A\'s proven per-circle address there').toBeTruthy();
     log('STEP5 the circle was learned', 'PASS', `pair ${String(bRoster.pair).slice(0, 14)}…, founder at ${String(bRoster.founderAddress).slice(0, 12)}…`);
 
-    // ── B renames under Mij; A's Contacten row for B renames — THE BOOK READS THE ROSTER (2026-09-21). ────
+    // ── B renames in the persona panel; A's Contacten row for B renames — THE BOOK READS THE ROSTER (2026-09-21). ────
     // The name travels as B's `member-props` statement on the pair circle's membership lane, folded on A; the row's
     // name is what the roster says, the card (which named the row "Bea" at STEP3) the fallback. No message is sent.
     const bId = (await B.page.evaluate(async () => window.onderlingCall('pinboard', 'whoAmI', {})))?.webid;
-    await gotoCircles(B.page);   // B sits in the thread after STEP4: back to the launcher, where Mij is
+    await gotoCircles(B.page);   // B sits in the thread after STEP4: back to the launcher (the persona button is on every tab)
     await B.page.locator('.cc-persona-button__button').click(); await B.page.waitForTimeout(1200);
     await B.page.locator('.circle-screen__identity-edit').click(); await B.page.locator('.cc-profile__display').fill('Beatrix'); await B.page.locator('.cc-profile__save').click(); await B.page.waitForTimeout(1500); await B.page.locator('.cc-screen-panel__close').click();
     await gotoCircles(A.page);
     await A.page.locator('[data-tab="contacten"]').first().click(); await A.page.waitForTimeout(1000);
     const aRowName = async () => {
       // the roster folds on arrival; the painted row is re-read on each poll (Contacten re-opened)
-      await A.page.locator('.cc-persona-button__button').click(); await A.page.waitForTimeout(300);
+      await A.page.locator('[data-tab="circles"]').first().click(); await A.page.waitForTimeout(300);
       await A.page.locator('[data-tab="contacten"]').first().click(); await A.page.waitForTimeout(700);
       return A.page.locator(`.cc-contacts__row[data-contact-id="${bId}"] .cc-contacts__name`).first().textContent().catch(() => null);
     };
@@ -226,7 +227,7 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
       }, bId).catch((e) => String(e));
       throw new Error(`A's row for B did not take the roster's name — painted "${await aRowName()}"; A's pair rosters: ${JSON.stringify(aRoster)}`);
     }
-    log('STEP6 the book reads the roster', 'PASS', 'B renamed under Mij; A\'s row reads "Beatrix" without a message');
+    log('STEP6 the book reads the roster', 'PASS', 'B renamed in the persona panel; A\'s row reads "Beatrix" without a message');
   } finally {
     await teardown([A, B].filter(Boolean));
   }

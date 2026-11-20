@@ -25,25 +25,22 @@ describe('circle availability screen (M3)', () => {
       .withTimeout(60_000);
   });
 
-  // Availability is a door under the gear (Instellingen → Verbinding, 2026-10-24): the settings button → Verbinding →
-  // "Availability"; its Save and its back return to Verbinding.
+  // Availability opens from Vandaag's availability block (it left Instellingen → Verbinding, 2026-11-20); its Save and
+  // its back return to Vandaag.
   async function openAvailability() {
-    await waitFor(element(by.id('settings-button'))).toBeVisible().withTimeout(10_000);
-    await element(by.id('settings-button')).tap();
-    await waitFor(element(by.id('settings-group-connection'))).toBeVisible().withTimeout(10_000);
-    await element(by.id('settings-group-connection')).tap();
-    await waitFor(element(by.id('settings-door-availability'))).toBeVisible()
-      .whileElement(by.id('circle-settings-group')).scroll(400, 'down');
-    await element(by.id('settings-door-availability')).tap();
+    await waitFor(element(by.id('circle-tab-screens'))).toBeVisible().withTimeout(10_000);
+    await element(by.id('circle-tab-screens')).tap();
+    await waitFor(element(by.id('vandaag-availability'))).toBeVisible().withTimeout(15_000);
+    await element(by.id('vandaag-availability')).tap();
     // The loading state carries the same `circle-availability` id — wait for the loaded form (its holiday switch).
     await waitFor(element(by.id('holiday-active'))).toBeVisible().withTimeout(15_000);
   }
 
-  it('opens Availability from Verbinding, toggles holiday, Saves back to Verbinding', async () => {
+  it('opens Availability from Vandaag, toggles holiday, Saves back to Vandaag', async () => {
     await openAvailability();
     await element(by.id('holiday-active')).tap();
     await element(by.id('circle-availability-save')).tap();
-    await waitFor(element(by.id('circle-settings-group'))).toBeVisible().withTimeout(10_000);
+    await waitFor(element(by.id('vandaag-availability'))).toBeVisible().withTimeout(10_000);
   });
 
   it('the Circles tab returns from Availability to the launcher', async () => {

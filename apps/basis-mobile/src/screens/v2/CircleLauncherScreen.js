@@ -1497,7 +1497,6 @@ export default function CircleLauncherScreen({
   const screenOverlay = (<>{switcherModal}{personaPanelSheet}{personaEditor}{bannerView}</>);
   // THE SETTINGS BUTTON (web twin: showSettingsHome({ from })): the settings home from any tab; its back returns there
   const settingsFromRef = useRef(null);
-  const availabilityFromRef = useRef(null);
   const openSettings = () => { settingsFromRef.current = lastTabRef.current; setView('settingsHome'); };
   useEffect(() => {
     if (view !== 'screens') {
@@ -1928,12 +1927,12 @@ export default function CircleLauncherScreen({
       // Rules consent preview → back to rules editor.
       if (selected && view === 'rulesconsent') { setView('rules'); return true; }
       if (view === 'blocked') { setView('contacten'); return true; }
-      if (view === 'logReport') { setSettingsGroupId('my-data'); setView('settingsGroup'); return true; }
+      if (view === 'logReport') { setView('settingsHome'); return true; }   // its door sits on the settings home, beside feedback
       if (view === 'shareContact') { onTab(lastTabRef.current); return true; }
-      // shared-with-me opens from Mij's chip; availability from the Verbinding settings (blocked from Contacten, above)
+      // shared-with-me opens from Vandaag's chip; availability from Vandaag's block (blocked from Contacten, above)
       if (view === 'sharedWithMe') { onTab(lastTabRef.current); return true; }
-      if (view === 'availability' && availabilityFromRef.current === 'screens') { availabilityFromRef.current = null; onTab('screens'); return true; }
-      if (view === 'availability' || view === 'points') { setSettingsGroupId('connection'); setView('settingsGroup'); return true; }
+      if (view === 'availability') { onTab('screens'); return true; }
+      if (view === 'points') { setSettingsGroupId('connection'); setView('settingsGroup'); return true; }
       // the person's settings behind the gear: a group → the home → Mij; the circle chooser → the home
       if (view === 'settingsGroup' || view === 'settingsCircles') { setView('settingsHome'); return true; }
       if (view === 'settingsHome') { onTab(settingsBackFor(settingsFromRef.current, basisManifest).tab); return true; }
@@ -2503,7 +2502,7 @@ export default function CircleLauncherScreen({
                 else if (a?.kind === 'open-proposals') { const c = circles.find((x) => x.id === a.circleId); if (c) openProposals(c); }
                 else if (settingsGroupForAction(a)) { setSettingsGroupId(settingsGroupForAction(a)); setView('settingsGroup'); }
                 else if (a?.kind === 'open-shared-with-me') setView('sharedWithMe');
-                else if (a?.kind === 'open-availability') { availabilityFromRef.current = 'screens'; setView('availability'); }
+                else if (a?.kind === 'open-availability') setView('availability');
                 // "Nieuw voor jou": opening a row is reading it (on every device), and it goes to the thing itself
                 else if (a?.kind === 'for-you-open' && a.row) {
                   readMarks.markRows([a.row]).catch(() => {});
@@ -2562,7 +2561,7 @@ export default function CircleLauncherScreen({
   if (view === 'logReport') {
     return (
       <WithTabBar avatar={personaButton} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
-        <LogReportScreen onBack={() => { setSettingsGroupId('my-data'); setView('settingsGroup'); }} />
+        <LogReportScreen onBack={() => setView('settingsHome')} />
       </WithTabBar>
     );
   }
@@ -2606,7 +2605,7 @@ export default function CircleLauncherScreen({
   // `groupTitle` and its own back (the gear's home), and paints just its declared sections.
   const myDataScreen = (extra = {}) => (
     <CircleMyDataScreen selvesOn={selvesOn} showBotActions={botActionsShown} frequent={usageRows(actionFrequency.snapshot(), { names: { ...Object.fromEntries((circles ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t, labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; } })} onClearFrequent={() => { actionFrequency.clear(); setFrequencyTick((n) => n + 1); }} callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('settingsHome')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
-          doors={{ availability: () => setView('availability'), points: () => setView('points'), sharedWithMe: () => setView('sharedWithMe'), blocked: () => setView('blocked'), logReport: () => setView('logReport') }}
+          doors={{ points: () => setView('points') }}
           personClock={personClockRef.current} selfSet={{ held: heldSelves, on: selvesOn }} {...extra} />
   );
   // The person's settings behind the settings button (web parity: showSettingsHome / showSettingsCircleChooser).
@@ -2623,6 +2622,8 @@ export default function CircleLauncherScreen({
             if (d?.target?.kind === 'nav' && d.target.to === 'help') { openHelpDoor(); return; }
             // the introduction's seven cards again (the manifest's settings door), over Today where the deck is drawn
             if (d?.target?.kind === 'nav' && d.target.to === 'intro') { setView('screens'); setIntroOpen(true); return; }
+            // "Meld een probleem" beside Feedback geven: this device's log to copy (web parity)
+            if (d?.target?.kind === 'nav' && d.target.to === 'logReport') { setView('logReport'); return; }
             if (d?.target?.kind !== 'op') return;
             // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed (web parity)
             Promise.resolve(bundle?.callSkill?.('basis', d.target.opId, { screen: 'settingsHome' }))
@@ -2652,11 +2653,10 @@ export default function CircleLauncherScreen({
       <WithTabBar avatar={personaButton} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active={lastTabRef.current} onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <CircleAvailabilityScreen
           store={availabilityStore}
-          // from Vandaag's availability words back to Vandaag (its head reads them again); from the settings, Verbinding
+          // opened from Vandaag's availability words (it left the Verbinding settings): back to Vandaag, whose head reads them again
           onBack={() => {
             vandaagHead.current?.invalidate();
-            if (availabilityFromRef.current === 'screens') { availabilityFromRef.current = null; onTab('screens'); return; }
-            setSettingsGroupId('connection'); setView('settingsGroup');
+            onTab('screens');
           }}
         />
       </WithTabBar>

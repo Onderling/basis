@@ -119,7 +119,7 @@ export function foldPolicyUpdates(bodies, { admins } = {}) {
  * @param {(circleId: string, statement: object) => void|Promise<*>} [a.fan]  best-effort fan
  * @returns {(u: {groupId: string, policy: object, version: number}) => Promise<object|null>}
  */
-export function makePolicyUpdateEmitter({ rail, fan = null, membershipUpToFor = null } = {}) {
+export function makePolicyUpdateEmitter({ rail, fan = null, membershipUpToFor = null, contentUpToFor = null } = {}) {
   if (!rail || typeof rail.append !== 'function') {
     throw new Error('makePolicyUpdateEmitter: a governance-lane rail is required');
   }
@@ -135,7 +135,15 @@ export function makePolicyUpdateEmitter({ rail, fan = null, membershipUpToFor = 
       // the settings version it carries; whatever I sign after is judged by this one or later (the receivers' line)
       let upTo = null;
       try { upTo = typeof membershipUpToFor === 'function' ? (membershipUpToFor(groupId) ?? null) : null; } catch { upTo = null; }
-      res = await rail.append(groupId, { kind: POLICY_UPDATE_KIND, subject: `policy-v${v}`, payload: { policy, version: v, ...(typeof proposalId === 'string' && proposalId ? { proposalId } : {}), ...(typeof upTo === 'string' && upTo ? { membershipUpTo: upTo } : {}) } });
+      // `contentUpTo`: the content lanes' tips as THIS device holds them — what they cover was made before this change and
+      // keeps the settings before it (contentLine.js). Unreadable: an empty line, so nothing is put behind it.
+      let contentUpTo = { items: [], chat: [] };
+      try {
+        const c = typeof contentUpToFor === 'function' ? contentUpToFor(groupId) : null;
+        const tips = (xs) => (Array.isArray(xs) ? xs.filter((h) => typeof h === 'string' && h) : []);
+        if (c) contentUpTo = { items: tips(c.items), chat: tips(c.chat) };
+      } catch { contentUpTo = { items: [], chat: [] }; }
+      res = await rail.append(groupId, { kind: POLICY_UPDATE_KIND, subject: `policy-v${v}`, payload: { policy, version: v, contentUpTo, ...(typeof proposalId === 'string' && proposalId ? { proposalId } : {}), ...(typeof upTo === 'string' && upTo ? { membershipUpTo: upTo } : {}) } });
     } catch { res = null; }
     if (!res) return null;
     if (typeof fan === 'function') {

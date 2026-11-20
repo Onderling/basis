@@ -135,7 +135,7 @@ import { makePolicyUpdateEmitter, denyWinsMerge, POLICY_UPDATE_KIND } from '../.
 import { normalizeCirclePolicy, decisionClassFor } from '../../v2/circlePolicy.js';
 import { chainOfBodies, judgePolicyChain, membershipGateFor, proposalsOn } from '../../v2/governanceReceiverGate.js';   // the governed gate's host half
 import { processRefusalLog } from '../../v2/refusalLog.js';   // every refusal says why
-import { onEarlierCircleLink } from '@onderling/core';
+import { onEarlierCircleLink, frontier } from '@onderling/core';
 // a link proof made before the member was named in it says so in the device log (no circle id, no address)
 onEarlierCircleLink(() => processRefusalLog().note({ tag: 'identity', lane: 'circle-link', check: 'link-proof', reason: 'earlier-link-proof' }));
 import { makeKeyRail, makeKeyEmitter, KEY_CATCHUP_SUBTYPES } from '../../v2/keyRail.js';   // the group-key lane — sealed key events as signed spine statements
@@ -6753,6 +6753,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       .finally(() => siblingCarry.carry({ subtype: 'circle-governance-broadcast', circleId, event: statement, msgId: `policy:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
     // where my membership chain in the circle stood (the line the receivers judge my earlier removals and role changes by)
     membershipUpToFor: (circleId) => authorChainTip(circleId, circleAddressFor(circleId)),
+    // where the content lanes stood on this device (the line the receivers judge content by: contentLine.js)
+    contentUpToFor: (circleId) => ({
+      items: frontier((itemsRail?.storedStatements?.(circleId) ?? []).map((s) => s.body)),
+      chat: frontier((chatRail?.storedStatements?.(circleId) ?? []).map((s) => s.body)),
+    }),
   });
   /**
    * THE circle-scoped send — every piece of circle traffic leaves through it: the chat/noticeboard fan

@@ -5,7 +5,7 @@
   },
   "apps/basis-mobile/src/core/circleStoresRN.js": {
     "count": 3,
-    "note": "debt: the shared IO helpers still write cc.circlePinned raw (group (c), waiting); sealed by its caller for cc.circlePolicy., cc.circleRecipe., cc.circleRules. (sealedKeyValue)"
+    "note": "sealed by its caller: the IO helpers are handed sealedKeyValue for cc.circlePolicy., cc.circleRecipe., cc.circleRules.; asyncFixedIo has no production caller left (the pins go through the shared sealed localStoragePinIo)"
   },
   "apps/basis-mobile/src/core/firstRun.js": {
     "count": 1,
@@ -32,8 +32,8 @@
     "note": "not content: cc.advisorShown.* — when the advisor card was dismissed"
   },
   "apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js": {
-    "count": 4,
-    "note": "debt: cc.circleSeenAt (2 writes) — circle ids, waiting for the ruling on group (c); not content: cc.lastTab, cc.circleViewMode"
+    "count": 2,
+    "note": "not content: cc.lastTab, cc.circleViewMode — view state (the seen-marks are sealed through the shared circleSeenMarks.js)"
   },
   "apps/basis/src/household/persist.js": {
     "count": 1,
@@ -42,10 +42,6 @@
   "apps/basis/src/v2/addressFallback.js": {
     "count": 1,
     "note": "sealed by its caller: cc.fallbackOffer — both shells hand fallbackOfferStateIo sealedKeyValue"
-  },
-  "apps/basis/src/v2/circlePinStore.js": {
-    "count": 1,
-    "note": "debt: cc.circlePinned — the circle ids the person pinned (membership metadata)"
   },
   "apps/basis/src/v2/circlePolicyStore.js": {
     "count": 2,
@@ -65,7 +61,7 @@
   },
   "apps/basis/src/v2/contactUnread.js": {
     "count": 1,
-    "note": "debt: cc.contactSeenAt — per contact, when their thread was last read (contact ids)"
+    "note": "sealed by its caller: makeContactSeenStore (cc.contactSeenAt) is handed sealedKeyValue by sealedContactSeenStore, the one both shells use"
   },
   "apps/basis/src/v2/contactsSource.js": {
     "count": 1,
@@ -101,7 +97,7 @@
   },
   "apps/basis/src/v2/screenView.js": {
     "count": 2,
-    "note": "debt: onderling.screen.<bot> — a screen's GRANT, including its capability tokens to act as the person at the bot (a credential)"
+    "note": "not sealable: onderling.screen.<bot> — a screen's grant, including its capability tokens to act as the person at the bot; a screen has no content key at all (its own key sits in the same storage), so it is a bearer device by design, as the client notes tell toolbox builders"
   },
   "apps/basis/src/v2/themePref.js": {
     "count": 1,
@@ -112,7 +108,7 @@
     "note": "sealed by its caller: both shells hand the peer backend sealedKeyValue (strict) — the web in buildCircleBot (circleApp.js), the phone in bootAgentBundle (agentBundle.js), both after the agent's boot"
   },
   "apps/basis/web/v2/circleApp.js": {
-    "count": 12,
-    "note": "debt: cc.contactSeenAt (read marks per contact) and cc.circleSeenAt — ids, waiting for the ruling on group (c); not content: basis.theme, cc.lastTab, cc.circleViewMode, circle.app.lang (2), basis.nearby-asked:*, basis.nearbySelf, basis.nearbyAllows, cc.activeCircle (sessionStorage), cc.advisorShown.*"
+    "count": 10,
+    "note": "not content: basis.theme, cc.lastTab, cc.circleViewMode, circle.app.lang (2), basis.nearby-asked:*, basis.nearbySelf, basis.nearbyAllows, cc.activeCircle (sessionStorage), cc.advisorShown.* — device settings and view state, no person's content (the seen-marks and pins are sealed through circleSeenMarks.js, contactUnread.js, circlePinStore.js)"
   }
 }

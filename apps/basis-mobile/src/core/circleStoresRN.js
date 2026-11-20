@@ -27,7 +27,7 @@ import {
   // α.2 — per-user screens store.
   createUserScreenStore,
   // β.5 — per-user pin-to-top store.
-  createCirclePinStore,
+  createCirclePinStore, localStoragePinIo,
   // γ.2 — per-circle rules store factory (new in γ.2).
   createCircleRulesStore,
   // the shared ios of the person's content stores, SEALED at rest (ledger L1083) — the same ones the web uses
@@ -195,9 +195,9 @@ export function asyncRawIo(storage) {
 }
 
 
-/** β.5 — per-user "pin to top" store (single key: `cc.circlePinned`). */
+/** β.5 — per-user "pin to top" store (single key: `cc.circlePinned`), sealed at rest through the shared io (web ≡ mobile). */
 export function makeCirclePinStoreRN(storage) {
-  return createCirclePinStore(asyncFixedIo('cc.circlePinned', storage));
+  return createCirclePinStore(localStoragePinIo(storage));
 }
 
 /**

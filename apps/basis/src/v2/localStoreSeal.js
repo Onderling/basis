@@ -205,17 +205,26 @@ export function sealedLocalVault(vault) {
  *   • A PLAIN value from before sealing reads as itself and is rewritten sealed at that read, once, so content does not
  *     sit in plain text until the person happens to change it. A read that finds a sealed value writes nothing.
  * The value is never logged.
+ *
+ * `load` answers `null` for everything it cannot hand on. `loadOrThrow` tells the cases apart for a caller that would
+ * otherwise WRITE over what it could not read (the seen-marks): it answers `null` only when the storage answered —
+ * nothing stored, or a value that will not open with this key (nothing readable here: starting empty is right) — and
+ * THROWS when the storage read itself failed, or there is no content key yet (not known: do not write).
  * @param {object} storage  `getItem` / `setItem` / `removeItem` (sync or async)
  */
 export function sealedJsonIo(storage, { waitForKey = false } = {}) {
   const kv = sealedKeyValue(storage, { name: 'a sealed value', strict: true, waitForKey });
+  async function loadOrThrow(key) {
+    if (!waitForKey && !shellContentSeal()) throw new Error('sealedJsonIo: no content key yet — the value is not known');
+    const raw = await kv.getItem(key);   // a storage error comes through; a value this key cannot open is null
+    if (raw == null || raw === '') return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  }
   return {
     async load(key) {
-      let raw = null;
-      try { raw = await kv.getItem(key); } catch { return null; }
-      if (raw == null || raw === '') return null;
-      try { return JSON.parse(raw); } catch { return null; }
+      try { return await loadOrThrow(key); } catch { return null; }
     },
+    loadOrThrow,
     async save(key, value) { await kv.setItem(key, JSON.stringify(value)); },
     async remove(key) { await kv.removeItem(key); },
   };

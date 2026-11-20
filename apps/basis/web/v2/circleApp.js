@@ -259,7 +259,8 @@ import { renderPersonCard } from './personCard.js';
 import { createPersonClock, webAppState } from '../../src/v2/personClock.js';
 import { personWeekOn, switchPersonWeek } from '../../src/v2/personWeekOverview.js';
 import { contactCardFromLink, loadShareMyContact, sharedLinkState, sharedLinkWords, withdrawSharedLink } from '../../src/v2/contactCardLink.js';
-import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../src/v2/contactUnread.js';
+import { buildContactUnread, totalUnread, sealedContactSeenStore } from '../../src/v2/contactUnread.js';
+import { createCircleSeenMarks, circleSeenMarksIo } from '../../src/v2/circleSeenMarks.js';
 import { renderShareMyContact } from './shareMyContact.js';
 import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler, subjectLabelerFor } from '../../src/v2/governanceView.js';
@@ -831,7 +832,7 @@ import { settingsControlsFromManifest, transportsStatusLine, TRANSPORT_MODES } f
 import { parseCircleBuiltin } from '../../src/v2/circleComposerBuiltins.js';
 // agent-add admin approval store.
 import { createAgentRequestStore } from '../../src/v2/agentRequest.js';
-import { buildTilePreviews, bumpSeenAt, seenOnLeave } from '../../src/v2/circleTilePreviews.js';
+import { buildTilePreviews, seenOnLeave } from '../../src/v2/circleTilePreviews.js';
 import { createReadMarks } from '../../src/v2/readMarks.js';
 import { makeAfterClaimHook } from '../../src/v2/claimRouter.js';
 import { mergeAvailability } from '../../src/v2/memberAvailability.js';
@@ -3145,7 +3146,7 @@ function repaintActiveTab() {
 
 // WHAT IS NEW IN CONTACTEN (2026-09-21): the seen-marks on this device, the unread map from the channel's durable
 // turns, the count on each row and the sum on the tab. Recomputed when the roster paints and when a turn lands.
-const contactSeen = makeContactSeenStore({ getItem: (k) => window.localStorage.getItem(k), setItem: (k, v) => window.localStorage.setItem(k, v) });
+const contactSeen = sealedContactSeenStore(globalThis.localStorage);   // sealed at rest; a read or a mark before the key waits for it
 // …and what each contact's row LAST READ on this device — the left-hand side of the rename marker: a
 // contact who renames themselves on the pair roster announces nothing, so the row says what they were until
 // the thread is opened.
@@ -3810,22 +3811,23 @@ function paintContactTurn({ contactId, fromAddr, origin, text, buttons, messageI
   return bubble;
 }
 
-// seenAt persistence: bumped on showDetail(id) so unread counts
-// reset after the user opens a circle.  One key holds {circleId → ts}.
-const SEEN_AT_KEY = 'cc.circleSeenAt';
-function readSeenAt() {
-  try { const raw = window.localStorage.getItem(SEEN_AT_KEY); return raw ? JSON.parse(raw) : {}; }
-  catch { return {}; }
-}
-function writeSeenAt(map) {
-  try { window.localStorage.setItem(SEEN_AT_KEY, JSON.stringify(map)); }
-  catch { /* quota / disabled */ }
+// The circles' seen-marks (`cc.circleSeenAt`), held by the shared `createCircleSeenMarks`: sealed at rest, loaded when
+// the content key arrives, `null` ("not known yet": no unread counts) until then; an open before the load is applied to
+// the loaded map, never written over it (ledger L1085). The synchronous readers below read the in-memory copy.
+const circleSeenMarks = createCircleSeenMarks(circleSeenMarksIo(globalThis.localStorage));
+const readSeenAt = () => circleSeenMarks.current();
+circleSeenMarks.subscribe(() => {
   _vandaagHead?.invalidate();   // Vandaag's "circles with news" counts what is not yet seen
   _mijHead?.invalidate();       // …and Mij's unread reading
-}
+  if (getActiveCircle() == null && _activeTab === 'circles') { try { paintLauncher(); } catch { /* the next visit paints it */ } }
+});
+onShellContentSeal(() => {
+  circleSeenMarks.load().catch(() => {});
+  refreshContactUnread().then(repaintContactBadge).catch(() => {});   // the contact marks are known now too
+});
 // …and on LEAVING a circle too: what happened while you were inside is not news on the launcher (one rule, both shells).
 subscribeActiveCircle(seenOnLeave((id) => {
-  writeSeenAt(bumpSeenAt(readSeenAt(), id));
+  circleSeenMarks.open(id).catch(() => {});
   readMarks.markCircleFrom({ events: eventLog.query({ excludeMuted: true }), circleId: id, myRefs: unreadMyRefs }).catch(() => {});
 }));
 // Whose lines are MINE for the unread count: 'me' (local stamps) and every address this person's devices speak as —
@@ -7536,8 +7538,8 @@ async function showDetail(id) {
   // folio /zoek's embedder (or null it for an 'off' circle). Best-effort.
   try { circleSyncFolioNoteEmbedder?.(); } catch { /* /zoek stays lexical */ }
   // bump the seenAt marker so the next launcher render clears
-  // this circle's unread badge…
-  writeSeenAt(bumpSeenAt(readSeenAt(), id));
+  // this circle's unread badge (remembered and applied on load when the marks are not loaded yet)…
+  circleSeenMarks.open(id).catch(() => {});
   // …and mark what is in it read on every device of the person
   readMarks.markCircleFrom({ events: eventLog.query({ excludeMuted: true }), circleId: id, myRefs: unreadMyRefs }).catch(() => {});
   const circle = circlesCache.find((c) => c.id === id) || removedCirclesCache.find((c) => c.id === id) || { id };

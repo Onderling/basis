@@ -43,7 +43,8 @@ import { nearbyTabs } from '../../../../basis/src/v2/nearbyTabs.js';
 import { nearbyStream, nearbyTabNews } from '../../../../basis/src/v2/nearbyStream.js';
 import { nearbyMenu, nearbyHereChoose } from '../../../../basis/src/v2/nearbyMenu.js';
 import { pushContactReply, subscribeContactReplies } from '../../core/contactReplyInbox.js';
-import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../../basis/src/v2/contactUnread.js';
+import { buildContactUnread, totalUnread, sealedContactSeenStore } from '../../../../basis/src/v2/contactUnread.js';
+import { createCircleSeenMarks, circleSeenMarksIo } from '../../../../basis/src/v2/circleSeenMarks.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Constants from 'expo-constants';
 import { View, Text, Pressable, ScrollView, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState, Image, Share } from 'react-native';
@@ -70,7 +71,7 @@ import {
   // §4 — admin's policy.view → default Chat/Screen landing surface.
   defaultViewModeFromPolicy,
   // per-circle activity preview + unread badge.
-  buildTilePreviews, bumpSeenAt, seenOnLeave, subscribeActiveCircle,
+  buildTilePreviews, seenOnLeave, subscribeActiveCircle,
   // claim-router hook (mirror claimed tasks to my own circle).
   makeAfterClaimHook,
   // Nearby model + label helpers (the action map + banner rule are SHARED with web — invariant 3).
@@ -713,7 +714,7 @@ export default function CircleLauncherScreen({
   // WHAT IS NEW IN CONTACTEN (2026-09-21, web parity): the seen-marks on this device (AsyncStorage), the unread map
   // from the channel's durable turns, the count on each row and the sum on the tab. Recomputed when a turn lands
   // (the reply inbox) and when a thread is opened (its seen-mark moves to now).
-  const contactSeen = useMemo(() => makeContactSeenStore(AsyncStorage), []);
+  const contactSeen = useMemo(() => sealedContactSeenStore(AsyncStorage), []);   // sealed; null before the key (no badge), a mark waits for it
   // WHAT THE PERSON READ ON ANY OF THEIR DEVICES (`readMarks.js`, web parity): the one read set the tiles, Vandaag and
   // the contact badges test; opening a circle or a conversation adds to it; re-read when a sibling's marks land.
   const [readTick, setReadTick] = useState(0);
@@ -742,6 +743,7 @@ export default function CircleLauncherScreen({
     } catch { setContactUnread({}); }
   }, [bundle, contactSeen, readMarks, readTick, contactNames]);
   useEffect(() => { refreshContactUnread(); }, [refreshContactUnread]);
+  useEffect(() => onShellContentSeal(() => { refreshContactUnread(); }), [refreshContactUnread]);   // the marks are known now
   useEffect(() => subscribeContactReplies(() => { refreshContactUnread(); }), [refreshContactUnread]);
   // 'How the bot shows actions' only for a person with a bot that acts: read from the contact book when a settings group opens
   const [botActionsShown, setBotActionsShown] = useState(false);
@@ -859,28 +861,21 @@ export default function CircleLauncherScreen({
   const [selectedOverride, setSelectedOverride] = useState(null);
   const [chatAi, setChatAi] = useState({ enriched: false, reason: 'no-provider' });   // S6.D — chat LLM enrichment for My-data
   // circle tile activity preview ({subtitle, ts, unread} per circle)
-  // + seenAt persistence (the per-circle "last-open" marker that drives the
-  // unread badge).  Loaded on mount; bumped on openCircle.
-  const [seenAt,   setSeenAt]   = useState({});
+  // + the seen-marks (the per-circle "last-open" marker that drives the unread badge), held by the shared
+  // `createCircleSeenMarks` (web alike): sealed, loaded when the content key is published, `null` ("not known yet": no
+  // unread counts) until then; an open before the load is applied to the loaded map, never written over it.
+  const circleSeenMarks = useMemo(() => createCircleSeenMarks(circleSeenMarksIo(AsyncStorage)), []);
+  const [seenAt,   setSeenAt]   = useState(null);
   const [previews, setPreviews] = useState({});
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem('cc.circleSeenAt');
-        if (alive && raw) setSeenAt(JSON.parse(raw) || {});
-      } catch { /* fresh */ }
-    })();
-    return () => { alive = false; };
-  }, []);
+    const unsub = circleSeenMarks.subscribe((m) => setSeenAt(m));
+    const off = onShellContentSeal(() => { circleSeenMarks.load().catch(() => {}); });
+    return () => { unsub(); off(); };
+  }, [circleSeenMarks]);
   // The circle you LEAVE is seen up to that moment (the shared rule, web alike) — every way out (← circles, a tab, Nearby)
   // goes through the active-circle signal, so one subscription covers them all.
   useEffect(() => subscribeActiveCircle(seenOnLeave((id) => {
-    setSeenAt((prev) => {
-      const next = bumpSeenAt(prev, id);
-      AsyncStorage.setItem('cc.circleSeenAt', JSON.stringify(next)).catch(() => {});
-      return next;
-    });
+    circleSeenMarks.open(id).catch(() => {});
     // …and what is in it is read on every device of the person (web parity)
     readMarksRef.current?.markCircleFrom({ events: eventLog?.query ? eventLog.query({ excludeMuted: true }) : [], circleId: id, myRefs: myRefsRef.current }).catch(() => {});
   })), []);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -1705,13 +1700,9 @@ export default function CircleLauncherScreen({
   const openProposals = useCallback((c) => { setSelected(c); setView('settings'); }, []);
   const openCircle = useCallback(async (c) => {
     setActiveCircle(c.id);
-    // bump the seenAt marker so the unread badge clears on the
-    // next launcher render; persist to AsyncStorage for next boot.
-    setSeenAt((prev) => {
-      const next = bumpSeenAt(prev, c.id);
-      AsyncStorage.setItem('cc.circleSeenAt', JSON.stringify(next)).catch(() => {});
-      return next;
-    });
+    // bump the seenAt marker so the unread badge clears on the next launcher render (sealed; an open before the marks
+    // are loaded is remembered and applied to them, never written over them — ledger L1085)
+    circleSeenMarks.open(c.id).catch(() => {});
     // …and mark what is in it read on every device of the person (web parity)
     readMarksRef.current?.markCircleFrom({ events: eventLog?.query ? eventLog.query({ excludeMuted: true }) : [], circleId: c.id, myRefs: myRefsRef.current }).catch(() => {});
     // no chat-route fallback anymore. Every tap-on-circle

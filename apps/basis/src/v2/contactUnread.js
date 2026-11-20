@@ -8,6 +8,7 @@
  * VIEW fact of this device — not carried to the siblings (a phone you read on does not silence the laptop; that is a
  * later choice) — read through an injected io so web (localStorage) and mobile (AsyncStorage) run one code.
  */
+import { sealedKeyValue, shellContentSeal } from './localStoreSeal.js';
 
 export const CONTACT_SEEN_KEY = 'cc.contactSeenAt';
 
@@ -25,6 +26,8 @@ export function buildContactUnread({ turns = [], seenAt = {}, readIds = null } =
     const ts = typeof t.receivedAt === 'number' ? t.receivedAt : (typeof t.ts === 'number' ? t.ts : 0);
     const entry = out[id] ?? (out[id] = { unread: 0, lastTs: 0, unreadIds: [] });
     if (ts > entry.lastTs) entry.lastTs = ts;
+    // `seenAt: null` is "the marks are not known yet": no unread is counted, never everything (ledger L1085)
+    if (seenAt === null) continue;
     const seen = typeof seenAt?.[id] === 'number' ? seenAt[id] : -Infinity;
     // …and read on none of my devices (`readMarks.js`: the message id, marked with when it was SENT)
     const mid = typeof t.messageId === 'string' && t.messageId ? t.messageId : null;
@@ -45,19 +48,38 @@ export function totalUnread(map) {
 
 /**
  * The seen-marks, on this device. `io` is `{ getItem(key), setItem(key, value) }`, sync or async (localStorage,
- * AsyncStorage). A mark only ever moves forward; a value that is not JSON reads as empty.
+ * AsyncStorage). A mark only ever moves forward; a value that is not JSON reads as empty. A read that FAILED (the
+ * storage threw) is not "nothing seen": `read` gives `null` (not known — no counts) and `mark` writes nothing, so a
+ * one-contact map never lands over the person's marks.
  */
 export function makeContactSeenStore(io) {
+  async function readOrThrow() {
+    const raw = await io.getItem(CONTACT_SEEN_KEY);   // a storage error comes through
+    let v = {};
+    try { v = raw ? JSON.parse(raw) : {}; } catch { v = {}; }
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  }
   async function read() {
-    try { const raw = await io.getItem(CONTACT_SEEN_KEY); const v = raw ? JSON.parse(raw) : {}; return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; }
-    catch { return {}; }
+    try { return await readOrThrow(); } catch { return null; }
   }
   async function mark(contactId, ts = Date.now()) {
     if (typeof contactId !== 'string' || !contactId) return;
-    const map = await read();
+    let map;
+    try { map = await readOrThrow(); } catch { return; }   // not read: write nothing over the marks
     if (typeof map[contactId] === 'number' && map[contactId] >= ts) return;
     map[contactId] = ts;
     try { await io.setItem(CONTACT_SEEN_KEY, JSON.stringify(map)); } catch { /* quota / disabled: the badge stays, nothing breaks */ }
   }
   return { read, mark };
+}
+
+/**
+ * The contact seen-marks, SEALED at rest (ledger L1083), over localStorage (web) or AsyncStorage (phone). A read
+ * before the content key gives `null` — "not known yet", which `buildContactUnread` answers with no unread count, never
+ * "nothing seen" (every contact unread). A `mark` before the key WAITS for it, so the person's look still counts and
+ * it never writes a fresh map over their marks.
+ */
+export function sealedContactSeenStore(storage) {
+  const store = makeContactSeenStore(sealedKeyValue(storage, { name: 'contact seen-marks', strict: true, waitForKey: true }));
+  return { read: async () => (shellContentSeal() ? store.read() : null), mark: store.mark };
 }

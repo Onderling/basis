@@ -60,6 +60,7 @@ import {
   PARAM_SCOPE,
   PARAM_KIND,
 } from '@onderling/core';
+import { isBackgroundSend } from '@onderling/core';
 import {
   NknTransport,
   RelayTransport,
@@ -254,6 +255,8 @@ const STALE_PARK_TTL_MS = param({ key: 'secureAgent.staleParkTtlMs', scope: PARA
 /** How many bytes of parked envelopes one bucket (a circle) may hold; parked input is unauthenticated, so it is capped by
  *  size as well as by count, the oldest going first. */
 const STALE_PARK_MAX_BYTES = param({ key: 'secureAgent.staleParkMaxBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1_048_576 });
+
+
 
 export async function createSecureAgent(opts = {}) {
   // warn about stubbed opts so callers know what's wired now
@@ -3076,6 +3079,8 @@ export async function createSecureAgent(opts = {}) {
 
   async function _sendOverRoute(addr, payload, sel, opts = {}) {
     const { tx, wireAddr, speakAs } = await _handshakeOverRoute(addr, sel, opts);
+    // nobody waits on a catch-up or a re-announce: a transport that paces its sends lets a person's own go first
+    const background = isBackgroundSend(payload);
     // v0.7.cc — record outbound for /debug-dump diagnostic.
     recordTraffic({
       dir:     'send',
@@ -3090,7 +3095,7 @@ export async function createSecureAgent(opts = {}) {
     // opt in, which is why the kernel's opt-in fileSharing sat uncalled for its whole life.
     const parts = chunkPayloadForRoute(payload, tx?.maxEnvelopeBytes);
     if (parts) {
-      const sendOpts = speakAs ? { from: speakAs } : {};
+      const sendOpts = { ...(speakAs ? { from: speakAs } : {}), ...(background ? { background: true } : {}) };
       // The transfer is the UNIT of the answer, not the chunk: the reassembler refuses a gap, so a
       // partly-delivered transfer is nothing to the receiver. Every part is still sent even when the
       // first is held — a held transfer must flush COMPLETE when the peer returns — and the verdicts
@@ -3110,7 +3115,7 @@ export async function createSecureAgent(opts = {}) {
       if (undelivered) return { ...verdict, held: false, delivered: false, ...(reason ? { reason } : {}) };
       return { ...verdict, held: false, delivered: true };
     }
-    return tx.sendOneWay(wireAddr, payload, speakAs ? { from: speakAs } : {});
+    return tx.sendOneWay(wireAddr, payload, { ...(speakAs ? { from: speakAs } : {}), ...(background ? { background: true } : {}) });
   }
 
   /**

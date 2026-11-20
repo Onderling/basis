@@ -13,7 +13,7 @@ export { NknTransport }        from './NknTransport.js';
 // adapter uses the SAME normalisation and port — web ≡ mobile by construction, not by copy.
 export { nknSenderVerdict, nknAuthenticatedSender, stripSubClientPrefix } from './nknSenderBinding.js';
 export { MqttTransport }       from './MqttTransport.js';
-export { RelayTransport }      from './RelayTransport.js';
+export { RelayTransport, RELAY_SEND_RATE } from './RelayTransport.js';
 export { RendezvousTransport } from './RendezvousTransport.js';
 
 // Inject-a-channel A2A transport across a network boundary (the #63 network

@@ -1,6 +1,6 @@
 # Architecture
 
-> **Last updated: 2026-11-19** — checked against the code on `development` that day. Every change to this file
+> **Last updated: 2026-11-20** — checked against the code on `development` that day. Every change to this file
 > moves this date (`scripts/lint-architecture-date.mjs` is red otherwise), so the date says how fresh the whole
 > file is, not one paragraph.
 
@@ -647,6 +647,13 @@ circle), and a message to one named peer takes the **addressed** point-to-point 
 mirror. Resolution — how a receiver merges concurrent writes to the same item — is the consistency layer's
 concern (§4 · Consistency & governance).
 
+**A start writes no items.** Demo data (the household's three demo items, demo members, tasks and noticeboard posts)
+is written only on a boot that asks for it (`seedDemoData: true`; `apps/basis/src/core/agent/demoHouseholdSeed.js`).
+The web and the phone used to write the three household items at every start, so a kept store grew by three each
+time; a real start now removes those copies once per device (only items whose author is the demo author and whose
+text is a demo text, deleted without a fan, since they never left the device), and a mark on the device's marker
+vault (`demo-seed-swept`) says it has run.
+
 #### Where the runtime does NOT match this yet
 
 Written down on 2026-08-03 because all four were live, and because prose that flatters the code is worse than
@@ -666,7 +673,7 @@ the honest tail is named below the table rather than dropped.
 | The **inbound handler map** (which subtype goes to which handler) is one shared composition (`src/v2/inboundWiring.js`) | ◐ MOBILE ONLY — the phone composes it; web (`circleApp.js`) and the box still build their own through `makePeerRouter`. That they route the same subtypes is pinned by `shellsRouteTheSameSubtypes`, not by construction |
 | Every peer send leaves through the one send gate | ◐ ONE DECLARED EXCEPTION — the screen view (a granted screen on another device) runs its own secure agent and sends outside `peerSend`; `oneSendGate.test.js` names it as the only exception |
 | A member removed from a circle stops being that circle's address at once | ◐ LAGS ONE READ — the gate's circle-address index (`createCircleAddressIndex`) drops a removed member's address at that circle's next non-empty roster read, not at the removal |
-| Everything a shell writes to the device is **sealed with the content key** (`localStoreSeal.js`) | ◐ PARTLY — the stores and several small key-value stores are sealed, and so is the person's own model setting with its API key; other small key-value stores are still written plain (on the web, for one, which ops the person used, `cc.actionFrequency`), and no guard counts raw key-value writes yet |
+| Everything a shell writes to the device is **sealed with the content key** (`localStoreSeal.js`) | ✅ ENFORCED (2026-11-20) — the stores and the small key-value stores of a person's content are sealed on every shell; what stays readable is named with its reason in `lint-sealed-key-value`'s baseline, none of it as debt (the Agent home lists it) |
 | The circle engine (`apps/pinboard`) keeps a **second physical store**, one pile for every circle tagged by circle id | ◐ PARTLY — noticeboard POSTS live in their circle's own store and ride its lane: pinboard is handed the host's circles (`hostCircles`) and writes and reads posts there (`apps/pinboard/src/lib/routedStore.js`); the copy into the circle store and the bridge back are gone. Who answered a post is the poster's own and stays on the poster's device. The pile still holds the circle engine's other rows (membership codes and redemptions, rules and their acceptances, the circle-chat mirror, reports), each tagged by circle id — the shared pile this section forbids, for those rows |
 
 **The honest tail, so the table is not read as "finished":** the mirror OBJECT and the peer-roster machinery
@@ -973,6 +980,20 @@ is refused (`toolbox-not-yours`), and a screen paired without one is not granted
 asks for is measured before it is sealed, and one too large for a single relay envelope is refused as
 `answer-too-large`, never cut.
 
+**A toolbox's page is a screen through one file, the screen client** (`src/v2/screenClient.js`, built into one ESM
+file with its types and version by `apps/basis/scripts/build-screen-client.mjs`). It is the web app's own screen
+composition (`createScreenView` over a browser agent) without the paint, so no screen logic is copied; nothing runs
+at import. Given the toolbox's name and the bot's screen start link once, it pairs by the paste route (`startPairing`
+gives the line the person pastes into their own chat with the bot and the code the page shows; `waitForGrant` answers
+granted, refused or expired) and later resumes from what the browser kept. It keeps everything under a prefix per
+toolbox (`onderling.screen.<toolbox>.`, `onderling-screen:<toolbox>:`), and sign-out removes exactly those keys. A
+call never throws: it answers the op's answer or `{ok: false, code}`, the code from one table (`screenClientCode`,
+`SCREEN_CLIENT_CODES`). A grant that ran out and a grant that was taken away (`/schermen los`, a pairing elsewhere)
+are ONE code, `grant-expired`, because the page does the same for both: pair again; the screen is then not paired.
+A toolbox's own failures fold into `toolbox-unreachable`. Each call has an abort signal and a time-out (30 s by
+default), and the client's state (not paired, connected, busy, broken after a call found no connection) can be read,
+heard and awaited. A screen holds no content key, so what it keeps in the browser is a bearer credential by design.
+
 The confidential LLM route for a Node process (the bots, the Telegram shell) is
 `@onderling/llm-client/providers/privatemode`: the Ollama provider's wire and parser with Privatemode's SDK as the
 transport, which attests the enclave and encrypts end-to-end on the caller's machine — no proxy; the key comes from the
@@ -1273,7 +1294,10 @@ below) and revocable on its own.
   full devices. The ceremony is authorised by the owner root itself — a member's roster row carries a per-circle
   *commitment* to the root, and a revocation carries the root's public key and its signature over exactly that
   circle, subject and member. The root exists only inside a ceremony, reconstructed from the phrase, so no device —
-  stolen or not — holds anything that can revoke a sibling.
+  stolen or not — holds anything that can revoke a sibling. A persona's runtime computes its commitment once per
+  circle and keeps it in memory (bounded, never written down), and the membership lane asks for it only when a stored
+  address-revoke statement names the author it is checking; those statements come from an index rebuilt per log
+  version.
 - **Older devices.** A delegated device from before the circle root keeps its own device-derived circle addresses
   until a phrase ceremony hands it the root. No such devices are in use; the fallback is due to be removed.
 
@@ -1431,9 +1455,37 @@ unchanged store writes nothing; a row it cannot open (sealed under another key) 
 byte, never handed on as content, until the caller writes that key itself. A small key-value store goes through
 `sealedKeyValue` (values sealed, keys legible, a write before the key refused rather than stored in the clear) or,
 for one JSON value per key, `sealedJsonIo`, which also answers a read before the key as "nothing kept" without
-overwriting anything and reseals an old plain value at its first read. What stays readable, and why: what must be read
-before a key exists, and what a paired screen keeps in its own browser (its grant), because a screen holds no content
-key. Not every small store goes through these yet (the table under "The data plane").
+overwriting anything and reseals an old plain value at its first read. A store of a person's content uses the strict
+mode: a read before the key, or of a value that will not open with this key, answers "not readable yet" and writes
+nothing over it; where an empty answer would be read as "nothing there" (the page book, a contact's name, the
+person's availability, the pins, the contact seen-marks) the read waits for the key instead.
+
+Sealed this way, on every shell that keeps them: the page blocks cache (appointment titles, task texts, the last chat
+line), the person's own model setting with its API key, the policy head, the pending recipe and rules, member
+overrides, availability, shared-with-me, the page book and its versions, contact names, the shared disclosure memo,
+which ops the person used, the offering draft, the agent request queue, the ask-match skips, the peer graph, the circle
+and contact seen-marks, the pins, the circle policy, recipe and rules, the fallback offer, and on the phone the
+calendar id map and the connection points; the box seals its key-value files. What stays readable, and why: what is
+read before a key exists (on the web the connection points and the chosen relay, both read at module load; on the
+phone the chosen relay and the extension mappings, which the boot loads before the agent publishes the key; the web's
+mappings are sealed), the enrol offer (stashed under the throwaway self's key and read after the enrol, across the key
+change; its personas and devices parts are sealed by the phrase), what a paired screen keeps in its own browser (its
+grant, and the screen client's storage), because a screen holds no content key, and device flags, settings and view
+state that are not a person's content (the theme, the language, the last tab, first-run flags, delivery-receipt
+preferences, the Nearby switches). `lint-sealed-key-value` holds this: every raw `.setItem(` in the shells and the shared
+v2 code is counted per file against a hand-edited baseline (`scripts/sealed-key-value-baseline.json`) whose every note
+starts with `sealed by its caller:`, `not content:`, `not sealable:` (the reader named) or `debt:`; a new file, a
+grown count or a note without a head is red. Writes through `sealedKeyValue` are not counted. No file is on the
+baseline as debt today.
+
+**Seen-marks are "not known" until they are loaded** (`src/v2/circleSeenMarks.js`, one holder for both shells). The
+circle marks are sealed, so a shell loads them once the content key exists. Until then `current()` is `null`, and the
+unread projections (the tiles, Today's circles-with-news block, the contact badge) count nothing and say no "nothing
+new" line: `null` is "not known", `{}` is known and empty. An open before the load is remembered and applied to the
+loaded map, so no write ever starts from an empty map over the stored marks; the load writes only when an open was
+pending. A read that failed (the storage threw, or no key yet) is not "nothing stored": the marks stay `null`, the
+early opens are kept, nothing is written, and the load can run again. The contact marks and the pins follow the same
+rule.
 
 **Two records of what happened, one retention vocabulary.** The agent keeps two append-only records with
 different readers: the **security audit** (a signed hash chain of key ceremonies and crypto events — its
@@ -1486,8 +1538,10 @@ only if it gives exactly the expected bytes on fixed vectors (decided 2026-11-19
 nonce over messages of 0, 29 and 300 bytes and one of 768 KiB built from a byte formula, because a native bridge
 that is right for small inputs and wrong for a device-log segment would otherwise pass; it must also refuse a
 flipped ciphertext byte, a flipped authenticator and a wrong key. The signature check's honest and tampered cases
-are fixed bytes in the source (`SIGNATURE_VECTORS`), so installing it runs no tweetnacl; the signing port still
-computes its reference with tweetnacl, on fixed seeds and messages, at install. An installed implementation that
+are fixed bytes in the source (`SIGNATURE_VECTORS`), and so are signing's: three seeds by three messages (empty,
+short, 1 KB), each with its public key and signatures written down (`SIGNING_VECTORS`), which a candidate must give
+byte for byte for the key pair and every signature. Installing any of the three runs no tweetnacl; a test pins that
+tweetnacl still gives exactly the written bytes. An installed implementation that
 throws after its vetting answers that call by tweetnacl, said once in the log; a secretbox open it refuses is asked
 of tweetnacl again, so a box that does not open is `null` to every caller whichever ran. The port never chooses a
 nonce: the caller does, as before. Which shell installs what: the phone libsodium over JSI for all three; the box

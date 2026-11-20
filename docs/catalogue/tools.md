@@ -28,7 +28,8 @@ was started 2026-11-18 with the first toolbox, a grocery search.
   The page does this with the **screen client**, one file built from the web app's own screen code
   (`apps/basis/src/v2/screenClient.js`, built by `apps/basis/scripts/build-screen-client.mjs`; its types in
   `screenClient.d.ts`). The page is bound to its own toolbox: it pairs only for a toolbox that is on, and calls only that
-  one (`toolbox-not-yours` otherwise).
+  one (`toolbox-not-yours` otherwise). Every refusal has a fixed code and a call never throws; a grant that ran out and one taken
+  away are one code, `grant-expired` (pair again).
 - **The household's admin** types `/toolbox`: the toolboxes the box's operator placed, each with its words and whether
   it is on. `/toolbox <naam> aan` shows the toolbox's card (its name, address, words and what it receives) and switches
   it on after their yes, in their own private chat only. `/toolbox <naam> uit` switches it off.
@@ -61,6 +62,9 @@ assistant: assistant-toolbox
   offered or without its key; the gate's words read live.
 - `apps/basis/test/v2/toolboxChoices.test.js` — a button per thing; the tap adds that thing (its reference, quantity 1)
   to the seller's list, else the shopping list, else asks; only from the thread it was shown in.
+- `apps/basis/test/screenClient.box.test.js` — the built screen client against the real box over the real relay: it
+  pairs for its toolbox, `useTool` answers, another toolbox gives `toolbox-not-yours`, an op it does not hold
+  `op-not-allowed`. `apps/basis/test/v2/screenClient.test.js` — codes, states, pairing, storage per toolbox, sign-out.
 - `apps/basis/test/v2/toolboxDoor.test.js` — `/toolbox` at the door: the list, the card with Ja/Nee, the yes from the
   admin's private chat only, off.
 
@@ -68,7 +72,8 @@ assistant: assistant-toolbox
 
 - A toolbox's key handed over from the admin's own app, sealed over the relay (after the alpha; for the alpha the key
   is the operator's).
-- A tool call from a screen through the door, the screen client as one file, and the link to a toolbox's own page.
+- A link from Basis to a toolbox's own page. (A tool call from a screen and the screen client as one file are built;
+  see "What a person can do".)
 
 ## Decisions that bind this area
 

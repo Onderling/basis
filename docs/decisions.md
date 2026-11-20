@@ -2011,7 +2011,8 @@ a box) are kept as a list of what a replacement must not repeat. No new pod feat
 ## 2026-11-18 — A circle uses an outside toolbox: one op for every tool, placed by the operator, switched on by the admin (Frits decided; Fable ruled the shapes)
 
 **Status:** decided; the door half built (the tool call from the box, `/toolbox`, the words); choices and a screen's
-call built 2026-11-19 (the entries of that date below); the toolbox's own page as one client file is a later step.
+call built 2026-11-19 (the entries of that date below); the screen client a toolbox's own page imports, one file,
+built 2026-11-19 (its entry below). A link from Basis to a toolbox's own page is not built.
 
 **Context:** Frits's grocery app (a toolbox) should be usable from the household bot. Nothing in the repo called an
 outside agent from the box: `contactSkills.js` turns a contact's skill cards into commands at runtime (web and phone,
@@ -2069,8 +2070,8 @@ they use.
 
 ## 2026-11-19 — A faster crypto implementation is vetted against fixed bytes in the source, never against tweetnacl at start; tweetnacl answers until then and on any refusal (Fable ruled)
 
-**Status:** settled. Built for the signature check and for secretbox; the signing port still computes its reference
-with tweetnacl at install, on fixed seeds and messages, until its follow-up lands.
+**Status:** settled and built for all three: the signature check, secretbox, and signing (2026-11-19: three seeds by
+three messages, the key pairs and signatures written as bytes, `SIGNING_VECTORS`), so no install runs tweetnacl.
 
 **Context:** the signature check, signing and key derivation, and secretbox each stand behind a port a shell may fill
 with a native implementation (libsodium on the phone, `node:crypto` on the box). The check used to mint a random key
@@ -2149,9 +2150,10 @@ person's Basis keeps its keys.
 
 ## 2026-11-19 — Everything a shell writes to the device is sealed, unless it must be read before a key exists (Frits)
 
-**Status:** decided; partly built. The stores, several small key-value stores and the person's own model setting are
-sealed; other small key-value stores are still written plain, and a guard that counts raw key-value writes is not yet
-on the trunk.
+**Status:** decided and built (2026-11-20). The stores and the small key-value stores of a person's content are
+sealed on every shell; `lint-sealed-key-value` counts every raw key-value write against a baseline in which each
+remaining one is named with its reason (sealed by its caller, not content, or not sealable), none as debt. What stays
+readable is listed in `docs/architecture.md`, the Agent home.
 
 **Context:** the agent's vaults and the shells' stores were sealed, but small key-value values the shells write
 (settings, caches, marks) were decided one by one, and one of them held the person's own model endpoint with its API
@@ -2168,3 +2170,27 @@ together even where each is not.
 
 **Consequences:** the remaining plain stores are listed in `docs/architecture.md` under "Where the runtime does NOT
 match this yet" until the guard holds them.
+
+---
+
+## 2026-11-19 — A toolbox's page is a screen through one client file; a grant that ran out and one taken away are one refusal
+
+**Status:** settled and built (`apps/basis/src/v2/screenClient.js`, built by `apps/basis/scripts/build-screen-client.mjs`).
+
+**Context:** a toolbox's own page, possibly opened from disk, has to pair with the household bot, call `tools.useTool`
+as the person and handle every way that can fail. The web app's screen shell already held all of a screen's logic
+(`createScreenView`), but only inside the app.
+
+**Decision:** the page imports one ESM file (with its types and version), which is the web app's screen composition
+without the paint; no screen logic is copied. Every refusal carries a fixed code from one table (`screenClientCode`),
+and a call never throws. A grant that ran out and a grant that was taken away are ONE code, `grant-expired`, since the
+page does the same for both: pair again. A toolbox's own failures fold into `toolbox-unreachable`. The client keeps
+its storage under a prefix per toolbox, and sign-out removes exactly that.
+
+**Alternatives / why:** *a client written apart from the app* would be a second screen implementation to keep in step.
+*Separate codes for expired and revoked* would ask every page to tell apart two cases it handles the same way.
+*Throwing on a refusal* leaves each page to catch errors whose
+shape it cannot know.
+
+**Consequences:** `docs/catalogue/tools.md`. A screen holds no content key, so what it keeps in the browser is a bearer
+credential; that is why a toolbox's page lives on an origin of its own (the entry above).

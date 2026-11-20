@@ -6,8 +6,10 @@
 export const FAB = Object.freeze({ bottom: 76, size: 56 });
 export const FAB_CLEARANCE = FAB.bottom + FAB.size + 16;
 
-/** THE HEADER AVATAR, top-right on every tab, and the room a page's top leaves so its first card is not under it. */
-export const HEADER_AVATAR = Object.freeze({ top: 8, right: 12, size: 34 });
-export const HEADER_AVATAR_CLEARANCE = HEADER_AVATAR.top + HEADER_AVATAR.size + 8;
-// what a header ROW beside the avatar keeps free on its right, so its buttons wrap instead of hiding under it
-export const HEADER_AVATAR_SIDE_CLEARANCE = HEADER_AVATAR.right + HEADER_AVATAR.size + 8;
+/** THE PERSONA BUTTON, top-right on every tab, and the room a page's top leaves so its first card is not under it. */
+export const PERSONA_BUTTON = Object.freeze({ top: 8, right: 12, size: 34 });
+export const PERSONA_BUTTON_CLEARANCE = PERSONA_BUTTON.top + PERSONA_BUTTON.size + 8;
+/** THE SETTINGS BUTTON, the gear just left of the persona button, the same size. */
+export const SETTINGS_BUTTON_GAP = 6;
+// what a header ROW beside the two buttons keeps free on its right, so its buttons wrap instead of hiding under them
+export const PERSONA_BUTTON_SIDE_CLEARANCE = PERSONA_BUTTON.right + 2 * PERSONA_BUTTON.size + SETTINGS_BUTTON_GAP + 8;

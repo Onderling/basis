@@ -32,6 +32,6 @@ describe('a thread opened from a notice', () => {
 
   it('the thread\'s header row keeps the frame avatar\'s room, so its ⋯ is never under it', () => {
     const thread = readFileSync(fileURLToPath(new URL('../src/screens/v2/ContactThreadScreen.js', import.meta.url)), 'utf8');
-    expect(thread).toMatch(/header: \{[^}]*paddingRight: HEADER_AVATAR_SIDE_CLEARANCE \}/);
+    expect(thread).toMatch(/header: \{[^}]*paddingRight: PERSONA_BUTTON_SIDE_CLEARANCE \}/);
   });
 });

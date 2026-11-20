@@ -1,7 +1,7 @@
 /* global device, element, by, waitFor */
 // THE FIRST-MESSAGE DOOR ON THE PHONE, with "people in my circles may write to me" OFF (decision 2026-11-12: the
 // persona is the policy; off = a member's first private message is a request like anyone's). A fresh install joins
-// Bram's circle, turns the choice off on its persona card (the person's editor, the header avatar) BEFORE anyone
+// Bram's circle, turns the choice off on its persona card (the person's editor, the persona button) BEFORE anyone
 // writes, and Bram's first private message then waits as a request: not in a thread until the person accepts it, and
 // in his thread after. The "on" case (the default: a thread, no request) is walked in e2e/messaging.test.js.
 // Runs against the RELEASE APK; deletes the app, so emulator only.
@@ -37,7 +37,7 @@ describe('the first-message door on the phone: a member asks first when the pers
 
   it('the person turns "people in my circles may write to me" off on their persona card', async () => {
     await backToLauncher();
-    await tapSoon(by.id('header-avatar'), 20_000);
+    await tapSoon(by.id('persona-button'), 20_000);
     await soon(by.id('circle-aboutme-panel'), 20_000);
     const off = by.id('mij-first-contact-default-circleMembersMayWrite-false');
     await waitFor(element(off)).toBeVisible().whileElement(by.id('mij-scroll')).scroll(300, 'down');

@@ -6320,8 +6320,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       return (await rosterRowsOf(circleId)).flatMap((m) => addressesOfRow(m)).filter((x) => x !== mine);
     }
     function tellLateRecipients(circleId) {
-      if (!circleId || !lateRecipients.holds(circleId)) return;
+      if (!circleId) return;
+      const waitsHere = [...waitingByMsg.values()].some((w) => w.circleId === circleId);
+      if (!lateRecipients.holds(circleId) && !waitsHere) return;
       rosterRowsOf(circleId).then((rows) => {
+        if (waitsHere) dropDepartedFromWaits(circleId, rows);
         const byAddress = new Map();
         for (const m of rows) for (const a of addressesOfRow(m, circleId)) if (m?.webid) byAddress.set(a, m.webid);
         return lateRecipients.rosterAddresses(circleId, [...byAddress.keys()], { webidsOf: (fresh) => fresh.map((a) => byAddress.get(a)) });
@@ -6353,14 +6356,27 @@ export async function createRealHouseholdAgent(opts = {}) {
       const waiting = [...new Set([...(prev?.refs ?? []), ...noAddress])].filter((w) => !sentTo.has(w));
       if (prev && prev.refs.size === waiting.length && waiting.every((w) => prev.refs.has(w))) return;   // nothing changed: no new entry
       const of = prev?.of ?? outcomes.length;
-      opts.deviceLog?.appendSilentEntry?.({ circleId, kind: 'delivery-state', payload: { msgId, state: ON_ITS_WAY, waiting, reached: Math.max(0, of - waiting.length), of } });
-      if (waiting.length) { waitingByMsg.set(msgId, { refs: new Set(waiting), of }); lateRecipients.noAddress(circleId, waiting); }
-      else waitingByMsg.delete(msgId);
+      writeWait(circleId, msgId, waiting, of);
     };
+    function writeWait(circleId, msgId, waiting, of) {
+      opts.deviceLog?.appendSilentEntry?.({ circleId, kind: 'delivery-state', payload: { msgId, state: ON_ITS_WAY, waiting, reached: Math.max(0, of - waiting.length), of } });
+      if (waiting.length) { waitingByMsg.set(msgId, { circleId, refs: new Set(waiting), of }); lateRecipients.noAddress(circleId, waiting); }
+      else waitingByMsg.delete(msgId);
+    }
+    // A MEMBER A LINE WAITS FOR WHO LEFT (or was removed) will never be reached: off the wait, so the bubble stops saying
+    // the rest follows. Read against the roster the tell reads anyway.
+    function dropDepartedFromWaits(circleId, rows) {
+      const onRoster = new Set(rows.map((m) => m?.webid).filter(Boolean));
+      for (const [msgId, w] of [...waitingByMsg]) {
+        if (w.circleId !== circleId) continue;
+        const still = [...w.refs].filter((r) => onRoster.has(r));
+        if (still.length !== w.refs.size) writeWait(circleId, msgId, still, w.of);
+      }
+    }
     seedWaitingRef.current = (circleId) => {
       const owed = awaitingChatRecipients({ eventLog: opts.deviceLog, circleId, myRef: circleSelfRef(circleId) });
       for (const o of owed) {
-        waitingByMsg.set(o.msgId, { refs: new Set(o.waiting), of: o.of });
+        waitingByMsg.set(o.msgId, { circleId, refs: new Set(o.waiting), of: o.of });
         // remembered as reached by NOBODY, without a roster read here: the next tell (any roster change, an address
         // landing) finds every address new and tells the line to the circle once — every receiver dedupes it — and
         // that fan writes who still waits

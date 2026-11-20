@@ -1531,9 +1531,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   const seedWaitingRef = { current: null, pending: new Set() };
   function reFanOwedChat(circleId) {
     if (!opts.deviceLog || reFannedCircles.has(circleId)) return;
-    // A circle is wired at boot BEFORE this factory builds its chat rail (further down): such an early open waits in
-    // `pending` and runs once the rail exists — until 2026-11-20 it returned here and the restart's re-fan never ran
-    if (!chatRail) { seedWaitingRef.pending.add(circleId); return; }
+    // A circle is wired at boot BEFORE this factory has built its chat rail and composed its API (further down): a send
+    // made then waits on a roster read that is not served until the API exists. Such an early open waits in `pending`
+    // and runs once both are there — until 2026-11-20 it returned here, marked done, and the restart's re-fan never ran
+    if (!chatRail || !apiComposed) { seedWaitingRef.pending.add(circleId); return; }
     reFannedCircles.add(circleId);
     // …and a line some members got while others had no address yet: the re-tell is seeded from the log
     try { seedWaitingRef.current?.(circleId); } catch { /* best-effort: the member's own catch-up remains */ }
@@ -6346,9 +6347,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       const owed = awaitingChatRecipients({ eventLog: opts.deviceLog, circleId, myRef: circleSelfRef(circleId) });
       for (const o of owed) {
         waitingByMsg.set(o.msgId, new Set(o.waiting));
-        // remembered as reached by NOBODY: this runs inside the circle's own open, where a roster read waits on that open,
-        // so the next tell (any roster change, an address landing) finds every address new and tells the line to the
-        // circle once — every receiver dedupes it — and that fan writes who still waits
+        // remembered as reached by NOBODY, without a roster read here: the next tell (any roster change, an address
+        // landing) finds every address new and tells the line to the circle once — every receiver dedupes it — and
+        // that fan writes who still waits
         lateRecipients.fanned(circleId, o.statement, [], (cid, st) => callSkill('pinboard', 'broadcastCircleChatStatement', {
           groupId: cid, event: st, msgId: o.msgId, ts: Date.now(),
         }), { msgId: o.msgId });
@@ -6639,9 +6640,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
       callSkill: (...a) => callSkill(...a),
     });
-    // the circles opened before the rail existed: what a restart still owes them goes out now
-    for (const cid of [...seedWaitingRef.pending]) reFanOwedChat(cid);
-    seedWaitingRef.pending.clear();
     chatEmit = makeChatEmitter({
       rail: chatRail,
       fan: (circleId, statement) => callSkill('pinboard', 'broadcastCircleChatStatement', {
@@ -10984,6 +10982,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   apiComposed = true;
   for (const cid of rostersToRead) scheduleRosterRead(cid);
   rostersToRead.clear();
+  // the circles opened before the chat rail and the API existed: what a restart still owes them goes out now
+  { const early = [...seedWaitingRef.pending]; seedWaitingRef.pending.clear(); for (const cid of early) reFanOwedChat(cid); }
   runRosterLine();
   selfAgent = api;
   return api;

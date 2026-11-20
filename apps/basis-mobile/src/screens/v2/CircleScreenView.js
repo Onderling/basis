@@ -33,7 +33,7 @@ import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import FaceView from './FaceView.js';
 import { t } from '../../core/localisation.js';
-import { identityLineWords, agentRowWords } from '../../../../basis/src/v2/mijWords.js';
+import { availabilityWords, agentRowWords } from '../../../../basis/src/v2/mijWords.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { whereTag } from '../../../../basis/src/v2/rowWhere.js';
 import { typedRowOp } from '../../../../basis/src/v2/rowPrimary.js';
@@ -236,7 +236,7 @@ function renderAwaiting(block, onAction, styles) {
 // Vandaag's availability words (web parity: circleScreen.js renderAvailability): one row, a tap opens the availability
 // screen. The words are the shared reading words.
 function renderAvailability(block, onAction, styles) {
-  const words = identityLineWords({ readings: block.content?.reading ? [block.content.reading] : [] }, { t, locale: dateLocaleOf(t) }).join(' · ');
+  const words = availabilityWords(block.content?.reading ?? null, { t });
   return (
     <View>
       <Text style={styles.blockTitle}>{t(block.titleKey ?? 'circle.availability.title')}</Text>
@@ -302,9 +302,8 @@ function renderCirclesUnread(block, onAction, styles) {
 }
 
 // Me's identity line: the name as the page's title, "Edit" beside it (`onAction({ kind: 'edit-me' })`, the person's
-// own editor), the readings below in one line, worded by the shared helper. Web parity: circleScreen.js.
+// own editor). Web parity: circleScreen.js.
 function renderIdentityLine(block, onAction, styles) {
-  const words = identityLineWords(block.content, { t, locale: dateLocaleOf(t) });
   return (
     <View>
       <View style={styles.identityHead}>
@@ -315,7 +314,6 @@ function renderIdentityLine(block, onAction, styles) {
           </Pressable>
         ) : null}
       </View>
-      {words.length ? <Text style={styles.noticeText} testID="mij-readings">{words.join(' · ')}</Text> : null}
     </View>
   );
 }

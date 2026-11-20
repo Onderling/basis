@@ -1103,17 +1103,16 @@ export default function CircleLauncherScreen({
   const availabilityStore = useMemo(() => makeAvailabilityStoreRN(AsyncStorage, {
     getPodWriter: () => sessionToPodWriterRN(sessionRef?.current ?? null),
   }), []);
-  // What Mij's declared blocks read beside the waist (the identity line's readings, the agents list)
+  // What the persona panel's and Vandaag's declared blocks read beside the waist (the agents list, "Wacht op jou")
   // the governance binding, for Mij's reads (made further down; read through a ref when Mij asks, after render)
   const govPolicyRef = useRef(null);
   const mijSources = useMemo(() => ({
-    eventLog, circles: circlesShown, seenAt, myRefs: unreadMyRefs, readIds: readMarks.ids(), availabilityStore,
+    eventLog, circles: circlesShown, seenAt, myRefs: unreadMyRefs, readIds: readMarks.ids(),
     // "wat wacht op jou": the votes open in each circle (the same fold the tile badge reads), a device offer here
     openProposals: (cid) => (govPolicyRef.current ? openPolicyProposals(govPolicyRef.current, cid) : Promise.resolve({ proposals: [] })),
     pendingDeviceOffer: () => pendingEnrollOffer(AsyncStorage),
     // what was shared with the person: a chip on Mij (once a door on My data)
     sharedWithMeCount: async () => ((await bundle?.sharedWithMeStore?.list?.()) ?? []).length,
-    relays: () => bundle?.agent?.relays?.list?.() ?? [],
     deviceId: () => bundle?.agent?.myDeviceId?.() ?? null,
     // the phone's own name, for "this device" when the person never named it
     deviceName: () => Constants.deviceName ?? null,
@@ -1124,7 +1123,7 @@ export default function CircleLauncherScreen({
       if (!one || one === 'default') return {};
       return { mijSelf: { id: one, name: heldSelves.find((p) => p.id === one)?.name ?? null, deviceId: bundle?.agent?.persona?.(one)?.enrolledDevice?.deviceId ?? null } };
     })(),
-  }), [eventLog, circles, circlesShown, seenAt, unreadMyRefs, availabilityStore, bundle, selvesOn, heldSelves]);
+  }), [eventLog, circles, circlesShown, seenAt, unreadMyRefs, bundle, selvesOn, heldSelves]);
   // SILENT out-of-circle delivery — the per-user "shared with me" inbox. The store is instantiated ON THE
   // BUNDLE (agentBundle.js) so the ChatScreen receive handler + this launcher share ONE instance; here we just
   // LOAD its list when the Mij sub-view opens (web≡mobile: mirrors web's `showSharedWithMe` reading the store).

@@ -207,8 +207,10 @@ next start.
 
 **A failure that repeats is counted,** not only logged once per start: `<data dir>/start-failures.json` holds how many
 starts in a row stopped and since when, and each stop's line says it (`Failed starts in a row: 7, since ...`). The file
-is removed when the assistant comes up (`device-runner: up`). A count that keeps growing means the files need a person:
-put the missing file back (the right folder, a backup), or restore the box from the phrase.
+is removed when the assistant comes up (`device-runner: up`). After **3** failed starts in a row (the parameter
+`box.startFailuresBeforeHold`) the assistant **stops trying**: it says `STOPPED TRYING ...` once and stays up without
+running, so the container does not restart it in a loop. A person then fixes the files (the missing file back, the right
+mount) or restores the box from the phrase (`--enrol`), and restarts the container.
 
 ## Backups (role `backup`)
 

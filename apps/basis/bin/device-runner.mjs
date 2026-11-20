@@ -132,7 +132,7 @@ import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
 import { EventLog } from '../src/eventLog.js';
 import { fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
 import { besidePersistDb } from '../src/household/persist.js';
-import { boxStores, vaultFilesMissing, startFailures } from '../src/v2/boxStorage.js';
+import { boxStores, vaultFilesMissing, startFailures, BOX_START_FAILURES_BEFORE_HOLD } from '../src/v2/boxStorage.js';
 import { resolveVaultPassphrase } from '../src/v2/boxVaultPassphrase.js';
 import { retentionFromDays } from '../src/v2/retentionPref.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, openOfferPersonas, pickByNames, enrolPickArgs, pickPrimary } from '../src/v2/enrollOffer.js';
@@ -223,12 +223,24 @@ function promptCacheSecret() {
 // A VAULT FILE MISSING BESIDE OTHER STATE is a loss, not a first start (L1115): a partly restored backup or an unmounted
 // folder would read as "nothing stored" and mint new keys over the household. Said, counted, and the box stops.
 const failedStarts = startFailures(dataDir);
+/**
+ * A start that could not read its keys: said with the run's count; after `BOX_START_FAILURES_BEFORE_HOLD` in a row the
+ * box stops trying (says what to do once and stays up, idle), else it exits for the container's restart (L1115).
+ */
+async function stopOnUnreadable(line, what) {
+  const run = failedStarts.note(what);
+  console.error(`${line} Failed starts in a row: ${run.count}, since ${run.since}.`);
+  if (run.count >= Number(BOX_START_FAILURES_BEFORE_HOLD)) {
+    console.error(`device-runner: STOPPED TRYING after ${run.count} starts in a row that could not read this box's keys. Nothing was changed and nothing runs. Fix the data folder (the missing or damaged file, the right mount) or restore the box from the phrase (--enrol), then restart the container. Waiting.`);
+    setInterval(() => {}, 1 << 30);   // stay up: the container's restart policy would otherwise loop
+    await new Promise(() => {});
+  }
+  process.exit(1);
+}
 {
   const missing = vaultFilesMissing(dataDir, existsSync);
   if (missing.length) {
-    const run = failedStarts.note('vault-file-missing');
-    console.error(`device-runner: ${missing.join(' and ')} is missing in ${dataDir} while the folder holds a box's other state; nothing was changed. Stopping. Put the file back (a backup, the right folder), or restore the box from the phrase. Failed starts in a row: ${run.count}, since ${run.since}.`);
-    process.exit(1);
+    await stopOnUnreadable(`device-runner: ${missing.join(' and ')} is missing in ${dataDir} while the folder holds a box's other state; nothing was changed. Stopping. Put the file back (a backup, the right folder), or restore the box from the phrase.`, 'vault-file-missing');
   }
 }
 const vault = new VaultNodeFs(path.join(dataDir, 'vault.json'), vaultPassphrase());
@@ -388,13 +400,12 @@ const agent = await createRealHouseholdAgent({
   seedDemoData: false,
   seedHousehold: false,
   enrollOfferStorage: offerStash,
-}).catch((err) => {
+}).catch(async (err) => {
   // THE CONTENT KEY COULD NOT BE READ (L1115): nothing was minted or written. Said in the log in words, and the box stops
   // so its service manager starts it again: a read that failed once may pass at the next start (the shells' "try again").
   if (bootFailureNotice(err)?.retry) {
-    const run = failedStarts.note(String(err?.what ?? err?.cause?.what ?? 'key'));
-    console.error(`device-runner: a key on this box could not be read (${err?.what ?? 'key'}); nothing was changed. Stopping; the container's restart tries again. If it keeps failing, restore the box from the phrase. Failed starts in a row: ${run.count}, since ${run.since}.`);
-    process.exit(1);
+    const what = String(err?.what ?? err?.cause?.what ?? 'key');
+    await stopOnUnreadable(`device-runner: a key on this box could not be read (${what}); nothing was changed. Stopping; the container's restart tries again. If it keeps failing, restore the box from the phrase.`, what);
   }
   throw err;
 });

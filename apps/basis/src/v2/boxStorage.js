@@ -17,6 +17,7 @@ import path from 'node:path';
 import { buildHouseholdDataSource } from '../household/persist.js';
 import { backendSnapshotIo, fileKeyValueStorage } from './eventLogPersistence.js';
 import { sealedLocalBackend, sealedKeyValue, shellContentSeal } from './localStoreSeal.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /**
  * A `StorageBackend` over a directory: one file per key (the key, URI-encoded, is the file name), each write
@@ -140,6 +141,13 @@ export function vaultFilesMissing(dataDir, exists) {
   const held = BOX_STATE_MARKS.some((m) => exists(path.join(dataDir, m)));
   return held ? BOX_VAULT_FILES.filter((f) => !exists(path.join(dataDir, f))) : [];
 }
+
+/**
+ * After this many failed starts in a row the box STOPS TRYING (L1115): it says so once, with what to do, and stays up
+ * without running, so its container does not restart it in a loop. A person fixes the files (or restores) and restarts
+ * the container; the next start that comes up clears the count.
+ */
+export const BOX_START_FAILURES_BEFORE_HOLD = param({ key: 'box.startFailuresBeforeHold', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
 
 /**
  * THE STARTS IN A ROW THAT COULD NOT READ THE BOX'S KEYS (L1115): the container restarts a box that stops, so one line

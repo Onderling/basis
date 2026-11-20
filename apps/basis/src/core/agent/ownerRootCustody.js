@@ -57,8 +57,10 @@ export async function ensureOwnerRoot({ rootKeyStore, legacyVault } = {}) {
   const seed = await rootKeyStore.getSeed();
   if (seed) return Bootstrap.fromSeed(seed);
 
+  // a legacy phrase that could not be READ is not absent: a new root over it would make this a different person (L1115)
   let phrase = null;
-  try { phrase = await legacyVault?.get(LEGACY_OWNER_PHRASE_KEY); } catch { /* treat as absent */ }
+  try { phrase = await legacyVault?.get(LEGACY_OWNER_PHRASE_KEY); } catch (err) { throw new KeyUnreadable('legacy-phrase', err); }
+  if (phrase != null && phrase !== '' && typeof phrase !== 'string') throw new KeyUnreadable('legacy-phrase');
   if (phrase && typeof phrase === 'string' && phrase.trim().length > 0) {
     const root = Bootstrap.fromMnemonic(phrase);
     await rootKeyStore.setSeed(root.secret);

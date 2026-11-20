@@ -133,7 +133,7 @@ import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
 import { EventLog } from '../src/eventLog.js';
 import { fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
 import { besidePersistDb } from '../src/household/persist.js';
-import { boxStores } from '../src/v2/boxStorage.js';
+import { boxStores, vaultFilesMissing, BOX_REGISTRY_DIR, startFailures, markBoxStarted, startBackoffMs, failureIsPermanent, BOX_START_FAILURES_BEFORE_HOLD } from '../src/v2/boxStorage.js';
 import { resolveVaultPassphrase } from '../src/v2/boxVaultPassphrase.js';
 import { retentionFromDays } from '../src/v2/retentionPref.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, openOfferPersonas, pickByNames, enrolPickArgs, pickPrimary } from '../src/v2/enrollOffer.js';
@@ -221,6 +221,49 @@ function promptCacheSecret() {
   return readFileSync(f, 'utf8').trim();
 }
 
+// A VAULT FILE MISSING BESIDE OTHER STATE is a loss, not a first start (L1115): a partly restored backup or an unmounted
+// folder would read as "nothing stored" and mint new keys over the household. Said, counted, and the box stops.
+const failedStarts = startFailures(dataDir);
+/** What to do, in words that name a step that works (the enrol runs only on an EMPTY data folder: it is a first start). */
+const WAY_OUT = `Fix the data folder (put the missing or damaged file back, or mount the right folder), or start the box over from the phrase: stop the container, move ${dataDir} aside (keep it), and run the enrol (--enrol) on an empty folder; its circles come back from the members.`;
+/** One line on the bot's admin line, when the box knows its token and its admin (no agent runs: one plain Bot API call). */
+async function tellAdmin(count, held) {
+  const token = String(process.env.TG_BOT_TOKEN ?? '').trim(); const admin = String(process.env.TG_ADMIN_UID ?? '').trim();
+  if (!token || !admin || typeof fetch !== 'function') return;
+  const root = (String(process.env.ONDERLING_TELEGRAM_API_ROOT ?? '').trim() || 'https://api.telegram.org').replace(/\/+$/, '');
+  const text = t(held ? 'circle.bot.box_stopped_trying' : 'circle.bot.box_cannot_start', { count });
+  try { await fetch(`${root}/bot${token}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: admin, text }), signal: AbortSignal.timeout?.(10_000) }); } catch { /* the log says it either way */ }
+}
+/**
+ * A start that could not read its keys (L1115): said with the run's count. It backs off (minutes, then hours) before it
+ * exits for the container's restart, so a cause that passes by itself is retried without a tight loop. Only a key that
+ * fails to DECRYPT, after `BOX_START_FAILURES_BEFORE_HOLD` in the window, HOLDS: says so once and stays up, idle. The
+ * admin line hears it once at the third failure and once at the hold. The enrol never counts.
+ */
+async function stopOnUnreadable(line, what, { permanent = false } = {}) {
+  if (values.enrol) { console.error(`${line} The enrol runs on an empty data folder: ${WAY_OUT}`); process.exit(1); }
+  const run = failedStarts.note(what);
+  console.error(`${line} Failed starts in a row: ${run.count}, since ${run.since}. ${WAY_OUT}`);
+  const hold = permanent && run.count >= Number(BOX_START_FAILURES_BEFORE_HOLD);
+  if (hold || run.count === Number(BOX_START_FAILURES_BEFORE_HOLD)) await tellAdmin(run.count, hold);
+  if (hold) {
+    console.error(`device-runner: STOPPED TRYING after ${run.count} starts that could not decrypt this box's keys: that does not pass by itself. Nothing was changed and nothing runs. ${WAY_OUT} Then restart the container. Waiting.`);
+    // stay up, idle: the container's restart policy would otherwise loop. ONE timeout, the longest a timer takes (about
+    // 24 days), no clock: when it ends the box exits once, restarts, counts one more and holds again
+    await new Promise((resolve) => { setTimeout(resolve, 2 ** 31 - 1); });
+  } else {
+    const wait = startBackoffMs(run.count);
+    console.error(`device-runner: trying again in ${Math.round(wait / 60_000)} minute(s).`);
+    await new Promise((resolve) => { setTimeout(resolve, wait); });
+  }
+  process.exit(1);
+}
+{
+  const missing = vaultFilesMissing(dataDir, existsSync, (d) => (existsSync(d) ? readdirSync(d) : []));
+  if (missing.length) {
+    await stopOnUnreadable(`device-runner: ${missing.join(' and ')} is missing in ${dataDir}, a folder that ran a box before; nothing was changed. Stopping.`, 'vault-file-missing');
+  }
+}
 const vault = new VaultNodeFs(path.join(dataDir, 'vault.json'), vaultPassphrase());
 // The CHAT-side vault, durable, because on a box there is no browser storage to fall back to.
 //
@@ -235,7 +278,7 @@ const chatVault = new VaultNodeFs(path.join(dataDir, 'chat-vault.json'), vaultPa
 // that booted unenrolled first (every box does; the service starts before anyone can enrol it) holds the
 // content of a throwaway identity, and that content does not carry over.
 const contentPaths = {
-  registry:  path.join(dataDir, 'registry'),
+  registry:  path.join(dataDir, BOX_REGISTRY_DIR),   // its rows also say "this folder ran a box" (vaultFilesMissing)
   pinboard:     path.join(dataDir, 'pinboard-items.json'),
   household: path.join(dataDir, 'household-items.json'),
   tasks:     path.join(dataDir, 'tasks-items.json'),
@@ -378,12 +421,12 @@ const agent = await createRealHouseholdAgent({
   seedDemoData: false,
   seedHousehold: false,
   enrollOfferStorage: offerStash,
-}).catch((err) => {
+}).catch(async (err) => {
   // THE CONTENT KEY COULD NOT BE READ (L1115): nothing was minted or written. Said in the log in words, and the box stops
   // so its service manager starts it again: a read that failed once may pass at the next start (the shells' "try again").
   if (bootFailureNotice(err)?.retry) {
-    console.error('device-runner: the content key on this box could not be read; nothing was changed. Stopping; the next start tries again. If it keeps failing, restore the box from the phrase.');
-    process.exit(1);
+    const what = String(err?.what ?? err?.cause?.what ?? 'key');
+    await stopOnUnreadable(`device-runner: a key on this box could not be read (${what}); nothing was changed. Stopping.`, what, { permanent: failureIsPermanent(err) });
   }
   throw err;
 });
@@ -1752,6 +1795,8 @@ const card = await callSkill('pinboard', 'getContactShareQr', {}).catch(() => nu
 walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken, clock: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone });
 // what other agents' task requests reach on this node (ids only), so a walk — or an operator — reads it from the box
 walkLog({ kind: 'peer-callable', accepts: agent.peer?.acceptsSkillCalls === true, skills: agent.peer?.callableSkills?.() ?? [] });
+failedStarts.clear();   // the box came up: a run of failed starts (L1115) ends here
+markBoxStarted(dataDir);   // written LAST: from now on a missing vault file here is a loss, not a first start
 console.log(`\ndevice-runner: up — data in ${dataDir}`);
 console.log(`  log       ${deviceLog.size} entr${deviceLog.size === 1 ? 'y' : 'ies'} restored from disk`);
 console.log(`  wire      ${relayUrl || 'LOCAL ONLY (set ONDERLING_RELAY_URL to join the relay)'}`);

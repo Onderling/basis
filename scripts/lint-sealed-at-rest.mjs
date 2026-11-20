@@ -42,6 +42,12 @@ const FILES = [
   { path: 'apps/basis-mobile/App.js',                              factory: 'backendSnapshotIo', wrapper: 'sealedLocalBackend' },
 ];
 
+/**
+ * Wrappers that ARE the named seal: `sealedNamedBackend(name, open)` returns `sealedLocalBackend(open(name), {scope})`
+ * (localStoreSeal.js), so a factory inside it is sealed.
+ */
+const SAME_SEAL = { sealedLocalBackend: ['sealedLocalBackend', 'sealedNamedBackend'] };
+
 /** Sealed by realAgent instead, so the shell hands it over bare. Matched on the store name. */
 const SEALED_ELSEWHERE = /cc-agent-registry/;
 
@@ -67,7 +73,7 @@ for (const { path, factory, wrapper } of FILES) {
     // So look a few lines each way. Three is the width of the real shapes here and narrow enough that
     // an unrelated call cannot vouch for one.
     const window = lines.slice(Math.max(0, i - 3), i + 4).join('\n');
-    if (window.includes(`${wrapper}(`)) return;                     // the ordinary, correct shape
+    if ((SAME_SEAL[wrapper] ?? [wrapper]).some((w) => window.includes(`${w}(`))) return; // the ordinary, correct shape
     problems.push({ path, line: i + 1, text: line.slice(0, 120) });
   });
 }

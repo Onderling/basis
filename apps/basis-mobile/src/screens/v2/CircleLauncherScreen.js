@@ -394,7 +394,7 @@ const CIRCLE_LLM_APPS = (process.env.EXPO_PUBLIC_CIRCLE_LLM_APPS || '').split(',
 // path is exercised there). The remaining path — a real signed-in Solid pod —
 // stays the live-pod tail.
 const circleSearchVectorStore = (AsyncStorage && typeof AsyncStorage.getItem === 'function')
-  ? sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-circle-rag' }))
+  ? sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-circle-rag' }), { scope: 'cc-circle-rag' })
   : createMemoryBackend();
 
 // Sealed media: the per-circle composition (ONE dev bucket per app session, the compositions cached per circle) lives
@@ -562,6 +562,7 @@ export default function CircleLauncherScreen({
   bootFailure = null,
   onRetryBoot = null,
   storedRefusal = false,
+  onDismissStoredRefusal = null,
   // The circle's policy on the governance lane (App.js builds it): stated here when an admin saves and when the
   // create wizard writes a new circle's first policy.
   circlePolicyLane = null,
@@ -3111,6 +3112,11 @@ export default function CircleLauncherScreen({
               <Text style={styles.bootFailed} accessibilityRole="alert" testID="launcher-stored-refused">
                 {t(storedValueRefusedNotice().key)}
               </Text>
+            ) : null}
+            {storedRefusal && typeof onDismissStoredRefusal === 'function' ? (
+              <Pressable onPress={onDismissStoredRefusal} accessibilityRole="button" testID="launcher-stored-refused-ok">
+                <Text style={styles.bootRetry}>{t('circle.stored_value_unreadable_ok')}</Text>
+              </Pressable>
             ) : null}
             {listPaint === 'empty' ? (
               <Text style={styles.muted}>{t('circle.empty')}</Text>

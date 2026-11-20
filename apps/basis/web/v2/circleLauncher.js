@@ -93,7 +93,7 @@ export function renderCircleLauncher(container, {
     if (bootNotice.retry && typeof onRetryBoot === 'function') {
       const retry = document.createElement('button');
       retry.type = 'button';
-      retry.className = 'circle-launcher__boot-retry';
+      retry.className = 'cc-btn cc-btn--primary circle-launcher__boot-retry';
       retry.textContent = tr('circle.boot_retry');
       retry.addEventListener('click', () => onRetryBoot());
       container.appendChild(retry);

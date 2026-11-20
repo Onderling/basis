@@ -176,7 +176,7 @@ describe('a strict store never writes over a value it could not open (L1115)', (
 
 describe('what the launcher says (L1115)', () => {
   it('an unreadable content key: its own words and "try again"; anything else: the reason', () => {
-    expect(bootFailureNotice(new ContentKeyUnreadable())).toEqual({ key: 'circle.boot_content_unreadable', params: {}, retry: true });
+    expect(bootFailureNotice(new ContentKeyUnreadable())).toEqual({ key: 'circle.boot_content_unreadable', params: {}, retry: true, startOver: true });
     expect(bootFailureNotice({ code: 'key-unreadable' })?.retry).toBe(true);
     expect(bootFailureNotice({ code: 'AGENT_WIRING_FAILED', cause: new ContentKeyUnreadable() })?.retry).toBe(true);
     expect(bootFailureNotice(new Error('boom'))).toEqual({ key: 'circle.boot_failed', params: { reason: 'boom' }, retry: false });

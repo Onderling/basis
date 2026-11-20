@@ -232,6 +232,14 @@ async function stopOnUnreadable(line, what) {
   console.error(`${line} Failed starts in a row: ${run.count}, since ${run.since}.`);
   if (run.count >= Number(BOX_START_FAILURES_BEFORE_HOLD)) {
     console.error(`device-runner: STOPPED TRYING after ${run.count} starts in a row that could not read this box's keys. Nothing was changed and nothing runs. Fix the data folder (the missing or damaged file, the right mount) or restore the box from the phrase (--enrol), then restart the container. Waiting.`);
+    // and on the bot's admin line, when the box knows its token and its admin (no agent runs: one plain Bot API call)
+    const token = String(process.env.TG_BOT_TOKEN ?? '').trim(); const admin = String(process.env.TG_ADMIN_UID ?? '').trim();
+    if (token && admin && typeof fetch === 'function') {
+      const root = (String(process.env.ONDERLING_TELEGRAM_API_ROOT ?? '').trim() || 'https://api.telegram.org').replace(/\/+$/, '');
+      try {
+        await fetch(`${root}/bot${token}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: admin, text: t('circle.bot.box_stopped_trying', { count: run.count }) }), signal: AbortSignal.timeout?.(10_000) });
+      } catch { /* the log says it either way */ }
+    }
     // stay up, idle: the container's restart policy would otherwise loop. ONE timeout, the longest a timer takes (about
     // 24 days), no clock: when it ends the box exits once, restarts, counts one more and holds again
     await new Promise((resolve) => { setTimeout(resolve, 2 ** 31 - 1); });

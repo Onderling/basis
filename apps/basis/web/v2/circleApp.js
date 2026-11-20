@@ -66,6 +66,9 @@ import { createSettingsPodMedium } from '../../src/v2/settingsPodMedium.js';
 import { inviteDeepLink } from '../../src/v2/inviteDeepLink.js';
 import { alphaViewMode, isAlphaTab, ALPHA_FALLBACK_TAB } from '../../src/v2/alphaSurface.js';
 import { runPendingForget, markerVaultOver, circleIdsFrom } from '../../src/v2/enrolForgets.js';
+import { checkPhraseForThisDevice, startDeviceOver, finishStartOver, wipeKeyValueStorage, restorePhraseWithoutAgent, START_OVER_PENDING_KEY } from '../../src/v2/startOver.js';
+import { pickRootKeyStore } from '../../src/core/agent/ownerRootCustody.js';
+import { makeBrowserVault } from '@onderling/secure-agent';
 import { DEFAULT_PERSONA } from '../../src/v2/contactPersona.js';
 import { contactAddSheetModel, addContactAs, contactLensModel, changeContactLens, contactThreadSelfFor } from '../../src/v2/contactLens.js';
 import { renderContactLensPanel } from './contactLensPanel.js';
@@ -3988,6 +3991,7 @@ function paintLauncher() {
     storedRefusal: _storedRefusal,
     onDismissStoredRefusal: () => { _storedRefusal = false; _storedRefusalSaid = true; try { paintLauncher(); } catch { /* the next visit */ } },
     onRetryBoot:  () => window.location.reload(),
+    onStartOver:  () => showStartOver(),
     t,
     onOpenCircle: showDetail,
     onNewCircle:  createCircle,
@@ -9585,11 +9589,62 @@ async function showSettings(id) {
   rerender();
 }
 
+// ── START THIS DEVICE OVER FROM YOUR PHRASE (L1115) ─────────────────────────────────────────────────────────────
+// The second door on the start-failure notice (after "Try again"), and what a boot opens after a start-over was cut
+// short. The order is the shared one (startOver.js): the phrase first and checked, the confirm in words, then mark,
+// wipe, the restore without an agent, unmark; then a fresh start of the app.
+async function wipeThisBrowser() {
+  await wipeKeyValueStorage(window.localStorage, `cc-owner-root:${START_OVER_PENDING_KEY}`);
+  try { window.sessionStorage?.clear?.(); } catch { /* none */ }
+  const dbs = (await globalThis.indexedDB?.databases?.().catch(() => [])) ?? [];
+  await Promise.all(dbs.map((d) => new Promise((resolve) => {
+    try { const req = indexedDB.deleteDatabase(d.name); req.onsuccess = req.onerror = req.onblocked = () => resolve(); } catch { resolve(); }
+  })));
+}
+function showStartOver({ resumed = false } = {}) {
+  hideTabBar?.();
+  const ownerRootVault = makeBrowserVault('cc-owner-root:');
+  const el = (tag, attrs = {}, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'onclick') n.addEventListener('click', v); else n.setAttribute(k, v); } for (const c of kids) n.append(c); return n; };
+  const said = el('p', { role: 'alert', class: 'start-over__said' });
+  const box = el('textarea', { rows: '4', class: 'start-over__phrase', 'aria-label': t('circle.start_over.phrase_label'), autocomplete: 'off', spellcheck: 'false' });
+  const page = el('section', { class: 'start-over' },
+    el('h2', {}, t('circle.start_over.button')),
+    el('p', {}, t(resumed ? 'circle.start_over.resumed' : 'circle.start_over.lede')),
+    box, said);
+  const go = el('button', { type: 'button', class: 'cc-btn cc-btn--primary', onclick: async () => {
+    said.textContent = '';
+    const checked = await checkPhraseForThisDevice(box.value, { rootKeyStore: pickRootKeyStore({ fallbackVault: ownerRootVault }), markerVault: markerVaultOver(window.localStorage) });
+    if (!checked.ok) { said.textContent = t(`circle.start_over.error_${checked.code === 'other-phrase' ? 'other_phrase' : 'invalid'}`); return; }
+    // the confirm in words: what is lost, what comes back; nothing is cleared before it
+    const confirm = el('div', { class: 'start-over__confirm' },
+      el('p', {}, t('circle.start_over.confirm_body')),
+      el('button', { type: 'button', class: 'cc-btn cc-btn--danger', onclick: async () => {
+        said.textContent = t('circle.start_over.working');
+        const r = await startDeviceOver({
+          phrase: checked.phrase, markerVault: markerVaultOver(window.localStorage), wipe: wipeThisBrowser,
+          restore: (p) => restorePhraseWithoutAgent({ mnemonic: p, rootKeyStore: pickRootKeyStore({ fallbackVault: makeBrowserVault('cc-owner-root:') }), chatVault: makeBrowserVault('cc-chat-id:'), markerVault: makeBrowserVault('cc-owner-root:') }),
+        }).catch(() => ({ ok: false, code: 'storage' }));
+        if (r.ok) { window.location.reload(); return; }
+        said.textContent = t('circle.start_over.error_storage');
+      } }, t('circle.start_over.confirm_yes')),
+      el('button', { type: 'button', class: 'cc-btn cc-btn--quiet', onclick: () => { confirm.remove(); said.textContent = t('circle.start_over.not_confirmed'); } }, t('circle.start_over.confirm_no')));
+    page.append(confirm);
+  } }, t('circle.start_over.submit'));
+  const back = el('button', { type: 'button', class: 'cc-btn cc-btn--quiet', onclick: () => window.location.reload() }, t('circle.start_over.confirm_no'));
+  page.append(go, back);
+  rootEl.replaceChildren(page);
+}
+
 // Was an enrol offer waiting when this boot started? Read before anything can consume it: a ceremony with an offer
 // waiting was an ADD, and the restore-finish flow ("your circles are not here") is not for it.
 let offerPendingAtBoot = false;
 
 async function boot() {
+  // FIRST OF ALL: a start-over cut short (L1115) is finished before anything reads, and its phrase page opens again
+  try {
+    const so = await finishStartOver({ markerVault: markerVaultOver(window.localStorage), wipe: wipeThisBrowser });
+    if (so.startedOver) { showStartOver({ resumed: true }); return; }
+  } catch { /* the next start tries again */ }
   // THE SIGNATURE CHECK: WebCrypto's batch behind the one strict rule, after its self-test (the vectors, an honest and a
   // tampered signature); a browser without Ed25519 in WebCrypto keeps tweetnacl. Reads then check ahead in one batch.
   try { const eq = await installWebSignatureEquation(globalThis.crypto?.subtle); console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`); } catch { /* tweetnacl stays */ }

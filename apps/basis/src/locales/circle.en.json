@@ -5983,6 +5983,7 @@
     "value_delete": "delete",
     "value_own": "their own",
     "screen_confirm_toolbox": "{{label}} wants to connect for the toolbox {{toolbox}}.",
+    "box_stopped_trying": "The household's box has stopped: {{count}} starts in a row could not read its keys. Nothing was changed and the bot does not answer now. Whoever runs the box: fix its data folder or restore it from the phrase (--enrol), then restart it.",
     "screen_toolbox_not_on": "The toolbox {{toolbox}} is not on in this household, so its page cannot connect. Ask the admin to switch it on (/toolbox).",
     "toolbox_not_yours": "This page may only use its own toolbox, not {{toolbox}}.",
     "screen_confirm_question": "A screen wants to connect as you. Which code does that screen show? Tap that code. If you do not see it, or did not do this yourself: tap \"None of these\".",
@@ -9704,6 +9705,64 @@
   "stored_value_unreadable_ok": {
     "text": "OK",
     "doc": "Launcher (ledger L1115): dismisses the refused-save notice; it is said once a session."
+  },
+  "start_over": {
+    "lede": {
+      "text": "Type your recovery phrase (24 words). Nothing is removed until it is checked and you confirm.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "resumed": {
+      "text": "Starting this device over was cut short. Type your recovery phrase again to finish it.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "phrase_label": {
+      "text": "Your recovery phrase",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "submit": {
+      "text": "Check the phrase",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "working": {
+      "text": "Starting this device over…",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "error_invalid": {
+      "text": "That is not a valid recovery phrase (24 words). Nothing was changed.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "error_other_phrase": {
+      "text": "This is another phrase than this device's. Nothing was changed.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "error_storage": {
+      "text": "Starting over did not finish. Start the app again: it goes on where it stopped.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "not_confirmed": {
+      "text": "Nothing was changed.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "button": {
+      "text": "Start this device over from your phrase",
+      "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    },
+    "confirm_title": {
+      "text": "Start this device over?",
+      "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    },
+    "confirm_body": {
+      "text": "Everything Basis keeps on this device is removed, and your phrase sets it up again.\n\nWhat comes back: your circles and what is in them, from the other members; your own things, from your other devices.\n\nWhat is lost: whatever was only on this device and never reached another device or member (a message that was not sent yet, a draft, this device's own settings).",
+      "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    },
+    "confirm_no": {
+      "text": "Not now",
+      "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    },
+    "confirm_yes": {
+      "text": "Start over",
+      "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    }
   },
   "boot_failed": {
     "text": "The app could not start ({{reason}}). Your data is still on this device — nothing here is empty, it is unread.",

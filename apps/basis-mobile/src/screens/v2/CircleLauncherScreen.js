@@ -350,6 +350,7 @@ import CircleGovernanceScreen from './CircleGovernanceScreen.js';   // Wave C §
 import { bindCircleGovernance, openPolicyProposals, makeGovernanceBroadcast } from '../../../../basis/src/v2/governanceAppWiring.js';   // §8 reports + settings-consensus governance
 import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-circle delivery — personal "shared with me" inbox (web≡mobile)
 import { launcherListPaint } from './launcherListPaint.js';
+import { bootFailureNotice, storedValueRefusedNotice } from '../../../../basis/src/v2/bootFailure.js';
 import { DEVELOPER_PARAM_KEY } from '../../../../basis/src/v2/paramsService.js';
 import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
 import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
@@ -550,6 +551,11 @@ export default function CircleLauncherScreen({
   // A failed agent boot, said HERE (web parity: `bootFailure` on the launcher). App.js used to hand it
   // only to the hidden ChatScreen, so the person saw "No circles yet." and concluded their data was gone.
   bootError = null,
+  // the boot's error itself (its kind decides the words: `bootFailureNotice`), "try again" (App.js runs the boot once
+  // more), and a save refused because the value it would replace could not be opened (L1115)
+  bootFailure = null,
+  onRetryBoot = null,
+  storedRefusal = false,
   // The circle's policy on the governance lane (App.js builds it): stated here when an admin saves and when the
   // create wizard writes a new circle's first policy.
   circlePolicyLane = null,
@@ -2983,6 +2989,7 @@ export default function CircleLauncherScreen({
   }
 
   const listPaint = launcherListPaint({ loading, settled: launcherSettled, count: circles.length, bootError });
+  const bootNotice = bootFailureNotice(bootFailure ?? bootError);
   return (
     <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="circles" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
       <View style={styles.page} testID="circle-launcher">
@@ -3011,9 +3018,19 @@ export default function CircleLauncherScreen({
             {/* β.1 — Nearby + Mijn dingen launcher shortcuts removed.
                 Nearby lives under the Mij tab; My-things is a seeded screen
                 under the Screens tab. */}
-            {bootError ? (
+            {bootNotice ? (
               <Text style={styles.bootFailed} accessibilityRole="alert" testID="launcher-boot-failed">
-                {t('circle.boot_failed', { reason: String(bootError) })}
+                {t(bootNotice.key, bootNotice.params)}
+              </Text>
+            ) : null}
+            {bootNotice?.retry && typeof onRetryBoot === 'function' ? (
+              <Pressable onPress={onRetryBoot} accessibilityRole="button" testID="launcher-boot-retry">
+                <Text style={styles.bootRetry}>{t('circle.boot_retry')}</Text>
+              </Pressable>
+            ) : null}
+            {storedRefusal ? (
+              <Text style={styles.bootFailed} accessibilityRole="alert" testID="launcher-stored-refused">
+                {t(storedValueRefusedNotice().key)}
               </Text>
             ) : null}
             {listPaint === 'empty' ? (
@@ -6800,6 +6817,7 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   shortcut:     { paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: theme.color.line, borderRadius: 16, backgroundColor: theme.color.card, marginBottom: 6, alignSelf: 'flex-start' },
   shortcutText: { fontSize: 13, color: theme.color.ink },
   bootFailed: { color: theme.color.ink, fontSize: 14, marginVertical: 10, lineHeight: 20 },
+  bootRetry: { color: theme.color.accent, fontSize: 15, fontWeight: '600', marginBottom: 10 },
   muted:      { color: theme.color.inkSoft, fontStyle: 'italic', paddingVertical: 10 },
   inviteBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   inviteCard: { backgroundColor: theme.color.paper, borderRadius: 14, padding: 20, alignItems: 'center', maxWidth: 320 },

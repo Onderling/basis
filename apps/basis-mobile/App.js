@@ -37,6 +37,7 @@ import ActStateBar from './src/rn/ActStateBar.js';
 // peer-router (inbound receipts) and CircleLauncherScreen's bubbles (rendering) share an instance.
 // Two maps would mean receipts advancing a state no bubble reads.
 import { createAppDeliveryMap } from '../basis/src/v2/deliveryState.js';
+import { onStoredValueRefused } from '../basis/src/v2/localStoreSeal.js';
 import { makeGiveUpConsumers } from '../basis/src/v2/deliveryGiveUp.js';
 import {
   makeReceiptSender, asyncStorageDeliveryIo, createDeliverySettingsStore,
@@ -140,6 +141,13 @@ export default function App() {
   // A phrase ceremony ran on this device and the restore-finish flow has not asked yet (web parity).
   const [restoreFinishPending, setRestoreFinishPending] = useState(false);
   const [bootError, setBootError] = useState(null);
+  // the boot's error itself (the launcher reads its kind: `bootFailureNotice`), a counter "try again" bumps to run the
+  // boot once more, and a save refused because the value it would replace could not be opened (L1115)
+  const [bootFailure, setBootFailure] = useState(null);
+  const [bootAttempt, setBootAttempt] = useState(0);
+  const retryBoot = useCallback(() => { setBootError(null); setBootFailure(null); setBootAttempt((n) => n + 1); }, []);
+  const [storedRefusal, setStoredRefusal] = useState(false);
+  useEffect(() => onStoredValueRefused(() => setStoredRefusal(true)), []);
 
   // Shared EventLog: boot-time agent events + ChatScreen's inbound peer
   // events land in one log so /logs shows everything.
@@ -635,11 +643,11 @@ export default function App() {
         }
       } catch (err) {
         dlog.warn('boot failed (App)', err?.message ?? err);
-        if (!cancelled) setBootError(err?.message ?? String(err));
+        if (!cancelled) { setBootError(err?.message ?? String(err)); setBootFailure(err ?? null); }
       }
     })();
     return () => { cancelled = true; };
-  }, [firstRun]);
+  }, [firstRun, bootAttempt]);
 
   if (!localeReady) return null;
   if (firstRun === 'checking') return null;   // probe still in-flight
@@ -699,6 +707,9 @@ export default function App() {
         <CircleLauncherScreen
           bundle={bundle}
           bootError={bootError}
+          bootFailure={bootFailure}
+          onRetryBoot={retryBoot}
+          storedRefusal={storedRefusal}
           deliveryStateMap={deliveryStateMapRef.current}
           registerCircleBotSink={registerCircleBotSink}
           onAcceptFallback={acceptFallbackOffer}

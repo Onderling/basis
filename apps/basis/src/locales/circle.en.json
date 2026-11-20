@@ -9689,6 +9689,18 @@
       }
     }
   },
+  "boot_content_unreadable": {
+    "text": "Your data on this device could not be opened. Nothing was changed: it is all still here. Try again; if this keeps happening, restore from your recovery phrase (that starts this device over and brings your circles back).",
+    "doc": "Launcher (ledger L1115): the content key is stored but could not be read at the start; nothing was minted or written. Try again first, the phrase second."
+  },
+  "boot_retry": {
+    "text": "Try again",
+    "doc": "Launcher (ledger L1115): the button under a start failure that can pass on a second try; starts the app again."
+  },
+  "stored_value_unreadable": {
+    "text": "A change was not saved: the value it would replace could not be opened on this device, so it was kept. Try again after restarting the app; if this keeps happening, restore from your recovery phrase.",
+    "doc": "Launcher (ledger L1115): a save the person made was refused because the stored value it would replace could not be opened with this device's key; it was kept, not overwritten."
+  },
   "boot_failed": {
     "text": "The app could not start ({{reason}}). Your data is still on this device — nothing here is empty, it is unread.",
     "doc": "Launcher: a failed agent boot is SAID where the person looks, instead of degrading into \"No circles yet.\" (the walk's W28/W29)."

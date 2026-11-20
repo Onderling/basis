@@ -49,7 +49,30 @@ function randomContentKey() {
 }
 
 /**
- * Read this device's content key from the sealed vault, minting and storing it on first use.
+ * The content key is stored but could not be read (ledger L1115): the vault entry would not decrypt, the storage
+ * failed at start, or what is stored is not a key. NOT "nothing stored": a new key here would make every sealed row on
+ * this device unreadable and let the stores write their defaults over what they could not open. So nothing is minted
+ * and nothing is written; the boot stops before any content store starts, and the shell says so in words (try again,
+ * then restore from the phrase). `code` is what a shell reads (`isContentKeyUnreadable`), never the message.
+ */
+export class ContentKeyUnreadable extends Error {
+  constructor(cause) {
+    super('The content key on this device could not be read; nothing was changed');
+    this.name = 'ContentKeyUnreadable';
+    this.code = 'content-key-unreadable';
+    if (cause !== undefined) this.cause = cause;
+  }
+}
+
+/** True for a ContentKeyUnreadable, also one that crossed a realm or a bundle boundary (by its code). */
+export function isContentKeyUnreadable(err) {
+  return err instanceof ContentKeyUnreadable || err?.code === 'content-key-unreadable';
+}
+
+/**
+ * Read this device's content key from the sealed vault, minting and storing it ONLY when the vault answered that
+ * nothing is stored (null or an empty string). A read that failed, or a stored value that is not a key, throws
+ * `ContentKeyUnreadable` and writes nothing: the next start that reads it finds the same key (ledger L1115).
  *
  * Idempotent: the second call returns the stored key, so every store on the device seals under one key and
  * a re-boot opens what the last boot wrote.
@@ -62,8 +85,11 @@ export async function ensureContentKey(sealedVault) {
   if (!sealedVault || typeof sealedVault.get !== 'function' || typeof sealedVault.set !== 'function') {
     throw new Error('ensureContentKey: a sealed vault is required');
   }
-  const existing = await sealedVault.get(CONTENT_AT_REST_VAULT_KEY).catch(() => null);
+  let existing;
+  try { existing = await sealedVault.get(CONTENT_AT_REST_VAULT_KEY); }
+  catch (err) { throw new ContentKeyUnreadable(err); }
   if (typeof existing === 'string' && existing.length > 0) return existing;
+  if (existing != null && existing !== '') throw new ContentKeyUnreadable();
   const minted = seedToString(randomContentKey());
   await sealedVault.set(CONTENT_AT_REST_VAULT_KEY, minted);
   return minted;

@@ -188,9 +188,12 @@ export async function endPreTicketToolboxGrants({ listGrants, revokeView, notify
  * @param {(name: string) => Promise<boolean>} [a.toolboxOn]  is this toolbox on here
  * @param {(name: string) => Promise<{page: string, ops: string[]}|null>} [a.toolboxPage]  an ON toolbox's placed page:
  *   its address and the ops the operator placed for it (L1113); null when it has none
+ * @param {(person: string, toolbox: string) => Promise<string|null>} [a.pageEntry]  an ENTRY for a toolbox page the box
+ *   serves itself (`toolboxPages.js`): it rides in the link's query beside the ticket; null when the box does not serve it
+ * @param {(person: string) => Promise<unknown>} [a.dropPageEntries]  a person who leaves loses their page entries and cookies
  * @param {() => number} [a.now]
  */
-export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeView, listGrants, notify = null, ask = null, tellRefused = null, expectRefusal = null, sendPrivately, where, verifyLaunch = null, personOfTelegram = null, launchButton = null, launchLabel = () => 'Telegram', toolboxOn = null, toolboxPage = null, now = Date.now, rand = Math.random }) {
+export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeView, listGrants, notify = null, ask = null, tellRefused = null, expectRefusal = null, sendPrivately, where, verifyLaunch = null, personOfTelegram = null, launchButton = null, launchLabel = () => 'Telegram', toolboxOn = null, toolboxPage = null, pageEntry = null, dropPageEntries = null, now = Date.now, rand = Math.random }) {
   const mine = async (person) => ((await listGrants()) ?? []).filter((g) => g?.actingAs === person);
   // when each person last connected a screen: a code tapped again within the offer's window says "connected"
   const connectedAt = new Map();
@@ -364,7 +367,12 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       const placed = typeof toolboxPage === 'function' ? await toolboxPage(name) : null;
       if (!placed?.page) return { ok: false, reason: 'toolbox-no-page', toolbox: name };
       const { ticket, until } = await mintTicket(person, name);
-      const link = encodeScreenStartLink(placed.page, { botAddress, relayUrl, botName, ticket, toolbox: name });
+      // a page the box serves itself lets a browser in only with an ENTRY, made with the ticket: in the query, where the
+      // page server reads it; the ticket stays in the fragment, which never reaches a server (or its log)
+      let address = placed.page;
+      const entry = typeof pageEntry === 'function' ? await pageEntry(person, name) : null;
+      if (entry) { const u = new URL(placed.page); u.hash = ''; u.searchParams.set('e', entry); address = u.toString(); }
+      const link = encodeScreenStartLink(address, { botAddress, relayUrl, botName, ticket, toolbox: name });
       // the thread remembers a line WITHOUT the link: a live ticket does not belong in memory (as `start()`)
       const sent = await sendPrivately(person, text(link, Math.round(SCREEN_PAIRING_TTL_MS / 60000)), remembered ?? '', null);
       if (!sent?.ok) return { ok: false, reason: sent?.reason ?? 'not-reachable' };
@@ -459,11 +467,23 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       return { ok: Boolean(await revokeView(g.viewPubKey)), viewPubKey: g.viewPubKey };
     },
 
-    /** Revoking a person drops every screen of theirs, and the link they may still hold. */
+    /**
+     * May this person enter this toolbox's page (the page server asks on every request): in the household, the toolbox
+     * on with a page, and their role holding useTool for it, the same cut the page's grant gets.
+     */
+    async mayUseToolbox(person, toolbox) {
+      if (typeof isAdmitted !== 'function' || !(await isAdmitted(person))) return false;
+      const placed = typeof toolboxPage === 'function' ? await toolboxPage(String(toolbox ?? '')) : null;
+      if (!placed?.page) return false;
+      return (await opsFor(person, String(toolbox))).includes('tools.useTool');
+    },
+
+    /** Revoking a person drops every screen of theirs, the link they may still hold, and their page entries and cookies. */
     async dropAll(person) {
       threads.setScreenNonce(person, null);
       door.drop(person);
       threads.setTelegramScreen(person, null);
+      try { await dropPageEntries?.(person); } catch { /* each page request asks again whether the person is in */ }
       let n = 0;
       for (const g of await mine(person)) if (await revokeView(g.viewPubKey)) n += 1;
       return n;

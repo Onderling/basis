@@ -375,7 +375,7 @@ export function sendDecisionFields(decision, explained = null, result = null, ta
   }
   if (result) {
     // a send without the hold guarantee answers whatever its transport answered: handed over, the weakest claim
-    out.outcome = result.delivered === true ? 'delivered'
+    out.outcome = result.delivered === true ? 'written'   // the transport took it: written, not delivered
       : result.held === true ? `held${result.reason ? `:${result.reason}` : ''}`
       : result.delivered === false ? `not-sent${result.reason ? `:${result.reason}` : ''}`
       : 'sent';

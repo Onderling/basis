@@ -6337,7 +6337,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const prev = waitingByMsg.get(msgId);
       if (!waiting.length && !prev) return;
       if (prev && prev.size === waiting.length && waiting.every((w) => prev.has(w))) return;   // nothing changed: no new entry
-      const reached = outcomes.filter((o) => o?.outcome === 'delivered' || String(o?.outcome ?? '').startsWith('held')).length;
+      const reached = outcomes.filter((o) => o?.outcome === 'written' || String(o?.outcome ?? '').startsWith('held')).length;
       opts.deviceLog?.appendSilentEntry?.({ circleId, kind: 'delivery-state', payload: { msgId, state: ON_ITS_WAY, waiting, reached, of: outcomes.length } });
       if (waiting.length) { waitingByMsg.set(msgId, new Set(waiting)); lateRecipients.noAddress(circleId, waiting); }
       else waitingByMsg.delete(msgId);

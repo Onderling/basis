@@ -575,7 +575,7 @@ async function _fanOutViaReliableSend({
         }
         sent += 1;
         failure = null;
-        last = { webid, addr, outcome: r?.held ? `held${r.reason ? `:${r.reason}` : ''}` : 'delivered' };
+        last = { webid, addr, outcome: r?.held ? `held${r.reason ? `:${r.reason}` : ''}` : 'written' };   // written to the transport: a claim about this device, never about the recipient
         // Held because this circle has NO route it may use (its points cannot carry per-circle addressing
         // and the user has not accepted the fallback) — a standing fact, not a peer being briefly offline.
         // Report it as BLOCKED so it reaches the same offer the other blocked case does: holding silently

@@ -8,7 +8,7 @@
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { availabilityRow } from '../../src/v2/mijWords.js';
 
-export function renderPersonaPanel(container, { model, t, availability = null, now = Date.now(), onAvailability, onTab, onShowAs, onClose } = {}) {
+export function renderPersonaPanel(container, { model, t, availability = null, connected = false, now = Date.now(), onAvailability, onTab, onShowAs, onClose } = {}) {
   if (!container || !model) return null;
   const tr = translatorOr(t, 'personaPanel.js');
   container.innerHTML = '';
@@ -35,7 +35,7 @@ export function renderPersonaPanel(container, { model, t, availability = null, n
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'cc-btn cc-btn--quiet cc-persona-panel__availability';
-    row.textContent = availabilityRow(availability, { now, t: tr });
+    row.textContent = availabilityRow(availability, { now, connected, t: tr });
     row.addEventListener('click', () => onAvailability());
     container.appendChild(row);
   }

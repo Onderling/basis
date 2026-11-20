@@ -17,33 +17,62 @@ export function availabilityReading(record, now = Date.now()) {
   return { key: 'availability', state: 'available' };
 }
 
-// the ring's colour per state: existing theme tokens only (src/v2/theme.js), no palette of its own
-const RING_TOKEN = Object.freeze({ available: 'green', quiet: 'amber', away: 'inkSoft' });
+/**
+ * Is this device connected? The relay fact the shells already show (the connection points list): connected at one of
+ * its relays (`agent.relays.list()` rows' `connected`). No relays, or none answering: not connected.
+ * @param {Array<{connected?: boolean}>|null} rows
+ */
+export function connectedAtRelay(rows) {
+  return Array.isArray(rows) && rows.some((r) => r?.connected === true);
+}
 
 /**
- * The person's availability as a RING around the persona button (Frits 2026-11-20: availability left Vandaag): the
- * state now and the theme colour token that rings the button. Colour is never the only signal: the button's label
- * (`personaButtonLabel`) names the state, and the persona panel says it in words (`availabilityRow`).
- * @returns {{state: 'available'|'quiet'|'away', token: 'green'|'amber'|'inkSoft'}}
+ * The person's presence now: availability AND connection, one of four states, in this precedence (Frits 2026-11-20):
+ * away (holiday) > quiet (quiet hours) > available and connected > available but not connected (`offline`).
+ * @returns {{state: 'away'|'quiet'|'available'|'offline', until?: string|null}}
  */
-export function availabilityRing(record, { now = Date.now() } = {}) {
-  const { state } = availabilityReading(record, now);
+export function presenceReading(record, { now = Date.now(), connected = false } = {}) {
+  const r = availabilityReading(record, now);
+  if (r.state !== 'available') return r;
+  return { key: 'availability', state: connected ? 'available' : 'offline' };
+}
+
+// the ring's colour per state: existing theme tokens only (src/v2/theme.js), no palette of its own; away is calm and
+// clearly not grey, never danger
+const RING_TOKEN = Object.freeze({ available: 'green', offline: 'inkSoft', quiet: 'amber', away: 'blue' });
+
+/**
+ * The person's presence as a RING around the persona button (Frits 2026-11-20: availability left Vandaag): the state
+ * now (`presenceReading`) and the theme colour token that rings the button. Colour is never the only signal: the
+ * button's label (`personaButtonLabel`) names the state, and the persona panel says it in words (`availabilityRow`).
+ * @returns {{state: 'away'|'quiet'|'available'|'offline', token: 'blue'|'amber'|'green'|'inkSoft'}}
+ */
+export function availabilityRing(record, { now = Date.now(), connected = false } = {}) {
+  const { state } = presenceReading(record, { now, connected });
   return { state, token: RING_TOKEN[state] };
 }
 
-/**
- * The persona panel's one availability row: the state now in words, and that a tap changes it ("beschikbaar · tik om
- * te wijzigen"). A tap opens the availability screen.
- */
-export function availabilityRow(record, { now = Date.now(), t } = {}) {
-  if (typeof t !== 'function') return '';
-  return t('circle.persona_panel.availability_row', { state: availabilityWords(availabilityReading(record, now), { t }) });
+/** The presence in words: away/quiet as the availability words; available as "beschikbaar, (niet) verbonden". */
+export function presenceWords(reading, { t } = {}) {
+  if (!reading || typeof t !== 'function') return '';
+  if (reading.state === 'available') return t('circle.profile.reading_available_connected');
+  if (reading.state === 'offline') return t('circle.profile.reading_available_offline');
+  return availabilityWords(reading, { t });
 }
 
-/** The persona button's spoken name with the state it is ringed by ("Persona, beschikbaar"). */
-export function personaButtonLabel(record, { now = Date.now(), t } = {}) {
+/**
+ * The persona panel's one availability row: the presence now in words, and that a tap changes it ("beschikbaar, niet
+ * verbonden · tik om te wijzigen"). A tap opens the availability screen.
+ */
+export function availabilityRow(record, { now = Date.now(), connected = false, t } = {}) {
   if (typeof t !== 'function') return '';
-  return t('circle.persona_button.label_with_state', { state: availabilityWords(availabilityReading(record, now), { t }) });
+  return t('circle.persona_panel.availability_row', { state: presenceWords(presenceReading(record, { now, connected }), { t }) });
+}
+
+/** The persona button's spoken name with the state its ring shows ("Persona, beschikbaar, verbonden"). */
+export function personaButtonLabel(record, { now = Date.now(), connected = false, t } = {}) {
+  if (typeof t !== 'function') return '';
+  return t('circle.persona_button.label_with_state', { state: presenceWords(presenceReading(record, { now, connected }), { t }) });
 }
 
 /**

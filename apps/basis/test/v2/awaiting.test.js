@@ -80,12 +80,20 @@ describe('the block\'s title names the kinds in it, not an appeal (Frits 2026-11
 
   it('the en bundle likewise', () => {
     expect(awaitingTitle(items('vote', 'rsvp'), { t: tOf(en) })).toBe('Votes and invitations');
-    expect(awaitingTitle(items('shared', 'device', 'vote'), { t: tOf(en) })).toMatch(/^Votes, .+ and .+$/);
+    expect(awaitingTitle(items('shared', 'device', 'vote'), { t: tOf(en) })).toBe('Votes and other requests');
   });
 
-  it('every kind the block can hold has a place in the order and its words in both bundles', () => {
-    expect(AWAITING_TITLE_ORDER).toEqual(['vote', 'rsvp', 'task', 'question', 'device', 'shared']);
-    for (const kind of AWAITING_TITLE_ORDER) for (const b of [nl, en]) expect(b.mij.awaiting_kind?.[kind]?.text, kind).toBeTruthy();
+  it('device offers and shared copies are one word, "andere verzoeken", last and said once', () => {
+    const t = tOf(nl);
+    expect(awaitingTitle(items('vote', 'rsvp', 'device', 'shared'), { t })).toBe('Stemmen, uitnodigingen en andere verzoeken');
+    expect(awaitingTitle(items('shared'), { t })).toBe('Andere verzoeken');
+    expect(awaitingTitle(items('device', 'shared'), { t })).toBe('Andere verzoeken');
+  });
+
+  it('every kind the block can hold has a word in the order, in both bundles', () => {
+    expect(AWAITING_TITLE_ORDER).toEqual([['vote'], ['rsvp'], ['task'], ['question'], ['device', 'shared']]);
+    for (const w of ['vote', 'rsvp', 'task', 'question', 'other']) for (const b of [nl, en]) expect(b.mij.awaiting_kind?.[w]?.text, w).toBeTruthy();
+    for (const b of [nl, en]) for (const gone of ['device', 'shared']) expect(b.mij.awaiting_kind?.[gone], gone).toBeUndefined();
     expect(awaitingTitle([], { t: tOf(nl) })).toBe('');
   });
 });

@@ -203,6 +203,7 @@ import { plusSuggestionPool, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plus
 import { circleListsFor } from '../../src/v2/circleGate.js';
 import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderPersonaButton } from './personaButton.js';
+import { connectedAtRelay } from '../../src/v2/mijWords.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
 import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../src/v2/personaSet.js';
 import { renderPersonaSwitcher } from './personaSwitcher.js';
@@ -3100,6 +3101,8 @@ function runPlusTarget(button) {
 // Loaded once (and again after the editor closes); every tab repaints the one element.
 let _personaButton = null;          // { name, initials, picture } from the shared loader
 let _availabilityNow = null;        // the stored availability: the persona button's ring and the panel's row say it
+// …with the connection: the relay fact the connection points list shows (connected at one of this device's relays)
+const connectedNow = () => { try { return connectedAtRelay(_peerAgent?.relays?.list?.() ?? []); } catch { return false; } };
 let _personaButtonUrl = null;       // the picture, opened with this device's own opener
 let _personaButtonEl = null;
 // THE SWITCHER'S SET: this device's selves (`personasHere`) and which of them the app shows (the screens book's
@@ -3136,7 +3139,7 @@ function paintPersonaButton() {
   }
   placePersonaButton();
   // the persona button opens the persona panel over the tab; the settings button beside it, the settings home
-  renderPersonaButton(_personaButtonEl, { avatar: _personaButton, pictureUrl: _personaButtonUrl, availability: _availabilityNow, t,
+  renderPersonaButton(_personaButtonEl, { avatar: _personaButton, pictureUrl: _personaButtonUrl, availability: _availabilityNow, connected: connectedNow(), t,
     onOpen: () => showPersonaPanel(), onSettings: () => showSettingsHome({ from: _activeTab }) });
 }
 async function refreshPersonaButton() {
@@ -5093,7 +5096,7 @@ async function showPersonaPanel(selected = null) {
   card.parentElement?.addEventListener('click', (e) => { if (e.target === card.parentElement) shut(); });   // a touch outside closes
   const body = renderPersonaPanel(card, { model, t,
     // the availability row: the state in words, a tap to change it; saved, the ring follows and the tab is back
-    availability: _availabilityNow,
+    availability: _availabilityNow, connected: connectedNow(),
     onAvailability: () => { shut(); showAvailability({ onDone: () => { refreshPersonaButton(); backToTab(); } }); },
     onTab: (id) => showPersonaPanel(id),
     onShowAs: () => { shut(); showPersonaSwitcher(); },

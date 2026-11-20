@@ -17,7 +17,7 @@ describe('renderPersonaButton', () => {
     const b = el.querySelector('.cc-persona-button__button');
     // its spoken name carries the availability its ring shows (no record: available)
     expect(b.getAttribute('aria-label')).toMatch(/^circle\.persona_button\.label_with_state/);
-    expect(b.dataset.availability).toBe('available');
+    expect(b.dataset.availability).toBe('offline');   // no relay connected: available, not connected
     b.click();
     expect(onOpen).toHaveBeenCalled();
   });

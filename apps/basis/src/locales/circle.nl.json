@@ -7183,6 +7183,14 @@
     "no_name_yet": {
       "text": "Nog geen naam",
       "doc": "Me's title while the person has no handle — never the tab's own word in its place."
+    },
+    "reading_available_connected": {
+      "text": "beschikbaar, verbonden",
+      "doc": "The persona button ring and panel row: available, and this device is connected at one of its relays (presenceWords)."
+    },
+    "reading_available_offline": {
+      "text": "beschikbaar, niet verbonden",
+      "doc": "The persona button ring and panel row: available, but this device is not connected at any relay (presenceWords)."
     }
   },
   "blocked": {
@@ -8714,13 +8722,9 @@
         "text": "vragen",
         "doc": "The \"Wacht op jou\" block title: the word for the question kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
       },
-      "device": {
-        "text": "apparaat-aanbiedingen",
-        "doc": "The \"Wacht op jou\" block title: the word for the device kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
-      },
-      "shared": {
-        "text": "gedeelde kopieën",
-        "doc": "The \"Wacht op jou\" block title: the word for the shared kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      "other": {
+        "text": "andere verzoeken",
+        "doc": "The \"Wacht op jou\" block title: ONE word for device offers and shared copies together, last in the order (awaitingTitle)."
       }
     },
     "awaiting_title_separator": {

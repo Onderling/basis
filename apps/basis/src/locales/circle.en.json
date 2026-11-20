@@ -7181,6 +7181,14 @@
     "no_name_yet": {
       "text": "No name yet",
       "doc": "Me's title while the person has no handle — never the tab's own word in its place."
+    },
+    "reading_available_connected": {
+      "text": "available, connected",
+      "doc": "The persona button ring and panel row: available, and this device is connected at one of its relays (presenceWords)."
+    },
+    "reading_available_offline": {
+      "text": "available, not connected",
+      "doc": "The persona button ring and panel row: available, but this device is not connected at any relay (presenceWords)."
     }
   },
   "blocked": {
@@ -8717,13 +8725,9 @@
         "text": "questions",
         "doc": "The \"Wacht op jou\" block title: the word for the question kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
       },
-      "device": {
-        "text": "device offers",
-        "doc": "The \"Wacht op jou\" block title: the word for the device kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
-      },
-      "shared": {
-        "text": "shared copies",
-        "doc": "The \"Wacht op jou\" block title: the word for the shared kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      "other": {
+        "text": "other requests",
+        "doc": "The \"Wacht op jou\" block title: ONE word for device offers and shared copies together, last in the order (awaitingTitle)."
       }
     },
     "awaiting_title_separator": {

@@ -46,7 +46,8 @@ test('the persona panel opens over the tab; the settings button comes back to th
   await expect(page.locator('.circle-vandaag__day')).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('.circle-vandaag__availability, .circle-screen__block--availability'), 'nothing of it on Vandaag').toHaveCount(0);
   const button = page.locator('.cc-persona-button__button');
-  await expect(button).toHaveAttribute('data-availability', 'available');
+  // this project runs without a relay: available, but not connected (the grey ring); the label says so in words
+  await expect(button).toHaveAttribute('data-availability', 'offline');
   await expect(button).toHaveAttribute('aria-label', /Persona, /);
   await page.locator('.cc-persona-button').screenshot({ path: 'test-results/persona-button-ring.png' });
   await button.click();

@@ -68,6 +68,9 @@ describe('Vandaag', () => {
     expect(blockOpensWhole(onboarding)).toBe(false);
     expect(blockOpensWhole({ type: 'tasks', status: 'ok' })).toBe(true);
   });
+  it('Vandaag\'s declared top (the availability words, "Wacht op jou") has no "meer": it is no block of the page to open whole', () => {
+    for (const type of ['availability', 'awaiting']) expect(blockOpensWhole({ type, status: 'ok' }), type).toBe(false);
+  });
   it('the persona button is named "Persona", not "Aanpassen"', () => {
     const host = document.createElement('div');
     renderPersonaButton(host, { avatar: { initials: '?' }, t: (k) => nl.persona_button[k.replace('circle.persona_button.', '')]?.text ?? k, onOpen: () => {} });

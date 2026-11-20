@@ -135,13 +135,33 @@ export const BOX_STARTED_FILE = 'box-started';
  * came up) is a loss, not a first start (L1115): a partly restored backup would otherwise read as "nothing stored" and
  * mint new keys over a household. Without the mark it is a first start, also one that was cut short half-way (it goes
  * on). NOT caught: an unmounted data folder (an empty mount point carries no mark and reads as a first start). Pure over
- * `exists`, so a test needs no disk.
+ * `exists` and `list`, so a test needs no disk.
+ *
+ * A folder WITHOUT the mark also ran a box when its registry holds a row: every box that ran before the mark existed
+ * has none, and its first start after the upgrade would otherwise mint a missing vault (the very loss). The registry
+ * row is the sign because a start writes it AFTER both vault files (the boot order: the vaults are made while the
+ * agent's keys are minted, the agent's own registry record when the agent is composed, then `box-started`). So a
+ * start cut short before the registry row left no sign (it goes on), and one cut short after it already wrote both
+ * vault files (nothing is missing: it goes on). Not the device log: a first start that came up may not have written
+ * it yet.
  * @param {string} dataDir @param {(p: string) => boolean} exists
+ * @param {(dir: string) => string[]} [list]  a folder's entry names ([] when there is none)
  * @returns {string[]} the vault files that are missing in a folder that ran a box (empty: go on)
  */
-export function vaultFilesMissing(dataDir, exists) {
-  if (!exists(path.join(dataDir, BOX_STARTED_FILE))) return [];
+export function vaultFilesMissing(dataDir, exists, list = () => []) {
+  if (!folderRanABox(dataDir, exists, list)) return [];
   return BOX_VAULT_FILES.filter((f) => !exists(path.join(dataDir, f)));
+}
+
+/** The box's registry folder (the agent registry, one file per row). */
+export const BOX_REGISTRY_DIR = 'registry';
+
+/** Whether this data folder ran a box before: its mark, or (a box from before the mark) a registry that holds a row. */
+function folderRanABox(dataDir, exists, list) {
+  if (exists(path.join(dataDir, BOX_STARTED_FILE))) return true;
+  let rows = [];
+  try { rows = list(path.join(dataDir, BOX_REGISTRY_DIR)) ?? []; } catch { rows = []; }
+  return rows.some((n) => typeof n === 'string' && n.endsWith('.json'));
 }
 
 /** The mark a start that came up leaves (idempotent). */

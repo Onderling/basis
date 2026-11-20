@@ -19,6 +19,13 @@ describe('the box\'s vault files (L1115)', () => {
   it('a folder that ran a box (its mark) with both vault files: go on', () => {
     expect(vaultFilesMissing(D, has('box-started', 'vault.json', 'chat-vault.json', 'registry'))).toEqual([]);
   });
+  it('no mark but a registry row (a box from before the mark): it ran a box; an empty registry does not count', () => {
+    const rows = (...names) => (dir) => (dir === path.join(D, 'registry') ? names : []);
+    expect(vaultFilesMissing(D, has('vault.json', 'registry'), rows('0d94a5.json'))).toEqual(['chat-vault.json']);
+    expect(vaultFilesMissing(D, has('vault.json', 'chat-vault.json', 'registry'), rows('0d94a5.json'))).toEqual([]);
+    expect(vaultFilesMissing(D, has('vault.json', 'registry'), rows())).toEqual([]);   // a first start cut short
+    expect(vaultFilesMissing(D, has('vault.json'), () => { throw new Error('ENOENT'); })).toEqual([]);
+  });
   it('a folder that ran a box, its chat vault missing (a backup put back without it): a loss', () => {
     expect(vaultFilesMissing(D, has('box-started', 'vault.json', 'device-log'))).toEqual(['chat-vault.json']);
   });

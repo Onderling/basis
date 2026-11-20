@@ -132,7 +132,7 @@ import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
 import { EventLog } from '../src/eventLog.js';
 import { fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
 import { besidePersistDb } from '../src/household/persist.js';
-import { boxStores, vaultFilesMissing, startFailures, markBoxStarted, startBackoffMs, failureIsPermanent, BOX_START_FAILURES_BEFORE_HOLD } from '../src/v2/boxStorage.js';
+import { boxStores, vaultFilesMissing, BOX_REGISTRY_DIR, startFailures, markBoxStarted, startBackoffMs, failureIsPermanent, BOX_START_FAILURES_BEFORE_HOLD } from '../src/v2/boxStorage.js';
 import { resolveVaultPassphrase } from '../src/v2/boxVaultPassphrase.js';
 import { retentionFromDays } from '../src/v2/retentionPref.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, openOfferPersonas, pickByNames, enrolPickArgs, pickPrimary } from '../src/v2/enrollOffer.js';
@@ -258,7 +258,7 @@ async function stopOnUnreadable(line, what, { permanent = false } = {}) {
   process.exit(1);
 }
 {
-  const missing = vaultFilesMissing(dataDir, existsSync);
+  const missing = vaultFilesMissing(dataDir, existsSync, (d) => (existsSync(d) ? readdirSync(d) : []));
   if (missing.length) {
     await stopOnUnreadable(`device-runner: ${missing.join(' and ')} is missing in ${dataDir}, a folder that ran a box before; nothing was changed. Stopping.`, 'vault-file-missing');
   }
@@ -277,7 +277,7 @@ const chatVault = new VaultNodeFs(path.join(dataDir, 'chat-vault.json'), vaultPa
 // that booted unenrolled first (every box does; the service starts before anyone can enrol it) holds the
 // content of a throwaway identity, and that content does not carry over.
 const contentPaths = {
-  registry:  path.join(dataDir, 'registry'),
+  registry:  path.join(dataDir, BOX_REGISTRY_DIR),   // its rows also say "this folder ran a box" (vaultFilesMissing)
   pinboard:     path.join(dataDir, 'pinboard-items.json'),
   household: path.join(dataDir, 'household-items.json'),
   tasks:     path.join(dataDir, 'tasks-items.json'),

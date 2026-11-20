@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,6 +52,22 @@ describe('the box with its vault files missing in a folder that ran a box (L1115
     expect(second.out).not.toMatch(/STOPPED TRYING/);
     expect(JSON.parse(readFileSync(path.join(dataDir, 'start-failures.json'), 'utf8'))).toMatchObject({ count: 2 });
   }, 90_000);
+
+  // A box that ran before this upgrade has no `box-started` (the mark is new), but its registry holds its own record: a
+  // finished start wrote it, after both vault files. Its first start after the upgrade must not mint a missing vault.
+  it('a box that ran before the mark existed (registry rows, no mark), its chat vault gone: stops with words', async () => {
+    const dataDir = mkdtempSync(path.join(tmpdir(), 'box-old-folder-'));
+    cleanup.push(() => rmSync(dataDir, { recursive: true, force: true }));
+    const up = await startOnce(dataDir, { until: /device-runner: up/ });   // a real start that came up: a real old folder
+    expect(up.out, up.out.slice(-800)).toMatch(/device-runner: up/);
+    expect(readdirSync(path.join(dataDir, 'registry')).length, 'the start left no registry row').toBeGreaterThan(0);
+    rmSync(path.join(dataDir, 'box-started'));          // the folder of a box from before the mark
+    rmSync(path.join(dataDir, 'chat-vault.json'));      // a backup put back without its chat vault
+    const again = await startOnce(dataDir, { until: /trying again in|device-runner: up/ });
+    expect(again.out, again.out.slice(-800)).toMatch(/chat-vault\.json is missing/);
+    expect(again.out).not.toMatch(/device-runner: up/);
+    expect(existsSync(path.join(dataDir, 'chat-vault.json')), 'a new chat vault was minted').toBe(false);
+  }, 120_000);
 
   it('a folder without the mark is a first start, also one cut short half-way', async () => {
     const dataDir = mkdtempSync(path.join(tmpdir(), 'box-first-start-'));

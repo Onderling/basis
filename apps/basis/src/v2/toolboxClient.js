@@ -25,6 +25,12 @@ export const TOOL_CALL_TIMEOUT = param({ key: 'tools.callTimeoutMs', scope: PARA
 export const THUMB_MAX_BYTES = param({ key: 'tools.thumbMaxBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15_360 });
 /** …at most this many pictures per reply. */
 export const THUMB_MAX_COUNT = param({ key: 'tools.thumbMaxCount', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 });
+/**
+ * How many things of one shop a door that shows pictures shows as CARDS (pictures beside each other, their lines and
+ * buttons under them); the rest of the shop sits behind one "meer". One number for the box that fetches the pictures and
+ * the door that paints them, so the pictures go to the rows that are shown.
+ */
+export const TOOL_CARDS_PER_GROUP = param({ key: 'tools.cardsPerGroup', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
 /** …each fetched within this time, or left out. */
 export const THUMB_TIMEOUT = param({ key: 'tools.thumbTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3_000 });
 /** At most this many things from one answer (the rest is not read: an outside toolbox can answer thousands). */
@@ -162,12 +168,20 @@ function imageMime(bytes) {
  * placed host (the same origin as its endpoint, with its key: the egress stays one host per toolbox), only jpeg, png or
  * webp by the first bytes, at most THUMB_MAX_BYTES each and THUMB_MAX_COUNT per reply, each within THUMB_TIMEOUT.
  * Anything else is left out and the row stays. The URL never travels on (`image: null`).
- * @param {Array<{image?: string|null}>} items @param {{endpoint: string, key?: string|null, fetch?: Function, timeoutMs?: number}} o
+ * WHICH rows get one within the count: the rows a door shows as cards first (the first TOOL_CARDS_PER_GROUP of each
+ * shop, `seller`), then the rest in order (the rows behind "meer"); never simply the first rows of the answer, which for a
+ * toolbox that answers shop by shop left the second shop's cards without.
+ * @param {Array<{image?: string|null, seller?: string|null}>} items @param {{endpoint: string, key?: string|null, fetch?: Function, timeoutMs?: number}} o
  */
 export async function fetchThumbs(items, { endpoint, key = null, fetch = globalThis.fetch, timeoutMs = THUMB_TIMEOUT } = {}) {
   let origin = null;
   try { origin = new URL(endpoint).origin; } catch { origin = null; }
-  let left = THUMB_MAX_COUNT;
+  const rows = Array.isArray(items) ? items : [];
+  // the order the count is spent in: each shop's card rows, then the others as they came
+  const seen = new Map();
+  const isCard = rows.map((x) => { const s = String(x?.seller ?? ''); const n = seen.get(s) ?? 0; seen.set(s, n + 1); return n < TOOL_CARDS_PER_GROUP; });
+  const sameHost = (x) => { const url = typeof x?.image === 'string' ? x.image : null; try { return Boolean(url && origin && new URL(url).origin === origin); } catch { return false; } };
+  const chosen = new Set([...rows.keys()].filter((i) => isCard[i]).concat([...rows.keys()].filter((i) => !isCard[i])).filter((i) => sameHost(rows[i])).slice(0, THUMB_MAX_COUNT));
   const one = async (url) => {
     // `within` answers {value} · {error} · {timedOut}: only a value goes on
     const got = await within(timeoutMs, Promise.resolve().then(() => fetch(url, { method: 'GET', redirect: 'error', headers: { Accept: 'image/jpeg, image/png, image/webp', ...(key ? { authorization: `Bearer ${key}` } : {}) } })));
@@ -180,13 +194,9 @@ export async function fetchThumbs(items, { endpoint, key = null, fetch = globalT
     const mime = imageMime(bytes);
     return mime ? { mime, data: Buffer.from(bytes).toString('base64') } : null;
   };
-  return Promise.all((Array.isArray(items) ? items : []).map(async (x) => {
-    const url = typeof x?.image === 'string' ? x.image : null;
-    let same = false;
-    try { same = Boolean(url && origin && new URL(url).origin === origin); } catch { same = false; }
-    if (!same || left <= 0) return { ...x, image: null };
-    left -= 1;
-    const thumb = await one(url).catch(() => null);
+  return Promise.all(rows.map(async (x, i) => {
+    if (!chosen.has(i)) return { ...x, image: null };
+    const thumb = await one(x.image).catch(() => null);
     return { ...x, image: null, ...(thumb ? { thumb } : {}) };
   }));
 }

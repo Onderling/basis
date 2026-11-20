@@ -97,7 +97,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `untrusted-json` | — | JSON that someone else wrote is parsed with `parseUntrustedJson` (@onderling/core) |
 | `web-buttons` | — | no bare <button> in the web shell |
 
-## Named design guards (`G-*`, in fitness tests) · 27
+## Named design guards (`G-*`, in fitness tests) · 28
 
 *From an explicit `@guard [<id>] — <claim>` tag in a fitness test (preferred), or a `G-*` id in a
 `describe(...)` block (fallback). Tag a fitness test with `@guard` to add it here — an id is optional.*
@@ -123,6 +123,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | — | a toolbox is switched on only after the admin's yes in their own private chat, never from a group chat, and no line o… | `apps/basis/test/v2/toolboxDoor.test.js` |
 | — | Telegram door and a screen's kernel skill both reach tools.useTool through the gated call, so both write the tool-cal… | `apps/basis/test/v2/toolboxEveryRoute.test.js` |
 | — | toolbox wire is crossed for real: a socket, an HTTP server, the client's own fetch | `apps/basis/test/v2/toolboxOverHttp.test.js` |
+| — | a toolbox word's slot phrase is taken off the line only as whole words at its start or end (longest first, any case),… | `apps/basis/test/v2/toolboxSlots.test.js` |
 | — | a toolbox's key never appears in a reply, a refusal, a log line or the list of tools, and a toolbox with no key on th… | `apps/basis/test/v2/toolboxes.test.js` |
 | — | a placed toolbox is off until the admin's yes; one that is off is refused before any call leaves, and its words reach… | `apps/basis/test/v2/toolboxes.test.js` |
 | — | subtask-spawn gate bites — only an authorized actor can spawn under a parent | `packages/item-store/test/spawnSubtask.test.js` |

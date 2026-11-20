@@ -8,9 +8,14 @@ import { createServer } from 'node:http';
 export const TOOLBOX_KEY = 'sleutel-voor-de-proef';
 const KEY = TOOLBOX_KEY;
 
-/** A toolbox as the recorded one answers: the card, and products.choices as a schema.org ItemList. */
-export async function fakeToolbox() {
+/**
+ * A toolbox as the recorded one answers: the card, and products.choices as a schema.org ItemList. `perShop`: how many
+ * things per shop, shop by shop (Albert Heijn's first, then Jumbo's); the first of each is the recorded one. `inputs`
+ * holds every tool input it was asked with.
+ */
+export async function fakeToolbox({ perShop = 1 } = {}) {
   let base = '';
+  const inputs = [];
   const server = createServer((req, res) => {
     let body = '';
     req.on('data', (c) => { body += c; });
@@ -25,9 +30,11 @@ export async function fakeToolbox() {
         if (req.headers.authorization !== `Bearer ${KEY}`) return json(401, { jsonrpc: '2.0', id: null, error: { code: -32001, message: 'Unauthorized' } });
         const msg = JSON.parse(body);
         const data = msg.params.message.parts[0].data;
+        inputs.push(data.input);
         const product = (id, name, price, seller) => ({ '@type': 'ListItem', item: { '@type': 'Product', identifier: id, name, image: `${base}/img/${id}.jpg`, offers: { price, seller: { name: seller } } } });
+        const more = (shop, prefix) => Array.from({ length: Math.max(0, perShop - 1) }, (_, i) => product(`${prefix}:${i + 2}`, `${shop} melk ${i + 2}`, '1.00', shop));
         return json(200, { jsonrpc: '2.0', id: msg.id, result: { message: { role: 'ROLE_AGENT', parts: [{ data: { operation: data.operation, output: {
-          '@type': 'ItemList', itemListElement: [product('ah:33693', 'Halfvolle melk 1 L', '1.19', 'Albert Heijn'), product('jumbo:753536PAK', 'Jumbo halfvolle melk 1 L', '1.05', 'Jumbo')],
+          '@type': 'ItemList', itemListElement: [product('ah:33693', 'Halfvolle melk 1 L', '1.19', 'Albert Heijn'), ...more('Albert Heijn', 'ah'), product('jumbo:753536PAK', 'Jumbo halfvolle melk 1 L', '1.05', 'Jumbo'), ...more('Jumbo', 'jumbo')],
         } } }] } } });
       }
       return json(404, {});
@@ -35,6 +42,6 @@ export async function fakeToolbox() {
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${server.address().port}`;
-  return { base, close: () => new Promise((r) => server.close(r)) };
+  return { base, inputs, close: () => new Promise((r) => server.close(r)) };
 }
 

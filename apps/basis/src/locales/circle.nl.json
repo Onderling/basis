@@ -10041,11 +10041,7 @@
     },
     "more_of": {
       "text": "Meer van {{shop}} ({{n}})",
-      "doc": "Telegram: the one button under a shop's photo cards that shows the rest of that shop's things (ledger L1035)."
-    },
-    "more_of_line": {
-      "text": "Nog {{n}} van deze winkel:",
-      "doc": "Telegram: the line the more_of button stands under."
+      "doc": "Telegram: the one button in the message under a shop's album of cards that shows the rest of that shop's things (ledger L1035)."
     },
     "refresh": {
       "text": "Ververs",

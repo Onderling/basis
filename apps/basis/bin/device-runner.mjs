@@ -1399,7 +1399,8 @@ if (tgToken || inboxDoor.bridge) {
     };
   }
   // A CIRCLE'S TOOLBOXES (L1035). The operator PLACES a toolbox as one file, <data-dir>/toolboxes/<name>.json
-  // ({name, url, words: [{word, tool, field}]}), beside its key, <data-dir>/toolboxes/<name>.key (or the env value
+  // ({name, url, words: [{word, tool, field, says?, slots?}]}; `slots`: phrases that fill a tool parameter, read in
+  // toolboxes.js), beside its key, <data-dir>/toolboxes/<name>.key (or the env value
   // TOOLBOX_KEY_<NAME>): no chat line carries an address, a tool id or a key, and the key never appears in a reply, a
   // refusal, a log line or the list of tools. A placed toolbox is off until the admin's yes (`/toolbox <naam> aan`);
   // which are on lives in this box's vault. Mounted on the waist like any app.

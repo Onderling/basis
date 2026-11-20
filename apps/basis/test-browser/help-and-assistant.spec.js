@@ -18,6 +18,7 @@ test('Settings → Help opens the Help circle; Me has no second door to the "+"'
   // Me has no Assistant door: the "+" button is the one way into the conversation (Frits 2026-11-16)
   await page.locator('.cc-persona-button__button').click();
   await expect(page.locator('.cc-profile__assistant')).toHaveCount(0);
+  await page.locator('.cc-persona-panel__close').click();
 
   // Settings → Help: the Help circle opens (its conversation, where the bot answers)
   await page.locator('.cc-persona-button__settings').click();

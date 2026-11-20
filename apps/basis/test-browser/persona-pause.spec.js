@@ -26,8 +26,11 @@ test('a paused persona leaves this device, a resumed one comes back — no phras
   expect(await call(page, 'household', 'pausePersona', { personaId: made.id })).toMatchObject({ ok: true, reloadRequired: true });
   await page.reload(); await ready(page);
   await expect.poll(() => running(page), { timeout: 20_000, message: 'paused: Werk does not run here now' }).not.toContain(made.id);
-  // …and it is gone from the SWITCHER (whose rows are what the host passes as held): both checks poll the paint
+  // …and it is gone from the SWITCHER (whose rows are what the host passes as held), reached from the persona panel:
+  // both checks poll the paint
   await page.locator('.cc-persona-button__button').click();
+  await expect(page.locator(`.cc-persona-panel__tab[data-self="${made.id}"]`), 'no panel tab for the paused Werk').toHaveCount(0);
+  await page.locator('.cc-persona-panel__show-as').click();
   await expect(page.locator('.cc-persona-switcher__row[data-self="default"]'), 'the switcher is painted').toBeVisible({ timeout: 20_000 });
   await expect(page.locator(`.cc-persona-switcher__row[data-self="${made.id}"]`), 'no row for the paused Werk').toHaveCount(0);
   await page.locator('.cc-persona-switcher__close').click();

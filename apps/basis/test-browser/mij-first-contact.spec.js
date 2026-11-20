@@ -15,7 +15,9 @@ test('a persona card offers who may write first; a tap sets it on that persona',
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
 
+  // the persona button opens the panel; its "Aanpassen" opens the persona's own editor (the persona cards)
   await page.locator('.cc-persona-button__button').click();
+  await page.locator('.circle-screen__identity-edit').click();
   const on = page.locator('[data-testid="mij-first-contact-default-circleMembersMayWrite-true"]');
   const off = page.locator('[data-testid="mij-first-contact-default-circleMembersMayWrite-false"]');
   await expect(on, 'members may write: on by default').toHaveAttribute('aria-pressed', 'true', { timeout: 20_000 });

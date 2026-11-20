@@ -15,7 +15,9 @@ test('a persona card offers how far the "+" goes; a tap sets it on that persona'
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
 
+  // the persona button opens the panel; its "Aanpassen" opens the persona's own editor (the persona cards)
   await page.locator('.cc-persona-button__button').click();
+  await page.locator('.circle-screen__identity-edit').click();
   const choice = (n) => page.locator(`[data-testid="mij-plus-ceiling-default-${n}"]`);
   await expect(choice(3), 'a circle\'s things after a yes: in force by default').toHaveAttribute('aria-pressed', 'true', { timeout: 20_000 });
   await expect(choice(1)).toHaveAttribute('aria-pressed', 'false');

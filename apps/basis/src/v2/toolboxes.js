@@ -21,28 +21,6 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 const ON_KEY = 'tools.on';
 const NAME = /^[a-z][a-z0-9-]{0,31}$/;
 const WORD = /^[a-zà-ÿ][a-zà-ÿ0-9-]{0,23}$/;
-const PARAM = /^[A-Za-z][A-Za-z0-9_-]{0,31}$/;
-
-/**
- * A word's SLOTS as the operator placed them (`slots: [{param, list?, values: {value: [phrases]}}]`): the phrases that
- * mean a value of a tool parameter ('bij albert heijn' → stores: ah). Cleaned: phrases lower case, spaces folded, at most
- * 40 characters, 50 per value, 50 values and 5 slots; a slot without a param, with the word's own field as its param, or
- * without any phrase is dropped. The toolbox's own data: Basis knows no shop.
- */
-function readSlots(slots, field) {
-  const out = [];
-  for (const s of (Array.isArray(slots) ? slots : []).slice(0, 5)) {
-    const p = String(s?.param ?? '');
-    if (!PARAM.test(p) || p === field || !s.values || typeof s.values !== 'object' || Array.isArray(s.values)) continue;
-    const values = {};
-    for (const [value, phrases] of Object.entries(s.values).slice(0, 50)) {
-      const clean = [...new Set((Array.isArray(phrases) ? phrases : []).slice(0, 50).map((x) => String(x ?? '').toLowerCase().replace(/\s+/g, ' ').trim()).filter((x) => x && x.length <= 40))];
-      if (value && clean.length) values[value] = clean;
-    }
-    if (Object.keys(values).length) out.push({ param: p, ...(s.list === true ? { list: true } : {}), values });
-  }
-  return out;
-}
 
 /** A placed file as the operator wrote it, or null when it is not one (a bad name, address or words). */
 function readPlaced(p) {
@@ -175,6 +153,29 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
       return { ok: true, name: n, title: live.title, tool, items, ...(forScreen ? { output: r.output } : {}) };
     },
   };
+}
+
+const PARAM = /^[A-Za-z][A-Za-z0-9_-]{0,31}$/;
+
+/**
+ * A word's SLOTS as the operator placed them (`slots: [{param, list?, values: {value: [phrases]}}]`): the phrases that
+ * mean a value of a tool parameter ('bij albert heijn' → stores: ah). Cleaned: phrases lower case, spaces folded, at most
+ * 40 characters, 50 per value, 50 values and 5 slots; a slot without a param, with the word's own field as its param, or
+ * without any phrase is dropped. The toolbox's own data: Basis knows no shop.
+ */
+function readSlots(slots, field) {
+  const out = [];
+  for (const s of (Array.isArray(slots) ? slots : []).slice(0, 5)) {
+    const p = String(s?.param ?? '');
+    if (!PARAM.test(p) || p === field || !s.values || typeof s.values !== 'object' || Array.isArray(s.values)) continue;
+    const values = {};
+    for (const [value, phrases] of Object.entries(s.values).slice(0, 50)) {
+      const clean = [...new Set((Array.isArray(phrases) ? phrases : []).slice(0, 50).map((x) => String(x ?? '').toLowerCase().replace(/\s+/g, ' ').trim()).filter((x) => x && x.length <= 40))];
+      if (value && clean.length) values[value] = clean;
+    }
+    if (Object.keys(values).length) out.push({ param: p, ...(s.list === true ? { list: true } : {}), values });
+  }
+  return out;
 }
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

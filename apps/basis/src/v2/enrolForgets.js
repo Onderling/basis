@@ -21,6 +21,7 @@
  * shell decides WHAT is forgotten, only HOW its storage is reached.
  */
 import { renamedFrom } from '@onderling-app/pinboard/lib/moveRenamedStore';
+import { circleStorageName } from './localStoreSeal.js';   // the circle storage names, one rule with the stores themselves
 
 /**
  * The stores and keys a former self wrote, and the ones that are this device's own.
@@ -140,7 +141,7 @@ export const THROWAWAY_CONTENT = Object.freeze({
   ]),
 
   /** The per-circle stores for one circle id. Resolved from the registry before the registry is dropped. */
-  perCircleStores: (circleId) => [`cc-circle-${circleId}`, `cc-circle-cache-${circleId}`],
+  perCircleStores: (circleId) => [circleStorageName.store(circleId), circleStorageName.cache(circleId)],
 });
 
 /**

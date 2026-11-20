@@ -76,7 +76,7 @@ import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
 import { circleVersioningFor, getCircleVersionStore } from '../../src/web/circleVersioning.js';
 import { pickWebBackend } from '../../src/web/persistentBackend.js';
-import { sealedLocalBackend, sealedLocalVault, sealedKeyValue, sealedJsonIo, onShellContentSeal, onStoredValueRefused } from '../../src/v2/localStoreSeal.js';
+import { sealedLocalBackend, sealedNamedBackend, circleStorageName, sealedLocalVault, sealedKeyValue, sealedJsonIo, onShellContentSeal, onStoredValueRefused } from '../../src/v2/localStoreSeal.js';
 import { circleOfferingDraftIo } from '../../src/v2/circleOfferingDraft.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { VaultIndexedDB, VaultMemory, VaultLocalStorage } from '@onderling/vault';
 // S4 circle OIDC — reuse the existing browser Solid-OIDC wrapper (no rebuild). A signed-in
@@ -2133,7 +2133,7 @@ function webForgetAdapter() {
  * reload; falls back to in-memory under SSR / tests (no `indexedDB`) — see `pickWebBackend`. */
 function makeCirclePodClient(circleId) {
   const deviceId = `circle-${circleId}`;
-  const backend  = sealedLocalBackend(pickWebBackend(`cc-circle-${circleId}`), { scope: `cc-circle-${circleId}` });
+  const backend  = sealedNamedBackend(circleStorageName.store(circleId), pickWebBackend);
   // versioning: displaced bytes (overwrites · peer-updates · dropped
   // concurrent forks · deletes) land in `versions/` on the SAME backend —
   // the substrate under the my-data restore ops. Best-effort by design
@@ -9829,7 +9829,7 @@ async function boot() {
           console.info(`[cache-medium] ${circleId}: posture=${JSON.stringify(policy.pod ?? null)} → ${mode}`);   // web ≡ mobile
           if (mode !== 'cache') return null;   // no-pod → shared local backing
           const medium = createCircleCacheMedium({
-            localBackend: sealedLocalBackend(pickWebBackend(`cc-circle-cache-${circleId}`), { scope: `cc-circle-cache-${circleId}` }),
+            localBackend: sealedNamedBackend(circleStorageName.cache(circleId), pickWebBackend),
             deviceId:     `circle-cache-${circleId}`,
             resolvePod:   () => resolveCirclePodCustody(circleId),
           });

@@ -121,6 +121,25 @@ export function sealedLocalBackend(backend, { scope = null } = {}) {
 }
 
 /**
+ * The storage names of a circle's local stores, one rule for every shell: the circle's own item store and, for a
+ * pod-backed circle, its cache medium. A store is rebuilt over the same storage when the circle's producer is dropped
+ * (a posture change), so the refusal must be kept per NAME; the name and the scope therefore come from here, never typed
+ * twice at a call site.
+ */
+export const circleStorageName = Object.freeze({
+  store: (circleId) => `cc-circle-${circleId}`,
+  cache: (circleId) => `cc-circle-cache-${circleId}`,
+});
+
+/**
+ * Open a named local storage and seal it, the refusal kept under that same name: `open(name)` makes the platform's
+ * backend (IndexedDB on web, AsyncStorage on the phone), and the name it was opened under is the refusal's scope.
+ */
+export function sealedNamedBackend(name, open) {
+  return sealedLocalBackend(open(name), { scope: name });
+}
+
+/**
  * Wrap a key-value storage (localStorage on web, AsyncStorage on mobile, a file on the box) so the VALUES are sealed at
  * rest with this device's content key; the KEYS stay legible, so a store that lists its keys (a versions store) still
  * can. A write before the key exists is REFUSED rather than stored in the clear.

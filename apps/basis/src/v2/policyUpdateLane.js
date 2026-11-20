@@ -308,7 +308,7 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
  * @param {{lane: ReturnType<typeof makeCirclePolicyLane>|null, circleId: string, policy: object}} a
  * @returns {Promise<{ok: true, policy: object}|{ok: false, error: 'not-stated'}>}
  */
-export async function saveCircleSettings({ lane, circleId, policy } = {}) {
+export async function saveCircleSettings({ lane, circleId, policy, proposalId = null } = {}) {
   if (!lane || typeof lane.state !== 'function' || !policy || typeof policy !== 'object') return { ok: false, error: 'not-stated' };
   // the held settings: none held yet is `{}`; a read that FAILED is not "none" (a patch merged over nothing would be
   // stated as the circle's whole settings), so it is not a save
@@ -317,7 +317,8 @@ export async function saveCircleSettings({ lane, circleId, policy } = {}) {
   const { policyPending: _pending, ...held } = current;
   const merged = mergeCirclePolicy(held, policy);
   let statement = null;
-  try { statement = await lane.state(circleId, { policy: merged }); } catch { statement = null; }
+  // a decided proposal's change carries the proposal that decided it (the receiver gate checks it)
+  try { statement = await lane.state(circleId, { policy: merged, ...(proposalId ? { proposalId } : {}) }); } catch { statement = null; }
   return statement ? { ok: true, policy: merged } : { ok: false, error: 'not-stated' };
 }
 

@@ -147,8 +147,8 @@
  */
 import { createServer as createHttpServer }  from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
-import { readFile, stat }                    from 'node:fs/promises';
-import { extname, join, resolve }            from 'node:path';
+import { readFile, stat, realpath }          from 'node:fs/promises';
+import { extname, resolve, sep }             from 'node:path';
 import { networkInterfaces }                 from 'node:os';
 import { WebSocketServer }                   from 'ws';
 import {
@@ -411,21 +411,30 @@ export async function startRelay(opts = {}) {
       return;
     }
 
-    let pathname = req.url.split('?')[0];
+    // THE STATIC FILES NEVER LEAVE THEIR ROOT (the independent read of 2026-11-20): the path is decoded first, no segment
+    // may start with a dot (a dotfile, or `..`), and both the resolved path and the file it really is (a link followed)
+    // must be the root or INSIDE it — with a separator: `/srv/site-secret` starts with `/srv/site` too.
+    let pathname;
+    try { pathname = decodeURIComponent(String(req.url ?? '').split('?')[0]); }
+    catch { res.writeHead(400); res.end('Bad request'); return; }
     if (pathname === '/' || pathname === '') pathname = '/' + indexFile;
-
-    const rootAbs  = resolve(serveStaticDir);
-    const filePath = resolve(join(rootAbs, pathname));
-
-    // Security: prevent path traversal outside the static root.
-    if (!filePath.startsWith(rootAbs)) {
-      res.writeHead(403); res.end('Forbidden'); return;
+    if (pathname.includes('\0') || pathname.split(/[\\/]/).some((seg) => seg.startsWith('.'))) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found'); return;
     }
 
+    let rootReal;
+    try { rootReal = await realpath(resolve(serveStaticDir)); }
+    catch { res.writeHead(404); res.end('Not found'); return; }
+    const inside = (p) => p === rootReal || p.startsWith(rootReal + sep);
+    const filePath = resolve(rootReal, '.' + pathname);
+    if (!inside(filePath)) { res.writeHead(403); res.end('Forbidden'); return; }
+
     try {
-      const s = await stat(filePath);
+      const real = await realpath(filePath);
+      if (!inside(real)) { res.writeHead(403); res.end('Forbidden'); return; }
+      const s = await stat(real);
       if (s.isDirectory()) { res.writeHead(404); res.end('Not a file'); return; }
-      const data = await readFile(filePath);
+      const data = await readFile(real);
       const mime = MIME[extname(filePath)] ?? 'application/octet-stream';
       res.writeHead(200, {
         'Content-Type':                mime,

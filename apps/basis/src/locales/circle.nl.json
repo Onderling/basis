@@ -661,6 +661,10 @@
       }
     },
     "delivery": {
+      "on_its_way": {
+        "text": "Verstuurd naar {{reached}} van {{of}}; de rest volgt",
+        "doc": "Een kringbericht ging naar de leden van wie dit apparaat het adres kende; de anderen hadden er nog geen. Het gaat vanzelf naar ieder van hen zodra hun adres aankomt, en dan krijgt dit bericht weer de gewone woorden. {{reached}} telt verzendingen, nooit bevestigingen."
+      },
       "waiting_for_connection": {
         "text": "Nog niet verzonden: wacht op een verbinding",
         "doc": "Een bericht dat na een tijdje nog verstuurd wordt: het wacht op dit apparaat tot er een verbinding is, en gaat dan vanzelf."

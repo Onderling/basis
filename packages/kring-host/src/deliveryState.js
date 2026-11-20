@@ -124,6 +124,12 @@ export function createDeliveryStateMap() {
   // the held message going out, a receipt) drops it.
   /** @type {Map<string, string>} */
   const reasons = new Map();
+  // WHO A LINE STILL WAITS FOR — a side fact beside the state, never a rung (the ladder says what is PROVEN, this says
+  // who still waits for an address): `{ sent, of }` while a circle line was sent to `sent` of its `of` recipients and
+  // the rest wait; null once nobody waits. `sent` counts sends (an address was known), never receipts — a count of
+  // receipts would show who has receipts off. Fed by the log (`rehydrateDeliveryState` follows it).
+  /** @type {Map<string, {sent: number, of: number}>} */
+  const waiting = new Map();
   /** @type {Set<(msgId: string, state: DeliveryState) => void>} */
   const subs = new Set();
 
@@ -160,6 +166,18 @@ export function createDeliveryStateMap() {
       map.set(msgId, next);
       notify(msgId, next);
     },
+    /** Who a line still waits for, `{ sent, of }`, or null (see above). Notifies when it changes. */
+    setWaiting(msgId, w = null) {
+      if (typeof msgId !== 'string' || msgId === '') return;
+      const before = waiting.get(msgId) ?? null;
+      const next = w && Number.isFinite(w.sent) && Number.isFinite(w.of) && w.of > 0 ? { sent: w.sent, of: w.of } : null;
+      if ((before?.sent ?? null) === (next?.sent ?? null) && (before?.of ?? null) === (next?.of ?? null)) return;
+      if (next) waiting.set(msgId, next); else waiting.delete(msgId);
+      notify(msgId, map.get(msgId) ?? null);
+    },
+    waitingOf(msgId) {
+      return (typeof msgId === 'string' && waiting.get(msgId)) || null;
+    },
     /** The reason beside a failed/undeliverable/pending state, or null. */
     reasonOf(msgId) {
       return (typeof msgId === 'string' && reasons.get(msgId)) || null;
@@ -167,6 +185,7 @@ export function createDeliveryStateMap() {
     clear(msgId) {
       if (typeof msgId !== 'string' || msgId === '') return false;
       reasons.delete(msgId);
+      waiting.delete(msgId);
       if (!map.has(msgId)) return false;
       map.delete(msgId);
       notify(msgId, null);

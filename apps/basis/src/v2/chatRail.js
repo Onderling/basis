@@ -29,7 +29,8 @@ import { entryKindRegistryFromManifests, toEventLogItem, kindWakes, param, PARAM
 import { cardForCircleWire } from '@onderling/kring-host/circleBroadcast';
 import { chatManifest, CHAT_LANE } from './chatManifest.js';
 import { rosterBindingVerifier } from './membershipRail.js';
-import { NOT_TAKEN } from '../core/handlers/peerRouter.js';   // a verdict the receive record reads: not taken, so a repeat is handed on again
+import { NOT_TAKEN } from '../core/handlers/peerRouter.js';
+import { DELIVERY_WAITING_ENTRY } from './deliveryState.js';   // a verdict the receive record reads: not taken, so a repeat is handed on again
 
 /** The statement kinds the chat lane carries — DERIVED from the manifest's declared appends. */
 export const CHAT_RAIL_KINDS = entryKindRegistryFromManifests(chatManifest).kindsFor(CHAT_LANE);
@@ -430,8 +431,8 @@ export function owedChatStatements({ eventLog, circleId, myRef, ttlMs = 24 * 60 
     .reverse();   // the log is most-recent-first; re-fan oldest-first
 }
 
-/** The delivery-state entry that says who a line of mine still waits for (a member without an address yet): `{ msgId, state, waiting, reached, of }`. */
-export const ON_ITS_WAY = 'on-its-way';
+/** The delivery-state entry that says who a line of mine still waits for (a member without an address yet). */
+export const ON_ITS_WAY = DELIVERY_WAITING_ENTRY;
 
 /**
  * WHO A LINE STILL WAITS FOR — per RECIPIENT, as a projection of the one log (no second store). A fan that ends

@@ -11,7 +11,7 @@
  *   `// SECURITY: opted out — <reason>` comment.
  */
 
-export { createSecureAgent } from './createSecureAgent.js';
+export { createSecureAgent, isBackgroundSend } from './createSecureAgent.js';
 export { createSecureMeshAgent } from './createSecureMeshAgent.js';   // T5.3 — the unified secure-mesh factory
 export { makeBrowserVault, restoreOrGenerate } from './vault.js';
 

@@ -206,6 +206,8 @@ const DEFAULT_PUSH_THROTTLE_MS = param({ key: 'relay.pushThrottleMs', scope: PAR
 // Parameter register (#36) — per-connection message rate limit (scope:device, kind:internal).
 const DEFAULT_MSG_RATE_PER_SEC = param({ key: 'relay.msgRatePerSec', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 });
 const DEFAULT_MSG_RATE_BURST   = param({ key: 'relay.msgRateBurst', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60 });
+/** The per-connection limit on `send` frames (a client transport paces itself under it; a test pins the agreement). */
+export const RELAY_MSG_RATE = Object.freeze({ perSec: DEFAULT_MSG_RATE_PER_SEC, burst: DEFAULT_MSG_RATE_BURST });
 
 // Per-connection ceiling on how many addresses ONE socket may register.
 //

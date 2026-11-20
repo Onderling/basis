@@ -255,6 +255,20 @@ const STALE_PARK_TTL_MS = param({ key: 'secureAgent.staleParkTtlMs', scope: PARA
  *  size as well as by count, the oldest going first. */
 const STALE_PARK_MAX_BYTES = param({ key: 'secureAgent.staleParkMaxBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1_048_576 });
 
+
+/**
+ * A send nobody waits on (the start burst, 2026-11-20): a lane's catch-up (`*-catchup-request|batch|offer`, the naming every lane uses)
+ * or the per-boot address re-announce. A transport that paces its sends (the relay transport) sends these after what a
+ * person waits on; everything else is foreground, so nothing a person does gets slower by accident. Read from the
+ * payload's own subtype, so no caller needs a knob; a test in basis pins that every lane's subtypes are read so.
+ * @param {object} payload
+ * @returns {boolean}
+ */
+export function isBackgroundSend(payload) {
+  const st = payload?.subtype;
+  return typeof st === 'string' && (/-catchup-(request|batch|offer)$/.test(st) || st === 'circle-address-announce');
+}
+
 export async function createSecureAgent(opts = {}) {
   // warn about stubbed opts so callers know what's wired now
   // vs what they're asking for that will activate in a future slice.
@@ -3076,6 +3090,8 @@ export async function createSecureAgent(opts = {}) {
 
   async function _sendOverRoute(addr, payload, sel, opts = {}) {
     const { tx, wireAddr, speakAs } = await _handshakeOverRoute(addr, sel, opts);
+    // nobody waits on a catch-up or a re-announce: a transport that paces its sends lets a person's own go first
+    const background = isBackgroundSend(payload);
     // v0.7.cc — record outbound for /debug-dump diagnostic.
     recordTraffic({
       dir:     'send',
@@ -3090,7 +3106,7 @@ export async function createSecureAgent(opts = {}) {
     // opt in, which is why the kernel's opt-in fileSharing sat uncalled for its whole life.
     const parts = chunkPayloadForRoute(payload, tx?.maxEnvelopeBytes);
     if (parts) {
-      const sendOpts = speakAs ? { from: speakAs } : {};
+      const sendOpts = { ...(speakAs ? { from: speakAs } : {}), ...(background ? { background: true } : {}) };
       // The transfer is the UNIT of the answer, not the chunk: the reassembler refuses a gap, so a
       // partly-delivered transfer is nothing to the receiver. Every part is still sent even when the
       // first is held — a held transfer must flush COMPLETE when the peer returns — and the verdicts
@@ -3110,7 +3126,7 @@ export async function createSecureAgent(opts = {}) {
       if (undelivered) return { ...verdict, held: false, delivered: false, ...(reason ? { reason } : {}) };
       return { ...verdict, held: false, delivered: true };
     }
-    return tx.sendOneWay(wireAddr, payload, speakAs ? { from: speakAs } : {});
+    return tx.sendOneWay(wireAddr, payload, { ...(speakAs ? { from: speakAs } : {}), ...(background ? { background: true } : {}) });
   }
 
   /**

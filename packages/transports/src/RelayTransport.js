@@ -69,6 +69,14 @@ const OVER_RATE_RESEND_DELAY_MS = param({ key: 'transports.overRateResendDelayMs
 const OVER_RATE_RESEND_PER_SEC = param({ key: 'transports.overRateResendPerSec', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 });
 // How often one frame is sent in all before it is given up (the first send included).
 const OVER_RATE_MAX_ATTEMPTS = param({ key: 'transports.overRateMaxAttempts', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 });
+// THIS TRANSPORT PACES ITS OWN SENDS UNDER THE RELAY'S LIMIT (the start burst, 2026-11-20): the relay counts `send` frames per socket in
+// a token bucket (30 a second, a burst of 60, `relay.msgRatePerSec` / `relay.msgRateBurst`) and refuses what is over it.
+// This keeps its own bucket below that, so a start's burst is held here and sent as it allows, never refused there. A
+// test pins that these stay at or under the relay's.
+const RELAY_SEND_PER_SEC = param({ key: 'transports.relaySendPerSec', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 25 });
+const RELAY_SEND_BURST = param({ key: 'transports.relaySendBurst', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 50 });
+/** The pace this transport keeps on `send` frames (for the agreement test with the relay's own limit). */
+export const RELAY_SEND_RATE = Object.freeze({ perSec: RELAY_SEND_PER_SEC, burst: RELAY_SEND_BURST });
 
 /**
  * WebSocket relay-server `Transport`: registers this agent's address with the relay, which
@@ -138,6 +146,12 @@ export class RelayTransport extends Transport {
   #overRateBusy      = false;
   /** `{delayMs, perSec, maxAttempts}` — the register's values unless the composition (a test) narrows them. */
   #overRate;
+  /** The own pace (see RELAY_SEND_RATE): a token bucket, and what waits for a token in two classes — what a person waits
+   *  on first, background sends (catch-ups, re-announces) after; in order within each. */
+  #pace = { perSec: RELAY_SEND_PER_SEC, burst: RELAY_SEND_BURST, tokens: RELAY_SEND_BURST, at: 0 };
+  #waitingForeground = [];
+  #waitingBackground = [];
+  #paceTimer         = null;
 
   /**
    * @param {object} opts
@@ -168,6 +182,10 @@ export class RelayTransport extends Transport {
       perSec: pos(o.perSec, OVER_RATE_RESEND_PER_SEC),
       maxAttempts: Math.max(1, Math.floor(pos(o.maxAttempts, OVER_RATE_MAX_ATTEMPTS))),
     };
+    const pc = opts.sendPace ?? {};
+    this.#pace.perSec = pos(pc.perSec, RELAY_SEND_PER_SEC);
+    this.#pace.burst = pos(pc.burst, RELAY_SEND_BURST);
+    this.#pace.tokens = this.#pace.burst;
   }
 
   // G13 — extra addresses. The alias SET, the public API and the replay rule live in the base `Transport`
@@ -351,7 +369,7 @@ export class RelayTransport extends Transport {
     this.emit('disconnect');
   }
 
-  async _put(to, envelope) {
+  async _put(to, envelope, sendMeta = undefined) {
     // A refused relay is a permanent verdict, so say so now rather than after the 5s timeout below:
     // waiting would read as "the network is slow" for something that is never going to happen.
     if (this.#unprovenRelay) {
@@ -372,7 +390,53 @@ export class RelayTransport extends Transport {
     // a message held while the socket was closed flushed at open ahead of the alias's replayed bind, and the
     // relay refused it as an unregistered sender — silently for the sender (the enrol walk, 2026-09-16).
     await this.#awaitSenderBound(envelope);
-    this.#writeSend(to, envelope, 1);
+    await this.#paced(to, envelope, sendMeta?.background === true);
+  }
+
+  /** A token from the own bucket, or false (refilled by the time since the last look). */
+  #takeToken() {
+    const p = this.#pace; const now = Date.now();
+    p.tokens = Math.min(p.burst, p.tokens + ((now - (p.at || now)) * p.perSec) / 1000);
+    p.at = now;
+    if (p.tokens >= 1) { p.tokens -= 1; return true; }
+    return false;
+  }
+
+  /**
+   * Write a `send` frame now when the bucket has a token and nothing waits before it; else wait in its class. Resolves
+   * when the frame is written (a caller that awaits a send is paced with it), rejects when the write throws.
+   */
+  #paced(to, envelope, background) {
+    if (!this.#waitingForeground.length && !this.#waitingBackground.length && this.#takeToken()) {
+      this.#writeSend(to, envelope, 1);
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+      (background ? this.#waitingBackground : this.#waitingForeground).push({ to, envelope, resolve, reject });
+      this.#schedulePace();
+    });
+  }
+
+  #schedulePace() {
+    if (this.#paceTimer || this.#stopped) return;
+    const p = this.#pace;
+    const wait = p.tokens >= 1 ? 0 : Math.ceil(((1 - p.tokens) * 1000) / p.perSec);
+    this.#paceTimer = setTimeout(() => this.#drainPaced(), wait);
+  }
+
+  /** Send what waits as tokens allow: a person's sends first, then the background; in order within each. */
+  #drainPaced() {
+    this.#paceTimer = null;
+    if (this.#stopped) {
+      for (const w of [...this.#waitingForeground.splice(0), ...this.#waitingBackground.splice(0)]) w.reject(new Error('Relay: transport stopped'));
+      return;
+    }
+    if (!this.connected) { this.#paceTimer = setTimeout(() => this.#drainPaced(), this.#overRate.delayMs); return; }
+    while ((this.#waitingForeground.length || this.#waitingBackground.length) && this.#takeToken()) {
+      const w = this.#waitingForeground.length ? this.#waitingForeground.shift() : this.#waitingBackground.shift();
+      try { this.#writeSend(w.to, w.envelope, 1); w.resolve(); } catch (err) { w.reject(err); }
+    }
+    if (this.#waitingForeground.length || this.#waitingBackground.length) this.#schedulePace();
   }
 
   /** A frame sent AS an alias waits for that alias's ack on this socket (see `_put`). */

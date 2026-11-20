@@ -459,10 +459,12 @@ export class Transport extends Emitter {
   /**
    * OW — fire-and-forget. No reply expected.
    * `opts.from` — send AS one of our extra addresses (see `#senderFor`).
+   * `opts.background` — nobody waits on this send (a catch-up, a re-announce): a transport that paces its sends may let
+   *   what a person waits on go first. Handed to `_put` beside the envelope, never put on the wire.
    */
   async sendOneWay(to, payload, opts = {}) {
     const from = this.#senderFor(opts?.from, { to });
-    await this._send(to, mkEnvelope(P.OW, typeof from === 'string' ? from : await from, to, payload));
+    await this._send(to, mkEnvelope(P.OW, typeof from === 'string' ? from : await from, to, payload), opts?.background === true ? { background: true } : undefined);
   }
 
   /**
@@ -781,7 +783,7 @@ export class Transport extends Emitter {
   }
 
   /** Apply SecurityLayer (if set) and call _put. */
-  async _send(to, envelope) {
+  async _send(to, envelope, sendMeta = undefined) {
     this.#noteAppMessageId(to, envelope);   // before encryption — the payload is opaque after it
     const outgoing = this.#securityLayer
       ? this.#securityLayer.encrypt(envelope)
@@ -790,7 +792,7 @@ export class Transport extends Emitter {
     // check is after encryption on purpose: what matters is the size of what actually goes out.
     const tooBig = envelopeExceedsLimit(outgoing, this.maxEnvelopeBytes);
     if (tooBig) throw new EnvelopeTooLargeError(tooBig.bytes, tooBig.limit);
-    await this._put(to, outgoing);
+    await this._put(to, outgoing, sendMeta);
   }
 
   /** Register a pending-reply promise, call send(), return the promise. */

@@ -71,7 +71,7 @@ import {
   // §4 — admin's policy.view → default Chat/Screen landing surface.
   defaultViewModeFromPolicy,
   // per-circle activity preview + unread badge.
-  buildTilePreviews, seenOnLeave, subscribeActiveCircle,
+  buildTilePreviews, seenOnLeave, subscribeActiveCircle, subscribeTileChanges,
   // claim-router hook (mirror claimed tasks to my own circle).
   makeAfterClaimHook,
   // Nearby model + label helpers (the action map + banner rule are SHARED with web — invariant 3).
@@ -890,12 +890,16 @@ export default function CircleLauncherScreen({
     }).catch(() => {});
     return () => { alive = false; };
   }, [bundle, circles]);
+  // …and a LINE THAT LANDS (shared rule: subscribeTileChanges, web alike): without it nothing told the list, and a tile
+  // kept its old preview and count until something unrelated re-rendered (the upgrade walk, 2026-11-20)
+  const [tileTick, setTileTick] = useState(0);
+  useEffect(() => subscribeTileChanges(eventLog, () => setTileTick((n) => n + 1)), [eventLog]);
   // Recompute the previews map whenever events / circles / seenAt change.
   useEffect(() => {
     const events = eventLog?.query ? eventLog.query({ excludeMuted: true }) : [];
     // a landed item's subtitle names its kind in words
     setPreviews(buildTilePreviews({ events, circles, seenAt, myRefs: unreadMyRefs, t, readIds: readMarks.ids() }));
-  }, [eventLog, circles, seenAt, unreadMyRefs, readMarks, readTick]);
+  }, [eventLog, circles, seenAt, unreadMyRefs, readMarks, readTick, tileTick]);
   // per-circle voorstellen badge. Populated lazily after
   // circles load; refresh after a settings save (CircleSettingsScreen
   // calls back through onPoll once it persists a new proposal).

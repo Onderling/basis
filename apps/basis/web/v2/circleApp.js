@@ -832,7 +832,7 @@ import { settingsControlsFromManifest, transportsStatusLine, TRANSPORT_MODES } f
 import { parseCircleBuiltin } from '../../src/v2/circleComposerBuiltins.js';
 // agent-add admin approval store.
 import { createAgentRequestStore } from '../../src/v2/agentRequest.js';
-import { buildTilePreviews, seenOnLeave } from '../../src/v2/circleTilePreviews.js';
+import { buildTilePreviews, seenOnLeave, subscribeTileChanges } from '../../src/v2/circleTilePreviews.js';
 import { createReadMarks } from '../../src/v2/readMarks.js';
 import { makeAfterClaimHook } from '../../src/v2/claimRouter.js';
 import { mergeAvailability } from '../../src/v2/memberAvailability.js';
@@ -3819,6 +3819,11 @@ const readSeenAt = () => circleSeenMarks.current();
 circleSeenMarks.subscribe(() => {
   _vandaagHead?.invalidate();   // Vandaag's "circles with news" counts what is not yet seen
   _mijHead?.invalidate();       // …and Mij's unread reading
+  if (getActiveCircle() == null && _activeTab === 'circles') { try { paintLauncher(); } catch { /* the next visit paints it */ } }
+});
+// …and a LINE THAT LANDS while the circles list is on screen (shared rule: subscribeTileChanges, mobile alike): the tile
+// shows it and its count at once. `onCircleStored` repaints only an OPEN circle; with the list showing nothing did.
+subscribeTileChanges(eventLog, () => {
   if (getActiveCircle() == null && _activeTab === 'circles') { try { paintLauncher(); } catch { /* the next visit paints it */ } }
 });
 onShellContentSeal(() => {

@@ -35,6 +35,36 @@ import { param, PARAM_SCOPE, PARAM_KIND, entryKind, LANE } from '@onderling/item
 
 // Parameter register (#36) — tile subtitle render cap (scope:device, kind:internal). `param()` returns 60.
 const MAX_SUBTITLE_LEN = param({ key: 'circleTile.maxSubtitleLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60 });
+/** How long the circles list waits after a line lands before it paints, so a burst (a catch-up) paints once. */
+const TILE_REPAINT_WAIT_MS = param({ key: 'circleTile.repaintWaitMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 250 });
+
+/** Whether a logged entry can change a circle's tile: the same rule `buildTilePreviews` reads by. */
+function speaksOnTile(event) {
+  if (!event || typeof event !== 'object' || !eventCircleId(event)) return false;
+  return isItemLanding(event) || entryKind(event.type).lane === LANE.HUMAN;
+}
+
+/**
+ * THE CIRCLES LIST HEARS A LINE THAT LANDS WHILE IT IS ON SCREEN. Calls `fn` once per burst of entries that can change a
+ * tile (a line on the human lane, a landed item), a short wait after the first. The host paints its list in `fn` (web:
+ * only when the list is the tab showing; mobile: a tick its previews read). Until 2026-11-20 nothing told the list: a
+ * line landed and was in the circle, and the tile kept its old preview and count until the person left and came back.
+ *
+ * @param {{subscribe: (fn: (event: object) => void) => (() => void)}} eventLog
+ * @param {() => void} fn
+ * @param {object} [o]
+ * @returns {() => void} stop
+ */
+export function subscribeTileChanges(eventLog, fn, { waitMs = TILE_REPAINT_WAIT_MS, setTimer = (f, ms) => setTimeout(f, ms), clearTimer = (h) => clearTimeout(h) } = {}) {
+  if (typeof eventLog?.subscribe !== 'function' || typeof fn !== 'function') return () => {};
+  let pending = null;
+  const off = eventLog.subscribe((event) => {
+    if (pending || !speaksOnTile(event)) return;
+    pending = setTimer(() => { pending = null; try { fn(); } catch { /* the next landing paints again */ } }, Number(waitMs));
+  });
+  return () => { try { off?.(); } catch { /* already gone */ } if (pending) clearTimer(pending); pending = null; };
+}
+
 
 /**
  * Project an event list + seenAt snapshot into per-circle tile previews.

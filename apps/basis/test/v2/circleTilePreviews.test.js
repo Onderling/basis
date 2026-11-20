@@ -190,3 +190,29 @@ describe('seenOnLeave — the circle you leave is seen', () => {
   });
 });
 
+
+describe('the circles list hears a line that lands while it is on screen (subscribeTileChanges)', () => {
+  // the upgrade walk of 2026-11-20 and a two-app browser walk: a line arrived and was in the circle, and the list kept
+  // the old preview and count until the person left the tab and came back; nothing told the list to paint
+  const fakeLog = () => { const subs = new Set(); return { subscribe: (fn) => { subs.add(fn); return () => subs.delete(fn); }, append: (e) => { for (const fn of subs) fn(e); } }; };
+  const timers = () => { const q = []; return { setTimer: (fn) => { q.push(fn); return q.length; }, clearTimer: () => {}, flush: () => { while (q.length) q.shift()(); } }; };
+
+  it('a line on the human lane or a landed item calls the host once per burst; a system row does not', async () => {
+    const { subscribeTileChanges } = await import('../../src/v2/circleTilePreviews.js');
+    const log = fakeLog(); const tm = timers(); let painted = 0;
+    const stop = subscribeTileChanges(log, () => { painted += 1; }, { setTimer: tm.setTimer, clearTimer: tm.clearTimer });
+    log.append({ id: 's1', type: 'delivery-state', payload: { circleId: 'c1', msgId: 'm' } });
+    tm.flush();
+    expect(painted, 'a system row never repaints a tile').toBe(0);
+    for (let i = 0; i < 10; i += 1) log.append(mkEvent({ id: `m${i}`, ts: i, circleId: 'c1', payload: { text: `regel ${i}` } }));
+    tm.flush();
+    expect(painted, 'a burst of lines paints once').toBe(1);
+    log.append(mkEvent({ id: 'x', ts: 99, payload: { text: 'geen kring' } }));
+    tm.flush();
+    expect(painted, 'a line without a circle is no tile\'s').toBe(1);
+    stop();
+    log.append(mkEvent({ id: 'late', ts: 100, circleId: 'c1', payload: { text: 'na stop' } }));
+    tm.flush();
+    expect(painted).toBe(1);
+  });
+});

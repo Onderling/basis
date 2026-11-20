@@ -58,6 +58,9 @@ export const SEAMS = Object.freeze([
   // then opens that thread or circle another way, the shell asks the driver to recheck, or the banner lies over the
   // opened screen's header (found walking the phone, 2026-11-14: a tap on the thread's ⋯ landed on it). The box paints no
   // banner, so the seam is web and mobile only.
+  // THE CIRCLES LIST HEARS A LINE THAT LANDS while it is on screen (subscribeTileChanges, circleTilePreviews.js): a
+  // shell paints its list from it. Neither shell did on 2026-11-20 (the upgrade walk; a two-app browser walk).
+  { id: 'circles-list-hears-new-lines', pattern: /subscribeTileChanges\(/, shells: ['web', 'mobile'], why: 'a line that lands while the circles list is on screen stays off its tile (old preview, old count) until the person leaves and comes back' },
   { id: 'banner-recheck-on-open', pattern: /\.recheck\(\)/, shells: ['web', 'mobile'], why: 'a banner raised before its thread or circle was opened stays over the header of that screen and takes the taps meant for it' },
   // THE SCREEN DOOR in the app: a pasted or scanned screen offer reaches the grant only through the shared pairing (three
   // codes, one pick). The box has no pairing UI: its door is the household bot's (`botScreens`), which composes the same

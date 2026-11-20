@@ -60,6 +60,7 @@ export function renderCircleLauncher(container, {
   storedRefusal = false,
   onDismissStoredRefusal = null,
   onRetryBoot = null,
+  onStartOver = null,
   // The circles an admin removed this person from (`loadRemovedCircles`): tiles of their own, marked, read-only, until
   // the person closes them from inside the circle. No context menu — pin, mute and leave mean nothing there.
   removedCircles = [],
@@ -98,6 +99,15 @@ export function renderCircleLauncher(container, {
       retry.textContent = tr('circle.boot_retry');
       retry.addEventListener('click', () => onRetryBoot());
       container.appendChild(retry);
+    }
+    // the way out when trying again does not help (L1115): second, after "Try again"
+    if (bootNotice.startOver && typeof onStartOver === 'function') {
+      const over = document.createElement('button');
+      over.type = 'button';
+      over.className = 'cc-btn cc-btn--quiet circle-launcher__start-over';
+      over.textContent = tr('circle.start_over.button');
+      over.addEventListener('click', () => onStartOver());
+      container.appendChild(over);
     }
   }
   if (storedRefusal) {

@@ -149,7 +149,7 @@ describe('frontierReplay — the windowed lane catch-up', () => {
     expect(rounds).toBeGreaterThan(1);                                  // via multiple paged rounds
   });
 
-  it('a fully-caught-up receiver gets SILENCE (no batch, no paging loop)', async () => {
+  it('a fully-caught-up receiver gets an EMPTY answer (no statements, no paging loop), so silence means "not reached"', async () => {
     const bindings = new Map();
     const ada = await device('webid:ada', bindings);
     const bo  = await device('webid:bo',  bindings);
@@ -160,7 +160,12 @@ describe('frontierReplay — the windowed lane catch-up', () => {
     const serve = makeFrontierReplay({ rail: ada.rail, subtypes: SUBTYPES, sendToPeer: (a, p) => sent.push(p) });
     const pull  = makeFrontierReplay({ rail: bo.rail,  subtypes: SUBTYPES, sendToPeer: () => {} });
     await serve.onRequest('peer:bo', { subtype: SUBTYPES.request, circleId: CIRCLE, frontier: pull.localFrontier(CIRCLE) });
-    expect(sent).toHaveLength(0);
+    expect(sent).toEqual([{ subtype: SUBTYPES.batch, circleId: CIRCLE, statements: [], seq: 0, done: true, more: false }]);
+    // …and the receiver does not page on an empty answer
+    const asked = [];
+    const pull2 = makeFrontierReplay({ rail: bo.rail, subtypes: SUBTYPES, sendToPeer: (a, p) => asked.push(p) });
+    await pull2.onBatch('peer:ada', sent[0]);
+    expect(asked).toHaveLength(0);
   });
 
   it('a PRUNED/unknown frontier degrades to over-serving; idempotent ingest drops the duplicates', async () => {

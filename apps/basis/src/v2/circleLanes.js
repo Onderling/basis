@@ -33,7 +33,7 @@ import { makeSyncSelection, HOLD_EVERYTHING } from './syncSelection.js';
 import { GRANTS_BROADCAST } from './grantsRail.js';
 import { makeItemsPeerHandler, ITEMS_BROADCAST, ITEMS_CATCHUP_SUBTYPES } from './itemsRail.js';
 import { OWN_DEVICES_SCOPE, isOwnPlaceId } from './grantsManifest.js';
-import { makeFrontierReplay } from './frontierReplay.js';
+import { makeFrontierReplay, CATCHUP_ASK_FEW } from './frontierReplay.js';
 import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from './chatRail.js';
 import { KEY_STATEMENT_BROADCAST, KEY_CATCHUP_SUBTYPES, makeKeyPeerHandler } from './keyRail.js';
 
@@ -107,6 +107,10 @@ export function buildCircleLanes({
   // Where a request goes: each other member's PER-CIRCLE address from the derived roster; the global key only when
   // the person allows the address fallback (the same gate the fan's resolver reads). Never this device's own row.
   const aim = { selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey ?? null, allowGlobal: () => agent.addressFallbackOn?.() === true };
+  // THE CONTENT LANES ASK A FEW, NOT ALL (the start burst, 2026-11-20): items and chat ask three members per circle (own
+  // devices first, the rest at random) and widen on silence or a gap. The deny-wins lanes below (governance, membership,
+  // keys) keep asking everyone: a removal held by one honest member must still arrive.
+  const askFew = { askFew: CATCHUP_ASK_FEW, ownAddressFor: (cid) => { try { return agent.circleAddressFor?.(cid) ?? null; } catch { return null; } } };
   const gov = govRail ? makeGovernanceCatchUp({
     rail: govRail,
     sendToPeer: send,
@@ -146,6 +150,7 @@ export function buildCircleLanes({
     sendToPeer: send,
     ...aim,
     subtypes: ITEMS_CATCHUP_SUBTYPES,
+    ...askFew,
     statementsFor: (circleId) => agent.itemsRail.catchUpStatements(circleId),
     // the person's own scope is never served on a circle's catch-up: it has its own, between their devices only
     mayServe: (fromPeerAddr, circleId) => circleId !== OWN_DEVICES_SCOPE,
@@ -158,6 +163,7 @@ export function buildCircleLanes({
     sendToPeer: send,
     ...aim,
     subtypes: CHAT_CATCHUP_SUBTYPES,
+    ...askFew,
     onChange: chatChange,
     ...(typeof chatRefused === 'function' ? { onRefused: chatRefused } : {}),
     ...(typeof chatCatchUpOffer === 'function' ? { onOffer: chatCatchUpOffer } : {}),

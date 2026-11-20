@@ -304,6 +304,7 @@ import CircleTabBar, { PlusDialButtons } from './CircleTabBar.js';
 import { plusDialFor, plusPress, PLUS_MIDDLE_KEY } from '../../../../basis/src/v2/plusDial.js';
 import CircleScreenView from './CircleScreenView.js';
 import PersonaButton from './PersonaButton.js';
+import { connectedAtRelay } from '../../../../basis/src/v2/mijWords.js';
 import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
@@ -492,7 +493,7 @@ function WithTabBar({ active, onSelect, badges, avatar = null, onAvatar = null, 
       <View style={{ flex: 1 }}>{children}</View>
       {/* the persona button, top-right on every tab: the persona's picture or initials; a tap opens the persona panel over
           the tab. Left of it, the settings button: the settings home from anywhere (web twin: personaButton.js) */}
-      {avatar ? <PersonaButton avatar={avatar} availability={avatar.availability ?? null} onPress={onAvatar} /> : null}
+      {avatar ? <PersonaButton avatar={avatar} availability={avatar.availability ?? null} connected={!!avatar.connected} onPress={onAvatar} /> : null}
       {avatar && typeof onSettings === 'function' ? <SettingsButton onPress={onSettings} /> : null}
       {overlay}
       {/* THE "+" is docked in the tab bar (manifest `plus`, shared plusDial.js). Open, the screen is dimmed: a touch on it
@@ -1093,13 +1094,16 @@ export default function CircleLauncherScreen({
   // the stored availability the persona button's ring and the panel's row say (read again on every view change: it comes
   // back from the availability screen)
   const [availabilityNow, setAvailabilityNow] = useState(null);
+  // …with the connection: the relay fact the connection points list shows (connected at one of this device's relays)
+  const [connectedNow, setConnectedNow] = useState(false);
   useEffect(() => {
+    try { setConnectedNow(connectedAtRelay(bundle?.agent?.relays?.list?.() ?? [])); } catch { setConnectedNow(false); }
     let alive = true;
     Promise.resolve().then(() => availabilityStore.get()).then((r) => { if (alive) setAvailabilityNow(r ?? null); }).catch(() => {});
     return () => { alive = false; };
   }, [view, availabilityStore]);
   // the persona button with the ring's record (every tab bar hands this one)
-  const personaButtonRinged = useMemo(() => (personaButton ? { ...personaButton, availability: availabilityNow } : null), [personaButton, availabilityNow]);
+  const personaButtonRinged = useMemo(() => (personaButton ? { ...personaButton, availability: availabilityNow, connected: connectedNow } : null), [personaButton, availabilityNow, connectedNow]);
   // What the persona panel's and Vandaag's declared blocks read beside the waist (the agents list, "Wacht op jou")
   // the governance binding, for Mij's reads (made further down; read through a ref when Mij asks, after render)
   const govPolicyRef = useRef(null);
@@ -1469,7 +1473,7 @@ export default function CircleLauncherScreen({
     ? { mijSelf: { ...panelModel.mijSelf, deviceId: bundle?.agent?.persona?.(panelModel.mijSelf.id)?.enrolledDevice?.deviceId ?? null } }
     : { mijSelf: undefined }) }), [mijSources, panelModel.mijSelf?.id, bundle]);   // eslint-disable-line react-hooks/exhaustive-deps
   const personaPanelSheet = (
-    <PersonaPanelSheet visible={panelOpen} model={panelModel} availability={availabilityNow}
+    <PersonaPanelSheet visible={panelOpen} model={panelModel} availability={availabilityNow} connected={connectedNow}
       onAvailability={() => { setPanelOpen(false); setView('availability'); }}
       onTab={(id) => setPanelSelf(id)}
       onShowAs={() => { setPanelOpen(false); setSwitcherOpen(true); }}

@@ -37,7 +37,11 @@ describe('the persona panel and the settings button — parity', () => {
     expect(view).not.toMatch(/case 'availability'|availabilityLine|VandaagAvailability/);
     expect(launcher).not.toMatch(/VandaagAvailability/);
     expect(webHost).not.toMatch(/renderVandaagAvailability/);
-    expect(personaButtonRN).toMatch(/availabilityRing\(/);
+    expect(personaButtonRN).toMatch(/availabilityRing\(availability, \{ connected \}\)/);
+    // connection is the relay fact, from the one shared helper on both shells (no second source)
+    expect(webHost).toMatch(/connectedAtRelay\(_peerAgent\?\.relays\?\.list\?\.\(\) \?\? \[\]\)/);
+    expect(launcher).toMatch(/connectedAtRelay\(bundle\?\.agent\?\.relays\?\.list\?\.\(\) \?\? \[\]\)/);
+    expect(sheet).toMatch(/availabilityRow\(availability, \{ connected, t \}\)/);
     expect(personaButtonRN).toMatch(/personaButtonLabel\(/);
     expect(sheet).toMatch(/availabilityRow\(/);
     expect(launcher).toMatch(/onAvailability=\{\(\) => \{ setPanelOpen\(false\); setView\('availability'\); \}\}/);

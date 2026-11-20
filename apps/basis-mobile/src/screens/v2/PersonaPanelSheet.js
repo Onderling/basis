@@ -12,7 +12,7 @@ import { useTheme } from './themeContext.js';
 import { useSheetCap } from './sheetCap.js';
 import { availabilityRow } from '../../../../basis/src/v2/mijWords.js';
 
-export default function PersonaPanelSheet({ visible, model, availability = null, onAvailability, onTab, onShowAs, onClose, children }) {
+export default function PersonaPanelSheet({ visible, model, availability = null, connected = false, onAvailability, onTab, onShowAs, onClose, children }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const sheetCap = useSheetCap(0.85);
@@ -35,7 +35,7 @@ export default function PersonaPanelSheet({ visible, model, availability = null,
           {/* the availability, in words, with the control to change it (the persona button's ring shows it in colour) */}
           {typeof onAvailability === 'function' ? (
             <Pressable onPress={onAvailability} accessibilityRole="button" style={styles.availability} testID="persona-panel-availability">
-              <Text style={styles.availabilityText}>{availabilityRow(availability, { t })}</Text>
+              <Text style={styles.availabilityText}>{availabilityRow(availability, { connected, t })}</Text>
             </Pressable>
           ) : null}
           <View style={styles.body}>{children}</View>

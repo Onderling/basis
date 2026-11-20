@@ -35,7 +35,7 @@ describe('Vandaag on the phone', () => {
   });
   it('the persona button: named the persona button, and the settings button beside it', () => {
     // named with the availability its ring shows (PersonaButton.js), so the colour is never the only signal
-    expect(read('PersonaButton.js')).toMatch(/accessibilityLabel=\{personaButtonLabel\(availability, \{ t \}\)\} testID="persona-button"/);
+    expect(read('PersonaButton.js')).toMatch(/accessibilityLabel=\{personaButtonLabel\(availability, \{ connected, t \}\)\} testID="persona-button"/);
     expect(launcher).toMatch(/accessibilityLabel=\{t\('circle\.persona_button\.settings'\)\} testID="settings-button"/);
     expect(PERSONA_BUTTON_CLEARANCE).toBeGreaterThan(PERSONA_BUTTON.top + PERSONA_BUTTON.size);
   });

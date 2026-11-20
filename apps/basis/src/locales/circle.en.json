@@ -9754,7 +9754,7 @@
       "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
     },
     "resumed": {
-      "text": "Starting this device over was cut short. Type your recovery phrase again to finish it.",
+      "text": "Starting this device over was cut short. Type your recovery phrase again to finish it; nothing more is removed until you do.",
       "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
     },
     "phrase_label": {
@@ -9804,6 +9804,34 @@
     "confirm_yes": {
       "text": "Start over",
       "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    },
+    "confirm_unknown": {
+      "text": "This device cannot check that this phrase is its own. If it is another person's phrase, this device comes back as that person.",
+      "doc": "Start this device over (ledger L1115): said in the confirm when the device could not name its own root (an unreadable marker or key door): any valid phrase is taken."
+    },
+    "cancel_cleared_title": {
+      "text": "Stop starting over?",
+      "doc": "Start this device over (ledger L1115): cancel on a start-over cut short AFTER the device was cleared."
+    },
+    "cancel_cleared_body": {
+      "text": "This device was already cleared. Without your phrase it starts as a new person, with none of your circles. You can still restore your phrase later.",
+      "doc": "Start this device over (ledger L1115): cancel on a start-over cut short AFTER the device was cleared: it comes up as a new identity."
+    },
+    "cancel_cleared_yes": {
+      "text": "Start as a new person",
+      "doc": "Start this device over (ledger L1115): cancel on a start-over cut short after the clear: confirm."
+    },
+    "cancel_cleared_no": {
+      "text": "Back to the phrase",
+      "doc": "Start this device over (ledger L1115): cancel on a start-over cut short after the clear: go back."
+    },
+    "web_stays": {
+      "text": "Other things on this website (the public pages, a screen page paired with a toolbox) stay.",
+      "doc": "Web: the start-over confirm (ledger L1115): the clear takes only Basis's own storage by name; the rest of the origin stays."
+    },
+    "error_blocked": {
+      "text": "Basis is open in another tab. Close the other tabs and try again: nothing more was removed.",
+      "doc": "Web: the start-over page (ledger L1115): a database delete was blocked by another tab; the start-over stopped, its mark kept."
     }
   },
   "boot_failed": {

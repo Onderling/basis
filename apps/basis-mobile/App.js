@@ -38,12 +38,13 @@ import ActStateBar from './src/rn/ActStateBar.js';
 // Two maps would mean receipts advancing a state no bubble reads.
 import { createAppDeliveryMap } from '../basis/src/v2/deliveryState.js';
 import { onStoredValueRefused } from '../basis/src/v2/localStoreSeal.js';
-import { checkPhraseForThisDevice, startDeviceOver, finishStartOver } from '../basis/src/v2/startOver.js';
+import { checkPhraseForThisDevice, startDeviceOver, readStartOverMark, cancelStartOver } from '../basis/src/v2/startOver.js';
+import * as FileSystem from 'expo-file-system';
 import { makeSecureStoreRootKeyStore } from './src/core/secureStoreRootKeyStore.js';
-import { wipePhone as wipePhoneWith, confirmStartOver } from './src/core/startOverPhone.js';
+import { wipePhone as wipePhoneWith, confirmStartOver, confirmCancelCleared } from './src/core/startOverPhone.js';
 
 /** This phone's wipe for a start-over (L1115). */
-const wipePhone = () => wipePhoneWith({ AsyncStorage, SecureStore });
+const wipePhone = () => wipePhoneWith({ AsyncStorage, SecureStore, FileSystem });
 import { makeGiveUpConsumers } from '../basis/src/v2/deliveryGiveUp.js';
 import {
   makeReceiptSender, asyncStorageDeliveryIo, createDeliverySettingsStore,
@@ -368,11 +369,12 @@ export default function App() {
   // open as "show welcome" — better to greet an extra time than to
   // silently skip on a real first run.
   useEffect(() => {
-    // FIRST: a start-over cut short (L1115) is finished before anything reads, and the restore door opens
-    finishStartOver({ markerVault: markerVaultOver(AsyncStorage), wipe: wipePhone })
-      .catch(() => ({ startedOver: false }))
-      .then(({ startedOver }) => (startedOver ? 'startover' : shouldShowFirstRunWelcome(AsyncStorage)))
-      .then((show) => { bootMark('firstrun.checked', { welcome: !!show }); setFirstRun(show === 'startover' ? 'restore' : (show ? 'show' : 'dismissed')); })
+    // FIRST: a start-over cut short (L1115) opens its phrase page again before anything reads. The mark clears nothing
+    // by itself: the phrase is asked again, checked against the mark's fingerprint
+    readStartOverMark(markerVaultOver(AsyncStorage))
+      .catch(() => null)
+      .then((mark) => { if (mark) { setStartOverMark(mark); return 'startover'; } return shouldShowFirstRunWelcome(AsyncStorage); })
+      .then((show) => { bootMark('firstrun.checked', { welcome: !!show }); setFirstRun(show === 'startover' ? 'startover' : (show ? 'show' : 'dismissed')); })
       .catch(() => setFirstRun('show'));
   }, []);
 
@@ -392,22 +394,33 @@ export default function App() {
   const startRestore = useCallback(() => setFirstRun('restore'), []);
   // START THIS DEVICE OVER FROM YOUR PHRASE (L1115), from the start-failure notice: the phrase first and checked, the
   // confirm in words, then the shared order (startOver.js): mark, wipe, the ordinary restore, unmark; then the boot
+  const [startOverMark, setStartOverMark] = useState(null);   // a start-over cut short, found at boot
   const startOver = useCallback(() => setFirstRun('startover'), []);
   const submitStartOver = useCallback(async (phrase) => {
-    const checked = await checkPhraseForThisDevice(phrase, { rootKeyStore: makeSecureStoreRootKeyStore(SecureStore), markerVault: markerVaultOver(AsyncStorage) });
+    const checked = await checkPhraseForThisDevice(phrase, { rootKeyStore: makeSecureStoreRootKeyStore(SecureStore), markerVault: markerVaultOver(AsyncStorage), markFingerprint: startOverMark?.fingerprint ?? null });
     if (!checked.ok) return checked;
-    const yes = await confirmStartOver(t);
+    const yes = await confirmStartOver(t, { known: checked.known });
     if (!yes) return { ok: false, code: 'not-confirmed' };
     const r = await startDeviceOver({
-      phrase: checked.phrase, markerVault: markerVaultOver(AsyncStorage), wipe: wipePhone,
+      phrase: checked.phrase, fingerprint: checked.fingerprint, markerVault: markerVaultOver(AsyncStorage), wipe: wipePhone,
       restore: (p) => restoreFromMnemonic({ mnemonic: p, asyncStorage: AsyncStorage, secureStore: SecureStore }),
     });
     if (!r.ok) return r;
     try { await markWelcomeDismissed(AsyncStorage); } catch { /* non-fatal */ }
-    setBootError(null); setBootFailure(null);
+    setBootError(null); setBootFailure(null); setStartOverMark(null);
     setFirstRun('dismissed');   // the boot runs again, on the restored device
     return r;
-  }, []);
+  }, [startOverMark]);
+  // Cancel. No start-over under way: back to the app, nothing changed. One cut short: the mark goes, nothing more is
+  // cleared; when the device was already cleared, it says first that it starts as a NEW identity (then the welcome).
+  const cancelStartOverPage = useCallback(async () => {
+    if (!startOverMark) { setFirstRun('dismissed'); return; }
+    if (startOverMark.stage === 'cleared' && !(await confirmCancelCleared(t))) return;
+    try { await cancelStartOver(markerVaultOver(AsyncStorage)); } catch { /* the next start asks again */ }
+    const cleared = startOverMark.stage === 'cleared';
+    setStartOverMark(null);
+    setFirstRun(cleared ? 'show' : 'dismissed');
+  }, [startOverMark]);
   const cancelRestore = useCallback(() => setFirstRun('show'), []);
 
   // 5.9b-followup — invoked from MnemonicEntryScreen with the raw text.
@@ -693,7 +706,7 @@ export default function App() {
     return (
       <SafeAreaProvider>
         <StatusBar style="auto" />
-        <MnemonicEntryScreen onSubmit={submitStartOver} onCancel={() => setFirstRun('dismissed')} />
+        <MnemonicEntryScreen onSubmit={submitStartOver} onCancel={cancelStartOverPage} />
       </SafeAreaProvider>
     );
   }

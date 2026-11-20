@@ -66,7 +66,8 @@ import { createSettingsPodMedium } from '../../src/v2/settingsPodMedium.js';
 import { inviteDeepLink } from '../../src/v2/inviteDeepLink.js';
 import { alphaViewMode, isAlphaTab, ALPHA_FALLBACK_TAB } from '../../src/v2/alphaSurface.js';
 import { runPendingForget, markerVaultOver, circleIdsFrom } from '../../src/v2/enrolForgets.js';
-import { checkPhraseForThisDevice, startDeviceOver, finishStartOver, wipeKeyValueStorage, restorePhraseWithoutAgent, START_OVER_PENDING_KEY } from '../../src/v2/startOver.js';
+import { checkPhraseForThisDevice, startDeviceOver, readStartOverMark, cancelStartOver, wipeKeyValueStorage, deleteDatabases, restorePhraseWithoutAgent, START_OVER_PENDING_KEY } from '../../src/v2/startOver.js';
+import { isBasisStorageKey, isBasisDatabase, BASIS_DB_NAMES } from '../../src/v2/basisStorageNames.js';
 import { pickRootKeyStore } from '../../src/core/agent/ownerRootCustody.js';
 import { makeBrowserVault } from '@onderling/secure-agent';
 import { DEFAULT_PERSONA } from '../../src/v2/contactPersona.js';
@@ -4024,7 +4025,7 @@ function paintLauncher() {
     storedRefusal: _storedRefusal,
     onDismissStoredRefusal: () => { _storedRefusal = false; _storedRefusalSaid = true; try { paintLauncher(); } catch { /* the next visit */ } },
     onRetryBoot:  () => window.location.reload(),
-    onStartOver:  () => showStartOver(),
+    onStartOver:  () => openStartOverPage(),
     t,
     onOpenCircle: showDetail,
     onNewCircle:  createCircle,
@@ -9606,62 +9607,97 @@ async function showSettings(id) {
 }
 
 // ── START THIS DEVICE OVER FROM YOUR PHRASE (L1115) ─────────────────────────────────────────────────────────────
-// The second door on the start-failure notice (after "Try again"), and what a boot opens after a start-over was cut
-// short. The order is the shared one (startOver.js): the phrase first and checked, the confirm in words, then mark,
-// wipe, the restore without an agent, unmark; then a fresh start of the app.
-async function wipeThisBrowser() {
-  await wipeKeyValueStorage(window.localStorage, `cc-owner-root:${START_OVER_PENDING_KEY}`);
-  try { window.sessionStorage?.clear?.(); } catch { /* none */ }
-  const dbs = (await globalThis.indexedDB?.databases?.().catch(() => [])) ?? [];
-  await Promise.all(dbs.map((d) => new Promise((resolve) => {
-    try { const req = indexedDB.deleteDatabase(d.name); req.onsuccess = req.onerror = req.onblocked = () => resolve(); } catch { resolve(); }
-  })));
+// The second door on the start-failure notice (after "Try again"). The order is the shared one (startOver.js): the
+// phrase first and checked IN THIS RUN, the confirm in words, then mark, clear, restore without an agent, unmark; then a
+// fresh start of the app. The page always opens on a FRESH load, before the boot opens a single store: a database this
+// tab already holds cannot be deleted (no store here closes on `versionchange`), so the door only asks for the page
+// (`START_OVER_PAGE_KEY`, a per-tab view choice that clears nothing) and reloads.
+const START_OVER_PAGE_KEY = 'basis.startOverPage';
+const START_OVER_MARK_KEY = `cc-owner-root:${START_OVER_PENDING_KEY}`;
+function openStartOverPage() {
+  try { window.sessionStorage.setItem(START_OVER_PAGE_KEY, '1'); } catch { /* the page opens on this load only */ }
+  window.location.reload();
 }
-function showStartOver({ resumed = false } = {}) {
-  hideTabBar?.();
-  const ownerRootVault = makeBrowserVault('cc-owner-root:');
+// The clear takes only what is Basis's by name (basisStorageNames.js): the origin is shared with the public site and the
+// toolbox screen pages. A delete another tab blocks fails the start-over with 'blocked' ("close the other tabs").
+async function wipeThisBrowser() {
+  await wipeKeyValueStorage(window.localStorage, START_OVER_MARK_KEY, { isOurs: isBasisStorageKey });
+  try { await wipeKeyValueStorage(window.sessionStorage, START_OVER_MARK_KEY, { isOurs: isBasisStorageKey }); } catch { /* none */ }
+  let listed = [];
+  try { listed = ((await globalThis.indexedDB?.databases?.()) ?? []).map((d) => d?.name).filter(isBasisDatabase); } catch { /* not listable: the fixed names */ }
+  if (globalThis.indexedDB) await deleteDatabases(globalThis.indexedDB, [...new Set([...listed, ...BASIS_DB_NAMES])]);
+}
+function showStartOver({ mark = null } = {}) {
+  const root = document.getElementById('circle-root') ?? document.body;
+  const markerVault = markerVaultOver(window.localStorage);
+  const rootKeyStore = () => pickRootKeyStore({ fallbackVault: makeBrowserVault('cc-owner-root:') });
   const el = (tag, attrs = {}, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'onclick') n.addEventListener('click', v); else n.setAttribute(k, v); } for (const c of kids) n.append(c); return n; };
   const said = el('p', { role: 'alert', class: 'start-over__said' });
   const box = el('textarea', { rows: '4', class: 'start-over__phrase', 'aria-label': t('circle.start_over.phrase_label'), autocomplete: 'off', spellcheck: 'false' });
-  const page = el('section', { class: 'start-over' },
+  const page = el('section', { class: 'start-over', 'data-testid': 'start-over' },
     el('h2', {}, t('circle.start_over.button')),
-    el('p', {}, t(resumed ? 'circle.start_over.resumed' : 'circle.start_over.lede')),
+    el('p', {}, t(mark ? 'circle.start_over.resumed' : 'circle.start_over.lede')),
     box, said);
-  const go = el('button', { type: 'button', class: 'cc-btn cc-btn--primary', onclick: async () => {
+  const go = el('button', { type: 'button', class: 'cc-btn cc-btn--primary', 'data-testid': 'start-over-check', onclick: async () => {
     said.textContent = '';
-    const checked = await checkPhraseForThisDevice(box.value, { rootKeyStore: pickRootKeyStore({ fallbackVault: ownerRootVault }), markerVault: markerVaultOver(window.localStorage) });
+    page.querySelector('.start-over__confirm')?.remove();
+    const checked = await checkPhraseForThisDevice(box.value, { rootKeyStore: rootKeyStore(), markerVault, markFingerprint: mark?.fingerprint ?? null });
     if (!checked.ok) { said.textContent = t(`circle.start_over.error_${checked.code === 'other-phrase' ? 'other_phrase' : 'invalid'}`); return; }
-    // the confirm in words: what is lost, what comes back; nothing is cleared before it
+    // the confirm in words: what is lost, what comes back, what stays; and, when this device could not name its own
+    // root, that it cannot check the phrase is its own. Nothing is cleared before it.
     const confirm = el('div', { class: 'start-over__confirm' },
       el('h3', {}, t('circle.start_over.confirm_title')),
       el('p', {}, t('circle.start_over.confirm_body')),
-      el('button', { type: 'button', class: 'cc-btn cc-btn--danger', onclick: async () => {
+      ...(checked.known ? [] : [el('p', { class: 'start-over__unknown' }, t('circle.start_over.confirm_unknown'))]),
+      el('p', {}, t('circle.start_over.web_stays')),
+      el('button', { type: 'button', class: 'cc-btn cc-btn--danger', 'data-testid': 'start-over-yes', onclick: async () => {
         said.textContent = t('circle.start_over.working');
         const r = await startDeviceOver({
-          phrase: checked.phrase, markerVault: markerVaultOver(window.localStorage), wipe: wipeThisBrowser,
-          restore: (p) => restorePhraseWithoutAgent({ mnemonic: p, rootKeyStore: pickRootKeyStore({ fallbackVault: makeBrowserVault('cc-owner-root:') }), chatVault: makeBrowserVault('cc-chat-id:'), markerVault: makeBrowserVault('cc-owner-root:') }),
+          phrase: checked.phrase, fingerprint: checked.fingerprint, markerVault, wipe: wipeThisBrowser,
+          restore: (p) => restorePhraseWithoutAgent({ mnemonic: p, rootKeyStore: rootKeyStore(), chatVault: makeBrowserVault('cc-chat-id:'), markerVault: makeBrowserVault('cc-owner-root:') }),
         }).catch(() => ({ ok: false, code: 'storage' }));
         if (r.ok) { window.location.reload(); return; }
-        said.textContent = t('circle.start_over.error_storage');
+        said.textContent = t(r.code === 'blocked' ? 'circle.start_over.error_blocked' : 'circle.start_over.error_storage');
       } }, t('circle.start_over.confirm_yes')),
       el('button', { type: 'button', class: 'cc-btn cc-btn--quiet', onclick: () => { confirm.remove(); said.textContent = t('circle.start_over.not_confirmed'); } }, t('circle.start_over.confirm_no')));
     page.append(confirm);
   } }, t('circle.start_over.submit'));
-  const back = el('button', { type: 'button', class: 'cc-btn cc-btn--quiet', onclick: () => window.location.reload() }, t('circle.start_over.confirm_no'));
+  // Cancel. With no start-over under way: back to the app, nothing changed. With one cut short: the mark goes and
+  // nothing more is cleared; when it was already cleared, say first that this device starts as a NEW identity.
+  const back = el('button', { type: 'button', class: 'cc-btn cc-btn--quiet', 'data-testid': 'start-over-cancel', onclick: async () => {
+    if (!mark) { window.location.reload(); return; }
+    if (mark.stage !== 'cleared') { await cancelStartOver(markerVault).catch(() => {}); window.location.reload(); return; }
+    page.querySelector('.start-over__cancel')?.remove();
+    page.append(el('div', { class: 'start-over__cancel' },
+      el('h3', {}, t('circle.start_over.cancel_cleared_title')),
+      el('p', {}, t('circle.start_over.cancel_cleared_body')),
+      el('button', { type: 'button', class: 'cc-btn cc-btn--danger', onclick: async () => { await cancelStartOver(markerVault).catch(() => {}); window.location.reload(); } }, t('circle.start_over.cancel_cleared_yes')),
+      el('button', { type: 'button', class: 'cc-btn cc-btn--quiet', onclick: (e) => e.currentTarget.parentElement.remove() }, t('circle.start_over.cancel_cleared_no'))));
+  } }, t('circle.start_over.confirm_no'));
   page.append(go, back);
-  rootEl.replaceChildren(page);
+  root.replaceChildren(page);
 }
 
 // Was an enrol offer waiting when this boot started? Read before anything can consume it: a ceremony with an offer
 // waiting was an ADD, and the restore-finish flow ("your circles are not here") is not for it.
 let offerPendingAtBoot = false;
 
+// App language: a persisted user choice (the Mij toggle) wins over the device locale; localStorage is the pre-boot
+// cache of app.lang. Before the boot's first paint — the start-over page (L1115) paints before the rest of the boot too.
+async function initAppLocale() {
+  let stored = null; try { stored = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ } // pre-boot cache of app.lang
+  await initLocalisation({ lng: (stored === 'nl' || stored === 'en') ? stored : detectDeviceLang() });
+}
+
 async function boot() {
-  // FIRST OF ALL: a start-over cut short (L1115) is finished before anything reads, and its phrase page opens again
+  // FIRST OF ALL (L1115): a start-over cut short, or the start-over page asked for, opens its phrase page before anything
+  // reads or opens a store. A mark clears nothing by itself: the phrase is asked again.
   try {
-    const so = await finishStartOver({ markerVault: markerVaultOver(window.localStorage), wipe: wipeThisBrowser });
-    if (so.startedOver) { showStartOver({ resumed: true }); return; }
-  } catch { /* the next start tries again */ }
+    const mark = await readStartOverMark(markerVaultOver(window.localStorage));
+    let asked = false;
+    try { asked = window.sessionStorage.getItem(START_OVER_PAGE_KEY) === '1'; window.sessionStorage.removeItem(START_OVER_PAGE_KEY); } catch { /* no page asked */ }
+    if (mark || asked) { await initAppLocale().catch(() => {}); showStartOver({ mark }); return; }
+  } catch { /* the ordinary boot */ }
   // THE SIGNATURE CHECK: WebCrypto's batch behind the one strict rule, after its self-test (the vectors, an honest and a
   // tampered signature); a browser without Ed25519 in WebCrypto keeps tweetnacl. Reads then check ahead in one batch.
   try { const eq = await installWebSignatureEquation(globalThis.crypto?.subtle); console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`); } catch { /* tweetnacl stays */ }
@@ -9710,10 +9746,7 @@ async function boot() {
   // the last moment a page is sure to get on a phone's browser; pagehide covers a reload and a closed tab.
   window.addEventListener('pagehide', () => { flushPendingSaves().catch(() => {}); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushPendingSaves().catch(() => {}); });
-  // App language: a persisted user choice (the Mij toggle) wins over the device locale.
-  // pre-boot cache of app.lang
-  let _storedAppLang = null; try { _storedAppLang = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ }
-  await initLocalisation({ lng: (_storedAppLang === 'nl' || _storedAppLang === 'en') ? _storedAppLang : detectDeviceLang() });
+  await initAppLocale();
   // A hosted build links back to its site, above everything else (no frame ⇒ nothing).
   renderHostFrame(document.body, { frame: HOST_FRAME, t });
   placePersonaButton();   // the person button below the line just painted (it may already be on screen)

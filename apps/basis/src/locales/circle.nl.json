@@ -9751,7 +9751,7 @@
       "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
     },
     "resumed": {
-      "text": "Dit apparaat opnieuw beginnen is onderbroken. Typ je herstelzin nog eens om het af te maken.",
+      "text": "Dit apparaat opnieuw beginnen is onderbroken. Typ je herstelzin nog eens om het af te maken; tot dan wordt er niets meer verwijderd.",
       "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
     },
     "phrase_label": {
@@ -9801,6 +9801,34 @@
     "confirm_yes": {
       "text": "Opnieuw beginnen",
       "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    },
+    "confirm_unknown": {
+      "text": "Dit apparaat kan niet nagaan of deze herstelzin de zijne is. Is het de herstelzin van iemand anders, dan komt dit apparaat terug als die persoon.",
+      "doc": "Start this device over (ledger L1115): said in the confirm when the device could not name its own root (an unreadable marker or key door): any valid phrase is taken."
+    },
+    "cancel_cleared_title": {
+      "text": "Stoppen met opnieuw beginnen?",
+      "doc": "Start this device over (ledger L1115): cancel on a start-over cut short AFTER the device was cleared."
+    },
+    "cancel_cleared_body": {
+      "text": "Dit apparaat is al leeggemaakt. Zonder je herstelzin begint het als een nieuw persoon, zonder je kringen. Je kunt je herstelzin later nog terugzetten.",
+      "doc": "Start this device over (ledger L1115): cancel on a start-over cut short AFTER the device was cleared: it comes up as a new identity."
+    },
+    "cancel_cleared_yes": {
+      "text": "Begin als nieuw persoon",
+      "doc": "Start this device over (ledger L1115): cancel on a start-over cut short after the clear: confirm."
+    },
+    "cancel_cleared_no": {
+      "text": "Terug naar de herstelzin",
+      "doc": "Start this device over (ledger L1115): cancel on a start-over cut short after the clear: go back."
+    },
+    "web_stays": {
+      "text": "Andere dingen op deze website (de openbare pagina's, een schermpagina die aan een gereedschapskist gekoppeld is) blijven staan.",
+      "doc": "Web: the start-over confirm (ledger L1115): the clear takes only Basis's own storage by name; the rest of the origin stays."
+    },
+    "error_blocked": {
+      "text": "Basis staat open in een ander tabblad. Sluit de andere tabbladen en probeer het opnieuw: er is niets meer verwijderd.",
+      "doc": "Web: the start-over page (ledger L1115): a database delete was blocked by another tab; the start-over stopped, its mark kept."
     }
   },
   "boot_failed": {

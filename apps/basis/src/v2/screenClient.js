@@ -17,7 +17,7 @@ import { SCREEN_PAIRING_TTL_MS } from './screenDoor.js';
 import { createSecureAgent, makeBrowserVault } from '@onderling/secure-agent';
 
 /** The client's version: the page can say which one it was built against. */
-export const SCREEN_CLIENT_VERSION = '0.1.0';
+export const SCREEN_CLIENT_VERSION = '0.2.0';   // 0.2.0 (L1113): the link's one-use ticket goes back in the offer
 
 /**
  * Every refusal's code. `grant-expired` is ONE code for a grant that ran out AND one that was taken away (`/schermen los`,

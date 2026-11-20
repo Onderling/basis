@@ -118,3 +118,12 @@ describe('the offer holds nothing long-lived of the person', () => {
     expect(r.reason).toBe('grant-failed');
   });
 });
+
+describe('the app door does not pair a toolbox\'s page as a plain screen (L1113)', () => {
+  it('an offer that names a toolbox or carries a ticket is refused in words; nothing is asked', async () => {
+    const p = createAppScreenPairing({ callSkill: async () => ({ ok: true }), rand: () => 0.42 });
+    expect(await p.offer(encodePairingOffer({ viewPubKey: 'P', nonce: 'n1', toolbox: 'boodschappen' }))).toEqual({ ok: false, reason: 'toolbox-page' });
+    expect(await p.offer(encodePairingOffer({ viewPubKey: 'P', nonce: 'n2', ticket: 'T' }))).toEqual({ ok: false, reason: 'toolbox-page' });
+    expect((await p.offer(encodePairingOffer({ viewPubKey: 'P', nonce: 'n3' }))).ok).toBe(true);
+  });
+});

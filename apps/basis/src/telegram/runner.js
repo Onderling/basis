@@ -33,6 +33,7 @@ import { telegramPlain } from './telegramPlain.js';
 import { scrubSecrets } from '@onderling/logger';
 import { modelDownClass } from '../v2/modelWatch.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import { redactPairingSecrets } from '../v2/connectionPairing.js';
 
 /** The line a person gets when the model did not answer, by cause class. */
 const MODEL_DOWN_LINE = { refused: 'circle.bot.model_refused', slow: 'circle.bot.model_slow', unreachable: 'circle.bot.model_down' };
@@ -441,8 +442,10 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   async function aroundTurn({ threadId, lines, ctx, own }, run) {
     const chatId = ctx.chatId;
     const text = lines.map((l) => String(l ?? '').trim()).join('\n');
+    // what the log keeps and the thread remembers: never a pasted pairing offer's or start link's body (its ticket)
+    const kept = redactPairingSecrets(text);
     const started = Date.now();
-    turns.set(chatId, { ts: new Date(started).toISOString(), chat: chatId.slice(-4), text, ...(lines.length > 1 ? { lines: lines.length } : {}), ...(ctx.caller ? { caller: ctx.caller } : {}), thread: threadId });
+    turns.set(chatId, { ts: new Date(started).toISOString(), chat: chatId.slice(-4), text: kept, ...(lines.length > 1 ? { lines: lines.length } : {}), ...(ctx.caller ? { caller: ctx.caller } : {}), thread: threadId });
     let r;
     try {
       await greetOnce(chatId, threadId);
@@ -457,7 +460,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       const rec = turns.get(chatId); turns.delete(chatId);
       // a read lives one turn past the turn that made it
       lastReads.turnEnded(threadId);
-      if (rec && !/^(__confirm:|[A-Za-z][\w-]*:)/.test(text)) engine.remember(threadId, 'you', text);
+      if (rec && !/^(__confirm:|[A-Za-z][\w-]*:)/.test(text)) engine.remember(threadId, 'you', kept);
       // An op's result is the SYSTEM speaking; only a model reply is the assistant's own words.
       const voice = rec?.opId || rec?.route === 'help' ? 'system' : 'assistant';
       for (const reply of rec?.replies ?? []) engine.remember(threadId, voice, reply.text);

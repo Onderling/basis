@@ -18,7 +18,7 @@ import { compileConnectionGrant } from './connections.js';
 import { createScreenDoor, memoryUsedNonces, SCREEN_PAIRING_REFUSAL_CODES } from './screenDoor.js';
 
 /** The reasons a shell words as `circle.mydata.connection_offer_<reason>`: anything else is said as 'grant-failed'. */
-const WORDED = new Set([...SCREEN_PAIRING_REFUSAL_CODES, 'pairing-no-pick', 'nothing-picked', 'grant-failed', 'not-a-connect-uri', 'unreadable', 'wrong-version', 'incomplete']);
+const WORDED = new Set([...SCREEN_PAIRING_REFUSAL_CODES, 'pairing-no-pick', 'nothing-picked', 'grant-failed', 'not-a-connect-uri', 'unreadable', 'wrong-version', 'incomplete', 'toolbox-page']);
 const worded = (reason) => (WORDED.has(reason) ? reason : 'grant-failed');
 
 /** What the phone's scanner reads on 'Apparaten & sleutels' → connect a screen: a screen's offer only (Me → Scan does not
@@ -49,6 +49,9 @@ export function createAppScreenPairing({ callSkill, relays = null, door = null, 
       picked = null;
       const parsed = parsePairingOffer(String(text ?? '').trim());
       if (!parsed.ok) return parsed;
+      // a TOOLBOX'S PAGE (its offer names a toolbox or carries a ticket) pairs with the household's bot that holds the
+      // toolbox, from the link `/scherm <toolbox>` sends, never here as a plain screen of this app (L1113): refused in words
+      if (parsed.toolbox || parsed.ticket) return { ok: false, reason: 'toolbox-page' };
       const asked = await theDoor.ask(OWNER, parsed);
       if (!asked.ok) return asked;
       return { ok: true, codes: asked.codes, label: parsed.label ?? null, viewPubKey: parsed.viewPubKey };

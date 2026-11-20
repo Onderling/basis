@@ -1,6 +1,6 @@
 /**
  * A key that cannot be read at a start stops the boot, writes nothing, and reaches the launcher as words with
- * "try again" (ledger L1115; Fable's review of #1470, section 1).
+ * "try again" (ledger L1115; the review of its first fix, section 1).
  *
  * Through the REAL boot the phone runs: `bootAgentBundle` (which wraps every boot error as AGENT_WIRING_FAILED, the
  * typed one in `cause`) over AsyncStorage vaults sealed by `VaultEncrypted`. A first boot writes the keys; a second

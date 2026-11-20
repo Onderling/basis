@@ -198,16 +198,20 @@ start it stops, writing nothing, when:
 
 - a key or marker in its vaults is there but will not read (a wrong passphrase, a damaged file, a storage error):
   `device-runner: a key on this box could not be read (<which>); nothing was changed. Stopping. ...`;
-- `vault.json` or `chat-vault.json` is MISSING in a data folder that ran a box before (it holds `box-started`, written
-  last at a start that came up): a backup put back without them. A folder without that mark is a first start (also one
-  that was cut short), so an interrupted first start simply goes on. **Not caught:** a data folder that did not mount
-  (an empty mount point reads as a first start).
+- `vault.json` or `chat-vault.json` is MISSING in a data folder that ran a box before: a backup put back without them.
+  "Ran a box before" is `box-started` (written last at a start that came up) or, for a box that ran before that mark
+  existed, a `registry/` folder that holds a row (a start writes it after both vault files). A folder with neither is a
+  first start (also one that was cut short), so an interrupted first start simply goes on. **Not caught:** a data
+  folder that did not mount (an empty mount point reads as a first start).
 
-**What restarts it:** the `assistant` role's container (`deploy/roles/assistant.yml`, `restart: unless-stopped`).
-Before it exits, a failed start **backs off**: 1, 2, 4 … minutes, at most two hours (`box.startBackoffMs` and its window
-`box.startFailureWindowMs`), so a cause that passes by itself (a slow mount, a storage hiccup) is retried without a
-tight loop. `<data dir>/start-failures.json` counts the failed starts in the window, said in each stop's line, and is
-removed when the assistant comes up.
+**What restarts it: the container's restart policy, and nothing else.** A failed start **backs off** and then EXITS:
+1, 2, 4 … minutes, at most two hours (`box.startBackoffMs` and its window `box.startFailureWindowMs`), so a cause that
+passes by itself (a slow mount, a storage hiccup) is retried without a tight loop. The retry is the container coming
+back: the `assistant` role sets `restart: unless-stopped` (`deploy/roles/assistant.yml`), and any other way of running
+the assistant needs a restart policy too (`unless-stopped`, `always` or `on-failure`; a systemd unit
+`Restart=on-failure`). **Without one, the box stays down after its first back-off**: it waits, exits once, and nothing
+tries again until a person starts it. `<data dir>/start-failures.json` counts the failed starts in the window, said in
+each stop's line, and is removed when the assistant comes up.
 
 **It holds only for a key that fails to decrypt** (that does not pass by itself): after 3 such starts
 (`box.startFailuresBeforeHold`) it says `STOPPED TRYING ...` once and stays up without running. The bot's admin line in

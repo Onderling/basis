@@ -17,7 +17,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as sodium from 'react-native-libsodium';
 import { installPhoneSignatureEquation, installPhoneSigning, installPhoneSecretbox } from '../basis/src/v2/signatureEquations.js';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, Pressable, Text, StyleSheet, BackHandler, AppState } from 'react-native';
+import { View, Pressable, Text, StyleSheet, BackHandler, AppState, Alert } from 'react-native';
 import { flushPendingSaves } from '@onderling/local-store';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -38,12 +38,14 @@ import ActStateBar from './src/rn/ActStateBar.js';
 // Two maps would mean receipts advancing a state no bubble reads.
 import { createAppDeliveryMap } from '../basis/src/v2/deliveryState.js';
 import { onStoredValueRefused } from '../basis/src/v2/localStoreSeal.js';
-import { checkPhraseForThisDevice, startDeviceOver, finishStartOver } from '../basis/src/v2/startOver.js';
+import { checkPhraseForThisDevice, startDeviceOver, finishStartOver, wipeKeyValueStorage, START_OVER_PENDING_KEY } from '../basis/src/v2/startOver.js';
 import { makeSecureStoreRootKeyStore } from './src/core/secureStoreRootKeyStore.js';
-import { wipePhone as wipePhoneWith, confirmStartOver } from './src/core/startOverPhone.js';
 
-/** This phone's wipe for a start-over (L1115). */
-const wipePhone = () => wipePhoneWith({ AsyncStorage, SecureStore });
+/** This phone's wipe for a start-over (L1115): every AsyncStorage key but the mark, and the key door's seed. */
+async function wipePhone() {
+  await wipeKeyValueStorage(AsyncStorage, `cc-owner-root:${START_OVER_PENDING_KEY}`);
+  try { await makeSecureStoreRootKeyStore(SecureStore).deleteSeed(); } catch { /* nothing held there */ }
+}
 import { makeGiveUpConsumers } from '../basis/src/v2/deliveryGiveUp.js';
 import {
   makeReceiptSender, asyncStorageDeliveryIo, createDeliverySettingsStore,
@@ -396,7 +398,12 @@ export default function App() {
   const submitStartOver = useCallback(async (phrase) => {
     const checked = await checkPhraseForThisDevice(phrase, { rootKeyStore: makeSecureStoreRootKeyStore(SecureStore), markerVault: markerVaultOver(AsyncStorage) });
     if (!checked.ok) return checked;
-    const yes = await confirmStartOver(t);
+    const yes = await new Promise((resolve) => {
+      Alert.alert(t('circle.start_over.confirm_title'), t('circle.start_over.confirm_body'), [
+        { text: t('circle.start_over.confirm_no'), style: 'cancel', onPress: () => resolve(false) },
+        { text: t('circle.start_over.confirm_yes'), style: 'destructive', onPress: () => resolve(true) },
+      ], { cancelable: true, onDismiss: () => resolve(false) });
+    });
     if (!yes) return { ok: false, code: 'not-confirmed' };
     const r = await startDeviceOver({
       phrase: checked.phrase, markerVault: markerVaultOver(AsyncStorage), wipe: wipePhone,

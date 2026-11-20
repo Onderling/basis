@@ -9633,7 +9633,6 @@ function showStartOver({ resumed = false } = {}) {
     if (!checked.ok) { said.textContent = t(`circle.start_over.error_${checked.code === 'other-phrase' ? 'other_phrase' : 'invalid'}`); return; }
     // the confirm in words: what is lost, what comes back; nothing is cleared before it
     const confirm = el('div', { class: 'start-over__confirm' },
-      el('h3', {}, t('circle.start_over.confirm_title')),
       el('p', {}, t('circle.start_over.confirm_body')),
       el('button', { type: 'button', class: 'cc-btn cc-btn--danger', onclick: async () => {
         said.textContent = t('circle.start_over.working');

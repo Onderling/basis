@@ -34,14 +34,13 @@ test('the persona panel shows the name and the devices; Edit and the settings bu
   await expect(page.locator('.cc-screen-panel .cc-profile__geo-input')).toBeVisible();
   await page.locator('.cc-screen-panel__close').click();
 
-  // the doors Mij gave up have their own homes: availability on Vandaag and in Verbinding, shared-with-me a chip on
-  // Vandaag, blocked at the foot of Contacten, the log report in Mijn gegevens; the persona panel has no settings door —
+  // the doors Mij gave up have their own homes: availability on Vandaag, shared-with-me a chip on
+  // Vandaag, blocked at the foot of Contacten, the log report on the settings home (beside Feedback geven); the persona panel has no settings door —
   // the settings button beside the persona button is the one way in
   await expect(page.locator('.cc-profile__mydata')).toHaveCount(0);
   await expect(page.locator('.cc-persona-panel'), '"Aanpassen" closed the panel: the editor is its own sheet').toHaveCount(0);
   await page.locator('.cc-persona-button__settings').click();
-  await page.locator('.cc-settings__group--my-data').click();
-  await expect(page.locator('.cc-settings__door--log-report')).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.cc-settings__door-row--log-report')).toBeVisible({ timeout: 15_000 });
   expect(errs).toEqual([]);
 });
 

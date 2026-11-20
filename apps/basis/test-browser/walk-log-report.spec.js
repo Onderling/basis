@@ -1,6 +1,6 @@
 /**
- * THE COPY-LOG DOOR, ON A REAL SCREEN (2026-10-23). Instellingen → Mijn gegevens opens this device's log as text (event codes and numbers
- * only), Copy puts exactly that text on the clipboard, and Back returns to Mijn gegevens. Nothing is sent from the screen.
+ * THE COPY-LOG DOOR, ON A REAL SCREEN (2026-10-23). Instellingen → "Meld een probleem" (beside Feedback geven) opens this device's log as text (event codes and numbers
+ * only), Copy puts exactly that text on the clipboard, and Back returns to the settings home. Nothing is sent from the screen.
  *
  *   PEER_TEST_RELAY=ws://127.0.0.1:8797 npx playwright test --project=relay test-browser/walk-log-report.spec.js
  */
@@ -10,7 +10,7 @@ import { bootPeer, teardown, gotoCircles, log } from './peerHarness.js';
 const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
 
-test('Mijn gegevens shows the log as text, Copy copies exactly it, Back returns', async ({ browser }) => {
+test('Meld een probleem shows the log as text, Copy copies exactly it, Back returns', async ({ browser }) => {
   test.setTimeout(120_000);
   let A = null;
   try {
@@ -18,9 +18,8 @@ test('Mijn gegevens shows the log as text, Copy copies exactly it, Back returns'
     await A.page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await gotoCircles(A.page);
     await A.page.locator('.cc-persona-button__settings').click();
-    await A.page.locator('.cc-settings__group--my-data').click();
-    const door = A.page.locator('.cc-settings__door--log-report').first();
-    await expect(door, 'Mijn gegevens offers the copy-log door').toBeVisible({ timeout: 30_000 });
+    const door = A.page.locator('.cc-settings__door-row--log-report').first();
+    await expect(door, 'the settings home offers the copy-log door').toBeVisible({ timeout: 30_000 });
     await door.click();
 
     const text = A.page.locator('.cc-logreport__text').first();
@@ -36,7 +35,7 @@ test('Mijn gegevens shows the log as text, Copy copies exactly it, Back returns'
     log('STEP2 copy', 'PASS', `${copied.length} chars`);
 
     await A.page.locator('.cc-logreport__back').first().click();
-    await expect(A.page.locator('.cc-settings__door--log-report').first(), 'back on Mijn gegevens').toBeVisible({ timeout: 15_000 });
+    await expect(A.page.locator('.cc-settings__door-row--log-report').first(), 'back on the settings home').toBeVisible({ timeout: 15_000 });
     log('STEP3 back', 'PASS', '');
   } finally {
     await teardown([A].filter(Boolean));

@@ -17,14 +17,14 @@ test('the week overview is switched on in My data, survives a reload, and its ca
   try {
     A = await bootPeer(browser, 'A');
     await gotoCircles(A.page);
-    // the switch sits behind the settings button, in Weergave (since 2026-10-23; before that in My data)
+    // the switch sits behind the settings button, in Meldingen (since 2026-11-20; Weergave before that, My data before that)
     const openMij = async () => {
       await A.page.locator('.cc-persona-button__settings').click();
-      await A.page.locator('.cc-settings__group--appearance').first().click();
+      await A.page.locator('.cc-settings__group--notifications').first().click();
     };
     await openMij();
     const toggle = A.page.locator('.cc-profile__week-toggle').first();
-    await expect(toggle, 'Weergave offers the week overview').toBeVisible({ timeout: 30_000 });
+    await expect(toggle, 'Meldingen offers the week overview').toBeVisible({ timeout: 30_000 });
     await expect(toggle).toHaveAttribute('data-on', 'false');
     await toggle.click();
     await expect(toggle, 'switched on').toHaveAttribute('data-on', 'true', { timeout: 15_000 });

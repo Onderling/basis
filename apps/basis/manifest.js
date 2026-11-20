@@ -1175,7 +1175,8 @@ export const basisManifest = {
   },
 
   /**
-   * The person's settings, behind the gear on Mij ("Instellingen"): groups of sections, then the circles' own settings.
+   * The person's settings, behind the settings button beside the persona button ("Instellingen"): groups of sections,
+   * then the doors at the foot (the circles' own settings, help, the introduction, feedback, the copy-log report).
    * Both shells paint the home and each group from this declaration (`settingsHomeFor`), one painter per section id;
    * no shell lists a section by hand. A section lives in exactly one place: once declared here it is gone from the old
    * My data page. Kinds say how a row behaves, so it looks like what it is:
@@ -1183,9 +1184,9 @@ export const basisManifest = {
    *   control — a picker or a small form (theme, language)  fact    — plain text, nothing to do
    * `custody: true` marks a section of the owner's keys, devices or sign-in: its painter reaches only `private` ops, and
    * only through the waist (the fitness test reads both shells). A step-up before it paints is a later design.
-   * The last row is a door to a chooser of the person's circles; each opens that circle's own settings.
    */
   settingsGroups: [
+    // how the app looks and where it opens
     {
       id: 'appearance', labelKey: 'circle.settings_home.appearance',
       sections: [
@@ -1194,32 +1195,57 @@ export const basisManifest = {
         { id: 'start-screen',  kind: 'control' },
         // which round button sits on the "+"'s own spot (or none: a second tap closes it) — the `plus.middle` setting
         { id: 'plus-middle',   kind: 'control' },
-        { id: 'bot-actions',   kind: 'control' },
-        { id: 'week-overview', kind: 'switch'  },
-        { id: 'notifications', kind: 'switch'  },
-        { id: 'assistant',     kind: 'control' },
       ],
     },
+    // what the app tells me, and when
+    {
+      id: 'notifications', labelKey: 'circle.settings_home.notifications',
+      sections: [
+        { id: 'notifications', kind: 'switch'  },
+        { id: 'week-overview', kind: 'switch'  },
+      ],
+    },
+    // the assistant: my own model endpoint, and how the bot shows actions
+    {
+      id: 'assistant', labelKey: 'circle.settings_home.assistant',
+      sections: [
+        { id: 'assistant',     kind: 'control' },
+        { id: 'bot-actions',   kind: 'control' },
+      ],
+    },
+    // how this device reaches the others (availability is on Vandaag: its screen opens from that block)
     {
       id: 'connection', labelKey: 'circle.settings_home.connection',
       sections: [
-        { id: 'availability',      kind: 'door', target: { kind: 'nav', to: 'availability' } },
         { id: 'connection-points', kind: 'door', target: { kind: 'nav', to: 'points' } },
-        { id: 'delivery',          kind: 'control' },
-        { id: 'address-sharing',   kind: 'switch'  },
         { id: 'relay',             kind: 'control' },
-        { id: 'device-keeps',      kind: 'control' },
+        { id: 'address-sharing',   kind: 'switch'  },
+        { id: 'delivery',          kind: 'control' },
       ],
     },
+    // my devices, screens, agents and bots
     {
-      id: 'devices-keys', labelKey: 'circle.settings_home.devices_keys',
+      id: 'devices', labelKey: 'circle.settings_home.devices',
       sections: [
-        { id: 'devices',        kind: 'control', custody: true },
-        { id: 'agents',         kind: 'control' },
-        { id: 'connections',    kind: 'control' },
-        { id: 'connection-add', kind: 'control' },
-        { id: 'keys',           kind: 'control', custody: true },
-        { id: 'storage',        kind: 'control', custody: true },
+        { id: 'devices',         kind: 'control', custody: true },
+        { id: 'device-add',      kind: 'control', custody: true },
+        { id: 'device-replace',  kind: 'control', custody: true },
+        { id: 'device-primary',  kind: 'control', custody: true },
+        { id: 'connections',     kind: 'control' },
+        { id: 'connection-add',  kind: 'control' },
+        { id: 'agents',          kind: 'control' },
+        { id: 'companion-claim', kind: 'control', custody: true },
+        { id: 'bot-link',        kind: 'control', custody: true },
+      ],
+    },
+    // the way back: what a person looks for in a panic, in a group of its own
+    {
+      id: 'recovery', labelKey: 'circle.settings_home.recovery',
+      sections: [
+        { id: 'recovery-phrase',  kind: 'control', custody: true },
+        { id: 'restore',          kind: 'control', custody: true },
+        { id: 'recovery-file',    kind: 'control', custody: true },
+        { id: 'personas-receive', kind: 'control', custody: true },
       ],
     },
     {
@@ -1232,7 +1258,10 @@ export const basisManifest = {
         { id: 'frequent',        kind: 'control' },
         // the person's own record of what they do in the app (ownActions.js): its switch, how much is kept, export, wipe
         { id: 'own-actions',     kind: 'control' },
-        { id: 'log-report',      kind: 'door', target: { kind: 'nav', to: 'logReport' } },
+        // what this device keeps of what the person's devices sync
+        { id: 'device-keeps',    kind: 'control' },
+        // where the data lives: the pod (status, sign in, disconnect)
+        { id: 'storage',         kind: 'control', custody: true },
       ],
     },
     { id: 'per-circle', kind: 'door', labelKey: 'circle.settings_home.per_circle', target: { kind: 'nav', to: 'circleSettingsChooser' } },
@@ -1242,6 +1271,8 @@ export const basisManifest = {
     { id: 'intro', kind: 'door', labelKey: 'circle.introDeck.reopen', target: { kind: 'nav', to: 'intro' } },
     // feedback about the app: the feedback op (its thread to Onderling, prefilled), the same act /feedback and the "+" run
     { id: 'feedback', kind: 'door', labelKey: 'circle.feedback.plus', target: { kind: 'op', opId: 'feedback' } },
+    // …and beside it "Meld een probleem": this device's log to copy (codes and numbers only; nothing is sent from it)
+    { id: 'log-report', kind: 'door', labelKey: 'circle.profile.logReport', target: { kind: 'nav', to: 'logReport' } },
   ],
 
   /**

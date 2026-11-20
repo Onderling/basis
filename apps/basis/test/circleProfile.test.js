@@ -9,7 +9,7 @@ import { renderCircleMyData } from '../web/v2/circleMyData.js';
 import { renderSettingsHome } from '../web/v2/circleSettingsHome.js';
 import { settingsGroupFor } from '../src/v2/settingsHome.js';
 import { basisManifest as settingsManifest } from '../manifest.js';
-const WEERGAVE = settingsGroupFor(settingsManifest, 'appearance').sections.map((x) => x.id);
+const WEERGAVE = settingsGroupFor(settingsManifest, 'notifications').sections.map((x) => x.id);   // the week switch's group (Meldingen since 2026-11-20)
 const MY_DATA = settingsGroupFor(settingsManifest, 'my-data').sections.map((x) => x.id);
 
 const t = (k, v) => (v ? `${k}:${JSON.stringify(v)}` : k);
@@ -98,17 +98,19 @@ describe('renderProfileBasics — location', () => {
 });
 
 describe('My data — the doors Mij gave up', () => {
-  it('the log report is a door in Mijn gegevens; it fires its own view', () => {
-    const logReport = vi.fn();
-    const el = renderCircleMyData(document.createElement('div'), { t, only: MY_DATA, doors: { logReport } });
-    const door = el.querySelector('[data-section="log-report"] .cc-settings__door--log-report');
+  it('the log report is a door at the foot of the settings home, right after Feedback geven; it fires its own view', () => {
+    const onOpenDoor = vi.fn();
+    const el = renderSettingsHome(document.createElement('div'), { t, onOpenDoor });
+    const ids = [...el.querySelectorAll('.cc-settings__door-row')].map((b) => b.dataset.id);
+    expect(ids.slice(ids.indexOf('feedback'), ids.indexOf('feedback') + 2)).toEqual(['feedback', 'log-report']);
+    const door = el.querySelector('.cc-settings__door-row--log-report');
     expect(door.textContent).toBe('circle.profile.logReport');
     door.click();
-    expect(logReport).toHaveBeenCalled();
-    expect(renderCircleMyData(document.createElement('div'), { t, only: MY_DATA }).querySelector('.cc-settings__door--log-report')).toBeNull();
+    expect(onOpenDoor).toHaveBeenCalledWith(expect.objectContaining({ id: 'log-report', target: { kind: 'nav', to: 'logReport' } }));
+    expect(renderCircleMyData(document.createElement('div'), { t, only: MY_DATA, doors: { logReport: vi.fn() } }).querySelector('.cc-settings__door--log-report')).toBeNull();
   });
 
-  it('the week-overview switch is on the Weergave screen, as a real switch, and on no other screen', () => {
+  it('the week-overview switch is on the Meldingen screen, as a real switch, and on no other screen', () => {
     const onToggle = vi.fn();
     const el = renderCircleMyData(document.createElement('div'), { t, only: WEERGAVE, weekOverview: { on: false, onToggle } });
     const btn = el.querySelector('.cc-profile__week-toggle');

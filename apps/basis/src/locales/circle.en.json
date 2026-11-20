@@ -7620,7 +7620,7 @@
       "doc": "My data → keys: the member's CHOICE of which device others deliver to first (sync-policy §12, 2026-09-16). Announces this device's address in every circle with the primary flag; a boot announce never moves the slot."
     },
     "make_primary_no_point": {
-      "text": "Direct messages now land on this device ({{count}} circles told). It cannot sign your circle changes yet: type your recovery phrase on it once (Settings → Devices & keys).",
+      "text": "Direct messages now land on this device ({{count}} circles told). It cannot sign your circle changes yet: type your recovery phrase on it once (Settings → Recovery).",
       "doc": "After the main-device tap on a device without the circle root: direct messages land here, but it cannot be the point that signs the spine."
     },
     "make_primary_done": {
@@ -8889,7 +8889,7 @@
     "offer_title": "Add-device code",
     "offer_hint": "Scan or paste this code on the new device, then type the recovery phrase there. The code is not a secret — the phrase stays the only key.",
     "offer_error": "Could not build the code (this device is not in any circle yet).",
-    "offer_no_seal": "This device cannot show a code yet: it was added before the recovery seal existed. Type your recovery phrase on it once (Settings → Devices & keys), then try again.",
+    "offer_no_seal": "This device cannot show a code yet: it was added before the recovery seal existed. Type your recovery phrase on it once (Settings → Recovery), then try again.",
     "offer_paste_label": "Code from your current device (optional)",
     "personas_title": "Which personas does this device get?",
     "personas_hint": "Only what you tick comes to this device. A device you trust less is better given less.",
@@ -11247,7 +11247,10 @@
     "no_circles": "You are not in any circle yet.",
     "connection": "Connection",
     "my_data": "My data",
-    "devices_keys": "Devices & keys",
+    "notifications": "Notifications",
+    "assistant": "Assistant",
+    "devices": "Devices",
+    "recovery": "Recovery",
     "back": {
       "text": "← Settings",
       "doc": "Back link from a settings group (and the Advanced screen) to the settings home."

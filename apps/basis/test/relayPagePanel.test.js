@@ -1,10 +1,7 @@
 /**
- * basis — Objective D / Surface 4: the my-data relay-URL editor
- * is the FIRST live consumer of openPagePanel's docked side-panel (simple-form).
- *
- * The `set-relay` manifest op declares `surfaces.page`; the my-data control is an
- * entry button that opens the generic panel; the panel auto-builds a form from
- * `op.params` (url · clear), dispatches via `callSkill`, and closes on success.
+ * basis — the `set-relay` op's page surface (openPagePanel's docked side-panel, simple-form): the panel auto-builds a
+ * form from `op.params` (url · clear), dispatches via `callSkill`, and closes on success. The settings' relay row edits
+ * inline on both shells since 2026-11-20 (the web opened this panel, the phone edited inline: levelled to inline).
  * Mirrors `test/backToChat.test.js` (the openPagePanel back-to-chat consumer).
  *
  * @vitest-environment happy-dom
@@ -29,19 +26,17 @@ describe('set-relay — surfaces.page contract (#180)', () => {
   });
 });
 
-describe('my-data relay control — routes through the side-panel', () => {
-  it('renders an entry button that opens the panel (not the bespoke inline form)', () => {
-    const onOpenRelayPanel = vi.fn();
+describe('the relay control in Verbinding — edited inline, as on the phone (levelled 2026-11-20)', () => {
+  it('paints the field and Save, and Save hands the typed address to the host (the set-relay implementation)', async () => {
+    const onSaveRelay = vi.fn(async () => ({ ok: true, effective: 'ws://new:8787' }));
     const container = document.createElement('div');
-    renderCircleMyData(container, {
-      t: (k) => k, onOpenRelayPanel, relayUrl: '', relayEnvUrl: 'ws://env:8787', only: ['relay'],   // the relay is a Verbinding section
-    });
-    const btn = container.querySelector('.cc-mydata__relay-open');
-    expect(btn).not.toBeNull();
-    // the inline text-field editor must NOT also render (routed to the panel instead)
-    expect(container.querySelector('.cc-mydata__relay-input')).toBeNull();
-    btn.click();
-    expect(onOpenRelayPanel).toHaveBeenCalledTimes(1);
+    renderCircleMyData(container, { t: (k) => k, onSaveRelay, relayUrl: '', relayEnvUrl: 'ws://env:8787', only: ['relay'] });
+    expect(container.querySelector('.cc-mydata__relay-open'), 'no side-panel entry').toBeNull();
+    const input = container.querySelector('.cc-mydata__relay-input');
+    input.value = 'ws://new:8787';
+    container.querySelector('.cc-mydata__relay-save').click();
+    await tick();
+    expect(onSaveRelay).toHaveBeenCalledWith('ws://new:8787');
   });
 });
 

@@ -2114,27 +2114,6 @@ them is how people choose groceries.
 
 ---
 
-## 2026-11-20 — A toolbox's cards: an album per shop with one message under it; slot words in the operator's file (Frits said yes to all three; Fable shaped them)
-
-**Status:** settled and built (`thingCards.js`, `fetchThumbs`, `takeSlots` in `apps/basis/src/v2/`).
-
-**Context:** Frits's first look in Telegram: few pictures, the photos drawn huge (a lone photo is drawn at the chat's
-width), and `zoek hagelslag bij Albert Heijn` found a gift card because the whole line went on as the query.
-
-**Decision:** the box fetches pictures for the rows shown as cards first (3 per shop), within the existing caps. Per
-shop a door that shows pictures sends ONE group of pictures (Telegram: an album) and ONE message with the numbered
-lines and the buttons, since an album carries no buttons; fewer than two pictures send no group. The shared model
-(`thingCardGroups`) decides; a door only sends. Phrases that fill a tool parameter are SLOTS on a word in the
-operator's placed file (`slots: [{param, list?, values: {value: [phrases]}}]`), taken off the line only as whole words
-at its start or end, longest first; Basis knows no shop.
-
-**Alternatives / why:** *one photo per card* is what came out huge. *One picture alone* when a shop has one is drawn
-huge too; the words carry it. *The slots on the toolbox's card* would let the toolbox decide what the door hears; the
-words are the operator's, so their slots are too. *A phrase anywhere in the line* takes 'bij ah' out of 'koekjes bij ah
-bonus'.
-
----
-
 ## 2026-11-19 — A toolbox's page is a screen bound to its own toolbox (Fable ruled)
 
 **Status:** settled and built (`apps/basis/src/v2/screenActing.js`, `botScreens.js`).
@@ -2215,3 +2194,24 @@ shape it cannot know.
 
 **Consequences:** `docs/catalogue/tools.md`. A screen holds no content key, so what it keeps in the browser is a bearer
 credential; that is why a toolbox's page lives on an origin of its own (the entry above).
+
+---
+
+## 2026-11-20 — A toolbox's cards: an album per shop with one message under it; slot words in the operator's file (Frits said yes to all three; Fable shaped them)
+
+**Status:** settled and built (`thingCards.js`, `fetchThumbs`, `takeSlots` in `apps/basis/src/v2/`).
+
+**Context:** Frits's first look in Telegram: few pictures, the photos drawn huge (a lone photo is drawn at the chat's
+width), and `zoek hagelslag bij Albert Heijn` found a gift card because the whole line went on as the query.
+
+**Decision:** the box fetches pictures for the rows shown as cards first (3 per shop), within the existing caps. Per
+shop a door that shows pictures sends ONE group of pictures (Telegram: an album) and ONE message with the numbered
+lines and the buttons, since an album carries no buttons; fewer than two pictures send no group. The shared model
+(`thingCardGroups`) decides; a door only sends. Phrases that fill a tool parameter are SLOTS on a word in the
+operator's placed file (`slots: [{param, list?, values: {value: [phrases]}}]`), taken off the line only as whole words
+at its start or end, longest first; Basis knows no shop.
+
+**Alternatives / why:** *one photo per card* is what came out huge. *One picture alone* when a shop has one is drawn
+huge too; the words carry it. *The slots on the toolbox's card* would let the toolbox decide what the door hears; the
+words are the operator's, so their slots are too. *A phrase anywhere in the line* takes 'bij ah' out of 'koekjes bij ah
+bonus'.

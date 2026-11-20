@@ -192,7 +192,7 @@ export function makeFrontierReplay({
         else if (r && !r.ok) { refused.push(s); try { onRefused?.({ circleId, fromPeerAddr, reason: r.reason ?? 'refused', statement: s }); } catch { /* observer only */ } }
       } catch { /* one bad statement never blocks the rest */ }
     }
-    await afterAnswer(circleId, statements);
+    await afterAnswer(circleId, fromPeerAddr, statements);
     // ONE deferred re-ingest for refusals — the governance catch-up's own posture, for the same reason:
     // a pull-burst's batches race each other, and a statement whose binding needs a fact another
     // batch is still folding (a sibling's proven address, arriving by its announce-back a moment after
@@ -267,36 +267,47 @@ export function makeFrontierReplay({
     return { requested };
   }
 
-  /** circleId → the ask in progress when asking a few: `{ order, next, answered, timer }`. */
+  /** circleId → the ask in progress when asking a few: `{ own, others, next, asked, answered, timer }`. */
   const asking = new Map();
 
-  /** Ask the next few of this circle's order; when more remain, look again after the wait (silence widens). */
+  /**
+   * Ask the next few OTHER members of this circle (the first round also asks this person's own other devices, on top);
+   * when more remain, look again after the wait: silence widens.
+   */
   async function askNext(circleId, st) {
     if (st.timer) { clearTimeout(st.timer); st.timer = null; }
-    const round = st.order.slice(st.next, st.next + Number(askFew));
-    st.next += round.length;
+    const round = [...(st.next === 0 ? st.own : []), ...st.others.slice(st.next, st.next + Number(askFew))];
+    st.next += Math.min(Number(askFew), Math.max(0, st.others.length - st.next));
     st.answered = false;
     let requested = 0;
     for (const t of round) {
+      st.asked.add(t.addr);
       try { await requestFrom(t.addr, circleId); requested += 1; } catch { /* next peer */ }
     }
-    if (st.next < st.order.length) {
+    if (st.next < st.others.length) {
       st.timer = setTimeout(() => { st.timer = null; if (!st.answered) askNext(circleId, st).catch(() => {}); }, Number(askWaitMs));
       st.timer?.unref?.();
     }
     return requested;
   }
 
-  /** A batch from an asked member: the circle is answered; a GAP in it (a predecessor this device still lacks) widens. */
-  async function afterAnswer(circleId, statements) {
+  /**
+   * A batch for a circle being asked. It counts as the answer only from a member ASKED in this ask who is not this person
+   * (an own device is the least independent source: it was often away at the same time) — or from an own device when
+   * no other member can be asked. A GAP in an asked member's batch (a predecessor this device still lacks) widens at once.
+   */
+  async function afterAnswer(circleId, fromPeerAddr, statements) {
     const st = asking.get(circleId);
-    if (!st) return;
-    st.answered = true;
-    if (st.timer) { clearTimeout(st.timer); st.timer = null; }
+    if (!st || !st.asked.has(fromPeerAddr)) return;
+    const own = st.own.some((t) => t.addr === fromPeerAddr);
+    if (!own || st.others.length === 0) {
+      st.answered = true;
+      if (st.timer) { clearTimeout(st.timer); st.timer = null; }
+    }
     const have = new Set(rail.storedStatements(circleId).map((s) => s?.body?.hash).filter(Boolean));
     const lacks = (h) => typeof h === 'string' && h && !have.has(h);
     const gap = (statements ?? []).some((s) => lacks(s?.body?.parentHash) || (Array.isArray(s?.body?.deps) && s.body.deps.some(lacks)));
-    if (gap && st.next < st.order.length) { try { await askNext(circleId, st); } catch { /* the next start asks again */ } }
+    if (gap && st.next < st.others.length) { try { await askNext(circleId, st); } catch { /* the next start asks again */ } }
   }
 
   /** ONE circle's replay request, at each other member's PER-CIRCLE address (2026-09-21, see `catchUpTargets`). */
@@ -312,7 +323,7 @@ export function makeFrontierReplay({
     }
     const prior = asking.get(circleId);
     if (prior?.timer) clearTimeout(prior.timer);
-    const st = { order: [...targets.filter((t) => t.own), ...shuffle(targets.filter((t) => !t.own))], next: 0, answered: false, timer: null };
+    const st = { own: targets.filter((t) => t.own), others: shuffle(targets.filter((t) => !t.own)), next: 0, asked: new Set(), answered: false, timer: null };
     asking.set(circleId, st);
     return { requested: await askNext(circleId, st) };
   }

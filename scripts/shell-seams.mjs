@@ -28,6 +28,10 @@ export const SEAMS = Object.freeze([
   // queue in shared code, the circle on screen first and one step at a time. Each shell had its own dozen timers, all
   // firing at once over every circle, in the window where the person first taps (the cold-start freeze on a phone).
   { id: 'start-queue', pattern: /runStartQueue\(/, why: 'a start must pull in one order, one step at a time, the circle on screen first — never a burst of timers over every circle' },
+  // THE SETTINGS LANE IS HANDED ITS RAIL AT BOOT: the items rail judges every arrived statement by the settings changes
+  // the lane kept, and asks the lane when they are not known yet; a lane never handed its rail answers nothing at a quiet
+  // start, and the circle switches go unjudged on that device (the box lacked it until 2026-11-21).
+  { id: 'settings-lane-knows-its-rail', pattern: /circlePolicyLane\??\.useRail\(/, why: 'without its rail at boot the settings lane cannot tell the content rails what a circle\'s switches were, and they are not judged on arrival' },
   // PRESENCE ONLY WHERE THE PERSON STILL IS: every shell registers its per-circle addresses on the relay from a union
   // of lists (the substrate's, a cached one, a just-joined circle); a circle the fold says was left or removed is taken
   // out by one shared filter. Web and mobile kept a cached list that put a left circle back on the next socket.

@@ -29,7 +29,7 @@ import { judgePolicyChain, judgeWithProposals, proposalsOn } from './governanceR
 import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES } from './circlePolicy.js';
 import { processRefusalLog } from './refusalLog.js';
 import { sealedKeyValue } from './localStoreSeal.js';
-import { noteKeptPolicyChanges } from './keptPolicyChanges.js';
+import { noteKeptPolicyChanges, provideKeptPolicyChanges } from './keptPolicyChanges.js';
 
 export const POLICY_UPDATE_KIND = 'policy-update';
 
@@ -267,8 +267,15 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
   // The receive rail this device folds the lane with — handed over by the shell when it builds it, and remembered from
   // every apply, so a SAVE can bring the head up to date before it counts one past it.
   let knownRail = null;
+  // handed a rail, the lane is this device's provider of kept settings changes: a content rail that finds a circle's not
+  // known asks it to apply (a quiet start brings no settings statement that would make it apply by itself)
+  const know = (rail) => {
+    if (!rail || rail === knownRail) return;
+    knownRail = rail;
+    provideKeptPolicyChanges(rail.deviceLog, (circleId) => apply(circleId));
+  };
   const apply = (circleId, rail) => {
-    if (rail) knownRail = rail;
+    know(rail);
     return applyPolicyUpdates({ rail: rail ?? knownRail, circleId, membersOf, adminsOf, readPolicy, headStore, writePolicy });
   };
   return {
@@ -305,7 +312,7 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
     headVersion: async (circleId) => (await headStore.read(circleId).catch(() => null))?.version ?? 0,
     readPolicy: (circleId) => readPolicy(circleId),
     /** The shell hands over its receive rail when it builds it. */
-    useRail(rail) { if (rail) knownRail = rail; },
+    useRail(rail) { know(rail); },
     preserved: (circleId) => preservedPolicyStatementsFor({ headStore, circleId }),
   };
 }

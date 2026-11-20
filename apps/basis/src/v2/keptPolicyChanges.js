@@ -26,3 +26,23 @@ export function onKeptPolicyChanges(deviceLog, fn) {
   set.add(fn);
   return () => { set.delete(fn); };
 }
+
+/**
+ * NOT KNOWN IS ASKED FOR, NEVER WAITED ON. The lane applies when a settings statement ARRIVES; at a quiet start nothing
+ * arrives, so a rail that finds a circle's kept changes not known asks this device's settings lane to apply once
+ * (`provideKeptPolicyChanges`, registered by the lane when it is handed its rail). One ask in flight per circle.
+ */
+const providerByLog = new WeakMap();   // device log → (circleId) => Promise
+const askingByLog = new WeakMap();     // device log → Set<circleId> in flight
+export function provideKeptPolicyChanges(deviceLog, fn) {
+  if (deviceLog && typeof deviceLog === 'object' && typeof fn === 'function') providerByLog.set(deviceLog, fn);
+}
+export function requestKeptPolicyChanges(deviceLog, circleId) {
+  const fn = deviceLog ? providerByLog.get(deviceLog) : null;
+  if (typeof fn !== 'function' || typeof circleId !== 'string' || !circleId) return false;
+  const asking = askingByLog.get(deviceLog) ?? askingByLog.set(deviceLog, new Set()).get(deviceLog);
+  if (asking.has(circleId)) return true;
+  asking.add(circleId);
+  Promise.resolve().then(() => fn(circleId)).catch(() => {}).finally(() => asking.delete(circleId));
+  return true;
+}

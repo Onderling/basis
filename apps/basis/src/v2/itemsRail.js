@@ -20,6 +20,10 @@ import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
 import { itemsManifest, ITEMS_LANE } from './itemsManifest.js';
 import { rosterBindingVerifier } from './membershipRail.js';
+import { judgeItemStatement } from './contentJudge.js';
+import { linksIndex } from './contentLine.js';
+import { keptPolicyChangesOf, onKeptPolicyChanges, requestKeptPolicyChanges } from './keptPolicyChanges.js';
+import { processRefusalLog } from './refusalLog.js';
 import { NOT_TAKEN } from '../core/handlers/peerRouter.js';   // a verdict the receive record reads: not taken, so a repeat is handed on again
 
 /** The statement kinds the items lane carries — DERIVED from the manifest's declared appends. */
@@ -68,7 +72,7 @@ export const OWN_ITEMS_CATCHUP_SUBTYPES = Object.freeze({
  *   carried so a sibling verifies the chain without the registry. `belongs(scope, item)` says which lane an item of the
  *   one shared own store rides: a lane serves and applies only its own items (none of another self's).
  */
-export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, storeFor, verifyBinding = null, onItemApplied = null, onItemRemoved = null, own = null }) {
+export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, storeFor, verifyBinding = null, onItemApplied = null, onItemRemoved = null, own = null, judge = null }) {
   const refIn = selfRefIn(myRef);   // in each circle, the self this device is there
   if (typeof circleIdentityFor !== 'function' || typeof storeFor !== 'function') return null;
   const isOwn = (circleId) => (typeof own?.isOwn === 'function' ? own.isOwn(circleId) === true : (Boolean(own?.scope) && circleId === own.scope));
@@ -119,9 +123,130 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     console.warn(`[items-lane] refused an announcement in ${circleId}: its author ${String(ref).slice(0, 12)}… is not an admin there`);
   }
 
+  // ── THE CIRCLE'S SWITCHES BIND HERE (`contentJudge.js`) ─────────────────────────────────────────────────────────────
+  // Every statement that reaches the head is judged first, whatever brought it: the live fan, a catch-up, the re-apply
+  // when a store opens. Refused: kept on the log, not applied, said once per author. Parked (the settings it is judged
+  // by are not known here yet, or its place on the line is unknown and the readings differ): kept, judged again when
+  // the settings lane notes its kept changes or a link arrives. The own scope has no circle switches.
+  const judging = Boolean(judge) && Boolean(base.deviceLog);
+  const manifestsOf = () => { try { return (typeof judge?.manifests === 'function' ? judge.manifests() : judge?.manifests) ?? []; } catch { return []; } };
+  const parked = new Map();       // circleId → Map<hash, body>
+  const parkedIn = (cid) => parked.get(cid) ?? parked.set(cid, new Map()).get(cid);
+  const previousOf = new Map();   // statement hash → the row as it was before that statement changed it (this run)
+  const switchRefused = new Set();
+  let noLaneSaid = false;
+  function saySwitchRefusal(circleId, ref, code) {
+    const key = `${circleId}\u0000${ref ?? ''}`;
+    if (switchRefused.has(key)) return;
+    switchRefused.add(key);
+    processRefusalLog().note({ tag: 'gate', lane: 'items', check: 'circle-switch', reason: code ?? 'capability-denied' });
+  }
+  const rowIdOf = (circleId, b) => (b?.kind === 'snapshot' ? (itemOf(circleId, b)?.id ?? b.subject) : (b?.payload?.id ?? b?.subject));
+  /** `held`: the row as this device holds it before the statement (`undefined`: read it from the store). */
+  async function verdictFor(circleId, body, { held = undefined, linksOf = null } = {}) {
+    if (!judging || isOwn(circleId) || (body?.kind !== 'snapshot' && body?.kind !== 'remove')) return { verdict: 'apply' };
+    let row = held;
+    if (row === undefined) {
+      const id = rowIdOf(circleId, body);
+      try { row = (typeof id === 'string' && id) ? ((await storeFor(circleId)?.get?.(id)) ?? null) : null; } catch { row = null; }
+    }
+    let act; let type;
+    if (body.kind === 'snapshot') { act = row ? 'change' : 'add'; type = itemOf(circleId, body)?.type ?? null; }
+    else { if (!row) return { verdict: 'apply' }; act = 'remove'; type = row.type ?? null; }
+    let kept = keptPolicyChangesOf(base.deviceLog, circleId);
+    // not known: asked of this device's settings lane. A composition with NO settings lane cannot judge at all: it
+    // applies as before and says so once (every shell hands its lane the rail at boot: the shell seams hold that)
+    if (kept === undefined && !requestKeptPolicyChanges(base.deviceLog, circleId)) {
+      if (!noLaneSaid) { noLaneSaid = true; console.warn('[items-lane] no settings lane on this device: the circle switches are not judged on arrival here'); }
+      kept = [];
+    }
+    const links = linksOf ?? linksIndex(base.storedStatements(circleId).map((st) => st.body));
+    return judgeItemStatement({ body, act, type, linksOf: links, kept, manifests: manifestsOf() });
+  }
+
+  /**
+   * Judge every held statement of a circle again (the settings lane noted new kept changes, or a link arrived). A row
+   * with a statement that is now refused or still parked, or one a parked statement now joins, is REBUILT from the
+   * statements of it that are allowed, in log order, by the store's own merge (snapshots are whole rows): a later
+   * allowed change survives a take-back. No allowed statement left: an add taken back is dropped (no tombstone); a row
+   * older than the log goes back to the copy kept before the refused change, when this device kept one.
+   */
+  async function rejudge(circleId) {
+    if (!judging || isOwn(circleId)) return;
+    const store = storeFor(circleId);
+    if (!store) return;
+    let bodies = [];
+    try { ({ bodies = [] } = await base.readVerifiedBodies(circleId)); } catch { return; }
+    const linksOf = linksIndex(bodies);
+    const byRow = new Map();
+    for (const b of bodies) {
+      if (b?.kind !== 'snapshot' && b?.kind !== 'remove') continue;
+      const id = rowIdOf(circleId, b);
+      if (typeof id === 'string' && id) (byRow.get(id) ?? byRow.set(id, []).get(id)).push(b);
+    }
+    const waiting = parkedIn(circleId);
+    for (const [rowId, list] of byRow) {
+      // in log order: whether the row is held at a statement follows from the ones taken before it
+      let held = null;
+      const judged = [];
+      for (const b of list) {
+        const v = await verdictFor(circleId, b, { held, linksOf });
+        judged.push({ b, v });
+        if (v.verdict === 'apply') held = b.kind === 'snapshot' ? (itemOf(circleId, b) ?? held) : null;
+      }
+      const touched = judged.some(({ b, v }) => v.verdict !== 'apply' || waiting.has(b.hash));
+      if (!touched) continue;
+      for (const { b, v } of judged) {
+        if (v.verdict === 'park') waiting.set(b.hash, b);
+        else waiting.delete(b.hash);
+        if (v.verdict === 'refuse') saySwitchRefusal(circleId, b.payload?.authorRef, v.code);
+      }
+      await rebuildRow(circleId, store, rowId, judged);
+    }
+  }
+
+  async function rebuildRow(circleId, store, rowId, judged) {
+    const allowed = judged.filter(({ v }) => v.verdict === 'apply').map(({ b }) => b);
+    let before = null;
+    try { before = (await store.get?.(rowId)) ?? null; } catch { before = null; }
+    try { await store.delete(rowId, { sync: false }); } catch { return; }
+    for (const b of allowed) {
+      if (b.kind === 'snapshot') {
+        const item = itemOf(circleId, b);
+        if (item) { try { await store.put(item, { sync: false, origin: true }); } catch { /* a type not held here */ } }
+      } else {
+        try { await store.delete(rowId, { sync: false }); } catch { /* already gone */ }
+      }
+    }
+    if (allowed.length === 0) {
+      // the row's first statement on the log is an add that is now refused: the row goes. A row older than the log:
+      // the copy kept before its first refused change, or, when none was kept on this device, as it stood (never lost)
+      const firstTaken = judged.find(({ b }) => b.kind === 'snapshot');
+      const kept = firstTaken ? previousOf.get(firstTaken.b.hash) : null;
+      const wasAdd = Boolean(firstTaken) && !kept && !olderThanLog(firstTaken.b, judged);
+      const restore = kept ?? (wasAdd ? null : before);
+      if (restore) { try { await store.put(restore, { sync: false, origin: true }); } catch { /* best effort */ } }
+    }
+    let after = null;
+    try { after = (await store.get?.(rowId)) ?? null; } catch { after = null; }
+    if (!after && before && typeof onItemRemoved === 'function') { try { await onItemRemoved(circleId, rowId); } catch { /* never fails */ } }
+  }
+  // a row's first held snapshot that has a parent on its author's chain not held here may be a change of a row the
+  // log no longer shows the making of: not provably an add
+  function olderThanLog(b, judged) {
+    return judged.length > 0 && judged[0].b === b && Boolean(b.parentHash) && !judged.some(({ b: x }) => x.hash === b.parentHash);
+  }
+  if (judging) onKeptPolicyChanges(base.deviceLog, (cid) => { rejudge(cid).catch(() => {}); });
+
   async function applyToHead(circleId, body) {
     const store = storeFor(circleId);
     if (!store) return;
+    if (judging && !isOwn(circleId)) {
+      const v = await verdictFor(circleId, body);
+      if (v.verdict === 'park') { if (body?.hash) parkedIn(circleId).set(body.hash, body); return; }
+      if (body?.hash) parkedIn(circleId).delete(body.hash);
+      if (v.verdict === 'refuse') { saySwitchRefusal(circleId, body.payload?.authorRef, v.code); return; }
+    }
     if (body.kind === 'snapshot') {
       const item = itemOf(circleId, body);
       if (!item || typeof item.id !== 'string' || !item.id) return;
@@ -146,6 +271,7 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
       let previous = null;
       try { previous = (await store.get?.(item.id)) ?? null; } catch { previous = null; }
       const existed = !!previous;
+      if (previous && body?.hash) previousOf.set(body.hash, previous);   // the row as it was, for a take-back
       try { await store.put(item, { sync: false, origin: true }); }
       catch (err) {
         // a type this node does not hold (an extension it does not run): the row is not held, the statement stays on
@@ -258,6 +384,8 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     },
     catchUpStatements,
     rebuildHead,
+    /** Judge the circle's held statements again (the settings lane calls it through the kept-changes note). */
+    rejudge,
     /** The full gate (signature + declared kind + key↔ref binding), then the head apply. */
     async ingest(circleId, statement) {
       const res = await base.ingest(circleId, statement);
@@ -266,6 +394,8 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
       if (res?.ok && !res.existed) {
         try { await applyToHead(circleId, statement.body); }
         catch { /* the entry landed; the head converges on the next snapshot/catch-up */ }
+        // a statement that arrived may be the link a parked one waited for
+        if (judging && (parked.get(circleId)?.size ?? 0) > 0) { try { await rejudge(circleId); } catch { /* next arrival */ } }
       }
       return res;
     },

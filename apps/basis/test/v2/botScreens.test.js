@@ -4,12 +4,12 @@
  * lists and drops them; revoking the person drops them all.
  */
 import { describe, it, expect } from 'vitest';
-import { createBotScreens, parseScreenLink } from '../../src/v2/botScreens.js';
+import { createBotScreens, parseScreenLink, parseScreenStartLink, endPreTicketToolboxGrants } from '../../src/v2/botScreens.js';
 import { screenCode, codeChoices, screenLabel, SCREEN_PAIRING_TTL_MS } from '../../src/v2/screenDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
 import { EventLog } from '../../src/eventLog.js';
 
-function setup({ tellRefused = null, toolboxesOn = ['boodschappen'] } = {}) {
+function setup({ tellRefused = null, toolboxesOn = ['boodschappen'], pageOps = ['lists.addToList', 'lists.removeFromList'] } = {}) {
   let clock = 1_000_000;
   const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore(), now: () => clock });
   const grants = [];
@@ -23,9 +23,10 @@ function setup({ tellRefused = null, toolboxesOn = ['boodschappen'] } = {}) {
   const screens = createBotScreens({
     threads,
     isAdmitted: async (p) => admitted.has(p),
-    sendPrivately: async (person, text) => { if (!reachable) return { ok: false, reason: 'no-private-chat' }; privately.push({ person, text }); return { ok: true }; },
+    sendPrivately: async (person, text, remembered) => { if (!reachable) return { ok: false, reason: 'no-private-chat' }; privately.push({ person, text, remembered }); return { ok: true }; },
     columnOf: async (p) => (p === 'telegram:1' ? ['lists.addToList', 'assistant.assistant-overview', 'tools.useTool'] : []),
     toolboxOn: async (name) => toolboxesOn.includes(name),
+    toolboxPage: async (name) => (toolboxesOn.includes(name) ? { page: `https://${name}.example/page`, ops: pageOps } : null),
     grant: async (g) => { grants.push(g); return { ok: true }; },
     revokeView: async (v) => { const i = grants.findIndex((g) => g.viewPubKey === v); if (i < 0) return false; grants.splice(i, 1); return true; },
     listGrants: async () => grants.map((g) => ({ viewPubKey: g.viewPubKey, label: g.label, ops: g.ops, actingAs: g.actingAs })),
@@ -232,25 +233,36 @@ describe('a person connects a screen to the bot', () => {
 });
 
 describe('the paste route (/koppel-scherm)', () => {
-  it('the start address holds no secret; a pasted offer asks the same question; only the right code grants', async () => {
+  it('the start address carries a one-use ticket (Basis\'s own); a pasted offer without one is refused; only the right code grants', async () => {
     const { encodeScreenStartLink, parseScreenStartLink } = await import('../../src/v2/botScreens.js');
-    const start = encodeScreenStartLink('https://basis.example/app', { botAddress: 'BOT', relayUrl: 'wss://r', botName: '@b' });
-    expect(start).toContain('#scherm-nieuw=');
-    expect(parseScreenStartLink(start)).toEqual({ ok: true, botAddress: 'BOT', relayUrl: 'wss://r', botName: '@b' });
-    expect(JSON.stringify(parseScreenStartLink(start))).not.toMatch(/"n"|nonce/);
+    const bare = encodeScreenStartLink('https://basis.example/app', { botAddress: 'BOT', relayUrl: 'wss://r', botName: '@b' });
+    expect(parseScreenStartLink(bare)).toEqual({ ok: true, botAddress: 'BOT', relayUrl: 'wss://r', botName: '@b', ticket: null, toolbox: null });
     const ctx = setup();
     expect(await ctx.screens.pasted('telegram:1', { viewPubKey: '', nonce: 'x' })).toMatchObject({ ok: false, reason: 'not-an-offer' });
     ctx.admitted.delete('telegram:1');
     expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n9' })).toMatchObject({ ok: false, reason: 'not-admitted' });
     ctx.admitted.add('telegram:1');
-    const r = await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n9', label: 'laptop' });
+    // no ticket: refused, nothing asked (a page cannot get the column by leaving out its toolbox)
+    expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n9', label: 'laptop' })).toMatchObject({ ok: false, reason: 'pairing-needs-ticket' });
+    expect(ctx.asked).toEqual([]);
+    const a = await pasteTicket(ctx);
+    expect(a.toolbox).toBe(null);
+    const r = await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n9', label: 'laptop', ticket: a.ticket });
     expect(r).toMatchObject({ ok: true, pending: true });
     expect(r.code, 'the real code is never handed back').toBeUndefined();
     expect(ctx.grants).toEqual([]);
     expect(await ctx.screens.confirm('telegram:1', 'ja', { isPrivate: true })).toMatchObject({ declined: true });
-    await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n9' });
+    const b = await pasteTicket(ctx);
+    await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n9', ticket: b.ticket });
     expect((await ctx.screens.confirm('telegram:1', await screenCode('P', 'n9'), { isPrivate: true })).ok).toBe(true);
     expect(ctx.grants.map((g) => g.viewPubKey)).toEqual(['P']);
+  });
+
+  it('the thread remembers neither link: a line without the ticket', async () => {
+    const ctx = setup();
+    await ctx.screens.startPaste('telegram:1', (link) => `open ${link}`, 'I sent you a link.');
+    await ctx.screens.toolboxStart('telegram:1', 'boodschappen', (link) => `open ${link}`, 'I sent you the page link.');
+    expect(ctx.privately.map((p) => p.remembered)).toEqual(['I sent you a link.', 'I sent you the page link.']);
   });
 });
 
@@ -267,26 +279,162 @@ describe('a refusal to a screen is registered as the one answer to its offer, be
   });
 });
 
+/** `/scherm` for the admin (the paste route): Basis's own start link with its ticket. */
+const pasteTicket = async (ctx, person = 'telegram:1') => {
+  const r = await ctx.screens.startPaste(person, (link) => `open ${link}`);
+  const link = /https?:\/\/\S+/.exec(ctx.privately.at(-1).text)[0];
+  return { r, ...parseScreenStartLink(link) };
+};
+
+/** `/scherm <toolbox>`: the page link the bot sends privately, and the ticket it carries. */
+const pageTicket = async (ctx, toolbox = 'boodschappen', person = 'telegram:1') => {
+  const r = await ctx.screens.toolboxStart(person, toolbox, (link) => `open ${link}`);
+  if (!r.ok) return { r, ticket: null };
+  const link = /https?:\/\/\S+/.exec(ctx.privately.at(-1).text)[0];
+  return { r, link, ticket: parseScreenStartLink(link).ticket };
+};
+
 describe('a toolbox\'s page pairs for ITS toolbox only (ledger L1049)', () => {
   it('an offer naming a toolbox that is not on is refused in words; nothing is asked', async () => {
     const ctx = setup({ toolboxesOn: [] });
     expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', label: 'boodschappenpagina', toolbox: 'boodschappen' })).toMatchObject({ ok: false, reason: 'toolbox-not-on' });
     expect(ctx.asked).toEqual([]);
   });
-  it('the question names the toolbox; the grant records it and holds useTool', async () => {
+  it('the question names the toolbox and the ops; the grant records it and holds useTool', async () => {
     const ctx = setup();
-    await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', label: 'boodschappenpagina', toolbox: 'boodschappen' });
-    expect(ctx.asked.at(-1)).toMatchObject({ toolbox: 'boodschappen', label: 'boodschappenpagina' });
+    const { ticket } = await pageTicket(ctx);
+    await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', label: 'boodschappenpagina', toolbox: 'boodschappen', ticket });
+    expect(ctx.asked.at(-1)).toMatchObject({ toolbox: 'boodschappen', label: 'boodschappenpagina', ops: ['lists.addToList', 'tools.useTool'] });
     expect((await ctx.screens.confirm('telegram:1', await screenCode('P', 'n1'), { isPrivate: true })).ok).toBe(true);
     expect(ctx.grants.at(-1)).toMatchObject({ viewPubKey: 'P', toolbox: 'boodschappen' });
     expect(ctx.grants.at(-1).ops).toContain('tools.useTool');
   });
   it('a screen with no toolbox (Basis\'s own screens) does not hold useTool', async () => {
     const ctx = setup();
-    await ctx.screens.pasted('telegram:1', { viewPubKey: 'Q', nonce: 'n2' });
+    await ctx.screens.pasted('telegram:1', { viewPubKey: 'Q', nonce: 'n2', ticket: (await pasteTicket(ctx)).ticket });
     expect((await ctx.screens.confirm('telegram:1', await screenCode('Q', 'n2'), { isPrivate: true })).ok).toBe(true);
     expect(ctx.grants.at(-1).toolbox ?? null).toBeNull();
     expect(ctx.grants.at(-1).ops).not.toContain('tools.useTool');
   });
 });
 
+describe('a toolbox page\'s grant is its toolbox and the operator\'s ops, no more; its toolbox is the ticket\'s (ledger L1113)', () => {
+  it('SCOPE: the grant is useTool + the placed ops cut to the role column, never the whole column', async () => {
+    const ctx = setup();
+    const { ticket } = await pageTicket(ctx);
+    await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', toolbox: 'boodschappen', ticket });
+    expect((await ctx.screens.confirm('telegram:1', await screenCode('P', 'n1'), { isPrivate: true })).ok).toBe(true);
+    // 'lists.removeFromList' is placed but not in the person's column: not granted; the assistant op is in the column
+    // but not placed: not granted
+    expect([...ctx.grants.at(-1).ops].sort()).toEqual(['lists.addToList', 'tools.useTool']);
+  });
+
+  it('PROOF: a toolbox offer without a ticket is refused; nothing is asked', async () => {
+    const ctx = setup();
+    expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', toolbox: 'boodschappen' })).toMatchObject({ ok: false, reason: 'toolbox-needs-ticket' });
+    expect(ctx.asked).toEqual([]);
+  });
+
+  it('PROOF: the toolbox is the ticket\'s; an offer naming another toolbox is refused', async () => {
+    const ctx = setup({ toolboxesOn: ['boodschappen', 'bank'] });
+    const { ticket } = await pageTicket(ctx, 'boodschappen');
+    expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', toolbox: 'bank', ticket })).toMatchObject({ ok: false, reason: 'toolbox-ticket-mismatch' });
+    expect(ctx.asked).toEqual([]);
+  });
+
+  it('a ticket alone names the toolbox (a page that does not say its own name)', async () => {
+    const ctx = setup();
+    const { ticket } = await pageTicket(ctx);
+    await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', ticket });
+    expect(ctx.asked.at(-1)).toMatchObject({ toolbox: 'boodschappen' });
+  });
+
+  it('a ticket is used once, is the person\'s own, and runs out', async () => {
+    const ctx = setup();
+    ctx.admitted.add('telegram:2');
+    const a = await pageTicket(ctx);
+    expect((await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', ticket: a.ticket })).ok).toBe(true);
+    expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'P2', nonce: 'n2', ticket: a.ticket })).toMatchObject({ ok: false, reason: 'toolbox-ticket-unknown' });
+    const b = await pageTicket(ctx);
+    expect(await ctx.screens.pasted('telegram:2', { viewPubKey: 'P3', nonce: 'n3', ticket: b.ticket })).toMatchObject({ ok: false, reason: 'toolbox-ticket-unknown' });
+    const c = await pageTicket(ctx);
+    ctx.tick(SCREEN_PAIRING_TTL_MS + 1);
+    expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'P4', nonce: 'n4', ticket: c.ticket })).toMatchObject({ ok: false, reason: 'toolbox-ticket-expired' });
+  });
+
+  it('the page link is the operator\'s placed address, sent privately; a toolbox without a page or not on gives none', async () => {
+    const ctx = setup();
+    const { r, link } = await pageTicket(ctx);
+    expect(r.ok).toBe(true);
+    expect(link.startsWith('https://boodschappen.example/page')).toBe(true);
+    expect(parseScreenStartLink(link)).toMatchObject({ ok: true, botAddress: 'BOT', toolbox: 'boodschappen' });
+    expect((await pageTicket(ctx, 'bank')).r).toMatchObject({ ok: false, reason: 'toolbox-no-page' });
+  });
+
+  it('Basis\'s own screen keeps the role column', async () => {
+    const ctx = setup();
+    await ctx.screens.pasted('telegram:1', { viewPubKey: 'Q', nonce: 'n2', ticket: (await pasteTicket(ctx)).ticket });
+    expect((await ctx.screens.confirm('telegram:1', await screenCode('Q', 'n2'), { isPrivate: true })).ok).toBe(true);
+    expect([...ctx.grants.at(-1).ops].sort()).toEqual(['assistant.assistant-overview', 'lists.addToList']);
+  });
+
+  it('THE P1: a toolbox page that drops its ticket AND names no toolbox is refused; with its ticket it holds exactly useTool + the placed ops', async () => {
+    const ctx = setup();
+    expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'X', nonce: 'nx' })).toMatchObject({ ok: false, reason: 'pairing-needs-ticket' });
+    expect(ctx.asked).toEqual([]);
+    const { ticket } = await pageTicket(ctx);
+    await ctx.screens.pasted('telegram:1', { viewPubKey: 'X', nonce: 'nx', ticket });   // no toolbox named: the ticket's
+    expect((await ctx.screens.confirm('telegram:1', await screenCode('X', 'nx'), { isPrivate: true })).ok).toBe(true);
+    expect(ctx.grants.at(-1)).toMatchObject({ toolbox: 'boodschappen' });
+    expect([...ctx.grants.at(-1).ops].sort()).toEqual(['lists.addToList', 'tools.useTool']);
+  });
+
+  it('a Basis ticket does not pair a page that names a toolbox', async () => {
+    const ctx = setup();
+    const { ticket } = await pasteTicket(ctx);
+    expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'Y', nonce: 'ny', toolbox: 'boodschappen', ticket })).toMatchObject({ ok: false, reason: 'toolbox-ticket-mismatch' });
+  });
+});
+
+describe('the upgrade ends the toolbox pages\' grants made before tickets, once, and says so (ledger L1113)', () => {
+  const TTL = 1000;
+  const grantAt = (viewPubKey, issued, extra = {}) => ({ viewPubKey, actingAs: 'telegram:1', ops: ['tools.useTool'], tokens: [{ id: viewPubKey, expiresAt: issued + TTL }], ...extra });
+  const setupPass = (grants, now) => {
+    const told = []; const m = new Map();
+    return {
+      told, m,
+      a: {
+        listGrants: async () => grants.slice(),
+        revokeView: async (v) => { const i = grants.findIndex((g) => g.viewPubKey === v); if (i < 0) return false; grants.splice(i, 1); return true; },
+        notify: (person, key, params) => { told.push({ person, key, params }); },
+        marker: { get: async (k) => m.get(k) ?? null, set: async (k, v) => { m.set(k, v); } },
+        grantTtlMs: TTL, now: () => now.value,
+      },
+    };
+  };
+
+  it('ends toolbox grants issued before the pass, tells each person ONCE, keeps Basis\'s own; the next start does nothing', async () => {
+    const grants = [grantAt('P1', 100, { toolbox: 'boodschappen' }), grantAt('P2', 200, { toolbox: 'boodschappen' }), grantAt('Q', 100)];
+    const now = { value: 5000 };
+    const { a, told } = setupPass(grants, now);
+    expect(await endPreTicketToolboxGrants(a)).toEqual({ ran: true, ended: 2, told: 1 });
+    expect(grants.map((g) => g.viewPubKey)).toEqual(['Q']);
+    expect(told).toEqual([{ person: 'telegram:1', key: 'circle.bot.screen_toolbox_grant_ended', params: { toolbox: 'boodschappen' } }]);
+    grants.push(grantAt('R', 100, { toolbox: 'boodschappen' }));
+    expect(await endPreTicketToolboxGrants(a)).toMatchObject({ ran: false });
+    expect(grants.map((g) => g.viewPubKey)).toEqual(['Q', 'R']);
+  });
+
+  it('a pass cut short runs again, and leaves a page paired WITH a ticket after it first started', async () => {
+    const grants = [grantAt('OLD', 100, { toolbox: 'boodschappen' })];
+    const now = { value: 5000 };
+    const { a, m } = setupPass(grants, now);
+    const failing = { ...a, revokeView: async () => { throw new Error('lane down'); } };
+    await expect(endPreTicketToolboxGrants(failing)).rejects.toThrow();
+    expect(JSON.parse(m.get('screens.toolbox-ticket-v1'))).toEqual({ started: 5000 });
+    grants.push(grantAt('NEW', 6000, { toolbox: 'boodschappen' }));   // paired with a ticket after the first start
+    now.value = 9000;
+    expect(await endPreTicketToolboxGrants(a)).toMatchObject({ ran: true, ended: 1 });
+    expect(grants.map((g) => g.viewPubKey)).toEqual(['NEW']);
+  });
+});

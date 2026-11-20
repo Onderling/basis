@@ -71,7 +71,7 @@ import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createInboundAdmission } from '../src/v2/inboundAdmission.js';
 import { makeCarriedTurnLanding } from '../src/v2/contactTurnFan.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
-import { createBotScreens, encodeScreenLaunchLink, SCREEN_CALL_BUDGET } from '../src/v2/botScreens.js';
+import { createBotScreens, encodeScreenLaunchLink, SCREEN_CALL_BUDGET, endPreTicketToolboxGrants } from '../src/v2/botScreens.js';
 import { createIdentityLink, createLinkTombstones, linkedCompanionSkill } from '../src/v2/botIdentityLink.js';
 import { IDENTITY_LINK_REVOKE_SUBTYPE, LINKED_COMPANION_OP } from '../src/v2/identityLink.js';
 import { createBotCircles, botCircleHandle } from '../src/v2/botCircles.js';
@@ -120,6 +120,7 @@ import { ensureHouseholdLists, householdBotApps, templateLists, loadListItems, e
 import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
+import { opDescription } from '../src/v2/opDescriptions.js';
 import { makeToolboxOps, toolboxListLine, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords, makeChoiceKeeper, toolChoicesReply, makePickThing, makeMoreThings, toolChoiceGateRule, choiceThreadOf } from '../src/v2/toolboxes.js';
 import { wrapCallSkillWithEgressGate, isExternalEgressOp } from '../src/core/agent/egressGate.js';   // what leaves for a toolbox, and its record   // a circle's toolboxes (L1035): the key from the operator's config
 import { toolsManifest } from '../src/v2/toolsManifest.js';
@@ -1248,11 +1249,21 @@ if (tgToken || inboxDoor.bridge) {
     launchLabel: (person) => t('circle.bot.screen_label_telegram', {}, threads.langOf(person) ?? undefined),
     // the offer's question, in the person's own language, with the code their screen shows; Ja / Nee buttons send
     // `/koppelen`, which counts only from this private door
-    ask: (person, { codes, replaced, label = null, toolbox = null }) => {
+    ask: (person, { codes, replaced, label = null, toolbox = null, ops = null }) => {
       const lang = threads.langOf(person) ?? undefined;
       const tp = (k, p) => t(k, p, lang);
-      // a toolbox's page says which toolbox it pairs for: '<label> wil koppelen voor toolbox <naam>' (L1049)
-      const who = toolbox ? [tp('circle.bot.screen_confirm_toolbox', { label: label ?? 'scherm', toolbox })] : [];
+      // a toolbox's page says which toolbox it pairs for: '<label> wil koppelen voor toolbox <naam>' (L1049), and what it
+      // may then do, one line per op in the household's own words: the question is as wide as the grant (L1113)
+      const opLine = (id) => { const [app, op] = String(id).split('.'); return `• ${opDescription(app, op, lang)?.what ?? id}`; };
+      const who = toolbox ? [
+        tp('circle.bot.screen_confirm_toolbox', { label: label ?? 'scherm', toolbox }),
+        // `tools.useTool` is said once in words ('use the toolbox X'), never as an op id; the rest one line each
+        ...(Array.isArray(ops) && ops.length ? [
+          tp('circle.bot.screen_confirm_toolbox_ops'),
+          ...(ops.includes('tools.useTool') ? [tp('circle.bot.screen_confirm_toolbox_use', { toolbox })] : []),
+          ...ops.filter((op) => op !== 'tools.useTool').map(opLine),
+        ] : []),
+      ] : [];
       const text = [...who, tp('circle.bot.screen_confirm_question'), ...(replaced ? [tp('circle.bot.screen_confirm_replaced')] : [])].join('\n');
       // the person PICKS the code their screen shows; "none of these" when it is not there (or they did not ask)
       return reach.sendToPerson(person, {
@@ -1266,6 +1277,8 @@ if (tgToken || inboxDoor.bridge) {
     columnOf: async (person) => screenColumnFor(doorCatalogue.catalogue(), (await botUsers.list()).find((u) => u.id === person)?.role ?? null, rolesPreset()),
     // a toolbox's page pairs only for a toolbox that is ON here (the toolboxes are made further down; asked at pairing time)
     toolboxOn: async (name) => ((await toolboxes?.listTools?.({}))?.toolboxes ?? []).some((b) => b.name === name),
+    // its placed page (the address and the ops its operator named, L1113): the link `/scherm <toolbox>` sends, and the grant
+    toolboxPage: async (name) => (await toolboxes?.pageOf?.(name)) ?? null,
     grant: async (g) => {
       const r = await agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce, ...(g.toolbox ? { toolbox: g.toolbox } : {}) });
       // whether the grant reached the screen, or is held until it next speaks (the screen's address, its first characters)
@@ -1578,7 +1591,9 @@ if (tgToken || inboxDoor.bridge) {
         return;
       }
       const offer = parsePairingOffer(payload?.offer);
-      const r = offer.ok ? await screens.offer({ from, viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label }) : { ok: false, reason: offer.reason };
+      // a toolbox's page over the relay names its toolbox and hands back its ticket, as a pasted one does (L1113): an offer
+      // that names a toolbox is never granted as Basis's own screen
+      const r = offer.ok ? await screens.offer({ from, viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label, toolbox: offer.toolbox, ticket: offer.ticket }) : { ok: false, reason: offer.reason };
       // an offer is granted, or (the usual way) waits for the person's code, or was declined — each logs what it is
       walkLog({ kind: 'screen-offer', ok: r.ok, ...(!r.ok ? { reason: r.reason } : r.declined ? { declined: true } : { to: String(r.person).slice(-4), ...(r.pending ? { pending: true } : { ops: r.ops?.length ?? 0 }) }) });
     };
@@ -1586,6 +1601,19 @@ if (tgToken || inboxDoor.bridge) {
     // whether the grants lane folded after this boot: until it does, every screen token is refused as revoked (fail
     // closed) — the walk log says so, with how many screens hold a live grant (their keys' first characters)
     Promise.resolve(agent.surfaceGrantsReady?.()).then(async (ready) => {
+      // ONCE: a toolbox page's grant from before the ticketed link (L1113) is ended and its person told how to reconnect
+      if (ready === true) {
+        try {
+          const ended = await endPreTicketToolboxGrants({
+            listGrants: async () => (await agent.callSkill('household', 'listSurfaceGrants', {}))?.surfaces ?? [],
+            revokeView: async (viewPubKey) => (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true,
+            notify: async (person, key, params) => { await reach.sendToPerson(person, { text: t(key, params, threads.langOf(person) ?? undefined) }); },
+            marker: new VaultNodeFs(path.join(dataDir, 'screens-upgrade.json'), vaultPassphrase()),
+            grantTtlMs: SURFACE_GRANT_TTL_MS,
+          });
+          if (ended.ran) walkLog({ kind: 'toolbox-grants-ended', ended: ended.ended });
+        } catch (err) { console.warn('device-runner: the pre-ticket toolbox grants were not ended now; tried again at the next start:', err?.message ?? err); }
+      }
       const live = ((await agent.callSkill('household', 'listSurfaceGrants', {}).catch(() => null))?.surfaces ?? []);
       walkLog({ kind: 'surface-grants', ready: ready === true, screens: live.map((g) => String(g.viewPubKey).slice(0, 8)) });
     }, (err) => walkLog({ kind: 'surface-grants', ready: false, error: String(err?.message ?? err).slice(0, 120) }));

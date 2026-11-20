@@ -41,6 +41,9 @@ import { replyLine } from './replyLine.js';
 import { THREAD_LANGS } from './botThreads.js';
 import { toolboxRefusalText, toolboxListLine } from './toolboxes.js';
 
+/** A toolbox page's offer refused for its ticket (L1113): said as 'open it from the link /scherm <toolbox> sends'. */
+const TOOLBOX_TICKET_REFUSALS = new Set(['toolbox-needs-ticket', 'pairing-needs-ticket', 'toolbox-ticket-unknown', 'toolbox-ticket-expired', 'toolbox-ticket-mismatch']);
+
 /** How many entries of one part the week overview shows before it says how many more there are. */
 export const WEEK_OVERVIEW_MAX_ITEMS = param({ key: 'assistant.weekOverviewMaxItems', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15 });
 
@@ -928,10 +931,20 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   async function screenOp(person, how) {
     if (!person || !admin.screens) return { ok: false, error: 'unwired' };
     const tp = personT(person);
+    // `/scherm <toolbox>`: that toolbox's own page, with its one-use ticket, to the person's private door (L1113)
+    const word = String(how ?? '').trim().toLowerCase();
+    if (word && word !== 'link' && typeof admin.screens.toolboxStart === 'function') {
+      const r = await admin.screens.toolboxStart(person, word, (link, minutes) => tp('circle.bot.screen_toolbox_link', { toolbox: word, link, minutes }), tp('circle.bot.screen_toolbox_link_remembered', { toolbox: word }));
+      if (!r.ok) {
+        const key = r.reason === 'toolbox-no-page' ? 'circle.bot.screen_toolbox_no_page' : r.reason === 'no-app-url' ? 'circle.bot.screen_no_app' : 'circle.bot.screen_not_reachable';
+        return { ok: false, error: { code: r.reason, message: tp(key, { toolbox: word }) } };
+      }
+      return { ok: true, message: tp('circle.bot.screen_sent_privately') };
+    }
     const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
     const wantsLink = /^\s*link\s*$/i.test(String(how ?? ''));
     if (row?.role === 'admin' && !wantsLink && typeof admin.screens.startPaste === 'function') {
-      const r = await admin.screens.startPaste(person, (link) => tp('circle.bot.screen_paste_link', { link }));
+      const r = await admin.screens.startPaste(person, (link, minutes) => tp('circle.bot.screen_paste_link', { link, minutes }), tp('circle.bot.screen_paste_remembered'));
       if (!r.ok) return { ok: false, error: { code: r.reason, message: tp(r.reason === 'no-app-url' ? 'circle.bot.screen_no_app' : 'circle.bot.screen_not_reachable') } };
       return { ok: true, message: tp('circle.bot.screen_sent_privately') };
     }
@@ -1297,9 +1310,14 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const tp = personT(person);
     const offer = parsePairingOffer(String(text ?? '').trim());
     if (!offer.ok) return { ok: false, error: { code: offer.reason, message: tp('circle.bot.screen_paste_usage') } };
-    const r = await admin.screens.pasted(person, { viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label, toolbox: offer.toolbox });
+    const r = await admin.screens.pasted(person, { viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label, toolbox: offer.toolbox, ticket: offer.ticket });
     // a page for a toolbox that is not on here: said in words, nothing asked (L1049)
     if (!r.ok && r.reason === 'toolbox-not-on') return { ok: false, error: { code: r.reason, message: tp('circle.bot.screen_toolbox_not_on', { toolbox: r.toolbox ?? offer.toolbox ?? '' }) } };
+    // a toolbox's page connects only from the link `/scherm <toolbox>` sent, once and in time (L1113): said in words
+    if (!r.ok && TOOLBOX_TICKET_REFUSALS.has(r.reason)) {
+      const toolbox = r.toolbox ?? offer.toolbox ?? null;
+      return { ok: false, error: { code: r.reason, message: toolbox ? tp('circle.bot.screen_toolbox_needs_link', { toolbox }) : tp('circle.bot.screen_paste_needs_link') } };
+    }
     if (!r.ok) return { ok: false, error: { code: r.reason, message: tp('circle.bot.screen_confirm_failed') } };
     return { ok: true, message: tp('circle.bot.screen_paste_asked') };
   }

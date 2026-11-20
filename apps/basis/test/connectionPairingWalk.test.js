@@ -27,7 +27,12 @@ describe('the pairing offer — deny-safe parsing', () => {
   it('round-trips what the view offers', () => {
     const uri = encodePairingOffer({ viewPubKey: 'K', relayUrl: 'ws://r', nonce: 'n1', label: 'laptop' });
     expect(uri.startsWith(CONNECT_SCHEME)).toBe(true);
-    expect(parsePairingOffer(uri)).toEqual({ ok: true, viewPubKey: 'K', relayUrl: 'ws://r', nonce: 'n1', label: 'laptop', toolbox: null });
+    expect(parsePairingOffer(uri)).toEqual({ ok: true, viewPubKey: 'K', relayUrl: 'ws://r', nonce: 'n1', label: 'laptop', toolbox: null, ticket: null });
+  });
+
+  it('a toolbox page\'s offer carries the toolbox and hands back its ticket (L1113)', () => {
+    const uri = encodePairingOffer({ viewPubKey: 'K', nonce: 'n1', toolbox: 'boodschappen', ticket: 'T1' });
+    expect(parsePairingOffer(uri)).toMatchObject({ ok: true, toolbox: 'boodschappen', ticket: 'T1' });
   });
 
   it('refuses with a REASON rather than a half-understood offer', () => {

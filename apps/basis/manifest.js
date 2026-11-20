@@ -1164,6 +1164,26 @@ export const basisManifest = {
   ],
 
   /**
+   * THE "+" — docked IN the tab bar (Frits 2026-11-19), so it never floats over a Save button or a composer. One tap
+   * opens it into round buttons; the button on the "+"'s own spot (`middle`) is what a second tap runs, so a double
+   * tap lands in the person's own conversation. Declared here, once, so moving the "+" or changing its buttons is a
+   * data change both shells follow (`src/v2/plusDial.js`); where exactly a button lands is the shell's drawing.
+   *   place  — 'bar-middle' (between the tabs; with an even count, as many on each side) · 'bar-end'
+   *   dial   — the buttons, in order. Scan and My QR are the SAME targets as Me's actions above (one door each).
+   *   middle — the default for the middle spot; a person may choose another, or none, per device (`plus.middle`).
+   */
+  plus: {
+    place: 'bar-middle',
+    middle: 'chat',
+    dial: [
+      // the person's own conversation (the "+" thread): a view no op backs
+      { id: 'chat',  labelKey: 'circle.plus.chat',  target: { kind: 'nav', to: 'plusThread' } },
+      { id: 'scan',  labelKey: 'circle.plus.scan',  target: { kind: 'op',  opId: 'scanQr' } },
+      { id: 'share', labelKey: 'circle.plus.my_qr', target: { kind: 'nav', to: 'shareContact' } },
+    ],
+  },
+
+  /**
    * The person's settings, behind the gear on Mij ("Instellingen"): groups of sections, then the circles' own settings.
    * Both shells paint the home and each group from this declaration (`settingsHomeFor`), one painter per section id;
    * no shell lists a section by hand. A section lives in exactly one place: once declared here it is gone from the old
@@ -1181,6 +1201,8 @@ export const basisManifest = {
         { id: 'theme',         kind: 'control' },
         { id: 'language',      kind: 'control' },
         { id: 'start-screen',  kind: 'control' },
+        // which round button sits on the "+"'s own spot (or none: a second tap closes it) — the `plus.middle` setting
+        { id: 'plus-middle',   kind: 'control' },
         { id: 'bot-actions',   kind: 'control' },
         { id: 'week-overview', kind: 'switch'  },
         { id: 'notifications', kind: 'switch'  },

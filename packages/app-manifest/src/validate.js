@@ -392,6 +392,29 @@ export function validateManifest(manifest, opts = {}) {
     }
   }
 
+  // Nav-chrome (the "+") — `manifest.plus`: where the "+" sits in the tab bar (`place`), the round buttons it opens
+  // into (`dial`, NavItems in order), and which of them sits on the "+"'s own spot (`middle`: a dial id, or null for
+  // none). Declared once so moving the "+" is a data change both shells follow. Forward-additive: absent → no "+".
+  if (manifest.plus !== undefined) {
+    const p = manifest.plus;
+    if (!p || typeof p !== 'object' || Array.isArray(p)) {
+      errors.push({ path: '/plus', message: 'plus must be an object if present' });
+    } else {
+      if (!PLUS_PLACES.includes(p.place)) {
+        errors.push({ path: '/plus/place', message: `plus.place must be one of ${PLUS_PLACES.join(' · ')}` });
+      }
+      const dialIds = new Set();
+      if (!Array.isArray(p.dial) || p.dial.length === 0) {
+        errors.push({ path: '/plus/dial', message: 'plus.dial must be a non-empty array of nav items' });
+      } else {
+        p.dial.forEach((item, i) => validateNavItem(item, `/plus/dial/${i}`, manifest, errors, dialIds, strict));
+      }
+      if (p.middle !== null && !dialIds.has(p.middle)) {
+        errors.push({ path: '/plus/middle', message: 'plus.middle must name a dial button, or be null (nothing in the middle)' });
+      }
+    }
+  }
+
   // The person's settings (behind the gear on Mij) — `manifest.settingsGroups`: groups of sections, each a door,
   // switch, control or fact (custody-guarded ones marked), then the door to the chooser of the person's circles and
   // any other door at the foot of the home (a nav item: an op of this manifest, or a view).
@@ -1333,6 +1356,9 @@ function validateView(v, path, manifest, errors, idSet, strict = false) {
  */
 /** The roles a nav item may be reserved for (`item.role`). */
 export const NAV_ROLES = Object.freeze(['admin']);
+
+/** Where the "+" may sit in the tab bar (`manifest.plus.place`): in the middle of the tabs, or after the last one. */
+export const PLUS_PLACES = Object.freeze(['bar-middle', 'bar-end']);
 
 /** The op a nav `to` names (its id or slash command starts with it, compared without case or punctuation), or null. */
 function navShadowsOp(to, manifest) {

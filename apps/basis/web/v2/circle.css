@@ -12,8 +12,8 @@
 .circle-page {
   max-width: 640px;
   margin: 0 auto;
-  /* bottom clears the fixed tab bar AND the floating "+" above it (.cc-fab: bottom 76 + 56 tall + 16 room) — the
-     phone's FAB_CLEARANCE (theme.js) is the same number, pinned by fitness/fabClearance.test.js */
+  /* bottom clears the fixed tab bar AND the opened "+"'s round buttons above it (76 + 56 tall + 16 room) — the
+     phone's FAB_CLEARANCE (fab.js) is the same number, pinned by fitness/fabClearance.test.js */
   padding: 18px 16px 148px;
 }
 
@@ -1588,12 +1588,21 @@
 .circle-vandaag-plus__pin, .circle-vandaag-plus__unpin { margin-left: -6px; padding-left: 4px; padding-right: 4px; }
 .circle-vandaag-plus__close { margin-top: 14px; }
 
-/* THE "+": one floating button on every tab, bottom-right above the tab bar — the page's one accent (terracotta) */
-.cc-fab { position: fixed; right: 20px; bottom: 76px; z-index: 50; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--accent-ink); color: var(--accent-contrast); font: inherit; font-size: 28px; line-height: 1; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
-.cc-fab:hover { filter: brightness(1.08); }
-/* the floating "+" shows exactly where the main tab bar shows: inside a circle (bar hidden) the circle's composer
-   and its attach "+" are the acts — and the floating one covered the composer's send button there */
-.circle-tabbar--hidden ~ .cc-fab { display: none; }
+/* THE "+": docked IN the tab bar (its place is declared in the manifest, `plus`), raised a little — the page's one
+   accent (terracotta). Part of the bar, so it never covers a Save button or a composer, and it is gone wherever the
+   bar is (inside a circle the composer and its attach "+" are the acts). */
+.circle-tabbar { align-items: center; }
+.cc-fab.circle-tabbar__plus { position: relative; z-index: 2; flex: 0 0 auto; width: 56px; height: 56px; margin: -18px 6px 0; border-radius: 50%; border: 0; background: var(--accent-ink); color: var(--accent-contrast); font: inherit; font-size: 28px; line-height: 1; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
+.cc-fab.circle-tabbar__plus:hover { filter: brightness(1.08); }
+/* open, the "+"'s own spot carries the middle button's word (a picture alone is a guess) */
+.cc-fab.circle-tabbar__plus.is-middle { font-size: 13px; font-weight: 700; }
+/* open: the screen and the tabs dimmed; a touch on either only folds the buttons back */
+.circle-plusdial__backdrop { position: fixed; inset: 0; z-index: -1; background: rgba(0, 0, 0, .35); }
+.circle-tabbar.is-dial-open .circle-tabbar__tab { opacity: .45; }
+/* the round buttons around the "+", each a thumb-reach above it, each with its word */
+.circle-plusdial { position: absolute; left: 0; right: 0; bottom: calc(100% + 16px); z-index: 2; display: flex; justify-content: center; gap: 28px; pointer-events: none; }
+.circle-plusdial__btn { pointer-events: auto; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--paper); color: var(--ink); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
+.circle-plusdial__btn:hover { color: var(--accent-ink); }
 .circle-vandaag-plus__section h4 { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; }
 
 /* The contact lens (adding a person, and "who are you for this contact"): it had no styles — the title ran out of the

@@ -12,19 +12,37 @@
  * in the manifest; web ≡ mobile by construction, both consume the same
  * projection).
  */
-import { circleTabs } from '../../src/v2/tabProjection.js';
+import { barSlots } from '../../src/v2/plusDial.js';
 import { basisManifest } from '../../src/index.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
-export function renderCircleTabBar(container, { active, t, onScreens, onCircles, onNearby, onContacts, onMij, badges = {} } = {}) {
+export function renderCircleTabBar(container, { active, t, onScreens, onCircles, onNearby, onContacts, onMij, badges = {}, plus = null } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'circleTabBar.js');
   // id → the host-wired handler.  Keyed by the projected tab id, so the
   // callback contract (onScreens/onCircles/onContacts/onMij) is unchanged.
   const handlers = { screens: onScreens, circles: onCircles, nearby: onNearby, contacten: onContacts, mij: onMij };
+  // THE "+" (shared plusDial.js): `plus = { dial, open, onPress }` from the host, or null on a screen without it. The bar
+  // only paints and reports a press — 'plus' (its own spot), a button id, or 'outside'; the host asks the shared
+  // `plusPress` what that does.
+  const open = !!(plus && plus.open);
+  const press = (what) => { if (typeof plus?.onPress === 'function') plus.onPress(what); };
+  stopEscape(container);
+  // the "+" node survives the repaint (the bar repaints whenever a count lands): a tap begun on it before a repaint must
+  // end on the same node, or the browser fires no click and the tap is lost
+  const keptPlus = [...container.children].find((n) => n.classList?.contains('circle-tabbar__plus')) ?? null;
   container.innerHTML = '';
-  container.className = 'circle-tabbar';
-  for (const tab of circleTabs(basisManifest)) {
+  container.className = open ? 'circle-tabbar is-dial-open' : 'circle-tabbar';
+  if (open) {
+    // the dimmed screen: a touch on it folds the buttons back and presses nothing under it
+    const backdrop = document.createElement('div');
+    backdrop.className = 'circle-plusdial__backdrop';
+    backdrop.addEventListener('click', () => press('outside'));
+    container.appendChild(backdrop);
+  }
+  for (const slot of barSlots(basisManifest, { plus: !!plus })) {
+    if (slot.kind === 'plus') { container.appendChild(plusSpot(keptPlus, plus, open, tr, press)); continue; }
+    const tab = slot.tab;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'circle-tabbar__tab';
@@ -44,14 +62,66 @@ export function renderCircleTabBar(container, { active, t, onScreens, onCircles,
       if (tab.id === 'contacten') btn.setAttribute('aria-label', tr('circle.contacts.unread_tab', { count: n }));
     }
     const on = handlers[tab.id];
-    btn.addEventListener('click', () => { if (typeof on === 'function') on(); });
+    // while the "+" is open the tabs are dimmed with the rest: a touch on one only closes
+    btn.addEventListener('click', () => { if (open) { press('outside'); return; } if (typeof on === 'function') on(); });
     container.appendChild(btn);
+  }
+  if (open) {
+    const row = document.createElement('div');
+    row.className = 'circle-plusdial';
+    for (const b of plus.dial?.around ?? []) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'circle-plusdial__btn';
+      btn.dataset.dial = b.id;
+      btn.textContent = tr(b.labelKey);
+      btn.addEventListener('click', () => press(b.id));
+      row.appendChild(btn);
+    }
+    container.appendChild(row);
+    const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); press('outside'); } };
+    document.addEventListener('keydown', onKey);
+    container._plusEscape = onKey;
   }
   return container;
 }
 
+/** The "+"'s own spot: closed, the "+"; open, the middle button (or, with none, the "+" that closes). */
+function plusSpot(kept, plus, open, tr, press) {
+  const b = kept ?? document.createElement('button');
+  if (!kept) {
+    b.type = 'button';
+    // one listener for the node's life; each paint hands it the press of now
+    b.addEventListener('click', () => b._plusPress?.('plus'));
+  }
+  b._plusPress = press;
+  b.className = 'circle-tabbar__plus cc-fab circle-vandaag__plus';
+  b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  const middle = open ? plus.dial?.middle : null;
+  if (middle) {
+    b.dataset.dial = middle.id;
+    b.classList.add('is-middle');
+    b.textContent = tr(middle.labelKey);
+    b.removeAttribute('title');
+    b.removeAttribute('aria-label');
+  } else {
+    delete b.dataset.dial;
+    b.textContent = open ? '×' : '+';
+    const name = open ? tr('circle.plus.close') : tr('circle.vandaag.plus');
+    b.title = name;
+    b.setAttribute('aria-label', name);
+  }
+  return b;
+}
+
+function stopEscape(container) {
+  if (container._plusEscape) document.removeEventListener('keydown', container._plusEscape);
+  container._plusEscape = null;
+}
+
 export function hideCircleTabBar(container) {
   if (!container) return;
+  stopEscape(container);
   container.innerHTML = '';
   container.className = 'circle-tabbar circle-tabbar--hidden';
 }

@@ -29,7 +29,7 @@ const turns = (page) => page.locator('.circle-vandaag-plus__turn');
 const openPlus = async (page) => {
   await page.locator('[data-tab="screens"]').first().click().catch(() => {});
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await expect(page.locator('.circle-vandaag-plus__line')).toBeVisible();
 };
 const say = async (page, line) => {

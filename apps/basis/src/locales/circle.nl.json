@@ -25,6 +25,32 @@
       "doc": "Global tab bar: the Nearby screen (the room this device is in)."
     }
   },
+  "plus": {
+    "chat": {
+      "text": "Chat",
+      "doc": "The opened '+' (docked in the tab bar): the button to the person's own conversation, on the '+''s own spot by default."
+    },
+    "scan": {
+      "text": "Scan",
+      "doc": "The opened '+': scan a QR code (the scanQr op)."
+    },
+    "my_qr": {
+      "text": "Mijn QR",
+      "doc": "The opened '+': show my own QR code to share my contact (the share-my-contact view). Frits: it must say it is the QR."
+    },
+    "close": {
+      "text": "Sluiten",
+      "doc": "The opened '+' with nothing on its middle spot: the '+' itself, whose tap folds the buttons back (its spoken label)."
+    },
+    "middle_hint": {
+      "text": "Wat een tweede tik op de + opent",
+      "doc": "Settings, Appearance: one line under that heading, saying what the choice does."
+    },
+    "middle_none": {
+      "text": "Niets (een tweede tik sluit)",
+      "doc": "Settings, Appearance: the choice to put no button on the '+''s middle spot (a second tap on the '+' then closes it)."
+    }
+  },
   "create_unavailable": {
     "text": "Nog geen kring aan te maken — de app is nog aan het starten.",
     "doc": "SP-13.1 — surfaced when createCircle is invoked before the agent bundle has booted."
@@ -10915,6 +10941,10 @@
       "home_startScreen": {
         "text": "De app opent op",
         "doc": "A setting's label (projected from the parameter register)."
+      },
+      "plus_middle": {
+        "text": "Het midden van de +",
+        "doc": "A setting's label (projected from the parameter register): which round button sits on the '+''s own spot."
       },
       "assistant_memoryDefault": {
         "text": "Hoeveel de assistent onthoudt van een gesprek",

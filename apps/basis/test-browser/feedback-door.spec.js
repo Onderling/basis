@@ -53,7 +53,7 @@ test('the "+" sheet\'s act opens the thread at once', async ({ page }) => {
   test.skip(!WITH_CARD, 'a build with a feedback card (VITE_SEEDED_CONTACT_CARD)');
   await page.goto('/');
   await page.waitForFunction(() => typeof window.onderlingCall === 'function', null, { timeout: 60_000 });
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   acceptOffer(page);
   await page.locator('.circle-vandaag-plus__act[data-act="basis.feedback"]').click();
   await expect(composer(page)).toHaveValue(/^\[.+ · .+\] $/, { timeout: 20_000 });

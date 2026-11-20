@@ -1248,7 +1248,12 @@ if (tgToken || inboxDoor.bridge) {
       const opLine = (id) => { const [app, op] = String(id).split('.'); return `• ${opDescription(app, op, lang)?.what ?? id}`; };
       const who = toolbox ? [
         tp('circle.bot.screen_confirm_toolbox', { label: label ?? 'scherm', toolbox }),
-        ...(Array.isArray(ops) && ops.length ? [tp('circle.bot.screen_confirm_toolbox_ops'), ...ops.map(opLine)] : []),
+        // `tools.useTool` is said once in words ('use the toolbox X'), never as an op id; the rest one line each
+        ...(Array.isArray(ops) && ops.length ? [
+          tp('circle.bot.screen_confirm_toolbox_ops'),
+          ...(ops.includes('tools.useTool') ? [tp('circle.bot.screen_confirm_toolbox_use', { toolbox })] : []),
+          ...ops.filter((op) => op !== 'tools.useTool').map(opLine),
+        ] : []),
       ] : [];
       const text = [...who, tp('circle.bot.screen_confirm_question'), ...(replaced ? [tp('circle.bot.screen_confirm_replaced')] : [])].join('\n');
       // the person PICKS the code their screen shows; "none of these" when it is not there (or they did not ask)
@@ -1595,6 +1600,7 @@ if (tgToken || inboxDoor.bridge) {
             revokeView: async (viewPubKey) => (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true,
             notify: async (person, key, params) => { await reach.sendToPerson(person, { text: t(key, params, threads.langOf(person) ?? undefined) }); },
             marker: new VaultNodeFs(path.join(dataDir, 'screens-upgrade.json'), vaultPassphrase()),
+            grantTtlMs: SURFACE_GRANT_TTL_MS,
           });
           if (ended.ran) walkLog({ kind: 'toolbox-grants-ended', ended: ended.ended });
         } catch (err) { console.warn('device-runner: the pre-ticket toolbox grants were not ended now; tried again at the next start:', err?.message ?? err); }

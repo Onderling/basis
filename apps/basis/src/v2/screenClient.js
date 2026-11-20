@@ -88,6 +88,14 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
   if (typeof toolbox !== 'string' || !toolbox.trim()) throw new TypeError('createScreenClient: toolbox (its name) required');
   const name = toolbox.trim();
   const start = parseScreenStartLink(String(bot ?? ''));
+  // the page was opened from the bot's link: its one-use ticket leaves the address bar once read (L1113), so a copied
+  // or bookmarked address carries none; done here so no page author can forget it
+  try {
+    const loc = globalThis.location;
+    if (start.ok && start.ticket && loc && typeof loc.href === 'string' && loc.href === String(bot) && globalThis.history?.replaceState) {
+      globalThis.history.replaceState(null, '', `${loc.pathname}${loc.search}`);
+    }
+  } catch { /* an address that cannot be rewritten keeps its fragment; the ticket is one use either way */ }
   const keyPrefix = `onderling.screen.${name}.`;
   const vaultPrefix = `onderling-screen:${name}:`;
   const store = prefixed(storage, keyPrefix);

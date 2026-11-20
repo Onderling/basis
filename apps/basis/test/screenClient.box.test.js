@@ -98,7 +98,7 @@ describe('the built screen client, on the booted box over the relay', () => {
 
     // `/scherm boodschappen`: the link to the toolbox's own placed page, with its one-use ticket
     const pageLine = textOf(await ask('/scherm boodschappen'));
-    const pageLink = (/https:\/\/boodschappen\.example\/pagina\/#scherm-nieuw=\S+/.exec(pageLine) ?? [])[0];
+    const pageLink = (/https:\/\/boodschappen\.example\/pagina#scherm-nieuw=\S+/.exec(pageLine) ?? [])[0];
     expect(pageLink, `the toolbox page's link:\n${pageLine}`).toBeTruthy();
 
     // the page for the toolbox that is on, opened from that link: pasted, the question names it and what it may do, the
@@ -113,7 +113,8 @@ describe('the built screen client, on the booted box over the relay', () => {
     expect(await page.waitForGrant()).toBe('granted');
     expect(page.state()).toBe('connected');
     expect(page.ops()).toContain('tools.useTool');
-    expect(page.ops().every((op) => ['tools.useTool', 'lists.listEntries', 'lists.addToList'].includes(op)), page.ops().join(', ')).toBe(true);
+    // exactly useTool and the placed ops the admin's column holds: an empty grant does not pass this
+    expect([...page.ops()].sort(), page.ops().join(', ')).toEqual(['lists.addToList', 'lists.listEntries', 'tools.useTool']);
     // the same link a second time: its ticket is spent
     const again = createScreenClient({ toolbox: 'boodschappen', bot: pageLink, storage: memoryStorage(), makeAgent });
     expect(textOf(await ask((await again.startPairing()).paste))).toContain('/scherm boodschappen');

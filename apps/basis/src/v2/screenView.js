@@ -173,7 +173,9 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
       }
       // a toolbox's page names its toolbox: the bot pairs it for that toolbox only (L1049)
       // and hands back the one-use ticket its link carried (`/scherm <toolbox>`): the bot pairs a toolbox's page only with it (L1113)
-      const offer = encodePairingOffer({ viewPubKey, relayUrl: parsed.relayUrl, nonce: parsed.nonce, label, ...(toolbox ? { toolbox } : {}), ...(ticket ? { ticket } : {}) });
+      // the ticket: the one given (a toolbox's page, the client), else the one its own start link carried (Basis's screen)
+      const handBack = ticket ?? parsed.ticket ?? null;
+      const offer = encodePairingOffer({ viewPubKey, relayUrl: parsed.relayUrl, nonce: parsed.nonce, label, ...(toolbox ? { toolbox } : {}), ...(handBack ? { ticket: handBack } : {}) });
       const code = await screenCode(viewPubKey, parsed.nonce);
       if (parsed.pasteMode) return { code, offer };   // nothing sent: the person carries the offer to their own chat
       await sendToBot({ subtype: SCREEN_OFFER_SUBTYPE, offer });

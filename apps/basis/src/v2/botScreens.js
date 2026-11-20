@@ -89,6 +89,9 @@ export function encodeScreenStartLink(appUrl, { botAddress, relayUrl = null, bot
     // a TOOLBOX'S PAGE link (L1113): the one-use ticket the page hands back in its offer, and which toolbox it is for
     ...(ticket ? { k: ticket } : {}), ...(toolbox ? { t: String(toolbox) } : {}),
   }));
+  // a toolbox's PAGE keeps its address as placed, query included (L1149: `?e=<entry>`), and gains nothing but the
+  // fragment; Basis's own app address is normalised as before
+  if (toolbox) return `${String(appUrl).replace(/#.*$/, '')}#scherm-nieuw=${body}`;
   return `${String(appUrl).replace(/[#?].*$/, '').replace(/\/+$/, '')}/#scherm-nieuw=${body}`;
 }
 /** @returns {{ok: true, botAddress: string, relayUrl: string|null, botName: string|null, ticket: string|null, toolbox: string|null}|{ok: false, reason: string}} */
@@ -124,24 +127,37 @@ export function parseScreenLaunchLink(link) {
 export const TOOLBOX_TICKET_UPGRADE_KEY = 'screens.toolbox-ticket-v1';
 
 /**
- * ONCE, at the first start of a box with ticketed toolbox pages (L1113): every grant a toolbox's page holds from before
- * is ended (it held the person's whole role column, and its toolbox was the page's own claim), and its person is told
- * once, in their chat, how to connect it again (`/scherm <toolbox>`). Basis's own screens are left alone. The mark is
- * written after the pass, so a pass cut short runs again at the next start.
- * @param {{listGrants: Function, revokeView: Function, notify?: Function, marker: {get: Function, set: Function}}} a
- * @returns {Promise<{ran: boolean, ended: number}>}
+ * ONCE per box, at the first start with ticketed toolbox pages (L1113): every grant a toolbox's page holds from BEFORE
+ * is ended (it held the person's whole role column, and its toolbox was the page's own claim), and each person is told
+ * ONCE, in their chat, how to connect again (`/scherm <toolbox>`). Basis's own screens are left alone.
+ *
+ * "From before" is read from the grant itself: its latest token's end minus the grant's life is when it was issued,
+ * and the pass ends only grants issued before the pass first STARTED (the time is kept first, the done mark after).
+ * A pass that was cut short therefore runs again at the next start without ending a page paired with a ticket since.
+ * @param {{listGrants: Function, revokeView: Function, notify?: Function, marker: {get: Function, set: Function}, grantTtlMs: number, now?: () => number}} a
+ * @returns {Promise<{ran: boolean, ended: number, told: number}>}
  */
-export async function endPreTicketToolboxGrants({ listGrants, revokeView, notify = null, marker }) {
-  if (await marker.get(TOOLBOX_TICKET_UPGRADE_KEY)) return { ran: false, ended: 0 };
+export async function endPreTicketToolboxGrants({ listGrants, revokeView, notify = null, marker, grantTtlMs, now = Date.now }) {
+  let mark = null;
+  try { mark = JSON.parse((await marker.get(TOOLBOX_TICKET_UPGRADE_KEY)) ?? 'null'); } catch { mark = null; }
+  if (mark?.done) return { ran: false, ended: 0, told: 0 };
+  const started = typeof mark?.started === 'number' ? mark.started : now();
+  if (typeof mark?.started !== 'number') await marker.set(TOOLBOX_TICKET_UPGRADE_KEY, JSON.stringify({ started }));
+  const issuedAt = (g) => {
+    const ends = (Array.isArray(g?.tokens) ? g.tokens : []).map((t) => Number(t?.expiresAt)).filter(Number.isFinite);
+    return ends.length ? Math.max(...ends) - Number(grantTtlMs) : -Infinity;   // no token: as old as it gets
+  };
   let ended = 0;
+  const toTell = new Map();   // person -> a toolbox to name
   for (const g of ((await listGrants()) ?? [])) {
-    if (!g?.toolbox || !g.viewPubKey) continue;
+    if (!g?.toolbox || !g.viewPubKey || issuedAt(g) >= started) continue;
     if (!(await revokeView(g.viewPubKey))) continue;
     ended += 1;
-    if (g.actingAs) { try { await notify?.(g.actingAs, 'circle.bot.screen_toolbox_grant_ended', { toolbox: String(g.toolbox) }); } catch { /* ended either way */ } }
+    if (g.actingAs && !toTell.has(g.actingAs)) toTell.set(g.actingAs, String(g.toolbox));
   }
-  await marker.set(TOOLBOX_TICKET_UPGRADE_KEY, new Date().toISOString());
-  return { ran: true, ended };
+  for (const [person, toolbox] of toTell) { try { await notify?.(person, 'circle.bot.screen_toolbox_grant_ended', { toolbox }); } catch { /* ended either way */ } }
+  await marker.set(TOOLBOX_TICKET_UPGRADE_KEY, JSON.stringify({ started, done: new Date(now()).toISOString() }));
+  return { ran: true, ended, told: toTell.size };
 }
 
 /**
@@ -198,7 +214,14 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
   // person who asked and the toolbox it was asked for. The page hands it back in its offer; the toolbox the grant is for
   // is read from HERE, never from the offer (an offer is the page's own, unsigned claim). In memory: a restart ends the
   // links in flight, and the person asks for a new one.
-  const tickets = new Map();   // sha256(ticket) -> {person, toolbox, until}
+  const tickets = new Map();   // sha256(ticket) -> {person, toolbox: string | null (null: Basis's own screen), until}
+  /** A fresh ticket for this person: for a toolbox's page, or (toolbox null) Basis's own screen on the paste route. */
+  async function mintTicket(person, toolbox) {
+    const ticket = randomNonce();
+    const until = now() + SCREEN_PAIRING_TTL_MS;
+    tickets.set(await sha256Hex(ticket), { person, toolbox: toolbox ?? null, until });
+    return { ticket, until };
+  }
   async function spendTicket(person, ticket) {
     const t = now();
     for (const [h, rec] of tickets) if (rec.until < t - SCREEN_PAIRING_TTL_MS) tickets.delete(h);
@@ -243,22 +266,28 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
   };
 
   /** The question, for an offer from either route: the code to pick from three, in the person's private door. */
-  async function askAbout(person, { viewPubKey, nonce, label, toolbox: claimed = null, ticket = null }) {
+  async function askAbout(person, { viewPubKey, nonce, label, toolbox: claimed = null, ticket = null, route = 'relay' }) {
     if (typeof ask !== 'function') return { ok: false, reason: 'no-private-door' };
     // a page that names a toolbox pairs only for one that is ON here; refused in words before anything is asked
     if (claimed && !(typeof toolboxOn === 'function' && await toolboxOn(String(claimed)))) return { ok: false, reason: 'toolbox-not-on', toolbox: String(claimed) };
     // A TOOLBOX'S PAGE pairs only with the ticket its link carried (L1113): the ticket names the toolbox; an offer that
     // names one without a ticket, or another one than its ticket, is refused before anything is asked. The person's pick
     // of the code still follows: the ticket proves the page, the code proves the person.
+    // EVERY PASTED OFFER carries a live ticket (Fable's review): a page that drops its ticket and names no toolbox would
+    // otherwise be paired as Basis's own screen and hold the person's whole column. What a grant holds is read from the
+    // ticket's MARK (Basis's own, or a toolbox), never from what the offer says or leaves out. The relay route without a
+    // ticket is Basis's own screen link, already bound to the person by its one-use nonce.
     let toolbox = null;
     if (ticket) {
       const spent = await spendTicket(person, ticket);
       if (!spent.ok) return spent;
-      if (claimed && String(claimed) !== spent.toolbox) return { ok: false, reason: 'toolbox-ticket-mismatch', toolbox: String(claimed) };
-      if (!(typeof toolboxOn === 'function' && await toolboxOn(spent.toolbox))) return { ok: false, reason: 'toolbox-not-on', toolbox: spent.toolbox };
+      if (claimed && String(claimed) !== (spent.toolbox ?? '')) return { ok: false, reason: 'toolbox-ticket-mismatch', toolbox: String(claimed) };
+      if (spent.toolbox && !(typeof toolboxOn === 'function' && await toolboxOn(spent.toolbox))) return { ok: false, reason: 'toolbox-not-on', toolbox: spent.toolbox };
       toolbox = spent.toolbox;
     } else if (claimed) {
       return { ok: false, reason: 'toolbox-needs-ticket', toolbox: String(claimed) };
+    } else if (route === 'paste') {
+      return { ok: false, reason: 'pairing-needs-ticket' };
     }
     // the door keeps it as the person's one pending offer: a second offer drops the first, and its screen is told —
     // unless it IS this screen (a reload, a second /scherm on the same browser): the screen asking now must not be the
@@ -298,11 +327,15 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
      * The paste route (`/scherm` for the admin, by default): the person gets the address a screen opens to make its own
      * connect code — no secret travels through the chat; the screen's offer comes back pasted (`/koppel-scherm`).
      */
-    async startPaste(person, text) {
+    async startPaste(person, text, remembered = '') {
       const { appUrl, botAddress, relayUrl, botName = null } = where() ?? {};
       if (!appUrl || !botAddress) return { ok: false, reason: 'no-app-url' };
       if (typeof sendPrivately !== 'function') return { ok: false, reason: 'no-private-door' };
-      const sent = await sendPrivately(person, text(encodeScreenStartLink(appUrl, { botAddress, relayUrl, botName })), null, buttonsFor(person));
+      // Basis's own screen on the paste route carries a ticket too (marked as Basis's own): a pasted offer pairs only
+      // with one, so a page cannot get the whole column by leaving out its toolbox (L1113)
+      const { ticket } = await mintTicket(person, null);
+      const link = encodeScreenStartLink(appUrl, { botAddress, relayUrl, botName, ticket });
+      const sent = await sendPrivately(person, text(link, Math.round(SCREEN_PAIRING_TTL_MS / 60000)), remembered ?? '', buttonsFor(person));
       return sent?.ok ? { ok: true } : { ok: false, reason: sent?.reason ?? 'not-reachable' };
     },
 
@@ -314,7 +347,7 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
     async pasted(person, { viewPubKey, nonce, label = null, toolbox = null, ticket = null }) {
       if (typeof viewPubKey !== 'string' || !viewPubKey || typeof nonce !== 'string' || !nonce) return { ok: false, reason: 'not-an-offer' };
       if (typeof isAdmitted !== 'function' || !(await isAdmitted(person))) return { ok: false, reason: 'not-admitted' };
-      return askAbout(person, { viewPubKey, nonce, label, toolbox, ticket });
+      return askAbout(person, { viewPubKey, nonce, label, toolbox, ticket, route: 'paste' });
     },
 
     /**
@@ -322,7 +355,7 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
      * sent to the person's PRIVATE door only. The page hands the ticket back in its offer; the pairing then asks the
      * person for the code as always (L1113). `text(link)` words it in the person's language.
      */
-    async toolboxStart(person, toolbox, text) {
+    async toolboxStart(person, toolbox, text, remembered = '') {
       const name = String(toolbox ?? '').trim();
       const { botAddress, relayUrl, botName = null } = where() ?? {};
       if (!botAddress) return { ok: false, reason: 'no-app-url' };
@@ -330,11 +363,10 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       if (typeof isAdmitted !== 'function' || !(await isAdmitted(person))) return { ok: false, reason: 'not-admitted' };
       const placed = typeof toolboxPage === 'function' ? await toolboxPage(name) : null;
       if (!placed?.page) return { ok: false, reason: 'toolbox-no-page', toolbox: name };
-      const ticket = randomNonce();
-      const until = now() + SCREEN_PAIRING_TTL_MS;
-      tickets.set(await sha256Hex(ticket), { person, toolbox: name, until });
+      const { ticket, until } = await mintTicket(person, name);
       const link = encodeScreenStartLink(placed.page, { botAddress, relayUrl, botName, ticket, toolbox: name });
-      const sent = await sendPrivately(person, text(link, Math.round(SCREEN_PAIRING_TTL_MS / 60000)), null, null);
+      // the thread remembers a line WITHOUT the link: a live ticket does not belong in memory (as `start()`)
+      const sent = await sendPrivately(person, text(link, Math.round(SCREEN_PAIRING_TTL_MS / 60000)), remembered ?? '', null);
       if (!sent?.ok) return { ok: false, reason: sent?.reason ?? 'not-reachable' };
       return { ok: true, until };
     },

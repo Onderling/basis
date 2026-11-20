@@ -132,3 +132,15 @@ export function acceptConnectionGrant(payload, { nonce, viewPubKey } = {}) {
     label: payload.label ?? null,
   };
 }
+
+/**
+ * A line with a pairing offer or a screen start link in it, with their bodies cut (L1113): an offer carries the one-use
+ * ticket its link held, a start link the ticket itself. What a thread REMEMBERS and what the log keeps get this, never
+ * the line as typed.
+ * @param {string} text @returns {string}
+ */
+export function redactPairingSecrets(text) {
+  return String(text ?? '')
+    .replace(/onderling-connect:\/\/[A-Za-z0-9_-]+/g, 'onderling-connect://…')
+    .replace(/#scherm-nieuw=[A-Za-z0-9_-]+/g, '#scherm-nieuw=…');
+}

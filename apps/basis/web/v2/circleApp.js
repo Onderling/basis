@@ -66,6 +66,10 @@ import { createSettingsPodMedium } from '../../src/v2/settingsPodMedium.js';
 import { inviteDeepLink } from '../../src/v2/inviteDeepLink.js';
 import { alphaViewMode, isAlphaTab, ALPHA_FALLBACK_TAB } from '../../src/v2/alphaSurface.js';
 import { runPendingForget, markerVaultOver, circleIdsFrom } from '../../src/v2/enrolForgets.js';
+import { checkPhraseForThisDevice, startDeviceOver, readStartOverMark, cancelStartOver, cancelStartOverAsks, wipeKeyValueStorage, deleteDatabases, restorePhraseWithoutAgent, START_OVER_PENDING_KEY } from '../../src/v2/startOver.js';
+import { isBasisStorageKey, isBasisDatabase, BASIS_DB_NAMES } from '../../src/v2/basisStorageNames.js';
+import { pickRootKeyStore } from '../../src/core/agent/ownerRootCustody.js';
+import { makeBrowserVault } from '@onderling/secure-agent';
 import { DEFAULT_PERSONA } from '../../src/v2/contactPersona.js';
 import { contactAddSheetModel, addContactAs, contactLensModel, changeContactLens, contactThreadSelfFor } from '../../src/v2/contactLens.js';
 import { renderContactLensPanel } from './contactLensPanel.js';
@@ -4021,6 +4025,7 @@ function paintLauncher() {
     storedRefusal: _storedRefusal,
     onDismissStoredRefusal: () => { _storedRefusal = false; _storedRefusalSaid = true; try { paintLauncher(); } catch { /* the next visit */ } },
     onRetryBoot:  () => window.location.reload(),
+    onStartOver:  () => openStartOverPage(),
     t,
     onOpenCircle: showDetail,
     onNewCircle:  createCircle,
@@ -9601,11 +9606,103 @@ async function showSettings(id) {
   rerender();
 }
 
+// ── START THIS DEVICE OVER FROM YOUR PHRASE (L1115) ─────────────────────────────────────────────────────────────
+// The second door on the start-failure notice (after "Try again"). The order is the shared one (startOver.js): the
+// phrase first and checked IN THIS RUN, the confirm in words, then mark, clear, restore without an agent, unmark; then a
+// fresh start of the app. The page always opens on a FRESH load, before the boot opens a single store: a database this
+// tab already holds cannot be deleted (no store here closes on `versionchange`), so the door only asks for the page
+// (`START_OVER_PAGE_KEY`, a per-tab view choice that clears nothing) and reloads.
+const START_OVER_PAGE_KEY = 'basis.startOverPage';
+const START_OVER_MARK_KEY = `cc-owner-root:${START_OVER_PENDING_KEY}`;
+function openStartOverPage() {
+  try { window.sessionStorage.setItem(START_OVER_PAGE_KEY, '1'); } catch { /* the page opens on this load only */ }
+  window.location.reload();
+}
+// The clear takes only what is Basis's by name (basisStorageNames.js): the origin is shared with the public site and the
+// toolbox screen pages. A delete another tab blocks fails the start-over with 'blocked' ("close the other tabs").
+async function wipeThisBrowser() {
+  await wipeKeyValueStorage(window.localStorage, START_OVER_MARK_KEY, { isOurs: isBasisStorageKey });
+  try { await wipeKeyValueStorage(window.sessionStorage, START_OVER_MARK_KEY, { isOurs: isBasisStorageKey }); } catch { /* none */ }
+  // `canClearThisBrowser` made sure the databases can be listed: a per-circle store is found only through the listing
+  const listed = ((await globalThis.indexedDB.databases()) ?? []).map((d) => d?.name).filter(isBasisDatabase);
+  await deleteDatabases(globalThis.indexedDB, [...new Set([...listed, ...BASIS_DB_NAMES])]);
+}
+// Before anything is touched: a browser that cannot list its databases would leave the per-circle stores behind, sealed
+// under a key that is gone, so the start-over stops with a word instead.
+async function canClearThisBrowser() {
+  return typeof globalThis.indexedDB?.databases === 'function' ? { ok: true } : { ok: false, code: 'cannot-list' };
+}
+function showStartOver({ mark = null } = {}) {
+  const root = document.getElementById('circle-root') ?? document.body;
+  const markerVault = markerVaultOver(window.localStorage);
+  const rootKeyStore = () => pickRootKeyStore({ fallbackVault: makeBrowserVault('cc-owner-root:') });
+  const el = (tag, attrs = {}, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'onclick') n.addEventListener('click', v); else n.setAttribute(k, v); } for (const c of kids) n.append(c); return n; };
+  const said = el('p', { role: 'alert', class: 'start-over__said' });
+  const box = el('textarea', { rows: '4', class: 'start-over__phrase', 'aria-label': t('circle.start_over.phrase_label'), autocomplete: 'off', spellcheck: 'false' });
+  const page = el('section', { class: 'start-over', 'data-testid': 'start-over' },
+    el('h2', {}, t('circle.start_over.button')),
+    el('p', {}, t(mark ? 'circle.start_over.resumed' : 'circle.start_over.lede')),
+    box, said);
+  const go = el('button', { type: 'button', class: 'cc-btn cc-btn--primary', 'data-testid': 'start-over-check', onclick: async () => {
+    said.textContent = '';
+    page.querySelector('.start-over__confirm')?.remove();
+    const checked = await checkPhraseForThisDevice(box.value, { rootKeyStore: rootKeyStore(), markerVault, markFingerprint: mark?.fingerprint ?? null });
+    if (!checked.ok) { said.textContent = t(`circle.start_over.error_${checked.code === 'other-phrase' ? 'other_phrase' : 'invalid'}`); return; }
+    // the confirm in words: what is lost, what comes back, what stays; and, when this device could not name its own
+    // root, that it cannot check the phrase is its own. Nothing is cleared before it.
+    const confirm = el('div', { class: 'start-over__confirm' },
+      el('h3', {}, t('circle.start_over.confirm_title')),
+      el('p', {}, t('circle.start_over.confirm_body')),
+      ...(checked.known ? [] : [el('p', { class: 'start-over__unknown' }, t('circle.start_over.confirm_unknown'))]),
+      el('p', {}, t('circle.start_over.web_stays')),
+      el('button', { type: 'button', class: 'cc-btn cc-btn--danger', 'data-testid': 'start-over-yes', onclick: async () => {
+        said.textContent = t('circle.start_over.working');
+        const r = await startDeviceOver({
+          phrase: checked.phrase, fingerprint: checked.fingerprint, markerVault, canClear: canClearThisBrowser, wipe: wipeThisBrowser,
+          restore: (p) => restorePhraseWithoutAgent({ mnemonic: p, rootKeyStore: rootKeyStore(), chatVault: makeBrowserVault('cc-chat-id:'), markerVault: makeBrowserVault('cc-owner-root:') }),
+        }).catch(() => ({ ok: false, code: 'storage' }));
+        if (r.ok) { window.location.reload(); return; }
+        said.textContent = t({ blocked: 'circle.start_over.error_blocked', 'cannot-list': 'circle.start_over.error_cannot_list' }[r.code] ?? 'circle.start_over.error_storage');
+      } }, t('circle.start_over.confirm_yes')),
+      el('button', { type: 'button', class: 'cc-btn cc-btn--quiet', onclick: () => { confirm.remove(); said.textContent = t('circle.start_over.not_confirmed'); } }, t('circle.start_over.confirm_no')));
+    page.append(confirm);
+  } }, t('circle.start_over.submit'));
+  // Cancel. With no start-over under way: back to the app, nothing changed. With one cut short (any mark: a stop inside
+  // the clear leaves no sure sign how far it got): say first that this device may already be cleared and may start as a
+  // NEW identity; on yes the mark goes and nothing more is cleared. What Cancel asks is `cancelStartOverAsks`'s.
+  const back = el('button', { type: 'button', class: 'cc-btn cc-btn--quiet', 'data-testid': 'start-over-cancel', onclick: async () => {
+    if (!cancelStartOverAsks(mark)) { window.location.reload(); return; }
+    page.querySelector('.start-over__cancel')?.remove();
+    page.append(el('div', { class: 'start-over__cancel' },
+      el('h3', {}, t('circle.start_over.cancel_cleared_title')),
+      el('p', {}, t('circle.start_over.cancel_cleared_body')),
+      el('button', { type: 'button', class: 'cc-btn cc-btn--danger', 'data-testid': 'start-over-cancel-yes', onclick: async () => { await cancelStartOver(markerVault).catch(() => {}); window.location.reload(); } }, t('circle.start_over.cancel_cleared_yes')),
+      el('button', { type: 'button', class: 'cc-btn cc-btn--quiet', onclick: (e) => e.currentTarget.parentElement.remove() }, t('circle.start_over.cancel_cleared_no'))));
+  } }, t('circle.start_over.confirm_no'));
+  page.append(go, back);
+  root.replaceChildren(page);
+}
+
 // Was an enrol offer waiting when this boot started? Read before anything can consume it: a ceremony with an offer
 // waiting was an ADD, and the restore-finish flow ("your circles are not here") is not for it.
 let offerPendingAtBoot = false;
 
+// App language: a persisted user choice (the Mij toggle) wins over the device locale; localStorage is the pre-boot
+// cache of app.lang. Before the boot's first paint — the start-over page (L1115) paints before the rest of the boot too.
+async function initAppLocale() {
+  let stored = null; try { stored = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ } // pre-boot cache of app.lang
+  await initLocalisation({ lng: (stored === 'nl' || stored === 'en') ? stored : detectDeviceLang() });
+}
+
 async function boot() {
+  // FIRST OF ALL (L1115): a start-over cut short, or the start-over page asked for, opens its phrase page before anything
+  // reads or opens a store. A mark clears nothing by itself: the phrase is asked again.
+  try {
+    const mark = await readStartOverMark(markerVaultOver(window.localStorage));
+    let asked = false;
+    try { asked = window.sessionStorage.getItem(START_OVER_PAGE_KEY) === '1'; window.sessionStorage.removeItem(START_OVER_PAGE_KEY); } catch { /* no page asked */ }
+    if (mark || asked) { await initAppLocale().catch(() => {}); showStartOver({ mark }); return; }
+  } catch { /* the ordinary boot */ }
   // THE SIGNATURE CHECK: WebCrypto's batch behind the one strict rule, after its self-test (the vectors, an honest and a
   // tampered signature); a browser without Ed25519 in WebCrypto keeps tweetnacl. Reads then check ahead in one batch.
   try { const eq = await installWebSignatureEquation(globalThis.crypto?.subtle); console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`); } catch { /* tweetnacl stays */ }
@@ -9654,10 +9751,7 @@ async function boot() {
   // the last moment a page is sure to get on a phone's browser; pagehide covers a reload and a closed tab.
   window.addEventListener('pagehide', () => { flushPendingSaves().catch(() => {}); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushPendingSaves().catch(() => {}); });
-  // App language: a persisted user choice (the Mij toggle) wins over the device locale.
-  // pre-boot cache of app.lang
-  let _storedAppLang = null; try { _storedAppLang = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ }
-  await initLocalisation({ lng: (_storedAppLang === 'nl' || _storedAppLang === 'en') ? _storedAppLang : detectDeviceLang() });
+  await initAppLocale();
   // A hosted build links back to its site, above everything else (no frame ⇒ nothing).
   renderHostFrame(document.body, { frame: HOST_FRAME, t });
   placePersonaButton();   // the person button below the line just painted (it may already be on screen)

@@ -108,7 +108,7 @@
     "note": "sealed by its caller: both shells hand the peer backend sealedKeyValue (strict) — the web in buildCircleBot (circleApp.js), the phone in bootAgentBundle (agentBundle.js), both after the agent's boot"
   },
   "apps/basis/web/v2/circleApp.js": {
-    "count": 10,
-    "note": "not content: basis.theme, cc.lastTab, cc.circleViewMode, circle.app.lang (2), basis.nearby-asked:*, basis.nearbySelf, basis.nearbyAllows, cc.activeCircle (sessionStorage), cc.advisorShown.* — device settings and view state, no person's content (the seen-marks and pins are sealed through circleSeenMarks.js, contactUnread.js, circlePinStore.js)"
+    "count": 11,
+    "note": "not content: basis.theme, cc.lastTab, cc.circleViewMode, circle.app.lang (2), basis.nearby-asked:*, basis.nearbySelf, basis.nearbyAllows, cc.activeCircle (sessionStorage), basis.startOverPage (sessionStorage: a one-load flag that opens the start-over page), cc.advisorShown.* — device settings and view state, no person's content (the seen-marks and pins are sealed through circleSeenMarks.js, contactUnread.js, circlePinStore.js)"
   }
 }

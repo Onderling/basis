@@ -213,6 +213,23 @@ export function isAuditKind(kind) { return entryKind(kind).audit === true; }
 export function retentionOf(kind) { return entryKind(kind).retain; }
 
 /**
+ * Statement kinds kept as RECORD inside a lane whose entries are otherwise audit-class: the lane's own row says how its
+ * entries age, and this table names the statements in it that never drop. A circle's settings changes
+ * (`policy-update`) are the settings HISTORY: a content statement is judged by the settings in force when it was made
+ * (the content line), so a change that compacted away would leave "which settings applied" unknowable. They are rare and
+ * small (settings, version, author, proposal id, the content lanes' tips; no content). Rules changes and votes keep
+ * compacting.
+ */
+export const RECORD_STATEMENTS = Object.freeze({ governance: Object.freeze(['policy-update']) });
+
+/** Retention class for one log ENTRY: its kind's row, unless the statement it carries is named in `RECORD_STATEMENTS`. */
+export function retentionOfEntry(entry) {
+  const kept = RECORD_STATEMENTS[entry?.type];
+  if (kept && kept.includes(entry?.payload?.body?.kind)) return RETAIN.RECORD;
+  return retentionOf(entry?.type);
+}
+
+/**
  * The retention window PER class, as a DURATION in ms — the ONE table both audit records read: `sa.audit`
  * (the signed security log, in secure-agent) and the agent trail (in basis's `eventLog`). It lives HERE, in
  * the substrate, precisely so both can import it — secure-agent cannot import the basis app, so a copy in

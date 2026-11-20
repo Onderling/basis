@@ -163,3 +163,18 @@ describe('governance catch-up — the offline third device converges (pull-all, 
     expect((await cu.requestCircle('c9', { callSkill })).requested, 'a circle with no roster here asks nobody').toBe(0);
   });
 });
+
+describe('the settings history is served whole (the content line needs it)', () => {
+  it('every policy-update is in the batch, even behind more than a batch of other statements', async () => {
+    const st = (kind, i) => ({ body: { kind, hash: `${kind}-${i}` }, sig: 's' });
+    const stored = [...Array.from({ length: 600 }, (_, i) => st('vote', i)), st('policy-update', 1), st('policy-update', 2)];
+    const rail = { storedStatements: () => stored, ingest: async () => ({ ok: true }), checkSigned: () => true };
+    const sent = [];
+    const cu = makeGovernanceCatchUp({ rail, sendToPeer: async (to, payload) => { sent.push(payload); } });
+    await cu.onRequest('peer', { subtype: GOV_CATCHUP_REQUEST, circleId: CIRCLE });
+    const kinds = sent[0].statements.map((s) => s.body.hash);
+    expect(kinds).toContain('policy-update-1');
+    expect(kinds).toContain('policy-update-2');
+    expect(sent[0].statements.length).toBeLessThanOrEqual(500);
+  });
+});

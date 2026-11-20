@@ -65,6 +65,10 @@ export const SEAMS = Object.freeze([
   // the person nothing they can act on, and one that carries on as if empty invites a restore that was not needed.
   { id: 'start-failure-words', pattern: /bootFailureNotice\(/, why: 'a start that could not read the content key must say so in words and offer to try again, never look like an empty account' },
   // A SAVE REFUSED because the value it would replace could not be opened is SAID (L1115): the stores swallow the throw.
+  // THE WAY OUT (L1115): the start-failure notice's second door, "start this device over from your phrase", and a boot
+  // that finds a start-over cut short before anything reads (`readStartOverMark`) and asks the phrase again. The box has no phrase prompt: it
+  // says it in its log and on the bot's admin line and stops restarting.
+  { id: 'start-over-door', pattern: /readStartOverMark\(/, shells: ['web', 'mobile'], why: 'a device whose key can never be read must have a way out that does not loop: start over from the phrase, finished even after a crash, never a clear without the phrase' },
   { id: 'stored-value-refusal-said', pattern: /onStoredValueRefused\(/, shells: ['web', 'mobile'], why: 'a change the person made that was not saved (the stored value could not be opened) must be said, not silently dropped' },
   { id: 'circles-list-hears-new-lines', pattern: /subscribeTileChanges\(/, shells: ['web', 'mobile'], why: 'a line that lands while the circles list is on screen stays off its tile (old preview, old count) until the person leaves and comes back' },
   { id: 'banner-recheck-on-open', pattern: /\.recheck\(\)/, shells: ['web', 'mobile'], why: 'a banner raised before its thread or circle was opened stays over the header of that screen and takes the taps meant for it' },

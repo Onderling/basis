@@ -22,7 +22,7 @@
 
 import { matchesFilter } from './filter.js';
 import {
-  ENTRY_KINDS, isSystemKind, isAuditKind, kindWakes, retentionOf, RETENTION_DEFAULTS,
+  ENTRY_KINDS, isSystemKind, isAuditKind, kindWakes, retentionOf, retentionOfEntry, RETENTION_DEFAULTS,
 } from '@onderling/item-store';
 import { log } from '@onderling/logger';
 
@@ -522,7 +522,7 @@ export class EventLog {
     const fold = [];
     for (const e of this.#events) {
       if (e.type === 'audit-summary') { keep.push(e); continue; }   // a fold never expires
-      const cls = retentionOf(e.type);
+      const cls = retentionOfEntry(e);   // a record statement inside an audit lane (`RECORD_STATEMENTS`) never expires
       // RECORD-class kinds never expire — the entry IS the record. Membership (the roster refolds from
       // these; one dropping away silently changes who-is-in on rebuild) and chat messages (the
       // conversation's record — dropping them is data destruction). Table-driven, not a per-kind hardcode.

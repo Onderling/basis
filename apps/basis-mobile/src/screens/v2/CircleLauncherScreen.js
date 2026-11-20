@@ -561,7 +561,6 @@ export default function CircleLauncherScreen({
   // more), and a save refused because the value it would replace could not be opened (L1115)
   bootFailure = null,
   onRetryBoot = null,
-  onStartOver = null,
   storedRefusal = false,
   onDismissStoredRefusal = null,
   // The circle's policy on the governance lane (App.js builds it): stated here when an admin saves and when the
@@ -3107,12 +3106,6 @@ export default function CircleLauncherScreen({
             {bootNotice?.retry && typeof onRetryBoot === 'function' ? (
               <Pressable onPress={onRetryBoot} accessibilityRole="button" testID="launcher-boot-retry">
                 <Text style={styles.bootRetry}>{t('circle.boot_retry')}</Text>
-              </Pressable>
-            ) : null}
-            {/* the way out when trying again does not help (L1115): second, after "Try again" */}
-            {bootNotice?.startOver && typeof onStartOver === 'function' ? (
-              <Pressable onPress={onStartOver} accessibilityRole="button" testID="launcher-boot-start-over">
-                <Text style={styles.bootRetry}>{t('circle.start_over.button')}</Text>
               </Pressable>
             ) : null}
             {storedRefusal ? (

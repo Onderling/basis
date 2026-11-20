@@ -285,14 +285,6 @@
         },
         "storage": {
           "text": "Opslaan lukte niet. Probeer het nogmaals of herstart de app."
-        },
-        "other-phrase": {
-          "text": "Dit is een andere herstelzin dan die van dit apparaat. Er is niets veranderd.",
-          "doc": "Start this device over (ledger L1115): the phrase is not this device's own (its root fingerprint differs); nothing was cleared."
-        },
-        "not-confirmed": {
-          "text": "Er is niets veranderd.",
-          "doc": "Start this device over (ledger L1115): the person did not confirm the start-over; nothing was cleared."
         }
       }
     },

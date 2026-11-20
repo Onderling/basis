@@ -294,14 +294,6 @@
         "storage": {
           "text": "Couldn't save your identity. Try again, or restart the app and reopen this screen.",
           "doc": "AsyncStorage write threw."
-        },
-        "other-phrase": {
-          "text": "This is another phrase than this device's. Nothing was changed.",
-          "doc": "Start this device over (ledger L1115): the phrase is not this device's own (its root fingerprint differs); nothing was cleared."
-        },
-        "not-confirmed": {
-          "text": "Nothing was changed.",
-          "doc": "Start this device over (ledger L1115): the person did not confirm the start-over; nothing was cleared."
         }
       }
     },

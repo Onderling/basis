@@ -17,7 +17,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as sodium from 'react-native-libsodium';
 import { installPhoneSignatureEquation, installPhoneSigning, installPhoneSecretbox } from '../basis/src/v2/signatureEquations.js';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, Pressable, Text, StyleSheet, BackHandler, AppState, Alert } from 'react-native';
+import { View, Pressable, Text, StyleSheet, BackHandler, AppState } from 'react-native';
 import { flushPendingSaves } from '@onderling/local-store';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -38,14 +38,6 @@ import ActStateBar from './src/rn/ActStateBar.js';
 // Two maps would mean receipts advancing a state no bubble reads.
 import { createAppDeliveryMap } from '../basis/src/v2/deliveryState.js';
 import { onStoredValueRefused } from '../basis/src/v2/localStoreSeal.js';
-import { checkPhraseForThisDevice, startDeviceOver, finishStartOver, wipeKeyValueStorage, START_OVER_PENDING_KEY } from '../basis/src/v2/startOver.js';
-import { makeSecureStoreRootKeyStore } from './src/core/secureStoreRootKeyStore.js';
-
-/** This phone's wipe for a start-over (L1115): every AsyncStorage key but the mark, and the key door's seed. */
-async function wipePhone() {
-  await wipeKeyValueStorage(AsyncStorage, `cc-owner-root:${START_OVER_PENDING_KEY}`);
-  try { await makeSecureStoreRootKeyStore(SecureStore).deleteSeed(); } catch { /* nothing held there */ }
-}
 import { makeGiveUpConsumers } from '../basis/src/v2/deliveryGiveUp.js';
 import {
   makeReceiptSender, asyncStorageDeliveryIo, createDeliverySettingsStore,
@@ -370,11 +362,8 @@ export default function App() {
   // open as "show welcome" — better to greet an extra time than to
   // silently skip on a real first run.
   useEffect(() => {
-    // FIRST: a start-over cut short (L1115) is finished before anything reads, and the restore door opens
-    finishStartOver({ markerVault: markerVaultOver(AsyncStorage), wipe: wipePhone })
-      .catch(() => ({ startedOver: false }))
-      .then(({ startedOver }) => (startedOver ? 'startover' : shouldShowFirstRunWelcome(AsyncStorage)))
-      .then((show) => { bootMark('firstrun.checked', { welcome: !!show }); setFirstRun(show === 'startover' ? 'restore' : (show ? 'show' : 'dismissed')); })
+    shouldShowFirstRunWelcome(AsyncStorage)
+      .then((show) => { bootMark('firstrun.checked', { welcome: !!show }); setFirstRun(show ? 'show' : 'dismissed'); })
       .catch(() => setFirstRun('show'));
   }, []);
 
@@ -392,29 +381,6 @@ export default function App() {
   // restore succeeds (→ 'dismissed', seeded vault) or the user cancels
   // back to 'show'.
   const startRestore = useCallback(() => setFirstRun('restore'), []);
-  // START THIS DEVICE OVER FROM YOUR PHRASE (L1115), from the start-failure notice: the phrase first and checked, the
-  // confirm in words, then the shared order (startOver.js): mark, wipe, the ordinary restore, unmark; then the boot
-  const startOver = useCallback(() => setFirstRun('startover'), []);
-  const submitStartOver = useCallback(async (phrase) => {
-    const checked = await checkPhraseForThisDevice(phrase, { rootKeyStore: makeSecureStoreRootKeyStore(SecureStore), markerVault: markerVaultOver(AsyncStorage) });
-    if (!checked.ok) return checked;
-    const yes = await new Promise((resolve) => {
-      Alert.alert(t('circle.start_over.confirm_title'), t('circle.start_over.confirm_body'), [
-        { text: t('circle.start_over.confirm_no'), style: 'cancel', onPress: () => resolve(false) },
-        { text: t('circle.start_over.confirm_yes'), style: 'destructive', onPress: () => resolve(true) },
-      ], { cancelable: true, onDismiss: () => resolve(false) });
-    });
-    if (!yes) return { ok: false, code: 'not-confirmed' };
-    const r = await startDeviceOver({
-      phrase: checked.phrase, markerVault: markerVaultOver(AsyncStorage), wipe: wipePhone,
-      restore: (p) => restoreFromMnemonic({ mnemonic: p, asyncStorage: AsyncStorage, secureStore: SecureStore }),
-    });
-    if (!r.ok) return r;
-    try { await markWelcomeDismissed(AsyncStorage); } catch { /* non-fatal */ }
-    setBootError(null); setBootFailure(null);
-    setFirstRun('dismissed');   // the boot runs again, on the restored device
-    return r;
-  }, []);
   const cancelRestore = useCallback(() => setFirstRun('show'), []);
 
   // 5.9b-followup — invoked from MnemonicEntryScreen with the raw text.
@@ -696,14 +662,6 @@ export default function App() {
       </SafeAreaProvider>
     );
   }
-  if (firstRun === 'startover') {
-    return (
-      <SafeAreaProvider>
-        <StatusBar style="auto" />
-        <MnemonicEntryScreen onSubmit={submitStartOver} onCancel={() => setFirstRun('dismissed')} />
-      </SafeAreaProvider>
-    );
-  }
   if (firstRun === 'restore') {
     return (
       <SafeAreaProvider>
@@ -754,7 +712,6 @@ export default function App() {
           bootError={bootError}
           bootFailure={bootFailure}
           onRetryBoot={retryBoot}
-          onStartOver={startOver}
           storedRefusal={storedRefusal}
           onDismissStoredRefusal={dismissStoredRefusal}
           deliveryStateMap={deliveryStateMapRef.current}

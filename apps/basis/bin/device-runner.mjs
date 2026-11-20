@@ -132,7 +132,7 @@ import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
 import { EventLog } from '../src/eventLog.js';
 import { fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
 import { besidePersistDb } from '../src/household/persist.js';
-import { boxStores } from '../src/v2/boxStorage.js';
+import { boxStores, vaultFilesMissing, startFailures } from '../src/v2/boxStorage.js';
 import { resolveVaultPassphrase } from '../src/v2/boxVaultPassphrase.js';
 import { retentionFromDays } from '../src/v2/retentionPref.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, openOfferPersonas, pickByNames, enrolPickArgs, pickPrimary } from '../src/v2/enrollOffer.js';
@@ -220,6 +220,17 @@ function promptCacheSecret() {
   return readFileSync(f, 'utf8').trim();
 }
 
+// A VAULT FILE MISSING BESIDE OTHER STATE is a loss, not a first start (L1115): a partly restored backup or an unmounted
+// folder would read as "nothing stored" and mint new keys over the household. Said, counted, and the box stops.
+const failedStarts = startFailures(dataDir);
+{
+  const missing = vaultFilesMissing(dataDir, existsSync);
+  if (missing.length) {
+    const run = failedStarts.note('vault-file-missing');
+    console.error(`device-runner: ${missing.join(' and ')} is missing in ${dataDir} while the folder holds a box's other state; nothing was changed. Stopping. Put the file back (a backup, the right folder), or restore the box from the phrase. Failed starts in a row: ${run.count}, since ${run.since}.`);
+    process.exit(1);
+  }
+}
 const vault = new VaultNodeFs(path.join(dataDir, 'vault.json'), vaultPassphrase());
 // The CHAT-side vault, durable, because on a box there is no browser storage to fall back to.
 //
@@ -381,7 +392,8 @@ const agent = await createRealHouseholdAgent({
   // THE CONTENT KEY COULD NOT BE READ (L1115): nothing was minted or written. Said in the log in words, and the box stops
   // so its service manager starts it again: a read that failed once may pass at the next start (the shells' "try again").
   if (bootFailureNotice(err)?.retry) {
-    console.error('device-runner: the content key on this box could not be read; nothing was changed. Stopping; the next start tries again. If it keeps failing, restore the box from the phrase.');
+    const run = failedStarts.note(String(err?.what ?? err?.cause?.what ?? 'key'));
+    console.error(`device-runner: a key on this box could not be read (${err?.what ?? 'key'}); nothing was changed. Stopping; the container's restart tries again. If it keeps failing, restore the box from the phrase. Failed starts in a row: ${run.count}, since ${run.since}.`);
     process.exit(1);
   }
   throw err;
@@ -1723,6 +1735,7 @@ const card = await callSkill('pinboard', 'getContactShareQr', {}).catch(() => nu
 walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken, clock: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone });
 // what other agents' task requests reach on this node (ids only), so a walk — or an operator — reads it from the box
 walkLog({ kind: 'peer-callable', accepts: agent.peer?.acceptsSkillCalls === true, skills: agent.peer?.callableSkills?.() ?? [] });
+failedStarts.clear();   // the box came up: a run of failed starts (L1115) ends here
 console.log(`\ndevice-runner: up — data in ${dataDir}`);
 console.log(`  log       ${deviceLog.size} entr${deviceLog.size === 1 ? 'y' : 'ies'} restored from disk`);
 console.log(`  wire      ${relayUrl || 'LOCAL ONLY (set ONDERLING_RELAY_URL to join the relay)'}`);

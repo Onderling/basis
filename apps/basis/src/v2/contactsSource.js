@@ -542,5 +542,5 @@ export function makeContactNameStore(io) {
  * contact as renamed for a moment.
  */
 export function sealedContactNameStore(storage) {
-  return makeContactNameStore(sealedKeyValue(storage, { name: 'contact names', strict: true, waitForKey: true }));
+  return makeContactNameStore(sealedKeyValue(storage, { name: 'contact names', strict: true, waitForKey: true, said: true }));
 }

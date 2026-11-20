@@ -9701,6 +9701,10 @@
     "text": "A change was not saved: the value it would replace could not be opened on this device, so it was kept. Try again after restarting the app; if this keeps happening, restore from your recovery phrase.",
     "doc": "Launcher (ledger L1115): a save the person made was refused because the stored value it would replace could not be opened with this device's key; it was kept, not overwritten."
   },
+  "stored_value_unreadable_ok": {
+    "text": "OK",
+    "doc": "Launcher (ledger L1115): dismisses the refused-save notice; it is said once a session."
+  },
   "boot_failed": {
     "text": "The app could not start ({{reason}}). Your data is still on this device — nothing here is empty, it is unread.",
     "doc": "Launcher: a failed agent boot is SAID where the person looks, instead of degrading into \"No circles yet.\" (the walk's W28/W29)."

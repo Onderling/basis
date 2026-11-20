@@ -232,7 +232,7 @@ export function createMemberOverrideStore({ load, save } = {}) {
 /** localStorage-backed load/save for member overrides. Key: `cc.circleOverride.<circleId>`. */
 export function localStorageOverrideIo(storage = globalThis.localStorage) {
   // SEALED at rest (ledger L1083: per-member overrides), on web and phone alike
-  const kv = sealedKeyValue(storage, { name: 'the member overrides', strict: true });
+  const kv = sealedKeyValue(storage, { name: 'the member overrides', strict: true, said: true });
   const key = (id) => `cc.circleOverride.${id}`;
   return {
     load: async (id) => {

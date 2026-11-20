@@ -191,6 +191,25 @@ same name answers, so gating on it there would fail good releases. It runs when 
 the upgrade through Caddy are proven from OUTSIDE after a bring-up:
 `node deploy/smoke/smoke.mjs wss://<relay-domain>`.
 
+## When the assistant cannot read its keys (it stops, and says so)
+
+The assistant (`apps/basis/bin/device-runner.mjs`) never makes a new key over one it could not read (ledger L1115). At a
+start it stops, writing nothing, when:
+
+- a key or marker in its vaults is there but will not read (a wrong passphrase, a damaged file, a storage error):
+  `device-runner: a key on this box could not be read (<which>); nothing was changed. Stopping; ...`;
+- `vault.json` or `chat-vault.json` is MISSING while the data folder holds a box's other state (a backup restored
+  without them, a folder that did not mount): `device-runner: chat-vault.json is missing in <dir> ...`.
+
+**What restarts it:** the `assistant` role's container (`deploy/roles/assistant.yml`, `restart: unless-stopped`):
+Docker starts it again after each stop, with a growing delay. A failure that passes (a storage hiccup) is gone at the
+next start.
+
+**A failure that repeats is counted,** not only logged once per start: `<data dir>/start-failures.json` holds how many
+starts in a row stopped and since when, and each stop's line says it (`Failed starts in a row: 7, since ...`). The file
+is removed when the assistant comes up (`device-runner: up`). A count that keeps growing means the files need a person:
+put the missing file back (the right folder, a backup), or restore the box from the phrase.
+
 ## Backups (role `backup`)
 
 A restic sidecar snapshots every box volume (relay, pod, companion, assistant, feedback, caddy) plus

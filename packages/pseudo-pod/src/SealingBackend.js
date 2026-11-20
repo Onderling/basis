@@ -76,6 +76,15 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null } = {
   // Resolved once and kept. A null result is NOT cached — "no identity yet" is a passing state, and
   // caching it would leave the store writing in the clear for the rest of the session.
   let cached = null;
+  // THE REFS WHOSE RECORD WOULD NOT OPEN (L1115): `get` answers null for them (one bad row must not take a store down),
+  // and null is what absent means, so a write to such a ref is refused until a read of it opens or it is deleted.
+  const unopened = new Set();
+  const refuseOverUnopened = (ref) => {
+    if (!unopened.has(ref)) return;
+    warn(`[at-rest] ${ref}: a write was refused; the stored record could not be opened and is kept`, null);
+    throw Object.assign(new Error(`SealingBackend: "${ref}" holds a record this device could not open; not written over`), { code: 'stored-value-unreadable', key: ref });
+  };
+
   async function strategy() {
     if (cached) return cached;
     const s = await getStrategy();
@@ -126,6 +135,7 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null } = {
      * because the fallback is invisible and the promise it breaks is the one on the front page.
      */
     async put(ref, bytes, ...rest) {
+      refuseOverUnopened(ref);
       const s = await strategy();
       if (!s) throw new Error(`SealingBackend: refusing to store "${ref}" unsealed — no content key yet`);
       return backend.put(ref, s.seal(encode(bytes)), ...rest);
@@ -133,6 +143,7 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null } = {
 
     /** The compare-and-swap write — sealed exactly as `put` (forwarding it verbatim would store plain text). */
     async putIf(ref, bytes, ifMatch) {
+      refuseOverUnopened(ref);
       const s = await strategy();
       if (!s) throw new Error(`SealingBackend: refusing to store "${ref}" unsealed — no content key yet`);
       const sealed = s.seal(encode(bytes));
@@ -164,14 +175,15 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null } = {
       // caught the throw and started with an empty log. The read is fixed at its source now (the agent
       // hydrates once the key exists), but a wrapper that hands out ciphertext when it cannot open it
       // will find another caller eventually.
+      // Some backends hand back the value itself, others a record carrying it as `bytes`. (Read FIRST: the no-key branch
+      // below needs it; it was read there before its declaration, a ReferenceError on every read before the key.)
+      const carried = (rec && typeof rec === 'object' && 'bytes' in rec) ? rec.bytes : rec;
       if (!s) {
         const looksSealed = typeof carried === 'string' && carried.startsWith('fp1:');
         if (!looksSealed) return rec;
         warn(`[at-rest] ${ref}: sealed, and read before this device had its content key`, null);
         return null;
       }
-      // Some backends hand back the value itself, others a record carrying it as `bytes`.
-      const carried = (rec && typeof rec === 'object' && 'bytes' in rec) ? rec.bytes : rec;
       if (carried == null) return rec;
       // NOT A STRING means it was written before sealing began — binary, straight from the store. Return
       // it untouched. Coercing it with `String()` produced "91,123,34…", the comma-joined bytes: not
@@ -196,11 +208,21 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null } = {
         // are JSON bodies), which is precisely why it would have sat unnoticed until something did.
         const openedText = s.open(carried);
         const opened = openedText === carried ? carried : decode(openedText);
+        unopened.delete(ref);
         return (rec && typeof rec === 'object' && 'bytes' in rec) ? { ...rec, bytes: opened } : opened;
       } catch (err) {
-        warn(`[at-rest] ${ref}: stored here but not openable with this device's content key`, err);
+        warn(`[at-rest] ${ref}: stored here but not openable with this device's content key; kept, not written over`, err);
+        unopened.add(ref);   // null reads as absent: a write must not take that for an empty slot (L1115)
         return null;
       }
+    },
+
+    /** Deleted on purpose: a fresh write to the ref may follow (forwarded; the refusal for it ends). */
+    async delete(ref, ...rest) {
+      if (typeof backend.delete !== 'function') throw new Error('SealingBackend: this backend has no delete');
+      const r = await backend.delete(ref, ...rest);
+      unopened.delete(ref);
+      return r;
     },
   };
 

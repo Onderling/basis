@@ -1612,7 +1612,7 @@ const deliveryByMessageId  = { get: (id) => deliveryStateMap.get(id) };
 // at most once per cooldown while the problem persists — informative, not nagging.
 const fallbackOffer = createFallbackOffer({
   // Its memory across restarts: a declined offer stays declined for its cooldown, not until the next reload.
-  io: fallbackOfferStateIo(sealedKeyValue(globalThis.localStorage, { name: 'the fallback offer' })),
+  io: fallbackOfferStateIo(sealedKeyValue(globalThis.localStorage, { name: 'the fallback offer', overwritable: true })),   // a remembered 'no': lost, the offer is simply made again (L1115)
   onOffer: () => {
     // One-tap accept: the button flips the setting IN the bubble. The cooldown still arms on showing
     // (`decline()`), so an ignored offer stays quiet for a week; a tapped one clears the evidence instead.
@@ -3931,8 +3931,9 @@ function launcherPinMuteSignature() {
 let _bootFailure = null;   // the agent boot's error, if it died — painted on the launcher
 // A save refused because the value it would replace could not be opened (L1115): said on the launcher, once heard.
 let _storedRefusal = false;
+let _storedRefusalSaid = false;   // said once a session: dismissed, it does not come back
 onStoredValueRefused(() => {
-  if (_storedRefusal) return;
+  if (_storedRefusal || _storedRefusalSaid) return;
   _storedRefusal = true;
   if (getActiveCircle() == null && _activeTab === 'circles') { try { paintLauncher(); } catch { /* painted at the next visit */ } }
 });
@@ -3985,6 +3986,7 @@ function paintLauncher() {
     mutedMap:  launcherMutedMap,
     bootFailure: _bootFailure,
     storedRefusal: _storedRefusal,
+    onDismissStoredRefusal: () => { _storedRefusal = false; _storedRefusalSaid = true; try { paintLauncher(); } catch { /* the next visit */ } },
     onRetryBoot:  () => window.location.reload(),
     t,
     onOpenCircle: showDetail,

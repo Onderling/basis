@@ -123,3 +123,43 @@ export function boxStores(dataDir) {
     ownDevicesSource: () => buildHouseholdDataSource({ path: paths.ownDevices }, { strategy: shellContentSeal() }),
   };
 }
+
+/** The box's two vault files: the owner root's side and the chat side (the content key, the delegation record). */
+export const BOX_VAULT_FILES = Object.freeze(['vault.json', 'chat-vault.json']);
+/** What says this data folder has held a running box (any one of them): a missing vault file beside it is a loss. */
+const BOX_STATE_MARKS = Object.freeze(['vault.json', 'chat-vault.json', 'registry', 'agent-vaults', 'device-log', 'device-log.json', 'household-items.json', 'settings.json', 'circle-policy.json', 'bot-threads.json']);
+
+/**
+ * A vault file that is MISSING while the data folder holds other state is a failure, not a first start (L1115): a
+ * partly restored backup or an unmounted folder would otherwise read as "nothing stored" and mint new keys over a
+ * household. A folder with none of the marks is a first start. Pure over `exists`, so a test needs no disk.
+ * @param {string} dataDir @param {(p: string) => boolean} exists
+ * @returns {string[]} the vault files that are missing beside other state (empty: go on)
+ */
+export function vaultFilesMissing(dataDir, exists) {
+  const held = BOX_STATE_MARKS.some((m) => exists(path.join(dataDir, m)));
+  return held ? BOX_VAULT_FILES.filter((f) => !exists(path.join(dataDir, f))) : [];
+}
+
+/**
+ * THE STARTS IN A ROW THAT COULD NOT READ THE BOX'S KEYS (L1115): the container restarts a box that stops, so one line
+ * per start would scroll past unseen. A small file counts them, with the first one's time, and every failed start
+ * says the count; a start that comes up clears it.
+ * @param {string} dataDir
+ */
+export function startFailures(dataDir) {
+  const file = path.join(dataDir, 'start-failures.json');
+  const read = () => { try { const v = JSON.parse(readFileSync(file, 'utf8')); return v && typeof v.count === 'number' ? v : null; } catch { return null; } };
+  return {
+    /** One more failed start: `{count, since}`. */
+    note(what, now = new Date()) {
+      const cur = read();
+      const next = { count: (cur?.count ?? 0) + 1, since: cur?.since ?? now.toISOString(), last: what };
+      try { writeFileSync(file, JSON.stringify(next), { mode: 0o600 }); } catch { /* said in the log either way */ }
+      return next;
+    },
+    /** The box came up: the run of failures ends. */
+    clear() { try { rmSync(file, { force: true }); } catch { /* nothing to clear */ } },
+    read,
+  };
+}

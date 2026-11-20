@@ -13,7 +13,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { WebSocketServer } from 'ws';
 import { randomBytes } from 'node:crypto';
 import { AgentIdentity, newAddressChallenge, verifyAddressPossession } from '@onderling/core';
-import { RelayTransport } from '../src/RelayTransport.js';
+import { RelayTransport, RELAY_SEND_RATE } from '../src/RelayTransport.js';
 
 const throwawayVault = () => { const m = new Map(); return { get: async (k) => m.get(k) ?? null, set: async (k, v) => { m.set(k, v); } }; };
 async function waitFor(pred, ms = 20_000) {
@@ -96,9 +96,10 @@ describe('the relay transport paces its own sends', () => {
     relay = ratedRelay();
     await connected();
     const to = 'z'.repeat(43);
-    // the burst (50) goes at once; the next 60 wait for tokens
-    const sends = Array.from({ length: 110 }, (_, n) => tx.sendOneWay(to, { n }).then(() => 'sent', (err) => `refused: ${err?.message ?? err}`));
-    await waitFor(() => relay.sends.length >= 50, 5_000);
+    // the burst goes at once; the next 60 wait for tokens
+    const burst = RELAY_SEND_RATE.burst;
+    const sends = Array.from({ length: burst + 60 }, (_, n) => tx.sendOneWay(to, { n }).then(() => 'sent', (err) => `refused: ${err?.message ?? err}`));
+    await waitFor(() => relay.sends.length >= burst, 5_000);
     for (const ws of relay.sockets) ws.terminate();
     const outcomes = await Promise.race([Promise.all(sends), new Promise((r) => setTimeout(() => r(null), 5_000))]);
     expect(outcomes, 'every waiting send ended within 5 s of the drop').not.toBeNull();
@@ -107,7 +108,7 @@ describe('the relay transport paces its own sends', () => {
     expect(refused.every((o) => /not connected/i.test(o)), refused[0]).toBe(true);
     await waitFor(() => tx.connected, 10_000);
     await new Promise((r) => setTimeout(r, 1_500));
-    const late = relay.sends.filter((x) => x.n >= 50);
+    const late = relay.sends.filter((x) => x.n >= burst + 2);
     expect(late.length, 'nothing that was refused is written after the reconnect').toBe(0);
   }, 40_000);
 });

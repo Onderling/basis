@@ -11016,6 +11016,10 @@
       "notify_policy_ask": {
         "text": "Notify: my open question in the room",
         "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_role": {
+        "text": "Notify: my role in a circle changed",
+        "doc": "A setting's label (projected from the parameter register)."
       }
     },
     "opt": {

@@ -11013,6 +11013,10 @@
       "notify_policy_ask": {
         "text": "Melding: mijn open vraag in de ruimte",
         "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_role": {
+        "text": "Melding: mijn rol in een kring veranderde",
+        "doc": "A setting's label (projected from the parameter register)."
       }
     },
     "opt": {

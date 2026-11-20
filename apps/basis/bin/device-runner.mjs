@@ -232,8 +232,9 @@ async function stopOnUnreadable(line, what) {
   console.error(`${line} Failed starts in a row: ${run.count}, since ${run.since}.`);
   if (run.count >= Number(BOX_START_FAILURES_BEFORE_HOLD)) {
     console.error(`device-runner: STOPPED TRYING after ${run.count} starts in a row that could not read this box's keys. Nothing was changed and nothing runs. Fix the data folder (the missing or damaged file, the right mount) or restore the box from the phrase (--enrol), then restart the container. Waiting.`);
-    setInterval(() => {}, 1 << 30);   // stay up: the container's restart policy would otherwise loop
-    await new Promise(() => {});
+    // stay up, idle: the container's restart policy would otherwise loop. ONE timeout, the longest a timer takes (about
+    // 24 days), no clock: when it ends the box exits once, restarts, counts one more and holds again
+    await new Promise((resolve) => { setTimeout(resolve, 2 ** 31 - 1); });
   }
   process.exit(1);
 }

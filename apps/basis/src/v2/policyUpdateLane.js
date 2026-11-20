@@ -310,8 +310,10 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
  */
 export async function saveCircleSettings({ lane, circleId, policy } = {}) {
   if (!lane || typeof lane.state !== 'function' || !policy || typeof policy !== 'object') return { ok: false, error: 'not-stated' };
+  // the held settings: none held yet is `{}`; a read that FAILED is not "none" (a patch merged over nothing would be
+  // stated as the circle's whole settings), so it is not a save
   let current = {};
-  try { current = (typeof lane.readPolicy === 'function' ? await lane.readPolicy(circleId) : null) ?? {}; } catch { current = {}; }
+  try { current = (typeof lane.readPolicy === 'function' ? await lane.readPolicy(circleId) : null) ?? {}; } catch { return { ok: false, error: 'not-stated' }; }
   const { policyPending: _pending, ...held } = current;
   const merged = mergeCirclePolicy(held, policy);
   let statement = null;

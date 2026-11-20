@@ -44,6 +44,19 @@ describe('a settings save', () => {
     expect(stored.get('c').features.tasks).toBe(false);
   });
 
+  it('a read of the held settings that fails: not saved (a patch is never stated over nothing)', async () => {
+    const said = [];
+    const lane = makeCirclePolicyLane({
+      emitter: () => async (u) => { said.push(u.policy); return { body: { hash: 'h1' }, sig: 's' }; },
+      headStore: makePolicyHeadStore(memIo()),
+      readPolicy: async () => { throw new Error('sealed store unreadable'); },
+      writePolicy: async () => {},
+      adminsOf: async () => new Set(),
+    });
+    expect(await saveCircleSettings({ lane, circleId: 'c', policy: { features: { chat: false } } })).toEqual({ ok: false, error: 'not-stated' });
+    expect(said).toEqual([]);
+  });
+
   it('no lane (the agent not up yet): not saved', async () => {
     expect(await saveCircleSettings({ lane: null, circleId: 'c', policy: {} })).toEqual({ ok: false, error: 'not-stated' });
   });

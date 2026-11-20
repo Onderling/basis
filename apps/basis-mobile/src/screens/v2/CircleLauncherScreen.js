@@ -123,7 +123,7 @@ import {
   circleReplyText, scopeCatalogueToApps,
   // B (circle bot) — dispatch primitives to run an interpreted command in the circle.
   parseInput, resolveDispatch, runDispatch, scopeReadyDispatch, executeBulkDispatch,
-  statingPolicyStore,
+  statingPolicyStore, saveCircleSettings,
   // profile-update propagation — the silent "pull-me" entry kind (the roster PULL trigger).
 } from '@onderling-app/basis';
 // B (circle bot) — v2 free-text→LLM→command surface (shared with web). Deep-imported like the other
@@ -1189,8 +1189,8 @@ export default function CircleLauncherScreen({
       spineGate: bundle?.agent?.spineGate ?? null,   // spine acts only from the point (as every other binding)
       // an enacted settings change: written here, then stated on the lane so every member's device applies it (this
       // binding used to write the store only: an approved settings proposal enacted on the phone reached nobody)
-      setPolicy: (cid, patch) => policyStore.update(cid, patch),
-      statePolicy: (cid, meta) => (circlePolicyLane ? circlePolicyLane.state(cid, meta) : null),
+      // a decided change is stated first and written only when stated (the settings save's own rule, web alike)
+      saveSettings: (cid, patch, meta) => saveCircleSettings({ lane: circlePolicyLane, circleId: cid, policy: patch, proposalId: meta?.proposalId ?? null }),
       policyVersionOf: (cid) => (circlePolicyLane ? circlePolicyLane.headVersion(cid) : 0),   // a rules change is stamped with it
     });
   }, [bundle, eventLog, policyStore, circlePolicyLane]);

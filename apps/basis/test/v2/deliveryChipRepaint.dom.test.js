@@ -110,3 +110,16 @@ describe('paintDeliveryChip', () => {
     expect(chipState(root)).toBe('maybe-received');
   });
 });
+
+describe('a circle line that still waits for members without an address', () => {
+  const tv = (key, vars) => (vars ? `${key}|${vars.reached}/${vars.of}` : key);
+  it('says how many it was sent to while someone waits, and the rung\'s words once nobody does', () => {
+    const { root } = mountBubble('m1', 'maybe-received');
+    paintDeliveryChip(root, 'm1', 'stored', { tr: tv, waiting: { sent: 9, of: 15 } });
+    const chip = () => root.querySelector('.circle-view__bubble-delivery');
+    expect(chip().getAttribute('aria-label')).toBe('circle.chat.delivery.on_its_way|9/15');
+    expect(chipState(root), 'the rung itself is unchanged').toBe('stored');
+    paintDeliveryChip(root, 'm1', 'stored', { tr: tv, waiting: null });
+    expect(chip().getAttribute('aria-label')).toBe('circle.chat.delivery.stored');
+  });
+});

@@ -110,9 +110,9 @@ describe('messaging on the phone — a circle round trip and a contact round tri
   });
 
   it('switched off later, a member the phone never answered: his next message is a request, shown by his circle name', async () => {
-    // the choice is on the persona's card in the person's editor (the header avatar): off = "ask first, like anyone else"
+    // the choice is on the persona's card in the person's editor (the persona button): off = "ask first, like anyone else"
     await backToLauncher();
-    await tapSoon(by.id('header-avatar'), 20_000);
+    await tapSoon(by.id('persona-button'), 20_000);
     await soon(by.id('circle-aboutme-panel'), 20_000);
     const off = by.id('mij-first-contact-default-circleMembersMayWrite-false');
     await waitFor(element(off)).toBeVisible().whileElement(by.id('mij-scroll')).scroll(300, 'down');

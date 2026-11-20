@@ -29,7 +29,7 @@ const turns = (page) => page.locator('.circle-vandaag-plus__turn');
 const openPlus = async (page) => {
   await page.locator('[data-tab="screens"]').first().click().catch(() => {});
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await expect(page.locator('.circle-vandaag-plus__line')).toBeVisible();
 };
 const say = async (page, line) => {
@@ -42,9 +42,10 @@ const lastAnswer = (page) => page.locator('.circle-vandaag-plus__turn--assistant
 const asked = (page) => page.evaluate(() => window.__onderlingTestModel.requests ?? []);
 /** everything the model was handed BEFORE this turn's own line: the kept turns */
 const historyOf = (req) => JSON.stringify((req?.messages ?? []).slice(0, -1));
-/** tick exactly one self in the header switcher */
+/** tick exactly one self in the switcher (the persona panel's "Laat zien als") */
 const only = async (page, selfId) => {
-  await page.locator('.cc-header-avatar__button').click();
+  await page.locator('.cc-persona-button__button').click();
+  await page.locator('.cc-persona-panel__show-as').click();
   const tick = (id) => page.locator(`.cc-persona-switcher__row[data-self="${id}"] .cc-persona-switcher__tick`);
   if ((await tick(selfId).getAttribute('aria-pressed')) !== 'true') await tick(selfId).click();
   for (const row of await page.locator('.cc-persona-switcher__row').all()) {

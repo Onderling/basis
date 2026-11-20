@@ -20,7 +20,7 @@
  */
 
 /** The basis manifest's top-level tabs that remain painted, in the manifest's own order (for tests). */
-export const ALPHA_TABS = Object.freeze(['screens', 'circles', 'contacten', 'mij']);
+export const ALPHA_TABS = Object.freeze(['screens', 'circles', 'contacten']);
 
 /** Circle view modes the alpha paints. One mode ⇒ no pill at all. */
 export const ALPHA_VIEW_MODES = Object.freeze(['chat']);

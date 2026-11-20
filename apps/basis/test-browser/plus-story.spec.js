@@ -25,7 +25,7 @@ const SCRIPT = [
   { when: 'zet dat morgen om 10', toolCall: { id: 'addEvent', args: { title: 'sleutel ophalen bij de buren' } } },
 ];
 
-const openPlus = async (page) => { await page.locator('.circle-vandaag__plus').click(); };
+const openPlus = async (page) => { await page.locator('.circle-vandaag__plus').dblclick(); };
 const say = async (page, line) => {
   const before = await page.locator('.circle-vandaag-plus__turn').count();
   await page.locator('.circle-vandaag-plus__line').fill(line);

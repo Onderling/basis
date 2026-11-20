@@ -24,14 +24,14 @@ describe('no own model', () => {
     const d = createPlusDoor({ t, threads: threads(), threadId: 'own:me' });
     const r = await d.read('wat kan je allemaal?');
     expect(r.done).toContain('circle.vandaag.plus_no_model');
-    for (const k of ['circle.tab.mij', 'circle.settings_home.title', 'circle.settings_home.appearance', 'circle.userLlm.title']) expect(r.done).toContain(k);
+    for (const k of ['circle.settings_home.title', 'circle.settings_home.appearance', 'circle.userLlm.title']) expect(r.done).toContain(k);
     expect(r.error ?? null).toBe(null);
   });
   it('the way to the setting is in both languages, from the screens\' own labels', () => {
     for (const bundle of [nl, en]) {
       for (const k of ['circle.vandaag.plus_no_model', 'circle.vandaag.plus_model_unreachable', 'circle.vandaag.plus_route_none',
         'circle.vandaag.plus_route_confidential', 'circle.vandaag.plus_route_plain', 'circle.vandaag.plus_route_local', 'circle.vandaag.plus_route_confidential_asserted',
-        'circle.tab.mij', 'circle.settings_home.title', 'circle.settings_home.appearance', 'circle.userLlm.title']) {
+        'circle.settings_home.title', 'circle.settings_home.appearance', 'circle.userLlm.title']) {
         expect(textOf(bundle, k), k).toBeTruthy();
       }
     }

@@ -6,9 +6,11 @@ import { renderCircleMyData } from '../web/v2/circleMyData.js';
 import { settingsGroupFor } from '../src/v2/settingsHome.js';
 import { basisManifest as settingsManifest } from '../manifest.js';
 // the Weergave group's sections live on its own screen (under the gear), not the old My data page
-const WEERGAVE = settingsGroupFor(settingsManifest, 'appearance').sections.map((x) => x.id);
+// what Weergave held before the regroup now spans Weergave, Meldingen and Assistent: the tests below paint all three
+const WEERGAVE = ['appearance', 'notifications', 'assistant'].flatMap((g) => settingsGroupFor(settingsManifest, g).sections.map((x) => x.id));
 const CONNECTION = settingsGroupFor(settingsManifest, 'connection').sections.map((x) => x.id);
-const DEVICES_KEYS = settingsGroupFor(settingsManifest, 'devices-keys').sections.map((x) => x.id);
+// the device acts (Apparaten), the way back (Herstel) and where the data lives (Mijn gegevens' pod)
+const DEVICES_KEYS = ['devices', 'recovery', 'my-data'].flatMap((g) => settingsGroupFor(settingsManifest, g).sections.map((x) => x.id));
 
 const t = (k, v) => (v ? `${k}:${JSON.stringify(v)}` : k);
 
@@ -86,6 +88,33 @@ describe('renderCircleMyData', () => {
     expect(el.querySelector('.cc-mydata__backup'), 'the export-only backup is gone').toBeNull();
     expect(onViewMnemonic).toHaveBeenCalled();
     expect(onRestore).toHaveBeenCalled();
+  });
+
+  it('the pod: signed in, "Pod loskoppelen" disconnects it (web ≡ phone, 2026-11-20); signed out, no such button', () => {
+    const onSignOut = vi.fn();
+    const on = renderCircleMyData(document.createElement('div'), { only: ['storage'], t, podStatus: { signedIn: true, webid: 'w' }, onSignOut });
+    const out = on.querySelector('.cc-mydata__signout');
+    expect(out?.textContent).toBe('circle.mydata.pod_signout');
+    out.click();
+    expect(onSignOut).toHaveBeenCalled();
+    expect(renderCircleMyData(document.createElement('div'), { only: ['storage'], t, podStatus: { signedIn: false }, onSignOut }).querySelector('.cc-mydata__signout')).toBeNull();
+  });
+
+  it('link a bot: the pasted /koppel link goes to the host (it opens the identity-link sheet); no bot link says so', () => {
+    const onLinkBot = vi.fn((text) => text.includes('#koppel-bot='));
+    const el = renderCircleMyData(document.createElement('div'), { only: ['bot-link'], t, onLinkBot });
+    const open = el.querySelector('.cc-mydata__link-bot');
+    expect(open.textContent).toBe('circle.identityLink.open');
+    open.click();
+    const input = el.querySelector('.cc-mydata__link-bot-input');
+    input.value = 'hallo';
+    el.querySelector('.cc-mydata__link-bot-go').click();
+    expect(el.querySelector('.cc-mydata__link-bot-note').textContent).toBe('circle.identityLink.not_a_link');
+    input.value = 'https://app.example/#koppel-bot=abc';
+    el.querySelector('.cc-mydata__link-bot-go').click();
+    expect(onLinkBot).toHaveBeenLastCalledWith('https://app.example/#koppel-bot=abc');
+    expect(el.querySelector('.cc-mydata__link-bot-note').textContent).toBe('');
+    expect(renderCircleMyData(document.createElement('div'), { only: ['bot-link'], t }).querySelector('.cc-mydata__link-bot')).toBeNull();
   });
 
   it('add-a-device: the enroll action renders when wired and fires its callback', () => {

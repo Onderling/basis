@@ -51,7 +51,7 @@ export function plusNoModelAnswer({ t }) {
 
 /** The way to the person's own model setting, in the screens' own labels. */
 export function ownModelSettingPath({ t }) {
-  return ['circle.tab.mij', 'circle.settings_home.title', 'circle.settings_home.appearance', 'circle.userLlm.title'].map((k) => t(k)).join(' → ');
+  return ['circle.settings_home.title', 'circle.settings_home.appearance', 'circle.userLlm.title'].map((k) => t(k)).join(' → ');
 }
 
 /**

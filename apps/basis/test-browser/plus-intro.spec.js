@@ -18,7 +18,7 @@ const reload = async (page) => { await page.waitForTimeout(3000); await page.got
 const openPlus = async (page) => {
   await page.locator('[data-tab="vandaag"]').first().click().catch(() => {});
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await expect(page.locator('.circle-vandaag-plus__line')).toBeVisible();
 };
 

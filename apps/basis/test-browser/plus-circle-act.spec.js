@@ -42,7 +42,7 @@ test('"zet melk op de boodschappen" in the "+" lands on the one circle that has 
   // the "+" line, on Vandaag
   await page.locator('[data-tab="screens"]').first().click();
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await page.locator('.circle-vandaag-plus__line').fill('zet melk op de boodschappen');
   await page.locator('.circle-vandaag-plus__line').press('Enter');
   await expect(page.locator('.circle-vandaag-plus__card'), 'one circle holds the list: no card, it runs').toHaveCount(0);

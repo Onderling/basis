@@ -34,10 +34,10 @@ describe('Me — the identity fields wait for the profile', () => {
   });
 });
 
-describe('Me — clears the status bar', () => {
-  it('pads its top by the safe-area inset', () => {
-    expect(ME).toMatch(/useSafeAreaInsets\(\)/);
-    expect(ME).toMatch(/paddingTop: insets\?\.top/);
+describe('Me — the short view sits in the persona panel (a sheet from the bottom), never under the status bar', () => {
+  it('is painted inside PersonaPanelSheet, not as a full screen', () => {
+    expect(ME).not.toMatch(/paddingTop: insets\?\.top/);
+    expect(read('../src/screens/v2/CircleLauncherScreen.js')).toMatch(/<PersonaPanelSheet[\s\S]{0,400}<CircleProfileScreen/);
   });
 });
 

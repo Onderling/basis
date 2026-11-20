@@ -14,6 +14,8 @@ export function renderSharedWithMe(container, {
   entries = [],
   t,
   onBack,
+  // the tab it returns to, named (`settingsBackFor`); it opens from Vandaag's "Wacht op jou"
+  backLabel = null,
   onOpen,
   loading = false,
 } = {}) {
@@ -24,7 +26,7 @@ export function renderSharedWithMe(container, {
   const back = document.createElement('button');
   back.type = 'button';
   back.className = 'cc-btn cc-btn--quiet shared-with-me__back';
-  back.textContent = tr('circle.back_mydata');
+  back.textContent = backLabel ?? tr('circle.back_to', { place: tr('circle.tab.vandaag') });
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);
 

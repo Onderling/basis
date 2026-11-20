@@ -1,5 +1,6 @@
 /**
- * basis-mobile v2 — the person's settings behind the gear on Mij (RN; web: circleSettingsHome.js): the home lists the
+ * basis-mobile v2 — the person's settings behind the settings button (the gear beside the persona button, on every
+ * tab) (RN; web: circleSettingsHome.js): the home lists the
  * declared groups and, last, the door to the circles' own settings; the chooser lists the person's circles, each
  * opening that circle's settings screen. What is listed and in which order is the manifest's (`settingsHomeFor`).
  */
@@ -14,11 +15,11 @@ import { FAB_CLEARANCE } from './fab.js';
 import { versionLine } from '../../../../basis/src/v2/versionLine.js';
 import Constants from 'expo-constants';
 
-export default function SettingsHomeScreen({ onBack, onOpenGroup, onOpenPerCircle, onOpenDoor }) {
+export default function SettingsHomeScreen({ onBack, backLabel = null, onOpenGroup, onOpenPerCircle, onOpenDoor, onAdvanced }) {
   const styles = useStyles();
   const { groups, perCircle, doors } = settingsHomeFor(basisManifest);
   return (
-    <Page title={t('circle.settings_home.title')} onBack={onBack} testID="settings-home">
+    <Page title={t('circle.settings_home.title')} onBack={onBack} backLabel={backLabel} testID="settings-home">
       {groups.map((g) => <Door key={g.id} label={t(g.labelKey)} onPress={() => onOpenGroup?.(g.id)} testID={`settings-group-${g.id}`} />)}
       {perCircle && typeof onOpenPerCircle === 'function'
         ? <Door label={t(perCircle.labelKey)} onPress={onOpenPerCircle} testID="settings-per-circle" />
@@ -27,6 +28,8 @@ export default function SettingsHomeScreen({ onBack, onOpenGroup, onOpenPerCircl
       {typeof onOpenDoor === 'function'
         ? doors.map((d) => <Door key={d.id} label={t(d.labelKey)} onPress={() => onOpenDoor(d)} testID={`settings-door-${d.id}`} />)
         : null}
+      {/* Advanced (raw parameter keys and values: a developer tool) at the foot, only behind the developer switch */}
+      {typeof onAdvanced === 'function' ? <Door label={t('circle.advanced.title')} onPress={onAdvanced} testID="settings-advanced" /> : null}
       {/* the version this build was made from (its tree's exact clean tag, through the build; none → dev) — web's line */}
       <Text style={styles.fact} testID="settings-version">{versionLine(Constants.expoConfig?.extra?.appVersion ?? null, t)}</Text>
     </Page>
@@ -44,12 +47,12 @@ export function CircleSettingsChooserScreen({ circles = [], onBack, onOpenCircle
   );
 }
 
-function Page({ title, onBack, testID, children }) {
+function Page({ title, onBack, backLabel = null, testID, children }) {
   const styles = useStyles();
   return (
     <ScrollView style={styles.wrap} contentContainerStyle={styles.content} testID={testID}>
       <View style={styles.header}>
-        {typeof onBack === 'function' && <Pressable onPress={onBack} testID="settings-back"><Text style={styles.back}>{t('circle.mydata.back')}</Text></Pressable>}
+        {typeof onBack === 'function' && <Pressable onPress={onBack} testID="settings-back"><Text style={styles.back}>{backLabel ?? t('circle.settings_home.back')}</Text></Pressable>}
         <Text style={styles.title}>{title}</Text>
       </View>
       {children}

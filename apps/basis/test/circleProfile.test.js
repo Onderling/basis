@@ -9,7 +9,7 @@ import { renderCircleMyData } from '../web/v2/circleMyData.js';
 import { renderSettingsHome } from '../web/v2/circleSettingsHome.js';
 import { settingsGroupFor } from '../src/v2/settingsHome.js';
 import { basisManifest as settingsManifest } from '../manifest.js';
-const WEERGAVE = settingsGroupFor(settingsManifest, 'appearance').sections.map((x) => x.id);
+const WEERGAVE = settingsGroupFor(settingsManifest, 'notifications').sections.map((x) => x.id);   // the week switch's group (Meldingen since 2026-11-20)
 const MY_DATA = settingsGroupFor(settingsManifest, 'my-data').sections.map((x) => x.id);
 
 const t = (k, v) => (v ? `${k}:${JSON.stringify(v)}` : k);
@@ -18,15 +18,15 @@ const identityBlock = (content) => ({ blockId: 'mij-identityLine-0', type: 'iden
 const agentsBlock = (items) => ({ blockId: 'mij-agents-1', type: 'agents', status: 'ok', titleKey: 'circle.recipe.block.agents', content: { items } });
 
 describe('renderCircleProfile — the declared screen', () => {
-  it('the name is the title, the readings one line under it, "Edit" opens the person\'s own editor', () => {
+  it('the name is the title (no readings under it: they went 2026-11-20), "Edit" opens the person\'s own editor', () => {
     const onBlockAction = vi.fn();
     const el = renderCircleProfile(document.createElement('div'), {
       t, onBlockAction,
-      blocks: [identityBlock({ name: 'Frits', readings: [{ key: 'online', on: true }, { key: 'unread', count: 2 }] }), agentsBlock([])],
+      blocks: [identityBlock({ name: 'Frits' }), agentsBlock([])],
     });
     expect(el.querySelectorAll('.cc-profile__title')).toHaveLength(1);
     expect(el.querySelector('.cc-profile__title').textContent).toBe('Frits');
-    expect(el.querySelector('.circle-screen__identity-readings').textContent).toBe('circle.profile.reading_online · circle.profile.reading_unread:{"count":2}');
+    expect(el.querySelector('.circle-screen__identity-readings')).toBeNull();
     el.querySelector('.circle-screen__identity-edit').click();
     expect(onBlockAction).toHaveBeenCalledWith({ kind: 'edit-me' });
   });
@@ -35,7 +35,7 @@ describe('renderCircleProfile — the declared screen', () => {
     const onBlockAction = vi.fn();
     const el = renderCircleProfile(document.createElement('div'), {
       t, onBlockAction,
-      blocks: [identityBlock({ name: 'Frits', readings: [] }), agentsBlock([{ kind: 'device', label: null, here: true }, { kind: 'bot', label: 'Huishoudbot' }])],
+      blocks: [identityBlock({ name: 'Frits' }), agentsBlock([{ kind: 'device', label: null, here: true }, { kind: 'bot', label: 'Huishoudbot' }])],
     });
     const rows = [...el.querySelectorAll('.circle-screen__agents-row')];
     expect(rows.map((r) => r.textContent)).toEqual(['circle.profile.agent_here', 'circle.profile.agent_bot:{"label":"Huishoudbot"}']);
@@ -43,14 +43,11 @@ describe('renderCircleProfile — the declared screen', () => {
     expect(onBlockAction).toHaveBeenCalledWith({ kind: 'open-my-data' });
   });
 
-  it('the gear is the one settings door; Advanced only behind the developer switch; no hand-listed section', () => {
-    const onSettings = vi.fn();
-    const el = renderCircleProfile(document.createElement('div'), { t, onSettings, blocks: [] });
-    el.querySelector('.cc-profile__gear').click();
-    expect(onSettings).toHaveBeenCalled();
+  it('the persona panel\'s short view holds no settings door and no Advanced (both behind the settings button); no hand-listed section', () => {
+    const el = renderCircleProfile(document.createElement('div'), { t, onSettings: vi.fn(), onAdvanced: vi.fn(), blocks: [] });
+    expect(el.querySelector('.cc-profile__gear')).toBeNull();
     expect(el.querySelector('.cc-profile__mydata'), 'the old My data door is gone').toBeNull();
     expect(el.querySelector('.cc-profile__advanced')).toBeNull();
-    expect(renderCircleProfile(document.createElement('div'), { t, onAdvanced: () => {} }).querySelector('.cc-profile__advanced')).not.toBeNull();
     for (const gone of ['.cc-profile__section', '.cc-profile__availability', '.cc-profile__shared-with-me', '.cc-profile__blocked', '.cc-profile__version', '.cc-profile__handle']) {
       expect(el.querySelector(gone), gone).toBeNull();
     }
@@ -101,17 +98,19 @@ describe('renderProfileBasics — location', () => {
 });
 
 describe('My data — the doors Mij gave up', () => {
-  it('the log report is a door in Mijn gegevens; it fires its own view', () => {
-    const logReport = vi.fn();
-    const el = renderCircleMyData(document.createElement('div'), { t, only: MY_DATA, doors: { logReport } });
-    const door = el.querySelector('[data-section="log-report"] .cc-settings__door--log-report');
+  it('the log report is a door at the foot of the settings home, right after Feedback geven; it fires its own view', () => {
+    const onOpenDoor = vi.fn();
+    const el = renderSettingsHome(document.createElement('div'), { t, onOpenDoor });
+    const ids = [...el.querySelectorAll('.cc-settings__door-row')].map((b) => b.dataset.id);
+    expect(ids.slice(ids.indexOf('feedback'), ids.indexOf('feedback') + 2)).toEqual(['feedback', 'log-report']);
+    const door = el.querySelector('.cc-settings__door-row--log-report');
     expect(door.textContent).toBe('circle.profile.logReport');
     door.click();
-    expect(logReport).toHaveBeenCalled();
-    expect(renderCircleMyData(document.createElement('div'), { t, only: MY_DATA }).querySelector('.cc-settings__door--log-report')).toBeNull();
+    expect(onOpenDoor).toHaveBeenCalledWith(expect.objectContaining({ id: 'log-report', target: { kind: 'nav', to: 'logReport' } }));
+    expect(renderCircleMyData(document.createElement('div'), { t, only: MY_DATA, doors: { logReport: vi.fn() } }).querySelector('.cc-settings__door--log-report')).toBeNull();
   });
 
-  it('the week-overview switch is on the Weergave screen, as a real switch, and on no other screen', () => {
+  it('the week-overview switch is on the Meldingen screen, as a real switch, and on no other screen', () => {
     const onToggle = vi.fn();
     const el = renderCircleMyData(document.createElement('div'), { t, only: WEERGAVE, weekOverview: { on: false, onToggle } });
     const btn = el.querySelector('.cc-profile__week-toggle');
@@ -136,15 +135,14 @@ describe('the version line (2026-09-19), at the foot of Instellingen', () => {
 });
 
 describe('renderCircleProfile — the Me actions, from the declaration (share my contact 2026-09-19 · scan 2026-10-09)', () => {
-  it('paints the declared Me actions (share-contact, scan) and hands the chosen id back; none without the seam', () => {
+  it('paints the declared Me action (share-contact; Scan is in the "+") and hands the chosen id back; none without the seam', () => {
     const onMeAction = vi.fn();
     const el = renderCircleProfile(document.createElement('div'), { t, onMeAction });
     const link = el.querySelector('.cc-profile__share-contact');
     expect(link.textContent).toBe('circle.profile.share_contact');
     link.click();
     expect(onMeAction).toHaveBeenCalledWith('share-contact');
-    el.querySelector('.cc-profile__scan').click();
-    expect(onMeAction).toHaveBeenCalledWith('scan');
+    expect(el.querySelector('.cc-profile__scan')).toBeNull();
     expect(renderCircleProfile(document.createElement('div'), { t }).querySelector('.cc-profile__share-contact')).toBeNull();
   });
 });

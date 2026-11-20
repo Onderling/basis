@@ -131,7 +131,7 @@ export {
 // this the wake rule existed twice and was held together by a fitness test.
 export {
   ENTRY_KINDS, VIEWER_FACING_SYSTEM_KINDS, LANE, RETAIN, UNKNOWN_KIND, RETENTION_DEFAULTS,
-  entryKind, isSystemKind, isAuditKind, retentionOf, retentionWindowFor,
+  entryKind, isSystemKind, isAuditKind, retentionOf, retentionOfEntry, RECORD_STATEMENTS, retentionWindowFor,
   conversationKinds, kindWakes, governanceWakes,
   SIGNS, SUBJECT, ACCEPTS, SYNC, bindingOf,   // the binding columns — declared 2026-09-15, read by a fitness test until the rails read them
   isMirroredKind,   // what the person's own history mirror keeps (docs/decisions.md 2026-11-13)

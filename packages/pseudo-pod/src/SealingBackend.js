@@ -44,6 +44,10 @@
  *     hands over.
  */
 
+/** The refs whose record would not open, per storage name, else per backend object (L1115). */
+const UNOPENED = new WeakMap();
+const UNOPENED_BY_NAME = new Map();
+
 /**
  * Wrap a StorageBackend so everything written through it is sealed.
  *
@@ -65,10 +69,6 @@
  * @param {string} [a.markScope]  the storage's own name, so the refusal outlives a new wrapper over the same storage
  * @returns {object} the same port, sealed
  */
-/** The refs whose record would not open, per storage name, else per backend object (L1115). */
-const UNOPENED = new WeakMap();
-const UNOPENED_BY_NAME = new Map();
-
 export function createSealingBackend({ backend, getStrategy, onWarn = null, markScope = null } = {}) {
   if (!backend || typeof backend.put !== 'function' || typeof backend.get !== 'function') {
     throw new Error('createSealingBackend: a StorageBackend (put/get/list) is required');

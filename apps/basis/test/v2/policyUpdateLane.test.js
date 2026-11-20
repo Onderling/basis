@@ -137,7 +137,7 @@ describe('makeCirclePolicyLane — a device behind the lane (L144)', () => {
       headStore, readPolicy: async () => local, writePolicy: async (c, p) => { local = p; }, adminsOf: async () => admins,
     });
     lane.useRail(rail(onLane));
-    await expect(lane.state('c')).rejects.toThrow('rail down');
+    expect(await lane.state('c')).toBeNull();   // a failed statement answers null, never 'stated'
     expect(local).toEqual({ storagePosture: 'p2' });   // not the lane's p0 that apply() wrote in between
   });
 });

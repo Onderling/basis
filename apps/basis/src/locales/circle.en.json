@@ -2967,6 +2967,10 @@
         "doc": "§4 — storage-policy bridge: pinboard one-way downgrade guard."
       }
     },
+    "not_stated": {
+      "text": "Not saved: the change could not be sent to the circle. Nothing changed here. Try again.",
+      "doc": "A circle settings save whose signed statement to the circle failed: nothing is written on this device, so it never differs from the other members'."
+    },
     "feat": {
       "chat": {
         "text": "Chat",

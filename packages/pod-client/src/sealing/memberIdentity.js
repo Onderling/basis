@@ -29,12 +29,17 @@ export function createMemberSealingIdentity({ store, key = DEFAULT_KEY } = {}) {
 
   /** Load the member's sealing keypair, generating + persisting one on first use. Returns {publicKey, privateKey, recipientId}. */
   async function ensure() {
-    const existing = await store.get(key);
+    const existing = await store.get(key);   // a read that fails throws through: never "absent"
+    // generate ONLY when nothing is stored: a value that is there but is not a keypair is not replaced (it would make
+    // every sealed copy to this member unreadable); it throws with the code the Basis shells say in words (L1115)
+    if (existing == null || existing === '') {
+      const kp = generateKeypair();
+      await store.set(key, JSON.stringify(kp));
+      return kp;
+    }
     const parsed = coerce(existing);
     if (parsed) return parsed;
-    const kp = generateKeypair();
-    await store.set(key, JSON.stringify(kp));
-    return kp;
+    throw Object.assign(new Error('The sealing key on this device could not be read; nothing was changed'), { code: 'key-unreadable', what: 'sealing-identity' });
   }
 
   return {

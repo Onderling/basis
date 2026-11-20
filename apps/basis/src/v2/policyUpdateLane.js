@@ -136,13 +136,15 @@ export function makePolicyUpdateEmitter({ rail, fan = null, membershipUpToFor = 
       let upTo = null;
       try { upTo = typeof membershipUpToFor === 'function' ? (membershipUpToFor(groupId) ?? null) : null; } catch { upTo = null; }
       // `contentUpTo`: the content lanes' tips as THIS device holds them — what they cover was made before this change and
-      // keeps the settings before it (contentLine.js). Unreadable: an empty line, so nothing is put behind it.
-      let contentUpTo = { items: [], chat: [] };
+      // keeps the settings before it (contentLine.js). A lane it cannot read FAILS the change: an empty line would put
+      // nothing behind it and take back the whole history the switch covers (chat never ages out).
+      let contentUpTo = null;
       try {
         const c = typeof contentUpToFor === 'function' ? contentUpToFor(groupId) : null;
-        const tips = (xs) => (Array.isArray(xs) ? xs.filter((h) => typeof h === 'string' && h) : []);
-        if (c) contentUpTo = { items: tips(c.items), chat: tips(c.chat) };
-      } catch { contentUpTo = { items: [], chat: [] }; }
+        const tips = (xs) => xs.filter((h) => typeof h === 'string' && h);
+        if (c && Array.isArray(c.items) && Array.isArray(c.chat)) contentUpTo = { items: tips(c.items), chat: tips(c.chat) };
+      } catch { contentUpTo = null; }
+      if (!contentUpTo) return null;
       res = await rail.append(groupId, { kind: POLICY_UPDATE_KIND, subject: `policy-v${v}`, payload: { policy, version: v, contentUpTo, ...(typeof proposalId === 'string' && proposalId ? { proposalId } : {}), ...(typeof upTo === 'string' && upTo ? { membershipUpTo: upTo } : {}) } });
     } catch { res = null; }
     if (!res) return null;

@@ -21,7 +21,7 @@ const KEY_PREFIX = 'cc.screenBlocksCache.';
  * same over AsyncStorage.
  */
 export function sealedScreenBlocksCacheIo(storage) {
-  const kv = sealedKeyValue(storage, { name: 'the page blocks cache' });
+  const kv = sealedKeyValue(storage, { name: 'the page blocks cache', overwritable: true })   // a cache: rebuilt from the stores it shows (L1115);
   return {
     load: async (screenId) => {
       try {

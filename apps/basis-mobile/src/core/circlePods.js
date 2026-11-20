@@ -14,7 +14,7 @@
 import { onPolicyPostureChange } from '../../../basis/src/v2/circlePolicyStore.js';
 import { VaultAsyncStorage } from '@onderling/react-native/identity/VaultAsyncStorage';
 import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
-import { sealedLocalBackend, sealedLocalVault } from '../../../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
+import { sealedNamedBackend, circleStorageName, sealedLocalVault } from '../../../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
 import { PodClient, generateKeypair as podGenerateKeypair, SolidOidcAuth,
   createSealedPodDataSource, podGroupPrefix,
@@ -242,7 +242,7 @@ export function getActiveRealPodRouting() {
 function makeCirclePodClient(circleId) {
   const deviceId = `circle-${circleId}`;
   const backend = asyncStorageRef
-    ? sealedLocalBackend(createAsBackend({ AsyncStorage: asyncStorageRef, scope: `cc-circle-${circleId}` }))
+    ? sealedNamedBackend(circleStorageName.store(circleId), (scope) => createAsBackend({ AsyncStorage: asyncStorageRef, scope }))
     : createMemoryBackend();
   // versioning: displaced bytes (overwrites · peer-updates · dropped
   // concurrent forks · deletes) land in `versions/` on the SAME backend —
@@ -666,7 +666,7 @@ export async function provisionCircleMedium(circleId) {
     if (typeof console !== 'undefined') console.info(`[cache-medium] ${circleId}: posture=${JSON.stringify(policy?.pod ?? null)} → ${mode}`);
     if (mode !== 'cache') return null;   // no-pod → shared local backing
     const localBackend = asyncStorageRef
-      ? sealedLocalBackend(createAsBackend({ AsyncStorage: asyncStorageRef, scope: `cc-circle-cache-${circleId}` }))
+      ? sealedNamedBackend(circleStorageName.cache(circleId), (scope) => createAsBackend({ AsyncStorage: asyncStorageRef, scope }))
       : createMemoryBackend();
     const medium = createCircleCacheMedium({
       localBackend,

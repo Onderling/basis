@@ -191,6 +191,36 @@ same name answers, so gating on it there would fail good releases. It runs when 
 the upgrade through Caddy are proven from OUTSIDE after a bring-up:
 `node deploy/smoke/smoke.mjs wss://<relay-domain>`.
 
+## When the assistant cannot read its keys (it stops, and says so)
+
+The assistant (`apps/basis/bin/device-runner.mjs`) never makes a new key over one it could not read (ledger L1115). At a
+start it stops, writing nothing, when:
+
+- a key or marker in its vaults is there but will not read (a wrong passphrase, a damaged file, a storage error):
+  `device-runner: a key on this box could not be read (<which>); nothing was changed. Stopping. ...`;
+- `vault.json` or `chat-vault.json` is MISSING in a data folder that ran a box before: a backup put back without them.
+  "Ran a box before" is `box-started` (written last at a start that came up) or, for a box that ran before that mark
+  existed, a `registry/` folder that holds a row (a start writes it after both vault files). A folder with neither is a
+  first start (also one that was cut short), so an interrupted first start simply goes on. **Not caught:** a data
+  folder that did not mount (an empty mount point reads as a first start).
+
+**What restarts it: the container's restart policy, and nothing else.** A failed start **backs off** and then EXITS:
+1, 2, 4 … minutes, at most two hours (`box.startBackoffMs` and its window `box.startFailureWindowMs`), so a cause that
+passes by itself (a slow mount, a storage hiccup) is retried without a tight loop. The retry is the container coming
+back: the `assistant` role sets `restart: unless-stopped` (`deploy/roles/assistant.yml`), and any other way of running
+the assistant needs a restart policy too (`unless-stopped`, `always` or `on-failure`; a systemd unit
+`Restart=on-failure`). **Without one, the box stays down after its first back-off**: it waits, exits once, and nothing
+tries again until a person starts it. `<data dir>/start-failures.json` counts the failed starts in the window, said in
+each stop's line, and is removed when the assistant comes up.
+
+**It holds only for a key that fails to decrypt** (that does not pass by itself): after 3 such starts
+(`box.startFailuresBeforeHold`) it says `STOPPED TRYING ...` once and stays up without running. The bot's admin line in
+Telegram hears it once at the third failure and once at the hold, when `TG_BOT_TOKEN` and `TG_ADMIN_UID` are set.
+
+**The way out the lines name:** fix the data folder (the missing or damaged file back, the right mount), or start the
+box over from the phrase: stop the container, move the data folder aside (keep it), and run the enrol (`--enrol`) on an
+empty folder; its circles come back from the members. The enrol never counts as a failed start.
+
 ## Backups (role `backup`)
 
 A restic sidecar snapshots every box volume (relay, pod, companion, assistant, feedback, caddy) plus

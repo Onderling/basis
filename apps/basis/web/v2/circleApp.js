@@ -76,7 +76,7 @@ import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
 import { circleVersioningFor, getCircleVersionStore } from '../../src/web/circleVersioning.js';
 import { pickWebBackend } from '../../src/web/persistentBackend.js';
-import { sealedLocalBackend, sealedLocalVault, sealedKeyValue, sealedJsonIo, onShellContentSeal, onStoredValueRefused } from '../../src/v2/localStoreSeal.js';
+import { sealedLocalBackend, sealedNamedBackend, circleStorageName, sealedLocalVault, sealedKeyValue, sealedJsonIo, onShellContentSeal, onStoredValueRefused } from '../../src/v2/localStoreSeal.js';
 import { circleOfferingDraftIo } from '../../src/v2/circleOfferingDraft.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { VaultIndexedDB, VaultMemory, VaultLocalStorage } from '@onderling/vault';
 // S4 circle OIDC — reuse the existing browser Solid-OIDC wrapper (no rebuild). A signed-in
@@ -1616,7 +1616,7 @@ const deliveryByMessageId  = { get: (id) => deliveryStateMap.get(id) };
 // at most once per cooldown while the problem persists — informative, not nagging.
 const fallbackOffer = createFallbackOffer({
   // Its memory across restarts: a declined offer stays declined for its cooldown, not until the next reload.
-  io: fallbackOfferStateIo(sealedKeyValue(globalThis.localStorage, { name: 'the fallback offer' })),
+  io: fallbackOfferStateIo(sealedKeyValue(globalThis.localStorage, { name: 'the fallback offer', overwritable: true })),   // a remembered 'no': lost, the offer is simply made again (L1115)
   onOffer: () => {
     // One-tap accept: the button flips the setting IN the bubble. The cooldown still arms on showing
     // (`decline()`), so an ignored offer stays quiet for a week; a tapped one clears the evidence instead.
@@ -2133,7 +2133,7 @@ function webForgetAdapter() {
  * reload; falls back to in-memory under SSR / tests (no `indexedDB`) — see `pickWebBackend`. */
 function makeCirclePodClient(circleId) {
   const deviceId = `circle-${circleId}`;
-  const backend  = sealedLocalBackend(pickWebBackend(`cc-circle-${circleId}`));
+  const backend  = sealedNamedBackend(circleStorageName.store(circleId), pickWebBackend);
   // versioning: displaced bytes (overwrites · peer-updates · dropped
   // concurrent forks · deletes) land in `versions/` on the SAME backend —
   // the substrate under the my-data restore ops. Best-effort by design
@@ -2326,7 +2326,7 @@ const circleInputHistory = createInputHistory();
 // #7). Same @onderling/pseudo-pod substrate the circle pods run on. Objective L:
 // browser-PERSISTENT (IndexedDB) so embedded vectors survive a reload instead of
 // re-embedding; falls back to in-memory under SSR / tests (no `indexedDB`).
-const circleSearchVectorStore = sealedLocalBackend(pickWebBackend('cc-circle-rag'));
+const circleSearchVectorStore = sealedLocalBackend(pickWebBackend('cc-circle-rag'), { scope: 'cc-circle-rag' });
 
 function buildCircleBot(agent) {
   // Merged catalogue (the LLM tool list + dispatch catalogue) — mirrors main.js.
@@ -3964,8 +3964,9 @@ function launcherPinMuteSignature() {
 let _bootFailure = null;   // the agent boot's error, if it died — painted on the launcher
 // A save refused because the value it would replace could not be opened (L1115): said on the launcher, once heard.
 let _storedRefusal = false;
+let _storedRefusalSaid = false;   // said once a session: dismissed, it does not come back
 onStoredValueRefused(() => {
-  if (_storedRefusal) return;
+  if (_storedRefusal || _storedRefusalSaid) return;
   _storedRefusal = true;
   if (getActiveCircle() == null && _activeTab === 'circles') { try { paintLauncher(); } catch { /* painted at the next visit */ } }
 });
@@ -4018,6 +4019,7 @@ function paintLauncher() {
     mutedMap:  launcherMutedMap,
     bootFailure: _bootFailure,
     storedRefusal: _storedRefusal,
+    onDismissStoredRefusal: () => { _storedRefusal = false; _storedRefusalSaid = true; try { paintLauncher(); } catch { /* the next visit */ } },
     onRetryBoot:  () => window.location.reload(),
     t,
     onOpenCircle: showDetail,
@@ -9632,7 +9634,7 @@ async function boot() {
   // Hydration happens INSIDE the agent now, at the first moment the content key exists — see the note
   // there. Reading it here, before that, handed back a sealed envelope and started the log empty on
   // every reload. The shell's job is the storage; when to read it is the agent's.
-  const deviceLogIo = backendSnapshotIo(sealedLocalBackend(pickWebBackend('cc-device-log')));
+  const deviceLogIo = backendSnapshotIo(sealedLocalBackend(pickWebBackend('cc-device-log'), { scope: 'cc-device-log' }));
   rootEl = document.getElementById('circle-root');
   tabBarEl = document.getElementById('circle-tabbar');
   // IS THIS TAB THE BUILD THE SITE SERVES? A page never updates itself: on 2026-09-19 a laptop ran the build from
@@ -9827,7 +9829,7 @@ async function boot() {
           console.info(`[cache-medium] ${circleId}: posture=${JSON.stringify(policy.pod ?? null)} → ${mode}`);   // web ≡ mobile
           if (mode !== 'cache') return null;   // no-pod → shared local backing
           const medium = createCircleCacheMedium({
-            localBackend: sealedLocalBackend(pickWebBackend(`cc-circle-cache-${circleId}`)),
+            localBackend: sealedNamedBackend(circleStorageName.cache(circleId), pickWebBackend),
             deviceId:     `circle-cache-${circleId}`,
             resolvePod:   () => resolveCirclePodCustody(circleId),
           });

@@ -6005,6 +6005,8 @@
     "value_delete": "delete",
     "value_own": "their own",
     "screen_confirm_toolbox": "{{label}} wants to connect for the toolbox {{toolbox}}.",
+    "box_stopped_trying": "The household's box has stopped: {{count}} starts could not decrypt its keys, which does not pass by itself. Nothing was changed and the bot does not answer now. Whoever runs the box: see its log for the way out (move the data folder aside and enrol from the phrase).",
+    "box_cannot_start": "The household's box cannot start: {{count}} times in a row it could not read its keys. Nothing was changed; it keeps trying, further apart. Whoever runs the box: look at its log.",
     "screen_confirm_toolbox_ops": "It may then do this, as you:",
     "screen_toolbox_needs_link": "The page of the toolbox {{toolbox}} connects only from the link the bot sends you. Type /scherm {{toolbox}} and open the page from that link (it works once, for a short while).",
     "screen_toolbox_link": "The page of the toolbox {{toolbox}}: {{link}}\nOpen it on the device you want to use; it works once, for {{minutes}} minutes. Then pick the code the page shows.",
@@ -9746,6 +9748,10 @@
     "text": "A change was not saved: the value it would replace could not be opened on this device, so it was kept. Try again after restarting the app; if this keeps happening, restore from your recovery phrase.",
     "doc": "Launcher (ledger L1115): a save the person made was refused because the stored value it would replace could not be opened with this device's key; it was kept, not overwritten."
   },
+  "stored_value_unreadable_ok": {
+    "text": "OK",
+    "doc": "Launcher (ledger L1115): dismisses the refused-save notice; it is said once a session."
+  },
   "boot_failed": {
     "text": "The app could not start ({{reason}}). Your data is still on this device — nothing here is empty, it is unread.",
     "doc": "Launcher: a failed agent boot is SAID where the person looks, instead of degrading into \"No circles yet.\" (the walk's W28/W29)."
@@ -10565,6 +10571,8 @@
     "connected": "Connected to {{bot}}. This is your management screen: bookmark this page to come back to it. This screen can do this for you:",
     "run": "Do",
     "failed": "Connecting did not work: {{reason}}",
+    "key_unreadable": "This screen's own key in this browser could not be read, so it cannot connect. Nothing was changed. Forget it here and connect this screen again (a new /scherm link).",
+    "forget_key": "Forget this screen here",
     "not_a_link": "This link is not (or no longer) valid. Ask the bot for a new one: /scherm.",
     "refused": "Not connected: another code, or \"none of these\", was picked in your chat with the bot. Ask for a new link: /scherm.",
     "timed_out": "Not connected: no answer came within ten minutes. Ask for a new link: /scherm.",

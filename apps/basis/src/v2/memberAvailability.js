@@ -109,7 +109,7 @@ export function createAvailabilityStore({ load, save } = {}) {
  */
 export function localStorageAvailabilityIo(storage = globalThis.localStorage) {
   const KEY = 'cc.availability';
-  const kv = sealedKeyValue(storage, { name: 'the availability', strict: true, waitForKey: true });
+  const kv = sealedKeyValue(storage, { name: 'the availability', strict: true, waitForKey: true, said: true });
   return {
     load: async () => {
       try { const s = await kv.getItem(KEY); return s ? JSON.parse(s) : null; } catch { return null; }

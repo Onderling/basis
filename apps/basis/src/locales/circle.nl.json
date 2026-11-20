@@ -6010,6 +6010,8 @@
     "value_delete": "weggooien",
     "value_own": "je eigen",
     "screen_confirm_toolbox": "{{label}} wil koppelen voor toolbox {{toolbox}}.",
+    "box_stopped_trying": "De box van het huishouden is gestopt: {{count}} keer kon hij zijn sleutels niet ontsleutelen, en dat gaat niet vanzelf over. Er is niets veranderd en de bot antwoordt nu niet. Wie de box beheert: zie zijn log voor de uitweg (de gegevensmap opzij zetten en met de herstelzin opnieuw inschrijven).",
+    "box_cannot_start": "De box van het huishouden kan niet starten: {{count}} keer achter elkaar kon hij zijn sleutels niet lezen. Er is niets veranderd; hij blijft het proberen, met steeds meer tijd ertussen. Wie de box beheert: kijk in zijn log.",
     "screen_confirm_toolbox_ops": "Hij mag dan dit doen, als jou:",
     "screen_toolbox_needs_link": "De pagina van toolbox {{toolbox}} koppelt alleen via de link die de bot je stuurt. Typ /scherm {{toolbox}} en open de pagina vanuit die link (die werkt één keer, korte tijd).",
     "screen_toolbox_link": "De pagina van toolbox {{toolbox}}: {{link}}\nOpen hem op het apparaat waar je hem wilt gebruiken; de link werkt één keer, {{minutes}} minuten. Kies daarna de code die de pagina laat zien.",
@@ -9743,6 +9745,10 @@
     "text": "Een wijziging is niet bewaard: wat ze zou vervangen kon op dit apparaat niet worden geopend, dus dat is bewaard gebleven. Probeer het opnieuw na een herstart van de app; blijft dit gebeuren, herstel dan met je herstelzin.",
     "doc": "Launcher (ledger L1115): a save the person made was refused because the stored value it would replace could not be opened with this device's key; it was kept, not overwritten."
   },
+  "stored_value_unreadable_ok": {
+    "text": "Oké",
+    "doc": "Launcher (ledger L1115): dismisses the refused-save notice; it is said once a session."
+  },
   "boot_failed": {
     "text": "De app kon niet starten ({{reason}}). Je gegevens staan nog op dit apparaat — er is niets weg, het is alleen niet ingelezen.",
     "doc": "Launcher: a failed agent boot is SAID where the person looks, instead of degrading into \"No circles yet.\" (the walk's W28/W29)."
@@ -10562,6 +10568,8 @@
     "connected": "Gekoppeld aan {{bot}}. Dit is je beheerscherm: zet deze pagina in je bladwijzers, dan kom je hier terug. Dit kan dit scherm voor je doen:",
     "run": "Doen",
     "failed": "Koppelen lukte niet: {{reason}}",
+    "key_unreadable": "De eigen sleutel van dit scherm in deze browser kon niet worden gelezen, dus het kan niet koppelen. Er is niets veranderd. Vergeet hem hier en koppel dit scherm opnieuw (een nieuwe /scherm-link).",
+    "forget_key": "Vergeet dit scherm hier",
     "not_a_link": "Deze link is niet (meer) geldig. Vraag de bot een nieuwe: /scherm.",
     "refused": "Niet gekoppeld: in je gesprek met de bot is een andere code of \"geen van deze\" gekozen. Vraag een nieuwe link: /scherm.",
     "timed_out": "Niet gekoppeld: er kwam binnen tien minuten geen antwoord. Vraag een nieuwe link: /scherm.",

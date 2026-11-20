@@ -51,8 +51,8 @@ import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../v2/addressS
 import { contactRelayScope } from '../../v2/connectionPoints.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity, sealStrategyForRecipients } from '../../v2/sharedCopyOpener.js'; // seal-to-self for settings + recipient-widened seal for view lanes
-import { contentSealStrategy } from '../../v2/contentAtRest.js';
-import { KeyUnreadable } from './keyUnreadable.js';   // the device's content-at-rest key — a person's own words on their own disk
+import { contentSealStrategy } from '../../v2/contentAtRest.js';   // the device's content-at-rest key — a person's own words on their own disk
+import { KeyUnreadable } from './keyUnreadable.js';   // a key that is there but will not read: the boot stops, nothing is minted (L1115)
 import { createSealingBackend } from '@onderling/pseudo-pod';            // the seal above a blind local store
 import { setShellContentSeal } from '../../v2/localStoreSeal.js';        // hand the content key to the shell's own stores
 import { wireEventLogPersistence } from '../../v2/eventLogPersistence.js';   // the device log hydrates HERE, where the key is
@@ -663,13 +663,22 @@ export async function createRealHouseholdAgent(opts = {}) {
   // own key, so sealed history opens on the replacement with nobody else online. Keys wrapped only to a
   // retired device's random vault key are not recoverable this way — an admin re-grant is the route.
   const historyKeysVault = await sealedVault(opts.historyKeysVault ?? pickVault('cc-history-keys:'));
-  const historyKeyChainFor = async (circleId) => {
-    try { const raw = await historyKeysVault.get(`chain:${circleId}`); return raw ? JSON.parse(raw) : []; }
-    catch { return []; }
+  // the STRICT read: nothing stored is an empty chain; a chain that is there but will not read (a decrypt failure, not
+  // JSON, not a list) throws, so nothing is written over it (L1115): the history keys are not re-derivable
+  const readHistoryChain = async (circleId) => {
+    let raw;
+    try { raw = await historyKeysVault.get(`chain:${circleId}`); } catch (err) { throw new KeyUnreadable('history-keys', err); }
+    if (raw == null || raw === '') return [];
+    let chain;
+    try { chain = JSON.parse(raw); } catch (err) { throw new KeyUnreadable('history-keys', err); }
+    if (!Array.isArray(chain)) throw new KeyUnreadable('history-keys');
+    return chain;
   };
+  // the readers' view: what opens, else nothing (a reader never writes)
+  const historyKeyChainFor = async (circleId) => { try { return await readHistoryChain(circleId); } catch { return []; } };
   const absorbHistoryKeys = async (circleId, chain) => {
     if (!Array.isArray(chain) || !chain.length) return 0;
-    const cur = await historyKeyChainFor(circleId);
+    const cur = await readHistoryChain(circleId);   // throws on an unreadable chain: the merge is not written over it
     const byVersion = new Map(cur.map((k) => [k.version, k]));
     let added = 0;
     for (const k of chain) { if (!byVersion.has(k.version)) { byVersion.set(k.version, k); added += 1; } }
@@ -3213,7 +3222,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     const { event, groupKey } = rotateKeyEvent({ groupId: circleId, priorEvents: events, recipients });
     const statement = await keyEmitRef.current(circleId, event);
     if (!statement) return null;
-    await absorbHistoryKeys(circleId, [{ version: event.version, groupKey }]);
+    // the new version is kept beside the old ones; a chain that will not read is not written over, said in the log (L1115)
+    try { await absorbHistoryKeys(circleId, [{ version: event.version, groupKey }]); }
+    catch (err) { console.warn(`[keys] ${String(circleId).slice(0, 12)}: the new key version was not kept locally; the stored history keys could not be read (${err?.what ?? err?.message ?? err})`); }
     await callSkill('pinboard', 'broadcastCircleKeyStatement', {
       groupId: circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now(),
     }).catch(() => {});
@@ -6753,11 +6764,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       .finally(() => siblingCarry.carry({ subtype: 'circle-governance-broadcast', circleId, event: statement, msgId: `policy:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
     // where my membership chain in the circle stood (the line the receivers judge my earlier removals and role changes by)
     membershipUpToFor: (circleId) => authorChainTip(circleId, circleAddressFor(circleId)),
-    // where the content lanes stood on this device (the line the receivers judge content by: contentLine.js)
-    contentUpToFor: (circleId) => ({
-      items: frontier((itemsRail?.storedStatements?.(circleId) ?? []).map((s) => s.body)),
-      chat: frontier((chatRail?.storedStatements?.(circleId) ?? []).map((s) => s.body)),
-    }),
+    // where the content lanes stood on this device (the line the receivers judge content by: contentLine.js). A lane this
+    // device cannot read gives no line (null), and the emitter then fails the change rather than state an empty one.
+    contentUpToFor: (circleId) => {
+      if (typeof itemsRail?.storedStatements !== 'function' || typeof chatRail?.storedStatements !== 'function') return null;
+      return {
+        items: frontier(itemsRail.storedStatements(circleId).map((s) => s.body)),
+        chat: frontier(chatRail.storedStatements(circleId).map((s) => s.body)),
+      };
+    },
   });
   /**
    * THE circle-scoped send — every piece of circle traffic leaves through it: the chat/noticeboard fan

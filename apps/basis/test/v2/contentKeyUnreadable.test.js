@@ -107,7 +107,7 @@ describe('a strict store never writes over a value it could not open (L1115)', (
     expect(s._m.get('cc.pins')).toBe(before);
   });
 
-  it('a write is allowed again once the value reads (or is removed on purpose)', async () => {
+  it('a write is allowed again once the value reads; a remove does NOT lift the refusal (remove-then-set is a save)', async () => {
     const s = memStorage();
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY_A }));
     await sealedKeyValue(s, { strict: true }).setItem('k', 'v1');
@@ -121,8 +121,35 @@ describe('a strict store never writes over a value it could not open (L1115)', (
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY_B }));
     expect(await kv.getItem('k')).toBe(null);
     await kv.removeItem('k');
-    await kv.setItem('k', 'fresh');
-    expect(await kv.getItem('k')).toBe('fresh');
+    await expect(kv.setItem('k', 'fresh')).rejects.toBeInstanceOf(StoredValueUnreadable);
+  });
+
+  it('a NON-strict store keeps what it could not open too; an overwritable one (a cache) does not', async () => {
+    const s = memStorage();
+    setShellContentSeal(groupKeyStrategy({ groupKey: KEY_A }));
+    await sealedKeyValue(s).setItem('cc.circlePolicy.c1', '{"pod":"mine"}');
+    await sealedKeyValue(s).setItem('cc.blocks', '{"n":1}');
+    const before = s._m.get('cc.circlePolicy.c1');
+    setShellContentSeal(groupKeyStrategy({ groupKey: KEY_B }));
+    const policy = sealedKeyValue(s, { name: 'the circle policy' });
+    await expect(policy.getItem('cc.circlePolicy.c1')).rejects.toThrow();
+    await expect(policy.setItem('cc.circlePolicy.c1', '{"pod":null}')).rejects.toBeInstanceOf(StoredValueUnreadable);
+    expect(s._m.get('cc.circlePolicy.c1')).toBe(before);
+    const cache = sealedKeyValue(s, { name: 'the page blocks cache', overwritable: true });
+    await expect(cache.getItem('cc.blocks')).rejects.toThrow();
+    await cache.setItem('cc.blocks', '{"n":2}');
+    expect(await cache.getItem('cc.blocks')).toBe('{"n":2}');
+  });
+
+  it('a value that opens but is not JSON is not written over either', async () => {
+    const s = memStorage();
+    setShellContentSeal(groupKeyStrategy({ groupKey: KEY_A }));
+    await sealedKeyValue(s, { strict: true }).setItem('cc.j', 'not json {');
+    const before = s._m.get('cc.j');
+    const io = sealedJsonIo(s);
+    expect(await io.load('cc.j')).toBe(null);
+    await expect(io.save('cc.j', { a: 1 })).rejects.toBeInstanceOf(StoredValueUnreadable);
+    expect(s._m.get('cc.j')).toBe(before);
   });
 
   it('a key never read and absent can be written (a fresh store is not locked)', async () => {
@@ -159,18 +186,22 @@ describe('what the launcher says (L1115)', () => {
 
   it('the words exist in both languages', () => {
     for (const loc of [en, nl]) {
-      for (const k of ['boot_content_unreadable', 'boot_retry', 'stored_value_unreadable']) expect(loc[k]?.text).toBeTruthy();
+      for (const k of ['boot_content_unreadable', 'boot_retry', 'stored_value_unreadable', 'stored_value_unreadable_ok']) expect(loc[k]?.text).toBeTruthy();
     }
   });
 
-  it('a refused save is heard by the shell', async () => {
+  it('a refused save is heard by the shell only when it was the person\'s own act (said: true)', async () => {
     const heard = [];
     const off = onStoredValueRefused((e) => heard.push(e));
     const s = memStorage();
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY_A }));
     await sealedKeyValue(s, { strict: true }).setItem('cc.x', 'v');
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY_B }));
-    const kv = sealedKeyValue(s, { name: 'the pins', strict: true });
+    const background = sealedKeyValue(s, { name: 'the seen-marks', strict: true });
+    await background.getItem('cc.x');
+    await background.setItem('cc.x', 'w').catch(() => null);
+    expect(heard).toEqual([]);
+    const kv = sealedKeyValue(s, { name: 'the pins', strict: true, said: true });
     await kv.getItem('cc.x');
     await kv.setItem('cc.x', 'w').catch(() => null);
     off();

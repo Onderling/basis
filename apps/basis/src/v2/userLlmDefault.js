@@ -103,7 +103,7 @@ const STORAGE_KEY = 'cc.userLlmDefault';
  * A screen that can read before the key (the phone's first frame) reads again on `onShellContentSeal`.
  */
 export function sealedUserLlmIo(storage) {
-  const io = sealedJsonIo(storage);
+  const io = sealedJsonIo(storage, { name: 'the model setting', said: true });
   return {
     load: () => io.load(STORAGE_KEY),
     save: async (v) => { try { await io.save(STORAGE_KEY, v); } catch { /* no content key yet: kept for this session only */ } },

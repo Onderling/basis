@@ -9745,6 +9745,64 @@
     "text": "Oké",
     "doc": "Launcher (ledger L1115): dismisses the refused-save notice; it is said once a session."
   },
+  "start_over": {
+    "lede": {
+      "text": "Typ je herstelzin (24 woorden). Er wordt niets verwijderd voordat hij is gecontroleerd en jij bevestigt.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "resumed": {
+      "text": "Dit apparaat opnieuw beginnen is onderbroken. Typ je herstelzin nog eens om het af te maken.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "phrase_label": {
+      "text": "Je herstelzin",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "submit": {
+      "text": "Controleer de herstelzin",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "working": {
+      "text": "Dit apparaat begint opnieuw…",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "error_invalid": {
+      "text": "Dat is geen geldige herstelzin (24 woorden). Er is niets veranderd.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "error_other_phrase": {
+      "text": "Dit is een andere herstelzin dan die van dit apparaat. Er is niets veranderd.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "error_storage": {
+      "text": "Opnieuw beginnen is niet afgemaakt. Start de app opnieuw: hij gaat verder waar hij stopte.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "not_confirmed": {
+      "text": "Er is niets veranderd.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "button": {
+      "text": "Begin dit apparaat opnieuw met je herstelzin",
+      "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    },
+    "confirm_title": {
+      "text": "Dit apparaat opnieuw beginnen?",
+      "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    },
+    "confirm_body": {
+      "text": "Alles wat Basis op dit apparaat bewaart wordt verwijderd, en je herstelzin zet het opnieuw op.\n\nWat terugkomt: je kringen en wat erin staat, van de andere leden; je eigen dingen, van je andere apparaten.\n\nWat verloren gaat: wat alleen op dit apparaat stond en nooit een ander apparaat of lid bereikte (een bericht dat nog niet verstuurd was, een concept, de eigen instellingen van dit apparaat).",
+      "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    },
+    "confirm_no": {
+      "text": "Nu niet",
+      "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    },
+    "confirm_yes": {
+      "text": "Opnieuw beginnen",
+      "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    }
+  },
   "boot_failed": {
     "text": "De app kon niet starten ({{reason}}). Je gegevens staan nog op dit apparaat — er is niets weg, het is alleen niet ingelezen.",
     "doc": "Launcher: a failed agent boot is SAID where the person looks, instead of degrading into \"No circles yet.\" (the walk's W28/W29)."

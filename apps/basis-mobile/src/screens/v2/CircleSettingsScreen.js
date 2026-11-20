@@ -260,7 +260,9 @@ export default function CircleSettingsScreen({
       await onProposePolicy?.(circleId, patch, { asMember: saveControl.propose === true });
       await refreshPolicyProposals();
     } else {
-      await store.update(circleId, working);
+      // a save the circle never got is not a save: nothing changed here, say so and stay (try again)
+      const saved = await store.update(circleId, working);
+      if (saved && saved.ok === false) { setStorageNote(t('circle.settings.not_stated')); return; }
       // §4 storage-policy bridge — when the pod tier changed, drive pinboard's
       // authoritative circle storage policy (web parity). The skill owns
       // admin-gating + the one-way guard; a rejection surfaces as a note and

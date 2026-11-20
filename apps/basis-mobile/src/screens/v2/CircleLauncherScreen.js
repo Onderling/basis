@@ -123,6 +123,7 @@ import {
   circleReplyText, scopeCatalogueToApps,
   // B (circle bot) — dispatch primitives to run an interpreted command in the circle.
   parseInput, resolveDispatch, runDispatch, scopeReadyDispatch, executeBulkDispatch,
+  statingPolicyStore,
   // profile-update propagation — the silent "pull-me" entry kind (the roster PULL trigger).
 } from '@onderling-app/basis';
 // B (circle bot) — v2 free-text→LLM→command surface (shared with web). Deep-imported like the other
@@ -2764,15 +2765,14 @@ export default function CircleLauncherScreen({
   if (selected && view === 'settings') {
     // The settings editor owns the `store.update` call (proposal and commit paths route through one place); the
     // store is wrapped here so every save also STATES the policy on the governance lane (circlePolicyLane).
+    // The settings are STATED to the circle and written here only when that went out (`statingPolicyStore`, web alike)
+    const stating = statingPolicyStore(policyStore, circlePolicyLane);
     const broadcastingStore = {
-      ...policyStore,
+      ...stating,
       update: async (cid, next) => {
         // Save says what happened (web parity): the policy save is not an op, so the act strip is told by hand
-        const saving = policyStore.update(cid, next);
-        const r = bundle?.actState?.track ? await bundle.actState.track({ appOrigin: 'basis', opId: 'circle-settings-save' }, saving) : await saving;
-        // the saved policy goes on the governance lane — every member, and whoever joins later, catches it up
-        circlePolicyLane?.state(cid).catch(() => { /* catch-up reconciles */ });
-        return r;
+        const saving = stating.update(cid, next);
+        return bundle?.actState?.track ? await bundle.actState.track({ appOrigin: 'basis', opId: 'circle-settings-save' }, saving) : await saving;
       },
     };
     return (

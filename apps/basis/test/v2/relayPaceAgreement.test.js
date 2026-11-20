@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { RELAY_MSG_RATE } from '@onderling/relay';
 import { RELAY_SEND_RATE } from '@onderling/transports';
-import { isBackgroundSend } from '@onderling/secure-agent';
+import { isBackgroundSend } from '@onderling/core';
 import { CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
 import { GOV_CATCHUP_REQUEST, GOV_CATCHUP_BATCH } from '../../src/v2/governanceCatchUp.js';
 import { KEY_CATCHUP_SUBTYPES } from '../../src/v2/keyRail.js';

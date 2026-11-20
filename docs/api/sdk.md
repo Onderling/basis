@@ -160,6 +160,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `InternalTransport` | class | [`core.md`](core.md#internaltransport) |
 | `invokeAgentSkill` | function | [`core.md`](core.md#invokeagentskill) |
 | `invokeWithHop` | function | [`core.md`](core.md#invokewithhop) |
+| `isBackgroundSend` | function | [`core.md`](core.md#isbackgroundsend) |
 | `isCeremonyKind` | function | [`core.md`](core.md#isceremonykind) |
 | `isChained` | function | [`core.md`](core.md#ischained) |
 | `isDiscoverability` | function | [`core.md`](core.md#isdiscoverability) |

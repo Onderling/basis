@@ -60,6 +60,7 @@ import {
   PARAM_SCOPE,
   PARAM_KIND,
 } from '@onderling/core';
+import { isBackgroundSend } from '@onderling/core';
 import {
   NknTransport,
   RelayTransport,
@@ -256,18 +257,6 @@ const STALE_PARK_TTL_MS = param({ key: 'secureAgent.staleParkTtlMs', scope: PARA
 const STALE_PARK_MAX_BYTES = param({ key: 'secureAgent.staleParkMaxBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1_048_576 });
 
 
-/**
- * A send nobody waits on (the start burst, 2026-11-20): a lane's catch-up (`*-catchup-request|batch|offer`, the naming every lane uses)
- * or the per-boot address re-announce. A transport that paces its sends (the relay transport) sends these after what a
- * person waits on; everything else is foreground, so nothing a person does gets slower by accident. Read from the
- * payload's own subtype, so no caller needs a knob; a test in basis pins that every lane's subtypes are read so.
- * @param {object} payload
- * @returns {boolean}
- */
-export function isBackgroundSend(payload) {
-  const st = payload?.subtype;
-  return typeof st === 'string' && (/-catchup-(request|batch|offer)$/.test(st) || st === 'circle-address-announce');
-}
 
 export async function createSecureAgent(opts = {}) {
   // warn about stubbed opts so callers know what's wired now

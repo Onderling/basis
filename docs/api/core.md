@@ -5598,6 +5598,25 @@ second sighting, each row keeping the sources it was seen on.
 
 **Returns:** `{subscribe, list, rebind, forget, close}`
 
+## `src/transport/sendClass.js`
+
+### `isBackgroundSend`
+
+**Kind:** function · **Import:** `isBackgroundSend` from `'@onderling/core'`
+
+```js
+isBackgroundSend(payload)
+```
+
+A send nobody waits on: a lane's catch-up (`*-catchup-request|batch|offer`, the naming every lane uses) or the
+per-boot address re-announce. Everything else is foreground, so nothing a person does gets slower by accident.
+
+**Parameters**
+
+- `payload` `object`
+
+**Returns:** `boolean`
+
 ## `src/transport/senderBinding.js`
 
 ### `senderVerdict`

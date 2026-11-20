@@ -6347,7 +6347,7 @@
       "doc": "A \"meer\" tapped after its list of things was replaced or went old: nothing to page; search again (ledger L1035)."
     },
     "toolbox_found_row": {
-      "text": "{{label}} \u00b7 {{more}}",
+      "text": "{{label}} · {{more}}",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
     "toolbox_pick_button": {
@@ -8498,7 +8498,7 @@
     },
     "plus_ceiling": {
       "text": "What the + may do for me",
-      "doc": "mij#personas \u2014 a persona card: heading of how far the person's own + goes for this persona (the ceiling, _plus.ceiling)."
+      "doc": "mij#personas — a persona card: heading of how far the person's own + goes for this persona (the ceiling, _plus.ceiling)."
     },
     "plus_ceiling_0": {
       "text": "Nothing. The + is off for this persona.",
@@ -8699,6 +8699,40 @@
     "driver_remove": {
       "text": "Remove {{what}}",
       "doc": "Mij → a driver chip's remove button (aria label): what is taken off."
+    },
+    "awaiting_kind": {
+      "vote": {
+        "text": "votes",
+        "doc": "The \"Wacht op jou\" block title: the word for the vote kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "rsvp": {
+        "text": "invitations",
+        "doc": "The \"Wacht op jou\" block title: the word for the rsvp kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "task": {
+        "text": "tasks",
+        "doc": "The \"Wacht op jou\" block title: the word for the task kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "question": {
+        "text": "questions",
+        "doc": "The \"Wacht op jou\" block title: the word for the question kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "device": {
+        "text": "device offers",
+        "doc": "The \"Wacht op jou\" block title: the word for the device kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "shared": {
+        "text": "shared copies",
+        "doc": "The \"Wacht op jou\" block title: the word for the shared kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      }
+    },
+    "awaiting_title_separator": {
+      "text": ", ",
+      "doc": "The \"Wacht op jou\" block title: between the kinds before the last."
+    },
+    "awaiting_title_last": {
+      "text": "{{list}} and {{last}}",
+      "doc": "The \"Wacht op jou\" block title: the kinds before the last ({{list}}) and the last one ({{last}})."
     }
   },
   "attach": {
@@ -11419,19 +11453,23 @@
     }
   },
   "persona_button": {
-    "label": {
-      "text": "Persona",
-      "doc": "The persona button's spoken name, top right on every tab (the persona's picture or initials): it opens the persona panel over the tab."
-    },
     "settings": {
       "text": "Settings",
       "doc": "The settings button's spoken name (the gear beside the persona button, on every tab): it opens the settings home."
+    },
+    "label_with_state": {
+      "text": "Persona, {{state}}",
+      "doc": "The persona button's spoken name with the availability its coloured ring shows ({{state}}, the shared reading words), so the colour is never the only signal."
     }
   },
   "persona_panel": {
     "close": {
       "text": "Close",
       "doc": "The persona panel (behind the persona button): its close button."
+    },
+    "availability_row": {
+      "text": "{{state}} · tap to change",
+      "doc": "The persona panel: the one availability row, the state now ({{state}}, the shared reading words) and that a tap changes it; a tap opens the availability screen."
     }
   },
   "back_to": {

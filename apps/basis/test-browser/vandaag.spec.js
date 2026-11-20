@@ -9,9 +9,9 @@ import { test, expect } from '@playwright/test';
 
 test.setTimeout(90_000);
 
-// the stored page's blocks: not Vandaag's declared top (the availability words, "Wacht op jou", "Nieuw voor jou"), which a
-// person does not place or move
-const TOP = ['availability', 'awaiting', 'forYou'];
+// the stored page's blocks: not Vandaag's declared top ("Wacht op jou", "Nieuw voor jou"), which a person does not place
+// or move
+const TOP = ['awaiting', 'forYou'];
 const pageBlocks = (page, field) => page.locator('.circle-screen__block')
   .evaluateAll((els, [f, top]) => els.filter((e) => !top.includes(e.dataset.blockType)).map((e) => e.dataset[f]), [field, TOP]);
 const blockTypes = (page) => pageBlocks(page, 'blockType');

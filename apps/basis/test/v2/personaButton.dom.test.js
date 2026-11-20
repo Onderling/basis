@@ -15,7 +15,9 @@ describe('renderPersonaButton', () => {
     expect(el.querySelector('.cc-persona-button__initials').textContent).toBe('FD');
     expect(el.querySelector('img')).toBeNull();
     const b = el.querySelector('.cc-persona-button__button');
-    expect(b.getAttribute('aria-label')).toBe('circle.persona_button.label');
+    // its spoken name carries the availability its ring shows (no record: available)
+    expect(b.getAttribute('aria-label')).toMatch(/^circle\.persona_button\.label_with_state/);
+    expect(b.dataset.availability).toBe('available');
     b.click();
     expect(onOpen).toHaveBeenCalled();
   });

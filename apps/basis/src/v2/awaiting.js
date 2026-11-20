@@ -34,7 +34,7 @@ export function awaitingItems({ now = Date.now(), circles = [], selfIn = () => n
   for (const c of circles) {
     const me = selfIn(c.id);
     const open = (proposalsByCircle[c.id] ?? []).filter((p) => !(p?.votes ?? []).some((v) => v?.voter && v.voter === me));
-    if (open.length) out.push({ kind: 'vote', circleId: c.id, name: named(c), count: open.length, open: { kind: 'open-proposals', circleId: c.id } });
+    if (open.length) out.push({ kind: 'vote', circleId: c.id, name: named(c), count: open.length, open: { kind: 'open-votes', circleId: c.id } });
   }
   for (const c of circles) {
     const me = selfIn(c.id);
@@ -45,4 +45,23 @@ export function awaitingItems({ now = Date.now(), circles = [], selfIn = () => n
   if (deviceOffer) out.push({ kind: 'device', count: 1, open: { kind: 'open-mydata' } });
   if (Number(sharedWithMe) > 0) out.push({ kind: 'shared', count: Number(sharedWithMe), open: { kind: 'open-shared-with-me' } });
   return out.map((it) => ({ ...it, labelKey: AWAITING_LABEL_KEYS[it.kind] }));
+}
+
+/**
+ * The block's TITLE names the kinds that are in it now, not an appeal (Frits 2026-11-20): "Stemmen en uitnodigingen",
+ * "Taken", "Stemmen, uitnodigingen, taken en vragen". A fixed order — votes, invitations, tasks, questions, then the
+ * other kinds the block holds (device offers, shared copies) — joined with commas and a final "en"/"and", the first
+ * letter capitalised; every word through t(). Tasks and questions have a place before the block holds them, so the
+ * title does not change shape when they arrive. No items: no title (the block is not shown).
+ */
+export const AWAITING_TITLE_ORDER = Object.freeze(['vote', 'rsvp', 'task', 'question', 'device', 'shared']);
+
+export function awaitingTitle(items = [], { t } = {}) {
+  if (typeof t !== 'function') return '';
+  const present = new Set((Array.isArray(items) ? items : []).map((it) => it?.kind));
+  const words = AWAITING_TITLE_ORDER.filter((k) => present.has(k)).map((k) => t(`circle.mij.awaiting_kind.${k}`));
+  if (!words.length) return '';
+  const last = words.pop();
+  const said = words.length ? t('circle.mij.awaiting_title_last', { list: words.join(t('circle.mij.awaiting_title_separator')), last }) : last;
+  return said.charAt(0).toLocaleUpperCase() + said.slice(1);
 }

@@ -25,7 +25,7 @@ describe('what is waiting for you (Mij)', () => {
       deviceOffer: true,
     });
     expect(items).toEqual([
-      { kind: 'vote', circleId: 'c1', name: 'Straat', count: 1, open: { kind: 'open-proposals', circleId: 'c1' }, labelKey: 'circle.mij.awaiting_vote' },
+      { kind: 'vote', circleId: 'c1', name: 'Straat', count: 1, open: { kind: 'open-votes', circleId: 'c1' }, labelKey: 'circle.mij.awaiting_vote' },
       { kind: 'rsvp', circleId: 'c2', name: 'Werk', count: 1, open: { kind: 'open-circle', circleId: 'c2' }, labelKey: 'circle.mij.awaiting_rsvp' },
       { kind: 'device', count: 1, open: { kind: 'open-mydata' }, labelKey: 'circle.mij.awaiting_device' },
     ]);
@@ -58,5 +58,34 @@ describe('Mij: what was shared with me is waiting too (it was a door on My data)
     expect(items).toEqual([{ kind: 'shared', count: 2, open: { kind: 'open-shared-with-me' }, labelKey: 'circle.mij.awaiting_shared' }]);
     expect(awaitingItems({ sharedWithMe: 0 })).toEqual([]);
     expect(awaitingItems({})).toEqual([]);
+  });
+});
+
+describe('the block\'s title names the kinds in it, not an appeal (Frits 2026-11-20)', async () => {
+  const { awaitingTitle, AWAITING_TITLE_ORDER } = await import('../../src/v2/awaiting.js');
+  const nl = (await import('../../src/locales/circle.nl.json', { with: { type: 'json' } })).default;
+  const en = (await import('../../src/locales/circle.en.json', { with: { type: 'json' } })).default;
+  const tOf = (bundle) => (k, v = {}) => {
+    const node = k.replace(/^circle\./, '').split('.').reduce((n, p) => n?.[p], bundle);
+    return String(node?.text ?? k).replace(/\{\{(\w+)\}\}/g, (_, n) => v[n] ?? '');
+  };
+  const items = (...kinds) => kinds.map((kind) => ({ kind }));
+
+  it('in a fixed order, joined with commas and a final "en", first letter capitalised', () => {
+    const t = tOf(nl);
+    expect(awaitingTitle(items('rsvp', 'vote', 'vote'), { t })).toBe('Stemmen en uitnodigingen');
+    expect(awaitingTitle(items('task'), { t })).toBe('Taken');
+    expect(awaitingTitle(items('question', 'task', 'rsvp', 'vote'), { t })).toBe('Stemmen, uitnodigingen, taken en vragen');
+  });
+
+  it('the en bundle likewise', () => {
+    expect(awaitingTitle(items('vote', 'rsvp'), { t: tOf(en) })).toBe('Votes and invitations');
+    expect(awaitingTitle(items('shared', 'device', 'vote'), { t: tOf(en) })).toMatch(/^Votes, .+ and .+$/);
+  });
+
+  it('every kind the block can hold has a place in the order and its words in both bundles', () => {
+    expect(AWAITING_TITLE_ORDER).toEqual(['vote', 'rsvp', 'task', 'question', 'device', 'shared']);
+    for (const kind of AWAITING_TITLE_ORDER) for (const b of [nl, en]) expect(b.mij.awaiting_kind?.[kind]?.text, kind).toBeTruthy();
+    expect(awaitingTitle([], { t: tOf(nl) })).toBe('');
   });
 });

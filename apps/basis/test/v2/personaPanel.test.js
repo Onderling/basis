@@ -72,23 +72,21 @@ describe('the settings button: back to where the person came from', () => {
   });
 });
 
-describe('Vandaag on top: the availability words, then "Wacht op jou", then "Nieuw voor jou"', () => {
+describe('Vandaag on top: "Wacht op jou" first, then "Nieuw voor jou"; availability is a line under the title (Frits 2026-11-20)', () => {
   const declared = todayTopBlocks(basisManifest);
 
-  it('is declared in the manifest, in that order', () => {
-    expect(declared.map((b) => b.type)).toEqual(['availability', 'awaiting']);
+  it('is declared in the manifest: "Wacht op jou" only (availability is no block)', () => {
+    expect(declared.map((b) => b.type)).toEqual(['awaiting']);
   });
 
-  it('paints the availability block with a tap to change it, and "Wacht op jou" only when something waits', async () => {
+  it('nothing waits: no "Wacht op jou" block, and no availability block either', async () => {
     const blocks = await materializeScreen({
       screen: { id: 'p', blocks: [{ id: 'n', type: 'notes', config: {} }] },
       hostOps: { forYou: true, todayTop: declared, availability: { holiday: { active: false }, quietHours: { enabled: false } }, circles: [], callSkill: async () => null },
     });
     const top = blocks.map((b) => b.type);
-    expect(top[0]).toBe('availability');
-    expect(blocks[0].content.reading).toMatchObject({ key: 'availability', state: 'available' });
-    expect(blocks[0].content.open).toEqual({ kind: 'open-availability' });
-    expect(top).not.toContain('awaiting');   // nothing waits: no empty block
+    expect(top).not.toContain('awaiting');
+    expect(top).not.toContain('availability');
   });
 
   it('"Wacht op jou" above "Nieuw voor jou" when something waits', async () => {

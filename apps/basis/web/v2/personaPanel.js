@@ -6,8 +6,9 @@
  * into the body this returns — the same declared Me the phone paints. Pure render: the host says what each tap does.
  */
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { availabilityRow } from '../../src/v2/mijWords.js';
 
-export function renderPersonaPanel(container, { model, t, onTab, onShowAs, onClose } = {}) {
+export function renderPersonaPanel(container, { model, t, availability = null, now = Date.now(), onAvailability, onTab, onShowAs, onClose } = {}) {
   if (!container || !model) return null;
   const tr = translatorOr(t, 'personaPanel.js');
   container.innerHTML = '';
@@ -28,6 +29,15 @@ export function renderPersonaPanel(container, { model, t, onTab, onShowAs, onClo
       tabs.appendChild(b);
     }
     container.appendChild(tabs);
+  }
+  // the availability, in words, with the control to change it (the persona button's ring shows it in colour)
+  if (typeof onAvailability === 'function') {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'cc-btn cc-btn--quiet cc-persona-panel__availability';
+    row.textContent = availabilityRow(availability, { now, t: tr });
+    row.addEventListener('click', () => onAvailability());
+    container.appendChild(row);
   }
   const body = document.createElement('div');
   body.className = 'cc-persona-panel__body';

@@ -14,6 +14,8 @@ kernel's roster fold; every shell composes the same binding).
   removal, a role or the rules is cast, the only place an admin sees a report, and the only place the changes made
   without the vote are listed). A member hears of an open decision as a line in the circle's conversation ("A decision
   opened: … your vote may be needed"), rendered from the proposal statement; the line itself is not a way in yet.
+  A second door: Vandaag's "Wacht op jou" chip ("N stemming(en) voor jou open") opens this screen for that circle,
+  where the vote is cast in one tap (web and phone, 2026-11-20; it opened the circle's settings before).
 - As an admin, set WHO DECIDES each governed action: one admin (`any-admin`), the admins together (`admin-quorum`, a
   majority of the admins; a single admin is the quorum), the whole circle (`member-vote`, a majority of all members),
   or, after the alpha, a few drawn members (`random-sample`, built and held back, see below). Who decides is itself a

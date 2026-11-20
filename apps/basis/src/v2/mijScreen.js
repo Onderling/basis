@@ -15,7 +15,7 @@ export function mijBlocks(manifest = basisManifest) {
 }
 
 /**
- * Vandaag's top (above "Nieuw voor jou"): the declared `todayBlocks` — the availability words and "Wacht op jou" — each
+ * Vandaag's top (above "Nieuw voor jou"): the declared `todayBlocks` ("Wacht op jou"), each
  * with a stable id. The materializer fills them when the shell asks for Vandaag's top (`hostOps.todayTop`).
  */
 export function todayTopBlocks(manifest = basisManifest) {

@@ -3099,6 +3099,7 @@ function runPlusTarget(button) {
 // THE PERSONA BUTTON — top-right on every tab: the persona's picture or initials; a tap opens the person's own editor.
 // Loaded once (and again after the editor closes); every tab repaints the one element.
 let _personaButton = null;          // { name, initials, picture } from the shared loader
+let _availabilityNow = null;        // the stored availability: the persona button's ring and the panel's row say it
 let _personaButtonUrl = null;       // the picture, opened with this device's own opener
 let _personaButtonEl = null;
 // THE SWITCHER'S SET: this device's selves (`personasHere`) and which of them the app shows (the screens book's
@@ -3135,7 +3136,7 @@ function paintPersonaButton() {
   }
   placePersonaButton();
   // the persona button opens the persona panel over the tab; the settings button beside it, the settings home
-  renderPersonaButton(_personaButtonEl, { avatar: _personaButton, pictureUrl: _personaButtonUrl, t,
+  renderPersonaButton(_personaButtonEl, { avatar: _personaButton, pictureUrl: _personaButtonUrl, availability: _availabilityNow, t,
     onOpen: () => showPersonaPanel(), onSettings: () => showSettingsHome({ from: _activeTab }) });
 }
 async function refreshPersonaButton() {
@@ -3149,6 +3150,7 @@ async function refreshPersonaButton() {
     const resolve = makeCirclePictureResolver(opener);
     _personaButtonUrl = _personaButton.picture && resolve ? (await Promise.resolve(resolve(_personaButton.picture)).catch(() => null)) : null;
   } catch { /* the initials stand */ }
+  _availabilityNow = await Promise.resolve().then(() => availabilityStore.get()).catch(() => null);
   paintPersonaButton();
 }
 // the switcher: tick selves (an op on the book: logged, undoable), "alle", or open a self's own editor
@@ -4725,11 +4727,9 @@ async function materializeVandaag() {
       ...forYouHostOps(),
       // the circles-with-news block counts what the circle tiles count
       seenAt: readSeenAt(),
-      // on top (the shared projection): the declared `todayBlocks` — the availability words, "Wacht op jou" — then
-      // "Nieuw voor jou"
+      // on top (the shared projection): the declared `todayBlocks` ("Wacht op jou"), then "Nieuw voor jou"
       forYou: true,
       todayTop: todayTopBlocks(),
-      availability: await Promise.resolve().then(() => availabilityStore.get()).catch(() => null),
       // "Wacht op jou": the votes open in each circle (the same fold the settings banner reads), a device offer here,
       // what was shared with the person
       openProposals: (cid) => openPolicyProposals(mijGov ??= shellGovernance(), cid),
@@ -5012,12 +5012,11 @@ function showVandaagCustomise() {
 // what a block on the person's pages asks for: a circle with news opens that circle, as its launcher tile does
 function onScreenAction(action) {
   if (action?.kind === 'open-circle' && action.circleId) showDetail(action.circleId);
-  // "Wacht op jou": a vote opens that circle's proposals (its settings, where the open votes are), as on the phone; a device offer the devices group;
-  // what was shared, its list. The availability words open the availability screen, which comes back to Vandaag.
-  else if (action?.kind === 'open-proposals' && action.circleId) showSettings(action.circleId);   // the circle's settings, where its open votes are (the phone's openProposals)
+  // "Wacht op jou": a vote opens that circle's OPEN VOTES, where it is cast in one tap (the decisions view; Frits
+  // 2026-11-20), as on the phone; a device offer the devices group; what was shared, its list.
+  else if (action?.kind === 'open-votes' && action.circleId) showGovernance(action.circleId);
   else if (settingsGroupForAction(action)) showMyData({ group: settingsGroupForAction(action) });
   else if (action?.kind === 'open-shared-with-me') showSharedWithMe();
-  else if (action?.kind === 'open-availability') showAvailability({ onDone: showScreens });
   // "Nieuw voor jou": opening a row is reading it (on every device), and it goes to the thing itself
   else if (action?.kind === 'for-you-open' && action.row) {
     const marked = readMarks.markRows([action.row]).catch(() => {});
@@ -5093,6 +5092,9 @@ async function showPersonaPanel(selected = null) {
   _panelClose = shut;
   card.parentElement?.addEventListener('click', (e) => { if (e.target === card.parentElement) shut(); });   // a touch outside closes
   const body = renderPersonaPanel(card, { model, t,
+    // the availability row: the state in words, a tap to change it; saved, the ring follows and the tab is back
+    availability: _availabilityNow,
+    onAvailability: () => { shut(); showAvailability({ onDone: () => { refreshPersonaButton(); backToTab(); } }); },
     onTab: (id) => showPersonaPanel(id),
     onShowAs: () => { shut(); showPersonaSwitcher(); },
     onClose: shut,
@@ -7319,7 +7321,7 @@ function showImageModal(src, { pending = false } = {}) {
 }
 
 // availability/quiet-hours/hopping (the former Mij body), now a sub-screen of Mij.
-// opened from Vandaag's availability block (it left the Verbinding settings, 2026-11-20): done returns to Vandaag
+// opened from the persona panel's availability row (it left Verbinding and Vandaag, 2026-11-20): done returns to the tab
 async function showAvailability({ onDone = () => showScreens() } = {}) {
   let working = await availabilityStore.get();
   const rerender = () => renderCircleAvailability(rootEl, {

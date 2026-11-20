@@ -50,7 +50,6 @@ import { policyFor } from './notifyBanner.js';
 import { tileCircles } from './helpContact.js';
 import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
 import { isPairCircleId } from './pairCircleId.js';
-import { normalizeAvailability, isPushSuppressed } from './memberAvailability.js';
 import { linkedBotsOf } from './identityLink.js';
 import { bookRowsOf } from './contactsSource.js';
 import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
@@ -101,8 +100,8 @@ export async function materializeScreen({ screen, hostOps = {}, mutedCircleIds =
   })));
   // "Nieuw voor jou" at the top of the page the shell asks it for (Vandaag), and only when it holds rows: never an
   // empty block. Not a block of the stored page: what is new is not something a person places or removes.
-  // Vandaag's top, in this order: what the manifest declares for it (`todayBlocks`: the availability words, "Wacht op
-  // jou"), then "Nieuw voor jou". Not blocks of the stored page, and none shown empty.
+  // Vandaag's top, in this order: what the manifest declares for it (`todayBlocks`: "Wacht op jou"), then "Nieuw voor
+  // jou". Not blocks of the stored page, and none shown empty.
   const top = [];
   if (hostOps.forYou === true && Array.isArray(hostOps.todayTop)) {
     const filled = await Promise.all(hostOps.todayTop.map((block) => materializeOneBlock({ block, activeCircleIds, allCircleIds, hostOps: ops, screenIsAll: isAllCircles(screen) })));
@@ -250,9 +249,6 @@ async function materializeOneBlock({ block, activeCircleIds: pageCircleIds, host
       // Me's own blocks: the name, and the person's agents and devices
       case 'awaiting':
         return await materializeAwaiting(block, hostOps);
-      // Vandaag's availability words: a tap opens the availability screen
-      case 'availability':
-        return materializeAvailability(block, hostOps);
       case 'identityLine':
         return await materializeIdentityLine(block, activeCircleIds, hostOps);
       case 'agents':
@@ -306,7 +302,7 @@ function materializeCirclesUnread(block, activeCircleIds, { eventLog, circles, s
 
 /**
  * The identity line: the person's (or the persona's) name, nothing else. Its readings went on 2026-11-20 (the
- * availability words to Vandaag's own block, the counts dropped: Vandaag's blocks say what is new and open).
+ * availability to the persona button's ring and the panel's row, the counts dropped: Vandaag says what is new and open).
  */
 async function materializeIdentityLine(block, _activeCircleIds, hostOps = {}) {
   const { callSkill } = hostOps;
@@ -320,23 +316,6 @@ async function materializeIdentityLine(block, _activeCircleIds, hostOps = {}) {
     } catch { /* nameless: the painter says "Mij" */ }
   }
   return { blockId: block.id, type: 'identityLine', status: 'ok', content: { name } };
-}
-
-/** The availability reading of a stored record at `now`: available · quiet until … · away (until …); null without one. */
-function availabilityReading(record, now) {
-  if (!record) return null;
-  const a = normalizeAvailability(record);
-  if (a.holiday.active && isPushSuppressed({ ...a, quietHours: { ...a.quietHours, enabled: false } }, new Date(now))) return { key: 'availability', state: 'away', until: a.holiday.until };
-  if (isPushSuppressed(a, new Date(now))) return { key: 'availability', state: 'quiet', until: a.quietHours.to };
-  return { key: 'availability', state: 'available' };
-}
-
-/** Vandaag's availability block: the words of now, and where a tap goes (the availability screen). Empty without a record. */
-function materializeAvailability(block, hostOps = {}) {
-  const now = typeof hostOps.now === 'function' ? hostOps.now() : Date.now();
-  const reading = availabilityReading(hostOps.availability, now);
-  const base = { blockId: block.id, type: 'availability', titleKey: 'circle.availability.title' };
-  return reading ? { ...base, status: 'ok', content: { reading, open: { kind: 'open-availability' } } } : { ...base, status: 'empty', content: {} };
 }
 
 /**

@@ -1,8 +1,9 @@
 /**
  * MIJ LEAVES THE TAB BAR, ON A REAL SCREEN (2026-11-20). The bar is Vandaag · Kringen · + · Contacten; the persona
  * button opens the persona panel over the tab that is showing (the short view, closed by a touch outside or its close);
- * the settings button beside it opens the settings home, whose back names the tab it returns to; Vandaag shows the
- * availability words, a tap on them opens the availability screen, and saving comes back to Vandaag.
+ * the settings button beside it opens the settings home, whose back names the tab it returns to; the persona button is
+ * ringed in the availability's colour and its label names it; the panel's availability row opens the availability
+ * screen. Vandaag shows no availability at all.
  *
  *   npx playwright test --project=no-relay test-browser/persona-panel.spec.js
  */
@@ -40,10 +41,17 @@ test('the persona panel opens over the tab; the settings button comes back to th
   await back.click();
   await expect(page.locator('[data-tab="contacten"]')).toHaveClass(/is-active/, { timeout: 15_000 });
 
-  // Vandaag: the availability words; a tap opens the availability screen, and saving comes back to Vandaag
+  // the availability left Vandaag: a ring on the persona button (its label names the state), the row in the panel
   await page.locator('[data-tab="screens"]').first().click();
-  const words = page.locator('.circle-screen__availability');
-  await expect(words, 'the availability block on Vandaag').toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.circle-vandaag__day')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.circle-vandaag__availability, .circle-screen__block--availability'), 'nothing of it on Vandaag').toHaveCount(0);
+  const button = page.locator('.cc-persona-button__button');
+  await expect(button).toHaveAttribute('data-availability', 'available');
+  await expect(button).toHaveAttribute('aria-label', /Persona, /);
+  await page.locator('.cc-persona-button').screenshot({ path: 'test-results/persona-button-ring.png' });
+  await button.click();
+  const words = page.locator('.cc-persona-panel__availability');
+  await expect(words, 'the availability row in the panel').toHaveText(/·/, { timeout: 15_000 });
   await words.click();
   await expect(page.locator('.circle-availability__title')).toBeVisible({ timeout: 15_000 });
   expect(errs).toEqual([]);

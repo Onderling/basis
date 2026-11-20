@@ -1,11 +1,54 @@
 /**
- * Me's and Vandaag's blocks in words — the availability words and the agents rows — said once, for both shells' painters.
+ * The availability (the persona button's ring and label, the panel's row) and Me's agents rows in words — said once, for both shells' painters.
  * Kept apart from `mijScreen.js` so a painter does not pull in the materializer.
  */
 
+import { normalizeAvailability, isPushSuppressed } from './memberAvailability.js';
+
 /**
- * Vandaag's availability words: available · quiet until … · away (until …) — what both shells paint in the block.
- * @param {{state: string, until?: string}|null} reading   the availability block's reading
+ * The availability reading of a stored record at `now`: available · quiet until … · away (until …). No record is
+ * available (the default), never a guess.
+ * @returns {{key: 'availability', state: 'available'|'quiet'|'away', until?: string|null}}
+ */
+export function availabilityReading(record, now = Date.now()) {
+  const a = normalizeAvailability(record ?? {});
+  if (a.holiday.active && isPushSuppressed({ ...a, quietHours: { ...a.quietHours, enabled: false } }, new Date(now))) return { key: 'availability', state: 'away', until: a.holiday.until };
+  if (isPushSuppressed(a, new Date(now))) return { key: 'availability', state: 'quiet', until: a.quietHours.to };
+  return { key: 'availability', state: 'available' };
+}
+
+// the ring's colour per state: existing theme tokens only (src/v2/theme.js), no palette of its own
+const RING_TOKEN = Object.freeze({ available: 'green', quiet: 'amber', away: 'inkSoft' });
+
+/**
+ * The person's availability as a RING around the persona button (Frits 2026-11-20: availability left Vandaag): the
+ * state now and the theme colour token that rings the button. Colour is never the only signal: the button's label
+ * (`personaButtonLabel`) names the state, and the persona panel says it in words (`availabilityRow`).
+ * @returns {{state: 'available'|'quiet'|'away', token: 'green'|'amber'|'inkSoft'}}
+ */
+export function availabilityRing(record, { now = Date.now() } = {}) {
+  const { state } = availabilityReading(record, now);
+  return { state, token: RING_TOKEN[state] };
+}
+
+/**
+ * The persona panel's one availability row: the state now in words, and that a tap changes it ("beschikbaar · tik om
+ * te wijzigen"). A tap opens the availability screen.
+ */
+export function availabilityRow(record, { now = Date.now(), t } = {}) {
+  if (typeof t !== 'function') return '';
+  return t('circle.persona_panel.availability_row', { state: availabilityWords(availabilityReading(record, now), { t }) });
+}
+
+/** The persona button's spoken name with the state it is ringed by ("Persona, beschikbaar"). */
+export function personaButtonLabel(record, { now = Date.now(), t } = {}) {
+  if (typeof t !== 'function') return '';
+  return t('circle.persona_button.label_with_state', { state: availabilityWords(availabilityReading(record, now), { t }) });
+}
+
+/**
+ * The availability words: available · quiet until … · away (until …) — what the panel row and the button's label say.
+ * @param {{state: string, until?: string}|null} reading   the availability reading (`availabilityReading`)
  * @param {{ t: (k: string, v?: object) => string }} o
  * @returns {string}
  */

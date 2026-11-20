@@ -1290,16 +1290,16 @@ export const basisManifest = {
   ],
 
   /**
-   * Vandaag's top, above "Nieuw voor jou": what Me used to say about now (Frits 2026-11-20). Materialized by the same
-   * screen materializer and painted by each shell's block painter; not blocks of the stored page (a person does not
-   * place or remove them), and a block with nothing to say is not shown.
-   *   availability — the availability words (beschikbaar · stil tot … · weg tot …), a tap opens the availability screen
-   *   awaiting     — "Wacht op jou": a vote open to the person, an appointment to answer, a device offer, what was
-   *                  shared with them — each a chip that opens where it lives
+   * Vandaag's top, above "Nieuw voor jou" (Frits 2026-11-20). Materialized by the same screen materializer and painted
+   * by each shell's block painter; not blocks of the stored page (a person does not place or remove them), and a block
+   * with nothing to say is not shown. The availability is no block: one quiet line under the page title
+   * (`availabilityLine`), a tap opens the availability screen.
+   *   awaiting     — "Wacht op jou", first: a vote open to the person (its chip opens the circle's open votes), an
+   *                  appointment to answer, a device offer, what was shared with them — each a chip that opens where it
+   *                  lives
    */
   todayBlocks: [
-    { type: 'availability', config: {} },
-    { type: 'awaiting',     config: {} },
+    { type: 'awaiting', config: {} },
   ],
 
   /**

@@ -54,6 +54,56 @@ export function shellContentSeal() {
 }
 
 /**
+ * A write refused because the value it would replace is stored but could not be opened with this device's key
+ * (ledger L1115). Writing over it would lose it for good: a setting's stored endpoint, a pin map, a circle's key. The
+ * refusal holds until a read of that key succeeds or the key is removed on purpose. `code` is what a caller reads.
+ * Where the save was the person's own act (the model setting, a pin), the shell SAYS it (`isStoredValueUnreadable`).
+ */
+export class StoredValueUnreadable extends Error {
+  constructor(name, key) {
+    super(`${name}: "${key}" holds a value this device could not open; not written over`);
+    this.name = 'StoredValueUnreadable';
+    this.code = 'stored-value-unreadable';
+    this.key = key;
+  }
+}
+
+/** True for a StoredValueUnreadable (also across a bundle boundary, by its code). */
+export function isStoredValueUnreadable(err) {
+  return err instanceof StoredValueUnreadable || err?.code === 'stored-value-unreadable';
+}
+
+/** Who hears a refused write (the shells: they SAY it on the launcher, `bootFailure.js`). */
+const refusedListeners = new Set();
+/**
+ * Hear every write refused because the value it would replace could not be opened: `fn({name, key})`. A shell
+ * subscribes once and says it where the person looks; the stores themselves swallow the throw.
+ * @returns {() => void} unsubscribe
+ */
+export function onStoredValueRefused(fn) {
+  if (typeof fn !== 'function') return () => {};
+  refusedListeners.add(fn);
+  return () => { refusedListeners.delete(fn); };
+}
+function refuse(name, key) {
+  const err = new StoredValueUnreadable(name, key);
+  console.warn(`[at-rest] ${name}: a save was refused; the stored value could not be opened and is kept`);
+  for (const fn of [...refusedListeners]) { try { fn({ name, key }); } catch { /* one listener never stops the others */ } }
+  return err;
+}
+
+/**
+ * The keys whose stored value would not open, per storage object. Per STORAGE, not per wrapper: a store that builds a
+ * fresh wrapper for each read and each write still sees the read's verdict at its write.
+ */
+const unopened = new WeakMap();
+const unopenedOf = (storage) => {
+  let set = unopened.get(storage);
+  if (!set) { set = new Set(); unopened.set(storage, set); }
+  return set;
+};
+
+/**
  * Wrap a local StorageBackend so what it writes is sealed at rest.
  *
  * Use this at EVERY local backend construction in a shell — the circle item store, the search index, the
@@ -105,14 +155,22 @@ export function sealedKeyValue(storage, { name = 'a store', strict = false, wait
       const s = shellContentSeal() ?? (waitForKey ? await keyArrives() : null);
       if (!s) return null;
       let plain;
-      try { plain = s.open(String(v)); } catch { return null; }
+      try { plain = s.open(String(v)); } catch {
+        unopenedOf(storage).add(key);   // not written over until it reads (L1115)
+        console.warn(`[at-rest] ${name}: a stored value this device cannot open; it is kept, not written over`);
+        return null;
+      }
+      unopenedOf(storage).delete(key);
       if (plain === v) {   // it was plain: seal it now, once
         try { await storage.setItem(key, s.seal(plain)); } catch { /* the next read tries again */ }
       }
       return plain;
     },
-    async setItem(key, value) { await storage.setItem(key, strategy().seal(String(value))); },
-    async removeItem(key) { await storage.removeItem(key); },
+    async setItem(key, value) {
+      if (strict && unopened.get(storage)?.has(key)) throw refuse(name, key);
+      await storage.setItem(key, strategy().seal(String(value)));
+    },
+    async removeItem(key) { await storage.removeItem(key); unopened.get(storage)?.delete(key); },
   };
   if (typeof storage.key === 'function') {
     kv.key = (i) => storage.key(i);
@@ -161,6 +219,7 @@ export function sealedLocalVault(vault) {
 
   const wrapped = {
     async set(key, value) {
+      if (unopened.get(vault)?.has(key)) throw refuse('a circle key vault', key);
       const s = strategy();
       if (!s) throw new Error(`sealedLocalVault: refusing to store "${key}" unsealed — no content key yet`);
       return vault.set(key, s.seal(typeof value === 'string' ? value : JSON.stringify(value)));
@@ -174,9 +233,11 @@ export function sealedLocalVault(vault) {
       let opened;
       try { opened = s.open(String(stored)); }
       catch (err) {
-        console.warn(`[at-rest] ${key}: a circle key is stored here that this device cannot open`, err);
+        console.warn(`[at-rest] ${key}: a circle key is stored here that this device cannot open; kept, not written over`, err);
+        unopenedOf(vault).add(key);
         return null;
       }
+      unopenedOf(vault).delete(key);
       // Written before sealing began: seal it now, on the way past. See the header for why key material
       // gets this and content does not.
       if (opened === String(stored)) {
@@ -184,6 +245,13 @@ export function sealedLocalVault(vault) {
         catch { /* best-effort — the value is still readable either way */ }
       }
       return opened;
+    },
+
+    async delete(key) {
+      if (typeof vault.delete !== 'function') throw new Error('sealedLocalVault: this vault has no delete');
+      const r = await vault.delete(key);
+      unopened.get(vault)?.delete(key);   // removed on purpose: a fresh write may follow
+      return r;
     },
   };
 

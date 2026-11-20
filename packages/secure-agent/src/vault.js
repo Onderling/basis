@@ -79,13 +79,16 @@ export function makeBrowserVault(arg = 'sa-id:') {
  * @returns {Promise<AgentIdentity>}
  */
 export async function restoreOrGenerate(vault) {
-  try {
-    if (await vault.has('agent-privkey')) {
-      return await AgentIdentity.restore(vault);
-    }
-  } catch {
-    // Corrupt or unreadable entry → generate fresh (next slice
-    // could surface a clearer warning + recovery flow).
-  }
-  return AgentIdentity.generate(vault);
+  // Generate ONLY when the vault says nothing is stored. An entry that is there but will not read (a wrong at-rest key,
+  // a storage error) is NOT absent: a fresh key over it would make this a different agent behind the same name. It
+  // throws, with `code: 'key-unreadable'` (the code the Basis shells read to say it in words and offer "try again").
+  let held;
+  try { held = await vault.has('agent-privkey'); } catch (err) { throw keyUnreadable(err); }
+  if (!held) return AgentIdentity.generate(vault);
+  try { return await AgentIdentity.restore(vault); } catch (err) { throw keyUnreadable(err); }
+}
+
+/** The agent's stored key could not be read: never replaced, said by its code (`key-unreadable`). */
+function keyUnreadable(cause) {
+  return Object.assign(new Error('The agent key on this device could not be read; nothing was changed'), { code: 'key-unreadable', what: 'chat-key', cause });
 }

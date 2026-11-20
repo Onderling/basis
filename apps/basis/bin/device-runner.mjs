@@ -58,6 +58,7 @@ import { VaultNodeFs } from '@onderling/vault';
 import { flushPendingSaves } from '@onderling/local-store';
 
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
+import { bootFailureNotice } from '../src/v2/bootFailure.js';
 import { initLocalisation, t } from '../src/localisation.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
 import { loadAssistantItems } from '../src/v2/assistantEngine.js';
@@ -376,6 +377,14 @@ const agent = await createRealHouseholdAgent({
   seedDemoData: false,
   seedHousehold: false,
   enrollOfferStorage: offerStash,
+}).catch((err) => {
+  // THE CONTENT KEY COULD NOT BE READ (L1115): nothing was minted or written. Said in the log in words, and the box stops
+  // so its service manager starts it again: a read that failed once may pass at the next start (the shells' "try again").
+  if (bootFailureNotice(err)?.retry) {
+    console.error('device-runner: the content key on this box could not be read; nothing was changed. Stopping; the next start tries again. If it keeps failing, restore the box from the phrase.');
+    process.exit(1);
+  }
+  throw err;
 });
 // The device log's windows from the register (the agent hydrated it at boot), as web and mobile apply them: the
 // windowed classes — the bot's turns with each person among them (chat class) — age out on this device's chat window.

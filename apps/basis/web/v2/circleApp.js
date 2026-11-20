@@ -76,7 +76,7 @@ import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
 import { circleVersioningFor, getCircleVersionStore } from '../../src/web/circleVersioning.js';
 import { pickWebBackend } from '../../src/web/persistentBackend.js';
-import { sealedLocalBackend, sealedLocalVault, sealedKeyValue, sealedJsonIo, onShellContentSeal } from '../../src/v2/localStoreSeal.js';
+import { sealedLocalBackend, sealedLocalVault, sealedKeyValue, sealedJsonIo, onShellContentSeal, onStoredValueRefused } from '../../src/v2/localStoreSeal.js';
 import { circleOfferingDraftIo } from '../../src/v2/circleOfferingDraft.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { VaultIndexedDB, VaultMemory, VaultLocalStorage } from '@onderling/vault';
 // S4 circle OIDC — reuse the existing browser Solid-OIDC wrapper (no rebuild). A signed-in
@@ -3962,6 +3962,13 @@ function launcherPinMuteSignature() {
 // showLauncher (which would re-schedule that refresh and loop forever; that infinite re-render
 // starved the main thread and hung the headless e2e, 2026-06-11).
 let _bootFailure = null;   // the agent boot's error, if it died — painted on the launcher
+// A save refused because the value it would replace could not be opened (L1115): said on the launcher, once heard.
+let _storedRefusal = false;
+onStoredValueRefused(() => {
+  if (_storedRefusal) return;
+  _storedRefusal = true;
+  if (getActiveCircle() == null && _activeTab === 'circles') { try { paintLauncher(); } catch { /* painted at the next visit */ } }
+});
 
 /**
  * The circles this device is in CHANGED underneath the launcher — an enrol offer consumed, a sibling's circle carried
@@ -4010,6 +4017,8 @@ function paintLauncher() {
     pinnedMap: launcherPinnedMap,
     mutedMap:  launcherMutedMap,
     bootFailure: _bootFailure,
+    storedRefusal: _storedRefusal,
+    onRetryBoot:  () => window.location.reload(),
     t,
     onOpenCircle: showDetail,
     onNewCircle:  createCircle,

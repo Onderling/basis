@@ -60,6 +60,12 @@ export const SEAMS = Object.freeze([
   // banner, so the seam is web and mobile only.
   // THE CIRCLES LIST HEARS A LINE THAT LANDS while it is on screen (subscribeTileChanges, circleTilePreviews.js): a
   // shell paints its list from it. Neither shell did on 2026-11-20 (the upgrade walk; a two-app browser walk).
+  // A START THAT COULD NOT READ THE CONTENT KEY (L1115) is said in words with "try again" (web, phone) or named in the
+  // log before a restart (the box): one decision, `bootFailureNotice`. A shell that paints the raw reason instead tells
+  // the person nothing they can act on, and one that carries on as if empty invites a restore that was not needed.
+  { id: 'start-failure-words', pattern: /bootFailureNotice\(/, why: 'a start that could not read the content key must say so in words and offer to try again, never look like an empty account' },
+  // A SAVE REFUSED because the value it would replace could not be opened is SAID (L1115): the stores swallow the throw.
+  { id: 'stored-value-refusal-said', pattern: /onStoredValueRefused\(/, shells: ['web', 'mobile'], why: 'a change the person made that was not saved (the stored value could not be opened) must be said, not silently dropped' },
   { id: 'circles-list-hears-new-lines', pattern: /subscribeTileChanges\(/, shells: ['web', 'mobile'], why: 'a line that lands while the circles list is on screen stays off its tile (old preview, old count) until the person leaves and comes back' },
   { id: 'banner-recheck-on-open', pattern: /\.recheck\(\)/, shells: ['web', 'mobile'], why: 'a banner raised before its thread or circle was opened stays over the header of that screen and takes the taps meant for it' },
   // THE SCREEN DOOR in the app: a pasted or scanned screen offer reaches the grant only through the shared pairing (three
@@ -421,7 +427,7 @@ export const SEAMS = Object.freeze([
 
 /** A shell is a file SET: the files that together compose the substrate for that surface. */
 export const SHELLS = Object.freeze([
-  { name: 'web',    files: ['apps/basis/web/v2/circleApp.js', 'apps/basis/web/v2/circleNearby.js', 'apps/basis/web/v2/circleMij.js'] },
+  { name: 'web',    files: ['apps/basis/web/v2/circleApp.js', 'apps/basis/web/v2/circleNearby.js', 'apps/basis/web/v2/circleMij.js', 'apps/basis/web/v2/circleLauncher.js'] },
   { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/core/phoneInboundWiring.js', 'apps/basis-mobile/src/core/phoneAppOps.js', 'apps/basis-mobile/src/core/phonePodReadBack.js', 'apps/basis-mobile/src/core/phonePodSession.js', 'apps/basis-mobile/src/core/circleMedia.js', 'apps/basis-mobile/src/core/circlePods.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/src/screens/v2/CircleAdminPanelScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMijScreen.js', 'apps/basis-mobile/App.js'] },
   { name: 'box',    files: ['apps/basis/bin/device-runner.mjs', 'apps/basis/src/telegram/runner.js'] },   // the runner is the box's Telegram door
 ]);

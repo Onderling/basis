@@ -51,7 +51,8 @@ import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../v2/addressS
 import { contactRelayScope } from '../../v2/connectionPoints.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity, sealStrategyForRecipients } from '../../v2/sharedCopyOpener.js'; // seal-to-self for settings + recipient-widened seal for view lanes
-import { contentSealStrategy } from '../../v2/contentAtRest.js';   // the device's content-at-rest key — a person's own words on their own disk
+import { contentSealStrategy } from '../../v2/contentAtRest.js';
+import { KeyUnreadable } from './keyUnreadable.js';   // the device's content-at-rest key — a person's own words on their own disk
 import { createSealingBackend } from '@onderling/pseudo-pod';            // the seal above a blind local store
 import { setShellContentSeal } from '../../v2/localStoreSeal.js';        // hand the content key to the shell's own stores
 import { wireEventLogPersistence } from '../../v2/eventLogPersistence.js';   // the device log hydrates HERE, where the key is
@@ -242,12 +243,12 @@ function makeBrowserVault(prefix, { durabilityMatters = false } = {}) {
  * (Host-only helper; createSecureAgent handles this for the chat side.)
  */
 async function restoreOrGenerate(vault) {
-  try {
-    if (await vault.has('agent-privkey')) {
-      return await AgentIdentity.restore(vault);
-    }
-  } catch { /* fall through to generate */ }
-  return AgentIdentity.generate(vault);
+  // generate ONLY when the vault says nothing is stored: a key that is there but will not read (a wrong at-rest key, a
+  // storage error) stops the boot, never a new host key over the one issuer's (L1115)
+  let held;
+  try { held = await vault.has('agent-privkey'); } catch (err) { throw new KeyUnreadable('host-key', err); }
+  if (!held) return AgentIdentity.generate(vault);
+  try { return await AgentIdentity.restore(vault); } catch (err) { throw new KeyUnreadable('host-key', err); }
 }
 
 /**
@@ -539,7 +540,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // strand its entries under a key the next boot no longer derives.
   const sealedBackings = [];
   const sealedVault = async (backing) => {
-    await migrateVaultToEncrypted({ backing, key: atRestKey, fingerprint: rootFingerprint });
+    // the sentinel's read is the boot's first read of a sealed vault: a storage error there is the same "could not read"
+    // as a key's, said with the same words (L1115), never the generic failure
+    try { await migrateVaultToEncrypted({ backing, key: atRestKey, fingerprint: rootFingerprint }); }
+    catch (err) { throw new KeyUnreadable('vault-sentinel', err); }
     sealedBackings.push(backing);
     return new VaultEncrypted({ backing, key: atRestKey });
   };

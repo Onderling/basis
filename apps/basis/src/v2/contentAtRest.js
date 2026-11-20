@@ -34,6 +34,7 @@
  */
 import { groupKeyStrategy } from '@onderling/pod-client';
 import { seedToString } from '@onderling/vault';
+import { KeyUnreadable, isKeyUnreadable } from '../core/agent/keyUnreadable.js';
 
 /** The reserved vault entry holding this device's content key. */
 export const CONTENT_AT_REST_VAULT_KEY = 'content-at-rest-key';
@@ -49,7 +50,22 @@ function randomContentKey() {
 }
 
 /**
- * Read this device's content key from the sealed vault, minting and storing it on first use.
+ * The content key is stored but could not be read (ledger L1115): the vault entry would not decrypt, the storage
+ * failed at start, or what is stored is not a key. NOT "nothing stored": a new key here would make every sealed row on
+ * this device unreadable and let the stores write their defaults over what they could not open. One of the family
+ * `KeyUnreadable` (core/agent/keyUnreadable.js): the shells read its code, `isContentKeyUnreadable` / `isKeyUnreadable`.
+ */
+export class ContentKeyUnreadable extends KeyUnreadable {
+  constructor(cause) { super('content-key', cause); this.name = 'ContentKeyUnreadable'; }
+}
+
+/** True for any key this device could not read at the start, also through a wrapping error's `cause`. */
+export const isContentKeyUnreadable = isKeyUnreadable;
+
+/**
+ * Read this device's content key from the sealed vault, minting and storing it ONLY when the vault answered that
+ * nothing is stored (null or an empty string). A read that failed, or a stored value that is not a key, throws
+ * `ContentKeyUnreadable` and writes nothing: the next start that reads it finds the same key (ledger L1115).
  *
  * Idempotent: the second call returns the stored key, so every store on the device seals under one key and
  * a re-boot opens what the last boot wrote.
@@ -62,8 +78,11 @@ export async function ensureContentKey(sealedVault) {
   if (!sealedVault || typeof sealedVault.get !== 'function' || typeof sealedVault.set !== 'function') {
     throw new Error('ensureContentKey: a sealed vault is required');
   }
-  const existing = await sealedVault.get(CONTENT_AT_REST_VAULT_KEY).catch(() => null);
+  let existing;
+  try { existing = await sealedVault.get(CONTENT_AT_REST_VAULT_KEY); }
+  catch (err) { throw new ContentKeyUnreadable(err); }
   if (typeof existing === 'string' && existing.length > 0) return existing;
+  if (existing != null && existing !== '') throw new ContentKeyUnreadable();
   const minted = seedToString(randomContentKey());
   await sealedVault.set(CONTENT_AT_REST_VAULT_KEY, minted);
   return minted;

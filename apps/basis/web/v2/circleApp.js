@@ -9997,6 +9997,9 @@ async function boot() {
           // when the message belongs to the circle actually on screen.
           if (info?.source !== 'receiver') return;
           if (!info?.circleId || info.circleId !== _circleRender?.circleId) return;
+          // …and only while that circle IS on screen: `_circleRender` outlives leaving the circle, and repainting it then
+          // drew the circle over whatever was showing (Vandaag, the list) the moment a line of it landed (2026-11-20)
+          if (getActiveCircle() !== info.circleId) return;
           try { _circleRender?.rerender?.(); } catch { /* no open circle */ }
         })(sendStoredReceipt);
       // The Nearby room confirms what lands with the SAME receipt (nearbyRoomBinding.js).

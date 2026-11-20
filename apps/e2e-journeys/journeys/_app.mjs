@@ -105,7 +105,7 @@ const mediumFor = (label, pod, circleId) => (id) => (id === circleId
 const laneLog = (node) => node.deviceLog ?? node.chatEventLog;
 
 /** Register the receive halves a shell registers, so fanned lane statements actually land. */
-function wireLanes(node) {
+export function wireLanes(node) {
   const inner = node._routerRef.fn;
   // GOVERNANCE — the rail a fanned decision statement must verify at before it lands, plus the
   // pull-all catch-up. Built here rather than per journey because the shells build it once per boot.

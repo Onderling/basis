@@ -81,7 +81,7 @@ import {
   // "My things" private notes-list.
   myThingsFromListFiles,
   // circle-scoped event stream + per-row action chips.
-  chatRows, mutedActorSet, agentActivityRows, actionsForStreamRow, resolveConversationKinds, sendersToPlace,
+  chatRows, mutedActorSet, agentActivityRows, actionsForStreamRow, conversationKindsOf, sendersToPlace,
   // recognising an inbound CHAT entry for THIS circle — the same kind + the same circle-id read the
   // conversation projection itself uses, so the refresh cannot key off something the filter ignores.
   CHAT_KIND, eventCircleId,
@@ -1583,7 +1583,7 @@ export default function CircleLauncherScreen({
     setLoading(true);
     try {
       const sources = resolveSkill
-        ? circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name, unnamedCircleName: () => t('circle.launcher.unnamed') })
+        ? circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name, unnamedCircleName: () => t('circle.launcher.unnamed'), policyStore })
         : {};
       const _l = await loadCircles(sources);
       setCircles(_l);
@@ -3559,10 +3559,8 @@ function CircleDetail({
   // name resolved to nothing and opening a circle threw `Property 'selectedPolicy' doesn't exist`. It never
   // showed up because the render already died one prop earlier on `onAcceptFallback`; two crashes stacked in
   // the same render, both from a name that reads perfectly plausibly in the file it sits in.
-  const allowedKinds = useMemo(() => resolveConversationKinds({
-    circleSetting: policy?.conversationKinds ?? circle?.conversationKinds ?? null,
-    templateKind:  policy?.kind ?? circle?.kind ?? null,
-  }), [policy?.kind, policy?.conversationKinds, circle?.kind, circle?.conversationKinds]);
+  const allowedKinds = useMemo(() => conversationKindsOf({ policy, circle }),
+    [policy?.kind, policy?.conversationKinds, circle?.kind, circle?.conversationKinds]);
   // Declared HERE (not with the entrust/MEMBERS blocks below) because the rows memo reads them: the
   // viewer signals gate the owner-only entrust action AND the reveal-gated sender labels, and the
   // roster is what the labels resolve against. The circle roster via listGroupMembers (web≡mobile);

@@ -97,6 +97,56 @@ export function resolveConversationKinds({ circleSetting = null, templateKind = 
 }
 
 /**
+ * What a circle's conversation shows, from its POLICY (where a create and the policy lane write it) with the circle
+ * record as the fallback. The one call both thread paints and every other reader make, so none resolves it its own way.
+ * @param {{policy?: object|null, circle?: object|null}} [a]
+ * @returns {string[]}
+ */
+export function conversationKindsOf({ policy = null, circle = null } = {}) {
+  return resolveConversationKinds({
+    circleSetting: policy?.conversationKinds ?? circle?.conversationKinds ?? null,
+    templateKind:  policy?.kind ?? circle?.kind ?? null,
+  });
+}
+
+/**
+ * EVERY READER OF AN ARRIVED LINE ASKS THE SAME FILTER. The kinds are a view filter (nothing is dropped), so they bind
+ * only when every consumer reads through them: the thread, the tile's count and subtitle, Today's news, the assistant's
+ * recent turns. Those readers are synchronous and the policy is read asynchronously, so each policy store notes what
+ * it read or wrote here (`noteCirclePolicy`), once per process, and the readers ask `knownConversationKindsOf`.
+ * Not known yet (never read this run, or a joined circle whose policy has not arrived): `null`, which filters nothing.
+ */
+const knownKinds = new Map();   // circleId → the kinds its conversation shows
+export function noteCirclePolicy(circleId, policy) {
+  if (typeof circleId !== 'string' || !circleId) return;
+  if (!policy || typeof policy !== 'object' || policy.policyPending === true) { knownKinds.delete(circleId); return; }
+  knownKinds.set(circleId, conversationKindsOf({ policy }));
+}
+/** @returns {string[]|null} */
+export function knownConversationKindsOf(circleId) {
+  return knownKinds.get(circleId) ?? null;
+}
+/** Read every listed circle's policy once, so the readers know its kinds (a shell calls it where it loads its circles). */
+export async function warmConversationKinds(policyStore, circles) {
+  if (!policyStore || typeof policyStore.get !== 'function') return;
+  await Promise.all((Array.isArray(circles) ? circles : []).map((c) => (typeof c === 'string' ? c : c?.id)).filter(Boolean)
+    .map((id) => Promise.resolve(policyStore.get(id)).catch(() => null)));
+}
+
+/**
+ * Does this logged line show in its circle's conversation? Only a HUMAN-lane line is judged (a system row and an item
+ * that landed are other rules'); a kind the circle has off does not show, count, or speak on a tile.
+ * @param {object} event
+ * @param {string[]|null} kinds   the circle's kinds; `null` = not known, nothing filtered
+ */
+export function showsInConversation(event, kinds) {
+  if (!Array.isArray(kinds)) return true;
+  const type = event?.type;
+  if (typeof type !== 'string' || ENTRY_KINDS[type]?.lane !== LANE.HUMAN) return true;
+  return kinds.includes(type);
+}
+
+/**
  * Turn one kind on or off for a circle, returning the new list.
  *
  * Takes the RESOLVED list rather than the stored setting, so the first change a circle makes starts from

@@ -31,6 +31,25 @@
 import { denyWinsMerge, POLICY_UPDATE_KIND } from './policyUpdateLane.js';
 
 /**
+ * THE ONE LINKS ADAPTER both rails hand the line: a lane's held statements → `linksOf(hash)`. A signed body names its
+ * parent `parentHash` (the spine's header), never `parent`; reading the wrong field ends every walk at its first link,
+ * so this is the only place it is read. Built once per judging pass, never per statement.
+ * @param {object[]} bodies  verified statement bodies this device holds on one lane
+ * @returns {(h: string) => ({parent: string|null, deps: string[]}|null)}  null = not held here
+ */
+export function linksIndex(bodies) {
+  const byHash = new Map();
+  for (const b of Array.isArray(bodies) ? bodies : []) {
+    if (!b || typeof b.hash !== 'string') continue;
+    byHash.set(b.hash, {
+      parent: typeof b.parentHash === 'string' && b.parentHash ? b.parentHash : null,
+      deps: Array.isArray(b.deps) ? b.deps.filter((d) => typeof d === 'string' && d) : [],
+    });
+  }
+  return (h) => byHash.get(h) ?? null;
+}
+
+/**
  * Where a statement stands to one line.
  * @param {string} hash
  * @param {string[]|undefined} tips  the line on this lane; not an array (a change without a line): unknown

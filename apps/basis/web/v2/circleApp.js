@@ -255,7 +255,7 @@ import { voteFailedLine, enactOutcomeLine } from '../../src/v2/governanceView.js
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
-import { makeCirclePolicyLane, sealedPolicyHeadStore, membersOfViaSkill } from '../../src/v2/policyUpdateLane.js';
+import { saveCircleSettings, statingPolicyStore, makeCirclePolicyLane, sealedPolicyHeadStore, membersOfViaSkill } from '../../src/v2/policyUpdateLane.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies, openOfferPersonas, ENROL_PERSONAS_PARAM, ENROL_GENERAL_PARAM, enrolPickState, togglePick, pickerRows, pickPrimary, enrolPickArgs, enrollOfferErrorKey } from '../../src/v2/enrollOffer.js';
 import { installWebSignatureEquation } from '../../src/v2/signatureEquations.js';
 import { runStartQueue, startQueueSiblings } from '../../src/v2/startQueue.js';
@@ -9548,7 +9548,8 @@ async function showSettings(id) {
       if (!useRecipe || !useModel) return t('circle.recipeApply.error');
       const res = await applyReviewedRecipe({
         circleId: id, recipe: useRecipe, model: useModel, declinedKeys,
-        sources: circleBaseSources, policyStore,
+        // the recipe's settings are stated to the circle, as a settings save is (web and phone alike)
+        sources: circleBaseSources, policyStore: statingPolicyStore(policyStore, circlePolicyLane),
         // Record the member's declined optional caps as capabilityOptOuts (the seam the gate honours).
         recordOptOuts: (optOuts) => overrideStore.update(id, { capabilityOptOuts: optOuts }),
       });
@@ -9564,10 +9565,11 @@ async function showSettings(id) {
       if (!asProposal()) {
         // Save says what happened (the walk: it said nothing). The policy save is not an op — a local store and the
         // governance lane — so the act strip is told by hand; everything through the waist is told by the wrap.
-        await actState.track({ appOrigin: 'basis', opId: 'circle-settings-save' }, policyStore.update(id, working));
-        // The just-saved policy goes on the governance lane as a signed statement — every member, and whoever
-        // joins later, catches it up.
-        circlePolicyLane.state(id).catch(() => { /* catch-up reconciles */ });
+        // The settings go on the governance lane as a signed statement (every member, and whoever joins later, catches
+        // it up) and are written here only when that statement went out: a save the circle never got is not a save.
+        const saved = await actState.track({ appOrigin: 'basis', opId: 'circle-settings-save' },
+          saveCircleSettings({ lane: circlePolicyLane, circleId: id, policy: working }));
+        if (!saved?.ok) { storageNote = t('circle.settings.not_stated'); rerender(); return; }   // stay: try again
         // §4 storage-policy bridge — when the pod tier changed, drive pinboard's
         // authoritative circle storage policy. The skill owns admin-gating + the
         // one-way guard; on failure we keep the local save and show a note.

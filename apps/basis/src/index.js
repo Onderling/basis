@@ -422,3 +422,6 @@ export {
 export { sharedCircleLocale, sharedConsequenceLocale, sharedRoleLocale, sharedHostLocale, sharedNounLocale, sharedLocale, mergeShared } from './locales/index.js';
 export { fieldAfterLoad } from './v2/fieldAfterLoad.js';
 export { itemKindChip } from './v2/embedChips.js';
+
+// an admin's settings save: stated to the circle, written here only when that went out (web and phone)
+export { statingPolicyStore } from './v2/policyUpdateLane.js';

@@ -6364,9 +6364,15 @@ export async function createRealHouseholdAgent(opts = {}) {
         // remembered as reached by NOBODY, without a roster read here: the next tell (any roster change, an address
         // landing) finds every address new and tells the line to the circle once — every receiver dedupes it — and
         // that fan writes who still waits
-        lateRecipients.fanned(circleId, o.statement, [], (cid, st, { only = null } = {}) => callSkill('pinboard', 'broadcastCircleChatStatement', {
-          groupId: cid, event: st, msgId: o.msgId, ts: Date.now(), ...(only ? { only } : {}),
-        }), { msgId: o.msgId });
+        // …and the re-tell goes to the members this line still WAITS for, never to the others whose address is merely new
+        // to this fresh memory (they hold it already): one whole-circle fan per waiting line at a start would be the burst
+        // the narrowing removed
+        lateRecipients.fanned(circleId, o.statement, [], async (cid, st, { only = null } = {}) => {
+          const waits = waitingByMsg.get(o.msgId)?.refs ?? new Set();
+          const to = (only ?? [...waits]).filter((w) => waits.has(w));
+          if (!to.length) return { sent: 0, attempted: 0, outcomes: [] };
+          return callSkill('pinboard', 'broadcastCircleChatStatement', { groupId: cid, event: st, msgId: o.msgId, ts: Date.now(), only: to });
+        }, { msgId: o.msgId });
         lateRecipients.noAddress(circleId, o.waiting);
       }
     };

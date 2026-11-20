@@ -29,8 +29,8 @@ import { entryKindRegistryFromManifests, toEventLogItem, kindWakes, param, PARAM
 import { cardForCircleWire } from '@onderling/kring-host/circleBroadcast';
 import { chatManifest, CHAT_LANE } from './chatManifest.js';
 import { rosterBindingVerifier } from './membershipRail.js';
-import { NOT_TAKEN } from '../core/handlers/peerRouter.js';
-import { DELIVERY_WAITING_ENTRY } from './deliveryState.js';   // a verdict the receive record reads: not taken, so a repeat is handed on again
+import { NOT_TAKEN } from '../core/handlers/peerRouter.js';   // a verdict the receive record reads: not taken, so a repeat is handed on again
+import { DELIVERY_WAITING_ENTRY } from './deliveryState.js';
 
 /** The statement kinds the chat lane carries — DERIVED from the manifest's declared appends. */
 export const CHAT_RAIL_KINDS = entryKindRegistryFromManifests(chatManifest).kindsFor(CHAT_LANE);

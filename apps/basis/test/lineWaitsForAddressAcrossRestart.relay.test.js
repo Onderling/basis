@@ -99,6 +99,16 @@ describe('a line waiting for one member across a restart', () => {
     await bindCircleAddressKeysFor({ agent: S2.agent, circleId: GROUP });
     await S2.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
 
+    // who gets the line again after the restart: the waiting member ALONE (the others hold it already; a re-tell to every
+    // member per waiting line would be the boot-time burst the narrowing removed)
+    const again = new Map([[F, 0], [R, 0]]);
+    for (const n of [F, R]) {
+      const live = n._routerRef.fn;
+      n._routerRef.fn = (env) => {
+        if (env?.payload?.subtype === 'circle-chat-statement' && env?.payload?.msgId === MSG) again.set(n, again.get(n) + 1);
+        return live(env);
+      };
+    }
     // the late member's address lands now (the founder tells the circle again, as after a join)
     await propagateCircleAddressesAfterJoin({ agent: F.agent, circleId: GROUP, newMemberWebid: L.pubKey });
     const lateRowHasAddress = async () => ((await S2.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members ?? [])
@@ -106,5 +116,7 @@ describe('a line waiting for one member across a restart', () => {
     expect(await untilTrue(lateRowHasAddress, 15000, 200), 'the late member\'s address landed at the restarted sender').toBe(true);
     const reached = await untilTrue(() => holds(L), 30000, 250);
     expect(reached, 'the late member holds the line once their address landed at the restarted sender').toBe(true);
+    await new Promise((r) => { setTimeout(r, 1500); });
+    expect({ founder: again.get(F), receiver: again.get(R) }, 'members who held it already were not sent it again').toEqual({ founder: 0, receiver: 0 });
   }, 240000);
 });

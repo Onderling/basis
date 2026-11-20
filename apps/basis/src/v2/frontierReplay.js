@@ -46,6 +46,16 @@ const REPLAY_OFFER_THRESHOLD = param({ key: 'replay.offerThreshold', scope: PARA
 /** Up to this many offered statements the RECEIVER allows automatically (system lanes never prompt);
  *  above it the offer is handed to the lane's `onOffer` seam — chat surfaces the real question there. */
 const REPLAY_AUTO_ALLOW = param({ key: 'replay.autoAllow', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 200 });
+// A content lane's catch-up asks this many members per circle at a start (own devices first, the rest at random), and
+// waits this long for an answer before it asks the next few (the start burst, 2026-11-20).
+export const CATCHUP_ASK_FEW = param({ key: 'replay.askFew', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
+const CATCHUP_ASK_WAIT_MS = param({ key: 'replay.askWaitMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 4_000 });
+/** A shuffled copy (Fisher-Yates over Math.random): a different pick at each start, never a fixed or supplied list. */
+function shuffled(list) {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i -= 1) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
 
 /**
  * @param {object} deps
@@ -68,6 +78,11 @@ export function makeFrontierReplay({
   limit = REPLAY_WINDOW_LIMIT, chunkSize = DEFAULT_CHUNK_SIZE,
   offerThreshold = REPLAY_OFFER_THRESHOLD, autoAllow = REPLAY_AUTO_ALLOW, onOffer: offerSeam = null,
   onRefused = null, selfWebid = null, allowGlobal = null,
+  // ASK A FEW, NOT ALL (the start burst, 2026-11-20): `askFew` members per circle — this person's own other devices
+  // first (`ownAddressFor(circleId)` names this device's address, so its siblings can be told apart), the rest shuffled
+  // at each start — widening to the next few after `askWaitMs` of silence, or at once when an answer leaves a gap.
+  // Absent: every member is asked, as before (the deny-wins lanes keep that).
+  askFew = null, askWaitMs = CATCHUP_ASK_WAIT_MS, ownAddressFor = null, shuffle = shuffled,
 } = {}) {
   if (!rail || typeof rail.storedStatements !== 'function' || typeof rail.ingest !== 'function') {
     throw new Error('frontierReplay: a rail (storedStatements + ingest) is required');
@@ -126,7 +141,12 @@ export function makeFrontierReplay({
       // only what this device can still vouch for (checked here, now): an unchecked one would be refused there and
       // leave the receiver a hole it cannot explain
       const missing = sendOnOnlyChecked(all.filter((s) => s?.body?.hash && !known.has(s.body.hash)), circleId, rail);
-      if (missing.length === 0) return;       // nothing to serve — silence, the receiver stops paging
+      // nothing to serve: say so — an empty answer, so the asker can tell "nothing new" from "not reached" (it widens only
+      // on silence); an older asker reads it as a batch that landed nothing and stops paging, as before
+      if (missing.length === 0) {
+        await sendToPeer(fromPeerAddr, { subtype: BATCH, circleId, statements: [], seq: 0, done: true, more: false }, { circleId });
+        return;
+      }
       const allowance = Number.isFinite(payload.allowance) && payload.allowance > 0 ? Math.floor(payload.allowance) : 0;
       // The consent gate (Frits, the chat-lane sitting): above the provider's threshold, do not stream —
       // answer with a SIZE SIGNAL and serve only a request that carries an explicit allowance. Small
@@ -172,6 +192,7 @@ export function makeFrontierReplay({
         else if (r && !r.ok) { refused.push(s); try { onRefused?.({ circleId, fromPeerAddr, reason: r.reason ?? 'refused', statement: s }); } catch { /* observer only */ } }
       } catch { /* one bad statement never blocks the rest */ }
     }
+    await afterAnswer(circleId, statements);
     // ONE deferred re-ingest for refusals — the governance catch-up's own posture, for the same reason:
     // a pull-burst's batches race each other, and a statement whose binding needs a fact another
     // batch is still folding (a sibling's proven address, arriving by its announce-back a moment after
@@ -246,14 +267,54 @@ export function makeFrontierReplay({
     return { requested };
   }
 
-  /** ONE circle's replay request, at each other member's PER-CIRCLE address (2026-09-21, see `catchUpTargets`). */
-  async function requestCircle(circleId, { callSkill }) {
-    const targets = await catchUpTargets({ callSkill, circleId, selfWebid, allowGlobal });
+  /** circleId → the ask in progress when asking a few: `{ order, next, answered, timer }`. */
+  const asking = new Map();
+
+  /** Ask the next few of this circle's order; when more remain, look again after the wait (silence widens). */
+  async function askNext(circleId, st) {
+    if (st.timer) { clearTimeout(st.timer); st.timer = null; }
+    const round = st.order.slice(st.next, st.next + Number(askFew));
+    st.next += round.length;
+    st.answered = false;
     let requested = 0;
-    for (const t of targets) {
+    for (const t of round) {
       try { await requestFrom(t.addr, circleId); requested += 1; } catch { /* next peer */ }
     }
-    return { requested };
+    if (st.next < st.order.length) {
+      st.timer = setTimeout(() => { st.timer = null; if (!st.answered) askNext(circleId, st).catch(() => {}); }, Number(askWaitMs));
+      st.timer?.unref?.();
+    }
+    return requested;
+  }
+
+  /** A batch from an asked member: the circle is answered; a GAP in it (a predecessor this device still lacks) widens. */
+  async function afterAnswer(circleId, statements) {
+    const st = asking.get(circleId);
+    if (!st) return;
+    st.answered = true;
+    if (st.timer) { clearTimeout(st.timer); st.timer = null; }
+    const have = new Set(rail.storedStatements(circleId).map((s) => s?.body?.hash).filter(Boolean));
+    const lacks = (h) => typeof h === 'string' && h && !have.has(h);
+    const gap = (statements ?? []).some((s) => lacks(s?.body?.parentHash) || (Array.isArray(s?.body?.deps) && s.body.deps.some(lacks)));
+    if (gap && st.next < st.order.length) { try { await askNext(circleId, st); } catch { /* the next start asks again */ } }
+  }
+
+  /** ONE circle's replay request, at each other member's PER-CIRCLE address (2026-09-21, see `catchUpTargets`). */
+  async function requestCircle(circleId, { callSkill }) {
+    const own = askFew && typeof ownAddressFor === 'function' ? (() => { try { return ownAddressFor(circleId) ?? null; } catch { return null; } })() : null;
+    const targets = await catchUpTargets({ callSkill, circleId, selfWebid, allowGlobal, ...(own ? { ownDevicesExcept: own } : {}) });
+    if (!(Number(askFew) > 0)) {
+      let requested = 0;
+      for (const t of targets) {
+        try { await requestFrom(t.addr, circleId); requested += 1; } catch { /* next peer */ }
+      }
+      return { requested };
+    }
+    const prior = asking.get(circleId);
+    if (prior?.timer) clearTimeout(prior.timer);
+    const st = { order: [...targets.filter((t) => t.own), ...shuffle(targets.filter((t) => !t.own))], next: 0, answered: false, timer: null };
+    asking.set(circleId, st);
+    return { requested: await askNext(circleId, st) };
   }
 
   return { onRequest, onBatch, onOffer, requestFrom, requestAll, requestCircle, localFrontier, subtypes: { request: REQ, batch: BATCH, offer: OFFER } };

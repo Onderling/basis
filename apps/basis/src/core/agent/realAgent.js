@@ -1396,6 +1396,13 @@ export async function createRealHouseholdAgent(opts = {}) {
   //   INBOUND — peer envelopes ingest back into THIS circle store (`wireCircleStoreInbound`, id-preserving,
   //             no echo). Best-effort (the op still runs locally). This is the SINGLE fan-out path for the
   //   circle: tasks ride it too now (tasks-v0's own substrate mirror is skipped when the store is injected).
+  // The restart's re-fan state (`reFanOwedChat`, below) lives HERE, above this function: the household circle is wired
+  // eagerly at boot, and its wiring asks for the re-fan; declared below that call, the read threw "before
+  // initialization", the household's wiring was caught as "NOT wired", and its re-fan never ran (2026-08-20 to 2026-11-20).
+  const reFannedCircles = new Set();
+  // (circleId) → the re-tell learns, from the log, what a restart still owes across it; bound with the membership rail
+  // further down — a circle opened before that is kept in `pending` and seeded when it binds
+  const seedWaitingRef = { current: null, pending: new Set() };
   async function ensureCircleSync(circleId) {
     const id = (typeof circleId === 'string' && circleId) ? circleId : 'household';
     if (circleSyncWired.has(id)) return;
@@ -1538,10 +1545,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // circle each boot, re-fan my own recent chat statements that have no logged receipt. A restart
   // therefore cannot silently break the hold promise: what was still owed goes out again, receivers'
   // rails dedup what they already have, and receipt-keyed removal stops the copies that arrive.
-  const reFannedCircles = new Set();
-  // (circleId) → the re-tell learns, from the log, what a restart still owes across it; bound with the membership rail
-  // further down — a circle opened before that is kept in `pending` and seeded when it binds
-  const seedWaitingRef = { current: null, pending: new Set() };
+  // (Its state, `reFannedCircles` and `seedWaitingRef`, is declared above `ensureCircleSync`.)
   function reFanOwedChat(circleId) {
     if (!opts.deviceLog || reFannedCircles.has(circleId)) return;
     // A circle is wired at boot BEFORE this factory has built its chat rail and composed its API (further down): a send

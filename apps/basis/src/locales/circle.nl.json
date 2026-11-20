@@ -10525,6 +10525,8 @@
     "connected": "Gekoppeld aan {{bot}}. Dit is je beheerscherm: zet deze pagina in je bladwijzers, dan kom je hier terug. Dit kan dit scherm voor je doen:",
     "run": "Doen",
     "failed": "Koppelen lukte niet: {{reason}}",
+    "key_unreadable": "De eigen sleutel van dit scherm in deze browser kon niet worden gelezen, dus het kan niet koppelen. Er is niets veranderd. Vergeet hem hier en koppel dit scherm opnieuw (een nieuwe /scherm-link).",
+    "forget_key": "Vergeet dit scherm hier",
     "not_a_link": "Deze link is niet (meer) geldig. Vraag de bot een nieuwe: /scherm.",
     "refused": "Niet gekoppeld: in je gesprek met de bot is een andere code of \"geen van deze\" gekozen. Vraag een nieuwe link: /scherm.",
     "timed_out": "Niet gekoppeld: er kwam binnen tien minuten geen antwoord. Vraag een nieuwe link: /scherm.",

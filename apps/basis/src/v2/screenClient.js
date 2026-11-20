@@ -13,6 +13,7 @@
  */
 import { createScreenView, screenAddressFor } from './screenView.js';
 import { parseScreenStartLink } from './botScreens.js';
+import { isKeyUnreadable } from '../core/agent/keyUnreadable.js';
 import { SCREEN_PAIRING_TTL_MS } from './screenDoor.js';
 import { createSecureAgent, makeBrowserVault } from '@onderling/secure-agent';
 
@@ -26,6 +27,9 @@ export const SCREEN_CLIENT_VERSION = '0.1.0';
 export const SCREEN_CLIENT_CODES = Object.freeze([
   'not-paired', 'grant-expired', 'rate-limited', 'no-connection', 'timeout', 'aborted', 'op-not-allowed',
   'toolbox-unreachable', 'toolbox-not-yours', 'answer-too-large', 'tool-error', 'not-found', 'failed',
+  // this page's own key in this browser is there but will not read (L1115): never replaced on its own; `signOut()`
+  // removes it, then pair again
+  'key-unreadable',
 ]);
 
 /** How long a call waits without its own `timeoutMs`. */
@@ -46,6 +50,7 @@ const TOOLBOX_CODES = Object.freeze({
  */
 export function screenClientCode(err, answer = null) {
   if (err) {
+    if (isKeyUnreadable(err)) return 'key-unreadable';
     const m = String(err?.code ?? err?.message ?? err);
     if (/aborted|AbortError/i.test(m)) return 'aborted';
     if (/rate-limited|RATE_LIMIT/i.test(m)) return 'rate-limited';

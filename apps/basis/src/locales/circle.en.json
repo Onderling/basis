@@ -10528,6 +10528,8 @@
     "connected": "Connected to {{bot}}. This is your management screen: bookmark this page to come back to it. This screen can do this for you:",
     "run": "Do",
     "failed": "Connecting did not work: {{reason}}",
+    "key_unreadable": "This screen's own key in this browser could not be read, so it cannot connect. Nothing was changed. Forget it here and connect this screen again (a new /scherm link).",
+    "forget_key": "Forget this screen here",
     "not_a_link": "This link is not (or no longer) valid. Ask the bot for a new one: /scherm.",
     "refused": "Not connected: another code, or \"none of these\", was picked in your chat with the bot. Ask for a new link: /scherm.",
     "timed_out": "Not connected: no answer came within ten minutes. Ask for a new link: /scherm.",

@@ -92,7 +92,7 @@ describe('Vandaag — whose chores are "mine"', () => {
 });
 
 describe('Vandaag — "mine" is the circle\'s own self', () => {
-  it('a chore assigned to the persona in the persona\'s circle is mine there — on the tasks block and the open-chores reading', async () => {
+  it('a chore assigned to the persona in the persona\'s circle is mine there, on the tasks block', async () => {
     const byCircle = {
       home: [{ id: 'h1', text: 'afwas', assignee: 'me-default', state: 'open' }],
       work: [{ id: 'w1', text: 'rapport', assignee: 'me-werk', state: 'open' }, { id: 'w2', text: 'koffie', assignee: 'me-default', state: 'open' }],
@@ -104,14 +104,12 @@ describe('Vandaag — "mine" is the circle\'s own self', () => {
       return null;
     };
     const selfIn = (circleId) => (circleId === 'work' ? 'me-werk' : 'me-default');
-    const [tasks, line] = await materializeScreen({
+    const [tasks] = await materializeScreen({
       screen: { id: 's', name: 'Vandaag', circleFilter: null, blocks: [
         { id: 't', type: 'tasks', config: { scope: 'assigned-to-me' } },
-        { id: 'i', type: 'identityLine', config: { readings: ['open'] } },
       ] },
       hostOps: { callSkill, selfIn, circles: [{ id: 'home', name: 'Thuis' }, { id: 'work', name: 'Werk' }] },
     });
     expect(tasks.content.items.map((r) => r.id).sort()).toEqual(['h1', 'w1']);
-    expect(line.content.readings.find((r) => r.key === 'open')?.count).toBe(2);
   });
 });

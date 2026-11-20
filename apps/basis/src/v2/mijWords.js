@@ -1,33 +1,19 @@
 /**
- * Me's blocks in words — the identity line's readings and the agents rows — said once, for both shells' painters.
+ * Me's and Vandaag's blocks in words — the availability words and the agents rows — said once, for both shells' painters.
  * Kept apart from `mijScreen.js` so a painter does not pull in the materializer.
  */
-import { whenWords } from './whenWords.js';
-
-const READING_WORDS = {
-  availability: (r, tr) => (r.state === 'away'
-    ? (r.until ? tr('circle.profile.reading_away', { until: r.until }) : tr('circle.profile.reading_away_open'))
-    : r.state === 'quiet' ? tr('circle.profile.reading_quiet', { until: r.until }) : tr('circle.profile.reading_available')),
-  online: (r, tr) => tr(r.on ? 'circle.profile.reading_online' : 'circle.profile.reading_offline'),
-  // a count of nothing says nothing: "0 unread · 0 open" was two words of noise on every Me
-  unread: (r, tr) => (Number(r.count) > 0 ? tr('circle.profile.reading_unread', { count: r.count }) : ''),
-  open: (r, tr) => (Number(r.count) > 0 ? tr('circle.profile.reading_open', { count: r.count }) : ''),
-  next: (r, tr, o) => tr('circle.profile.reading_next', { title: r.title, when: whenWords(r.when, o) }),
-};
 
 /**
- * The identity line's readings in words, in their order — what both shells paint after the name.
- * @param {{readings?: Array<object>}} content   the materialized identity line
- * @param {object} o
- * @param {(k: string, v?: object) => string} o.t
- * @param {string} [o.locale]
- * @param {string} [o.tz]
- * @returns {string[]}
+ * Vandaag's availability words: available · quiet until … · away (until …) — what both shells paint in the block.
+ * @param {{state: string, until?: string}|null} reading   the availability block's reading
+ * @param {{ t: (k: string, v?: object) => string }} o
+ * @returns {string}
  */
-export function identityLineWords(content, { t, locale, tz } = {}) {
-  return (Array.isArray(content?.readings) ? content.readings : [])
-    .map((r) => READING_WORDS[r.key]?.(r, t, { locale, tz }))
-    .filter((s) => typeof s === 'string' && s);
+export function availabilityWords(reading, { t } = {}) {
+  if (!reading || typeof t !== 'function') return '';
+  if (reading.state === 'away') return reading.until ? t('circle.profile.reading_away', { until: reading.until }) : t('circle.profile.reading_away_open');
+  if (reading.state === 'quiet') return t('circle.profile.reading_quiet', { until: reading.until });
+  return t('circle.profile.reading_available');
 }
 
 /**

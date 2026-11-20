@@ -1,6 +1,6 @@
 /**
  * Vandaag's top on the web: the availability words as a block whose tap opens the availability screen, and "Wacht op
- * jou" painted by the same block painter Mij used. The words come from the shared reading words (`identityLineWords`).
+ * jou" painted by the same block painter Mij used. The words come from the shared reading words (`availabilityWords`).
  * @vitest-environment happy-dom
  */
 import { describe, it, expect, vi } from 'vitest';

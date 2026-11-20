@@ -33,7 +33,7 @@ describe('the persona panel: the short view', () => {
   it('the name (with Aanpassen) and my devices and helpers; what waits and the readings went to Vandaag', () => {
     const blocks = mijBlocks(basisManifest);
     expect(blocks.map((b) => b.type)).toEqual(['identityLine', 'agents']);
-    expect(blocks[0].config.readings).toEqual([]);
+    expect(blocks[0].config.readings).toBeUndefined();
   });
 
   it('one persona: no tabs, no "Laat zien als"', () => {

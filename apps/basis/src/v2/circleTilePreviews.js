@@ -46,9 +46,11 @@ const MAX_SUBTITLE_LEN = param({ key: 'circleTile.maxSubtitleLen', scope: PARAM_
  * @param {string[]} [opts.myRefs=[]]  this person's refs — their own lines are never unread
  * @param {(key: string) => string} [opts.t]  the translator: a landed item's subtitle names its kind in words
  * @param {Set<string>} [opts.readIds]  every id the person READ, on any of their devices (`readMarks.js`): never new
+ * @param {number} [opts.since]  the news window's start (0 = none): older is not new (`unreadOnAnyDevice`)
+ * @param {(event: object) => boolean} [opts.skip]  an event another block holds: not counted here
  * @returns {Object<string, {subtitle: string|null, ts: number, unread: number, kinds: string[], unreadIds: Array<{id: string, at: number}>}>}
  */
-export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRefs = [], actorLabel = null, t = null, readIds = null } = {}) {
+export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRefs = [], actorLabel = null, t = null, readIds = null, since = 0, skip = null } = {}) {
   const known = new Set((circles || []).map((c) => c?.id).filter(Boolean));
   const out = {};
   // Seed entries for every known circle so the host can drive layout
@@ -81,7 +83,9 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRe
     // new = LANDED here after I looked (a line the relay held for hours counts once it arrives)
     // …and read on none of my devices (the read set holds the source's id: a landed item's, a line's own)
     const sourceId = landing ? event.payload.itemId : event.id;
-    if (landedTimeOf(event) > seen && countsAsUnread(event, { myRefs }) && !(readIds && readIds.has(sourceId))) {
+    // `skip`: what another block holds (Vandaag's circle block leaves out what is addressed to the person)
+    if (landedTimeOf(event) > seen && countsAsUnread(event, { myRefs }) && !(typeof skip === 'function' && skip(event))
+      && unreadOnAnyDevice({ id: sourceId, landedAt: landedTimeOf(event) }, { readIds, since })) {
       entry.unread += 1;
       // what opening the circle marks read: the id with the SOURCE's time (the same on every device)
       entry.unreadIds.push({ id: sourceId, at: landing ? (event.payload.saidAt ?? event.ts ?? 0) : (event.ts ?? 0) });
@@ -92,6 +96,18 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRe
   }
 
   return out;
+}
+
+/**
+ * THE READ RULE — "read on any device": a thing is unread when it landed here inside the window (`since`, the news
+ * window; 0 = no window) and its source id is in no read set of the person's devices (`readMarks.js`). The one test both
+ * of Vandaag's news blocks read ("Nieuw voor jou" through `notificationRows`, "Kringen met nieuws" through the tiles'
+ * count), so a thing read on any device leaves both at once.
+ * @param {{id: string, landedAt: number}} thing
+ * @param {{readIds?: Set<string>|null, since?: number}} [o]
+ */
+export function unreadOnAnyDevice({ id, landedAt } = {}, { readIds = null, since = 0 } = {}) {
+  return landedAt >= since && !(readIds && typeof readIds.has === 'function' && readIds.has(id));
 }
 
 /**

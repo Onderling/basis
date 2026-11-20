@@ -18,15 +18,15 @@ const identityBlock = (content) => ({ blockId: 'mij-identityLine-0', type: 'iden
 const agentsBlock = (items) => ({ blockId: 'mij-agents-1', type: 'agents', status: 'ok', titleKey: 'circle.recipe.block.agents', content: { items } });
 
 describe('renderCircleProfile — the declared screen', () => {
-  it('the name is the title, the readings one line under it, "Edit" opens the person\'s own editor', () => {
+  it('the name is the title (no readings under it: they went 2026-11-20), "Edit" opens the person\'s own editor', () => {
     const onBlockAction = vi.fn();
     const el = renderCircleProfile(document.createElement('div'), {
       t, onBlockAction,
-      blocks: [identityBlock({ name: 'Frits', readings: [{ key: 'online', on: true }, { key: 'unread', count: 2 }] }), agentsBlock([])],
+      blocks: [identityBlock({ name: 'Frits' }), agentsBlock([])],
     });
     expect(el.querySelectorAll('.cc-profile__title')).toHaveLength(1);
     expect(el.querySelector('.cc-profile__title').textContent).toBe('Frits');
-    expect(el.querySelector('.circle-screen__identity-readings').textContent).toBe('circle.profile.reading_online · circle.profile.reading_unread:{"count":2}');
+    expect(el.querySelector('.circle-screen__identity-readings')).toBeNull();
     el.querySelector('.circle-screen__identity-edit').click();
     expect(onBlockAction).toHaveBeenCalledWith({ kind: 'edit-me' });
   });
@@ -35,7 +35,7 @@ describe('renderCircleProfile — the declared screen', () => {
     const onBlockAction = vi.fn();
     const el = renderCircleProfile(document.createElement('div'), {
       t, onBlockAction,
-      blocks: [identityBlock({ name: 'Frits', readings: [] }), agentsBlock([{ kind: 'device', label: null, here: true }, { kind: 'bot', label: 'Huishoudbot' }])],
+      blocks: [identityBlock({ name: 'Frits' }), agentsBlock([{ kind: 'device', label: null, here: true }, { kind: 'bot', label: 'Huishoudbot' }])],
     });
     const rows = [...el.querySelectorAll('.circle-screen__agents-row')];
     expect(rows.map((r) => r.textContent)).toEqual(['circle.profile.agent_here', 'circle.profile.agent_bot:{"label":"Huishoudbot"}']);

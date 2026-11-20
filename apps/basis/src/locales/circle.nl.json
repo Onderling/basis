@@ -7152,26 +7152,6 @@
       "text": "stil tot {{until}}",
       "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
     },
-    "reading_online": {
-      "text": "online",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. This device is connected at its relays."
-    },
-    "reading_offline": {
-      "text": "offline",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. This device is not connected at its relays."
-    },
-    "reading_unread": {
-      "text": "{{count}} ongelezen",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
-    },
-    "reading_open": {
-      "text": "{{count}} open",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. What is the person's and still open, across circles — over every noun that declares whose it is and when it is done."
-    },
-    "reading_next": {
-      "text": "straks: {{title}} {{when}}",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. The soonest thing still to come, over every noun whose moment is scheduled."
-    },
     "agent_here": {
       "text": "dit apparaat",
       "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
@@ -11285,6 +11265,10 @@
     "removed": {
       "text": "Je bent verwijderd uit {{circle}}",
       "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "role": {
+      "text": "{{circle}}: {{change}}",
+      "doc": "'Nieuw voor jou': my role in a circle changed (made admin, or no longer); {{change}} is the membership notice's own sentence."
     },
     "many": {
       "text": "{{count}} nieuwe dingen bij {{name}}",

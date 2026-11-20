@@ -1279,13 +1279,13 @@ export const basisManifest = {
    * Me — the PERSONA PANEL behind the persona button (top right on every tab): ONE declared short view. Below the
    * actions above, these blocks, in order — filled by the one screen materializer (`mijScreenBlocks`) and painted by
    * each shell's block painter. No shell lists a section of the panel by hand.
-   *   identityLine — the person's (or the persona's) name with "Aanpassen" (the editor), and the readings named here
+   *   identityLine — the person's (or the persona's) name with "Aanpassen" (the editor)
    *   agents       — this person's devices, companions and linked bots, one row each (read-only; a tap opens the
    *                  devices settings group)
    */
   meBlocks: [
     // the name and "Aanpassen" only: the readings went (the availability to Vandaag; the counts were dropped)
-    { type: 'identityLine', config: { readings: [] } },
+    { type: 'identityLine', config: {} },
     { type: 'agents',       config: {} },
   ],
 

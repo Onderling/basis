@@ -69,7 +69,7 @@ export const BLOCK_DESCRIPTORS = Object.freeze({
   text:          { order: 7,  emoji: '✏️', places: BOTH,       config: () => ({ text: '' }) },
   // the person's own pages: the circles with news, a one-line "about me", the person's devices and helpers
   circlesUnread: { order: 8,  emoji: '🔔', places: ['mij'],    config: () => ({ limit: 5 }) },
-  identityLine:  { order: 9,  emoji: '🙂', places: ['mij'],    config: () => ({ readings: [] }) },
+  identityLine:  { order: 9,  emoji: '🙂', places: ['mij'],    config: () => ({}) },
   agents:        { order: 10, emoji: '🤝', places: ['mij'],    config: () => ({}) },
   awaiting:      { order: 11, emoji: '⏳', places: ['mij'],    config: () => ({}) },
   // the notes across the page's circles — filterable by label (notes carry tags)

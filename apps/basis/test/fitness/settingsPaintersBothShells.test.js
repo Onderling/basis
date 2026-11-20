@@ -48,7 +48,7 @@ describe('settings sections: declared once, painted on both shells', () => {
   };
   for (const [shell, src] of Object.entries(SHELLS)) {
     it(`${shell}: each painter paints exactly one section`, () => {
-      const sectionOpen = shell === 'web' ? /\bsection\(tr\(/g : /<Section title=/g;
+      const sectionOpen = shell === 'web' ? /\b(?:section\(tr\(|actionSection\()/g : /<(?:Section title=|ActSection\b)/g;
       const counts = painterBodies(src).map(([id, body]) => `${id}:${(body.match(sectionOpen) ?? []).length + (shell === 'web' && /renderUserLlmSettings\(holder/.test(body) ? 1 : 0)}`);
       expect(counts.filter((c) => !c.endsWith(':1'))).toEqual([]);
     });
@@ -70,8 +70,9 @@ describe('settings sections: declared once, painted on both shells', () => {
   // directly, writes no store, and every `callSkill` it makes names a `private` op of the declared app; everything else
   // it does is a host callback that opens the ceremony (the ceremony's own ops are the waist's to gate).
   const custody = settingsHomeFor(basisManifest).groups.flatMap((g) => g.sections.filter((x) => x.custody).map((x) => x.id));
-  it('the custody sections are the keys, the devices and the storage (sign-in)', () => {
-    expect([...custody].sort()).toEqual(['devices', 'keys', 'storage']);
+  it('the custody sections are the device acts, the way back (Herstel) and the storage (sign-in)', () => {
+    expect([...custody].sort()).toEqual(['bot-link', 'companion-claim', 'device-add', 'device-primary', 'device-replace', 'devices',
+      'personas-receive', 'recovery-file', 'recovery-phrase', 'restore', 'storage']);
   });
   const MANIFESTS = { basis: basisManifest };
   for (const [shell, src] of Object.entries(SHELLS)) {

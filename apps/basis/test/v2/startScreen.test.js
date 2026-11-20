@@ -16,8 +16,9 @@ describe('the start screen', () => {
   it('opens on Vandaag unless the person chose otherwise', () => {
     expect(START_SCREEN).toBe('vandaag');
     expect(startTabFor(undefined, null)).toBe('screens');
-    expect(startTabFor('vandaag', 'mij')).toBe('screens');
-    expect(startTabFor('circles', 'mij')).toBe('circles');
+    expect(startTabFor('vandaag', 'contacten')).toBe('screens');
+    expect(startTabFor('circles', 'contacten')).toBe('circles');
+    expect(startTabFor('last', 'mij'), 'Mij is no tab any more: the home').toBe('screens');
     expect(startTabFor('last', 'contacten')).toBe('contacten');
     expect(startTabFor('last', null), 'no last tab yet: the home').toBe('screens');
     expect(startTabFor('last', 'nearby'), 'a tab the alpha does not paint: the home').toBe('screens');

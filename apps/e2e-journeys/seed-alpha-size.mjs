@@ -12,6 +12,9 @@
  * The relay stays UP when seeding is done (the cold starts are measured with it reachable); stop with Ctrl-C.
  *
  *   node apps/e2e-journeys/seed-alpha-size.mjs --serial RFCT504SRZH [--circles 5] [--members 14] [--lines 200] [--port 8799]
+ *     [--host 192.168.2.20]   the relay's address on the LAN: the invites carry it and the phone dials it over Wi-Fi
+ *                             (no adb reverse). Without it the phone dials 127.0.0.1 through adb reverse, which bunches
+ *                             frames on arrival and drops with a USB blip (L1099): measure rates over Wi-Fi.
  *
  * Every sender's `undelivered` reports (the relay gave up on a line it was holding) are counted per sender and per
  * circle and printed at the end, and each later one as it comes (the relay stays up): 'sent' is what left, not what
@@ -33,6 +36,7 @@ const CIRCLES = Number(arg('circles', 5));
 const MEMBERS = Number(arg('members', 14));
 const LINES = Number(arg('lines', 200));
 const PORT = Number(arg('port', 8799));
+const HOST = arg('host', null);
 if (!serial) { console.error('--serial <adb serial> is required (the phone is free to wipe: the Samsung)'); process.exit(2); }
 
 const adb = (...a) => execFileSync('adb', ['-s', serial, ...a], { encoding: 'utf8' });
@@ -40,11 +44,11 @@ const step = (s) => console.log(`\n── ${s}`);
 const WORDS = ['melk', 'brood', 'morgen', 'vergadering', 'fiets', 'sleutel', 'tuin', 'koffie', 'om tien uur', 'de buren', 'boodschappen', 'het feest'];
 const line = (i) => `${WORDS[i % WORDS.length]} ${WORDS[(i * 7 + 3) % WORDS.length]} (${i + 1})`;
 
-step(`a local relay on :${PORT}, reached by the phone through adb reverse`);
+step(`a local relay on :${PORT}, reached by the phone ${HOST ? `over the LAN at ${HOST}` : 'through adb reverse'}`);
 const relay = await startRelay({ port: PORT });
-const relayUrl = `ws://127.0.0.1:${relay.port}`;
-adb('reverse', `tcp:${relay.port}`, `tcp:${relay.port}`);
-console.log(`relay ${relayUrl}; adb reverse tcp:${relay.port} set`);
+const relayUrl = `ws://${HOST ?? '127.0.0.1'}:${relay.port}`;
+if (!HOST) adb('reverse', `tcp:${relay.port}`, `tcp:${relay.port}`);
+console.log(`relay ${relayUrl}${HOST ? '' : `; adb reverse tcp:${relay.port} set`}`);
 
 step(`boot the founder and ${MEMBERS} members`);
 const handles = ['founder', ...Array.from({ length: MEMBERS }, (_, i) => `member-${i + 1}`)];
@@ -113,6 +117,6 @@ for (const [k, n] of tally('handle')) console.log(`  sender ${k}: ${n}`);
 for (const [k, n] of tally('reason')) console.log(`  reason ${k}: ${n}`);
 seeded = true;
 console.log('the relay stays UP for the cold starts; Ctrl-C stops it (then: adb reverse --remove-all).');
-const stop = async () => { try { adb('reverse', '--remove-all'); } catch { /* the phone may be gone */ } await relay.stop?.(); process.exit(0); };
+const stop = async () => { try { if (!HOST) adb('reverse', '--remove-all'); } catch { /* the phone may be gone */ } await relay.stop?.(); process.exit(0); };
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);

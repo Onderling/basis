@@ -36,8 +36,11 @@ export function blockTitle(block, t) {
  * Whether a block on the person's pages offers "meer" (open it whole): a block with rows does; the onboarding strip
  * does not — its cards are the whole of it, and a "more" under them reads as a second "Lees meer".
  */
+const NOT_WHOLE = new Set(['onboarding', 'forYou', 'awaiting']);
 export function blockOpensWhole(block) {
-  return block?.status === 'ok' && block?.type !== 'onboarding' && block?.type !== 'forYou';   // "Nieuw voor jou" is whole already
+  // "Nieuw voor jou" is whole already; Vandaag's declared top ("Wacht op jou") is no block of
+  // the stored page, so there is nothing to open whole (its "meer" opened the whole page again)
+  return block?.status === 'ok' && !NOT_WHOLE.has(block?.type);
 }
 
 /** The one quiet line an empty block shows. */

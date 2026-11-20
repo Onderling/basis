@@ -10,7 +10,7 @@ import { test, expect } from '@playwright/test';
 test.setTimeout(120_000);
 
 const rows = (page) => page.evaluate(() => window.onderlingOwnActions?.() ?? null);
-const openPlus = async (page) => { await page.locator('.circle-vandaag__plus').click(); };
+const openPlus = async (page) => { await page.locator('.circle-vandaag__plus').dblclick(); };
 const say = async (page, line) => {
   const before = await page.locator('.circle-vandaag-plus__turn').count();
   await page.locator('.circle-vandaag-plus__line').fill(line);

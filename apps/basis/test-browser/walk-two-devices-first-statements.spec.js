@@ -75,14 +75,14 @@ test('a rename on one device and a disclosure on the other, each its first state
     // ── the two first statements, one per device, close together ─────────────────────────────────────
     const newName = `Anna ${Date.now().toString(36).slice(-4)}`;
     await gotoCircles(A1.page);
-    await A1.page.locator('[data-tab="mij"]').first().click(); await A1.page.waitForTimeout(1200);
+    await A1.page.locator('.cc-persona-button__button').click(); await A1.page.waitForTimeout(1200);
     await A1.page.locator('.circle-screen__identity-edit').click(); await A1.page.locator('.cc-profile__display').fill(newName);
     const renamed = A1.page.locator('.cc-profile__save').click();
     const disclosed = (async () => {
       await call(A2.page, 'agents', 'setProfileProperty', { id: 'default', key: 'place', value: 'Groningen' });
       await call(A2.page, 'agents', 'setProfileDisclosure', { id: 'default', contextId: circle, key: 'place', enabled: true });
       await gotoCircles(A2.page);
-      await A2.page.locator('[data-tab="mij"]').first().click(); await A2.page.waitForTimeout(1500);
+      await A2.page.locator('.cc-persona-button__button').click(); await A2.page.waitForTimeout(1500);
       await A2.page.locator('.circle-screen__identity-edit').first().click(); await A2.page.waitForTimeout(2000);
       const row = A2.page.locator(`.cc-mij__table tr[data-circle-id="${circle}"]`);
       const btn = row.locator('.cc-mij__cell-action button').first();

@@ -52,7 +52,7 @@ test("a member who joined: the '+' runs \"zet melk op de boodschappen\" in the c
     }
     await B.page.locator('[data-tab="screens"]').first().click();
     await expect(B.page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
-    await B.page.locator('.circle-vandaag__plus').click();
+    await B.page.locator('.circle-vandaag__plus').dblclick();
     await B.page.locator('.circle-vandaag-plus__line').fill('zet melk op de boodschappen');
     await B.page.locator('.circle-vandaag-plus__line').press('Enter');
     // the answer is said once, in the thread (plusAnswerLineShown): the '+' turn, not a separate done line

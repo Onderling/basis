@@ -8,7 +8,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderContactsRoster } from '../../web/v2/contactsRoster.js';
 import { contactRowMeta, trustWordKey } from '../../src/v2/contactsSource.js';
-import { identityLineWords } from '../../src/v2/mijWords.js';
 import { renderCircleScreen } from '../../web/v2/circleScreen.js';
 import { browserDeviceName } from '../../src/v2/deviceName.js';
 import { mijScreenBlocks } from '../../src/v2/mijScreen.js';
@@ -39,13 +38,9 @@ describe('Contacts', () => {
 describe('Me', () => {
   it('no handle: "Nog geen naam", not the tab\'s word', () => {
     const el = renderCircleScreen(document.createElement('div'), {
-      blocks: [{ blockId: 'i', type: 'identityLine', status: 'ok', content: { name: null, readings: [] } }], t,
+      blocks: [{ blockId: 'i', type: 'identityLine', status: 'ok', content: { name: null } }], t,
     });
     expect(el.querySelector('.cc-profile__title')?.textContent).toBe('circle.profile.no_name_yet');
-  });
-  it('a count of nothing is not said', () => {
-    const words = identityLineWords({ readings: [{ key: 'online', on: true }, { key: 'unread', count: 0 }, { key: 'open', count: 0 }, { key: 'unread', count: 3 }] }, { t });
-    expect(words).toEqual(['circle.profile.reading_online', 'circle.profile.reading_unread:{"count":3}']);
   });
   it('"this device" by its own name when the person never gave it one', async () => {
     const callSkill = async (app, op) => (op === 'getProfileProperties' ? { properties: {} } : op === 'listContacts' ? { contacts: [] } : {});

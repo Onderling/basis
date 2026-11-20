@@ -14,9 +14,8 @@ describe('Help from Settings, the assistant from Me, on the phone', () => {
 
   it('Settings → Help opens the Help circle', async () => {
     await backToLauncher();
-    await tapSoon(by.id('circle-tab-mij'));
-    await device.takeScreenshot('help-02-me-actions');
-    await tapSoon(by.id('profile-settings'), 30_000);
+    await tapSoon(by.id('settings-button'), 30_000);
+    await device.takeScreenshot('help-02-settings');
     await tapSoon(by.id('settings-door-help'), 20_000);
     await soon(by.id('circle-detail-composer'), 30_000);
     await device.takeScreenshot('help-03-help-circle');

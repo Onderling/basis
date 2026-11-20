@@ -10,15 +10,19 @@ read state; the notification projection and "Nieuw voor jou" on Today follow.
 - See which contacts wrote: the count on a contact's row and the sum on the Contacten tab.
 - Read something on one device and have it read on all: opening a circle or a conversation marks what is in it read,
   and the person's other devices stop counting it once the mark arrives.
-- See "Nieuw voor jou" at the top of Today (only when something is there): a new post, task or appointment, a line in
-  a circle, a direct message, someone they admitted joining, their own removal; each row opens the thing, ✕ sets it
+- See "Nieuw voor jou" at the top of Today (only when something is there): what is addressed to them — a direct
+  message, a task given to them, someone they admitted joining, their own removal, their role changed, a circle setting
+  that changes what they may do; ordinary lines and posts in a circle are counted in "Kringen met nieuws" instead, so no
+  thing shows in both (option B, 2026-11-19). A reply to one of their lines is not yet told apart: a circle line carries
+  no reference to the line it answers and no mention. Each row opens the thing, ✕ sets it
   aside, "Alles gelezen" clears the block; a row that arrived long after it was sent says "kwam later binnen". Rows come
   from every persona on the device, ticked in the switcher or not, and each carries the face of the persona it is for.
 - Be told while the app is open: a banner at the top for what is addressed to them (a direct message, being removed
   from a circle), for the personas ticked in the switcher, never while they are already looking at it; several at once
   are one banner with a count; a tap opens it. Which kinds ring is a setting per kind (`notify.policy.<kind>`:
   banner, only on Today, or off). Being removed still shows after the circle has left their list.
-- Also under "Nieuw voor jou": a circle setting someone else changed, in the settings screen's own words; a task
+- Also under "Nieuw voor jou": a circle setting someone else changed, in the settings screen's own words, when it
+  turns a feature on or off or sets a rule (a name or a colour alone is not); a task
   someone else gave them (a banner by default; a change to its words is not news); their own open question in the
   Nearby room while it is open, the way back to it from any tab.
 
@@ -32,7 +36,12 @@ unfolded), poked by each shell on a log append and a stored direct message; the 
 
 - **One news projection**: `apps/basis/src/v2/circleTilePreviews.js` (`buildTilePreviews`): human-lane lines plus
   item landings, from others, newer than this device's seen-mark by when they ARRIVED here (`landedAt`), and in no
-  read set. The tiles, Today's news (`userScreenBlocks.js`) and Mij read it. The contact badges:
+  read set. The tiles and Today's news (`userScreenBlocks.js`) read it. **Addressed to me** is one predicate per row
+  kind, `isAddressedToMe` beside the projection (`notifications.js`): Today's "Nieuw voor jou" keeps only those rows, and
+  Today's "Kringen met nieuws" leaves the same things out (`newsKindOf`), so nothing shows in both. **Read** is one rule
+  for both blocks, `unreadOnAnyDevice` (`circleTilePreviews.js`): inside the news window and in no read set of the
+  person's devices; beside "Nieuw voor jou" the circle block no longer reads this device's seen-mark. The banner reads
+  every kind. The contact badges:
   `apps/basis/src/v2/contactUnread.js` (inbound turns by `receivedAt`).
 - **Arrival times**: the device log stamps `landedAt` at the first append of an id (`apps/basis/src/eventLog.js`,
   `landedTimeOf`); an inbound direct message is stored with `receivedAt` (`packages/item-store/src/addressedDeliver.js`).

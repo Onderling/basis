@@ -392,6 +392,11 @@ export const SEAMS = Object.freeze([
   // so a person on the default never sees the app jump to it seconds later. The phone only: the web paints nothing
   // until its agent is there and opens straight on the start (circleApp's startTabFor); the box has no screen.
   { id: 'first-frame-tab', pattern: /firstFrameTab\(/, shells: ['mobile'], why: 'the app opens on the circles list and jumps to Vandaag seconds later, under the person\'s finger' },
+  // THE "+" DOCKED IN THE TAB BAR: what a press on it or on one of its round buttons does is the shared `plusPress`
+  // (src/v2/plusDial.js); the host keeps only whether it is open and runs the target handed back. A host that decides
+  // for itself drifts from the other (a second tap that closes on one shell and opens the chat on the other). The box
+  // has no tab bar.
+  { id: 'plus-dial-press', pattern: /plusPress\(/, shells: ['web', 'mobile'], why: 'the "+" behaves differently per shell: the middle spot, the double tap into the chat, or the close' },
   // Today's reach card: a device with no relay says so and what works already. The host hands the strip the relay
   // question's own predicate; a shell that does not shows no card, and its person sends into nothing unwarned.
   { id: 'today-knows-no-relay', pattern: /relayKnown:\s*\(\)\s*=>/, shells: ['web', 'mobile'], why: 'a device with no connection point sends into nothing and nothing on Today says so' },

@@ -1,33 +1,91 @@
 /**
- * Me's blocks in words — the identity line's readings and the agents rows — said once, for both shells' painters.
+ * The availability (the persona button's ring and label, the panel's row) and Me's agents rows in words — said once, for both shells' painters.
  * Kept apart from `mijScreen.js` so a painter does not pull in the materializer.
  */
-import { whenWords } from './whenWords.js';
 
-const READING_WORDS = {
-  availability: (r, tr) => (r.state === 'away'
-    ? (r.until ? tr('circle.profile.reading_away', { until: r.until }) : tr('circle.profile.reading_away_open'))
-    : r.state === 'quiet' ? tr('circle.profile.reading_quiet', { until: r.until }) : tr('circle.profile.reading_available')),
-  online: (r, tr) => tr(r.on ? 'circle.profile.reading_online' : 'circle.profile.reading_offline'),
-  // a count of nothing says nothing: "0 unread · 0 open" was two words of noise on every Me
-  unread: (r, tr) => (Number(r.count) > 0 ? tr('circle.profile.reading_unread', { count: r.count }) : ''),
-  open: (r, tr) => (Number(r.count) > 0 ? tr('circle.profile.reading_open', { count: r.count }) : ''),
-  next: (r, tr, o) => tr('circle.profile.reading_next', { title: r.title, when: whenWords(r.when, o) }),
-};
+import { normalizeAvailability, isPushSuppressed } from './memberAvailability.js';
 
 /**
- * The identity line's readings in words, in their order — what both shells paint after the name.
- * @param {{readings?: Array<object>}} content   the materialized identity line
- * @param {object} o
- * @param {(k: string, v?: object) => string} o.t
- * @param {string} [o.locale]
- * @param {string} [o.tz]
- * @returns {string[]}
+ * The availability reading of a stored record at `now`: available · quiet until … · away (until …). No record is
+ * available (the default), never a guess.
+ * @returns {{key: 'availability', state: 'available'|'quiet'|'away', until?: string|null}}
  */
-export function identityLineWords(content, { t, locale, tz } = {}) {
-  return (Array.isArray(content?.readings) ? content.readings : [])
-    .map((r) => READING_WORDS[r.key]?.(r, t, { locale, tz }))
-    .filter((s) => typeof s === 'string' && s);
+export function availabilityReading(record, now = Date.now()) {
+  const a = normalizeAvailability(record ?? {});
+  if (a.holiday.active && isPushSuppressed({ ...a, quietHours: { ...a.quietHours, enabled: false } }, new Date(now))) return { key: 'availability', state: 'away', until: a.holiday.until };
+  if (isPushSuppressed(a, new Date(now))) return { key: 'availability', state: 'quiet', until: a.quietHours.to };
+  return { key: 'availability', state: 'available' };
+}
+
+/**
+ * Is this device connected? The relay fact the shells already show (the connection points list): connected at one of
+ * its relays (`agent.relays.list()` rows' `connected`). No relays, or none answering: not connected.
+ * @param {Array<{connected?: boolean}>|null} rows
+ */
+export function connectedAtRelay(rows) {
+  return Array.isArray(rows) && rows.some((r) => r?.connected === true);
+}
+
+/**
+ * The person's presence now: availability AND connection, one of four states, in this precedence (Frits 2026-11-20):
+ * away (holiday) > quiet (quiet hours) > available and connected > available but not connected (`offline`).
+ * @returns {{state: 'away'|'quiet'|'available'|'offline', until?: string|null}}
+ */
+export function presenceReading(record, { now = Date.now(), connected = false } = {}) {
+  const r = availabilityReading(record, now);
+  if (r.state !== 'available') return r;
+  return { key: 'availability', state: connected ? 'available' : 'offline' };
+}
+
+// the ring's colour per state: existing theme tokens only (src/v2/theme.js), no palette of its own; away is calm and
+// clearly not grey, never danger
+const RING_TOKEN = Object.freeze({ available: 'green', offline: 'inkSoft', quiet: 'amber', away: 'blue' });
+
+/**
+ * The person's presence as a RING around the persona button (Frits 2026-11-20: availability left Vandaag): the state
+ * now (`presenceReading`) and the theme colour token that rings the button. Colour is never the only signal: the
+ * button's label (`personaButtonLabel`) names the state, and the persona panel says it in words (`availabilityRow`).
+ * @returns {{state: 'away'|'quiet'|'available'|'offline', token: 'blue'|'amber'|'green'|'inkSoft'}}
+ */
+export function availabilityRing(record, { now = Date.now(), connected = false } = {}) {
+  const { state } = presenceReading(record, { now, connected });
+  return { state, token: RING_TOKEN[state] };
+}
+
+/** The presence in words: away/quiet as the availability words; available as "beschikbaar, (niet) verbonden". */
+export function presenceWords(reading, { t } = {}) {
+  if (!reading || typeof t !== 'function') return '';
+  if (reading.state === 'available') return t('circle.profile.reading_available_connected');
+  if (reading.state === 'offline') return t('circle.profile.reading_available_offline');
+  return availabilityWords(reading, { t });
+}
+
+/**
+ * The persona panel's one availability row: the presence now in words, and that a tap changes it ("beschikbaar, niet
+ * verbonden · tik om te wijzigen"). A tap opens the availability screen.
+ */
+export function availabilityRow(record, { now = Date.now(), connected = false, t } = {}) {
+  if (typeof t !== 'function') return '';
+  return t('circle.persona_panel.availability_row', { state: presenceWords(presenceReading(record, { now, connected }), { t }) });
+}
+
+/** The persona button's spoken name with the state its ring shows ("Persona, beschikbaar, verbonden"). */
+export function personaButtonLabel(record, { now = Date.now(), connected = false, t } = {}) {
+  if (typeof t !== 'function') return '';
+  return t('circle.persona_button.label_with_state', { state: presenceWords(presenceReading(record, { now, connected }), { t }) });
+}
+
+/**
+ * The availability words: available · quiet until … · away (until …) — what the panel row and the button's label say.
+ * @param {{state: string, until?: string}|null} reading   the availability reading (`availabilityReading`)
+ * @param {{ t: (k: string, v?: object) => string }} o
+ * @returns {string}
+ */
+export function availabilityWords(reading, { t } = {}) {
+  if (!reading || typeof t !== 'function') return '';
+  if (reading.state === 'away') return reading.until ? t('circle.profile.reading_away', { until: reading.until }) : t('circle.profile.reading_away_open');
+  if (reading.state === 'quiet') return t('circle.profile.reading_quiet', { until: reading.until });
+  return t('circle.profile.reading_available');
 }
 
 /**

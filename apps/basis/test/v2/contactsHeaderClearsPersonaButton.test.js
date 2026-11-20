@@ -2,7 +2,7 @@
  * THE CONTACTS HEADER'S BUTTONS STAY CLEAR OF THE AVATAR.
  *
  * On both test phones the second header button ("+ Add a bot") sat under the floating avatar top right, so nobody
- * could read what it added. The avatar is positioned absolutely (fab.js HEADER_AVATAR); a header row beside it keeps
+ * could read what it added. The avatar is positioned absolutely (fab.js PERSONA_BUTTON); a header row beside it keeps
  * the avatar's width free on its right, so its buttons wrap instead of hiding.
  */
 import { describe, it, expect } from 'vitest';
@@ -14,10 +14,11 @@ const read = (f) => fs.readFileSync(path.join(MOBILE, f), 'utf8');
 
 describe('the Contacts header next to the floating avatar', () => {
   it('fab.js declares the side clearance once', () => {
-    expect(read('fab.js')).toMatch(/export const HEADER_AVATAR_SIDE_CLEARANCE = HEADER_AVATAR\.right \+ HEADER_AVATAR\.size/);
+    // the persona button and, left of it, the settings button
+    expect(read('fab.js')).toMatch(/export const PERSONA_BUTTON_SIDE_CLEARANCE = PERSONA_BUTTON\.right \+ 2 \* PERSONA_BUTTON\.size \+ SETTINGS_BUTTON_GAP/);
   });
   it('the Contacts head row keeps it free on the right', () => {
     const src = read('ContactsScreen.js');
-    expect(src).toMatch(/head: \{[^}]*paddingRight: HEADER_AVATAR_SIDE_CLEARANCE/);
+    expect(src).toMatch(/head: \{[^}]*paddingRight: PERSONA_BUTTON_SIDE_CLEARANCE/);
   });
 });

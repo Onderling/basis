@@ -25,6 +25,32 @@
       "doc": "Global tab bar: the Nearby screen (the room this device is in)."
     }
   },
+  "plus": {
+    "chat": {
+      "text": "Chat",
+      "doc": "The opened '+' (docked in the tab bar): the button to the person's own conversation, on the '+''s own spot by default."
+    },
+    "scan": {
+      "text": "Scan",
+      "doc": "The opened '+': scan a QR code (the scanQr op)."
+    },
+    "my_qr": {
+      "text": "Mijn QR",
+      "doc": "The opened '+': show my own QR code to share my contact (the share-my-contact view). Frits: it must say it is the QR."
+    },
+    "close": {
+      "text": "Sluiten",
+      "doc": "The opened '+' with nothing on its middle spot: the '+' itself, whose tap folds the buttons back (its spoken label)."
+    },
+    "middle_hint": {
+      "text": "Wat een tweede tik op de + opent",
+      "doc": "Settings, Appearance: one line under that heading, saying what the choice does."
+    },
+    "middle_none": {
+      "text": "Niets (een tweede tik sluit)",
+      "doc": "Settings, Appearance: the choice to put no button on the '+''s middle spot (a second tap on the '+' then closes it)."
+    }
+  },
   "create_unavailable": {
     "text": "Nog geen kring aan te maken — de app is nog aan het starten.",
     "doc": "SP-13.1 — surfaced when createCircle is invoked before the agent bundle has booted."
@@ -50,7 +76,7 @@
         "doc": "Fold-in phase C (Q3) — pre-checked, uncheckable wizard line when the joined circle's invite carries the offering-matching signal; checked = disclose offering keys at the coarse 'category' rung for the chosen persona."
       },
       "hint": {
-        "text": "Alleen de categorie wordt gedeeld, nooit de tekst of tags. Vink uit als je je aanbod hier niet wilt delen — later aanpassen kan bij Mij → persona's.",
+        "text": "Alleen de categorie wordt gedeeld, nooit de tekst of tags. Vink uit als je je aanbod hier niet wilt delen — later aanpassen kan via de personaknop (rechtsboven) → Aanpassen.",
         "doc": "Fold-in phase C (Q3) — explains the coarse rung + how to change it later; shown under the pre-checked line."
       }
     },
@@ -215,7 +241,7 @@
           "doc": "Join wizard — default persona option label."
         },
         "hint": {
-          "text": "Alleen wat deze persona in deze kring deelt, wordt gedeeld. Niets bij een eerste keer. Later aanpassen kan bij Mij, persona's.",
+          "text": "Alleen wat deze persona in deze kring deelt, wordt gedeeld. Niets bij een eerste keer. Later aanpassen kan via de personaknop (rechtsboven).",
           "doc": "Join wizard: persona disclosure hint."
         },
         "already_in": {
@@ -588,10 +614,6 @@
   "loading": {
     "text": "Laden…",
     "doc": "Shown while circles are being fetched."
-  },
-  "back_me": {
-    "text": "← Mij",
-    "doc": "Back link from any screen under Me (Mij) to the Me screen — one key for all of them."
   },
   "back_mydata": {
     "text": "← Mijn gegevens",
@@ -1723,7 +1745,7 @@
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     },
     "onboarding_handle_hint": {
-      "text": "Je naam voor mensen in je kringen. Later te veranderen in Mij.",
+      "text": "Je naam voor mensen in je kringen. Later te veranderen via de personaknop (rechtsboven).",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     },
     "onboarding_handle_ph": {
@@ -4281,7 +4303,7 @@
       "doc": "First-time wizard, step 2 and the card editor: copy what the room self offers into the card as tags (a prefill the person sees and can remove)."
     },
     "wizard2_no_offers": {
-      "text": "Je biedt nog niets aan. Dat kan later, bij Mij.",
+      "text": "Je biedt nog niets aan. Dat kan later, via de personaknop (rechtsboven).",
       "doc": "First-time wizard, step 2: in place of the offers switch when nothing is offered yet; Mij/Me is the tab."
     },
     "wizard2_under": {
@@ -6331,7 +6353,7 @@
       "doc": "A \"meer\" tapped after its list of things was replaced or went old: nothing to page; search again (ledger L1035)."
     },
     "toolbox_found_row": {
-      "text": "{{label}} \u00b7 {{more}}",
+      "text": "{{label}} · {{more}}",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
     "toolbox_pick_button": {
@@ -6988,7 +7010,7 @@
       "doc": "S2 — personal offerings section. (Web editor retired in fold-in phase C; mobile CircleProfileScreen still renders it until the mobile mirror lands.)"
     },
     "offerings_moved": {
-      "text": "Aanbod staat nu bij Mij → persona's",
+      "text": "Aanbod staat nu achter de personaknop → Aanpassen",
       "doc": "Fold-in phase C — quiet pointer row on the Profiel screen, replacing the retired skills editor; opens the Mij persona surface."
     },
     "no_offerings": {
@@ -7038,10 +7060,6 @@
     "loc_clear": {
       "text": "Locatie wissen",
       "doc": "S2 — clear the saved location."
-    },
-    "availability": {
-      "text": "Beschikbaarheid →",
-      "doc": "S2 — open the availability/quiet-hours screen."
     },
     "sharedWithMe": {
       "text": "Met mij gedeeld →",
@@ -7135,26 +7153,6 @@
       "text": "stil tot {{until}}",
       "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
     },
-    "reading_online": {
-      "text": "online",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. This device is connected at its relays."
-    },
-    "reading_offline": {
-      "text": "offline",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. This device is not connected at its relays."
-    },
-    "reading_unread": {
-      "text": "{{count}} ongelezen",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
-    },
-    "reading_open": {
-      "text": "{{count}} open",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. What is the person's and still open, across circles — over every noun that declares whose it is and when it is done."
-    },
-    "reading_next": {
-      "text": "straks: {{title}} {{when}}",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. The soonest thing still to come, over every noun whose moment is scheduled."
-    },
     "agent_here": {
       "text": "dit apparaat",
       "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
@@ -7183,13 +7181,17 @@
       "text": "Kopieer logboek / Meld een probleem →",
       "doc": "The door on My data that shows this device's log (event codes and numbers only) and lets the person copy it."
     },
-    "avatar_label": {
-      "text": "Profiel",
-      "doc": "The header avatar's accessible name, top-right on every tab: it opens the person's profile (or the switcher with several selves)."
-    },
     "no_name_yet": {
       "text": "Nog geen naam",
       "doc": "Me's title while the person has no handle — never the tab's own word in its place."
+    },
+    "reading_available_connected": {
+      "text": "beschikbaar, verbonden",
+      "doc": "The persona button ring and panel row: available, and this device is connected at one of its relays (presenceWords)."
+    },
+    "reading_available_offline": {
+      "text": "beschikbaar, niet verbonden",
+      "doc": "The persona button ring and panel row: available, but this device is not connected at any relay (presenceWords)."
     }
   },
   "blocked": {
@@ -7330,10 +7332,6 @@
     "usage": {
       "text": "Gebruik",
       "doc": "S5 — usage metrics section."
-    },
-    "keys": {
-      "text": "Sleutels & back-up",
-      "doc": "S5 — key-management section heading."
     },
     "view_mnemonic": {
       "text": "Herstelzin tonen",
@@ -7605,7 +7603,7 @@
       "doc": "My data → keys: the member's CHOICE of which device others deliver to first (sync-policy §12, 2026-09-16). Announces this device's address in every circle with the primary flag; a boot announce never moves the slot."
     },
     "make_primary_no_point": {
-      "text": "Directe berichten komen nu op dit apparaat binnen ({{count}} kringen ingelicht). Het kan je kringwijzigingen nog niet ondertekenen: typ er één keer je herstelzin op (Instellingen → Apparaten & sleutels).",
+      "text": "Directe berichten komen nu op dit apparaat binnen ({{count}} kringen ingelicht). Het kan je kringwijzigingen nog niet ondertekenen: typ er één keer je herstelzin op (Instellingen → Herstel).",
       "doc": "After the main-device tap on a device without the circle root: direct messages land here, but it cannot be the point that signs the spine."
     },
     "make_primary_done": {
@@ -8506,7 +8504,7 @@
     },
     "plus_ceiling": {
       "text": "Wat de + voor me mag doen",
-      "doc": "mij#personas \u2014 a persona card: heading of how far the person's own + goes for this persona (the ceiling, _plus.ceiling)."
+      "doc": "mij#personas — a persona card: heading of how far the person's own + goes for this persona (the ceiling, _plus.ceiling)."
     },
     "plus_ceiling_0": {
       "text": "Niets. De + staat uit voor deze persona.",
@@ -8707,6 +8705,36 @@
     "driver_remove": {
       "text": "Haal {{what}} weg",
       "doc": "Mij → a driver chip's remove button (aria label): what is taken off."
+    },
+    "awaiting_kind": {
+      "vote": {
+        "text": "stemmen",
+        "doc": "The \"Wacht op jou\" block title: the word for the vote kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "rsvp": {
+        "text": "uitnodigingen",
+        "doc": "The \"Wacht op jou\" block title: the word for the rsvp kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "task": {
+        "text": "taken",
+        "doc": "The \"Wacht op jou\" block title: the word for the task kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "question": {
+        "text": "vragen",
+        "doc": "The \"Wacht op jou\" block title: the word for the question kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "other": {
+        "text": "andere verzoeken",
+        "doc": "The \"Wacht op jou\" block title: ONE word for device offers and shared copies together, last in the order (awaitingTitle)."
+      }
+    },
+    "awaiting_title_separator": {
+      "text": ", ",
+      "doc": "The \"Wacht op jou\" block title: between the kinds before the last."
+    },
+    "awaiting_title_last": {
+      "text": "{{list}} en {{last}}",
+      "doc": "The \"Wacht op jou\" block title: the kinds before the last ({{list}}) and the last one ({{last}})."
     }
   },
   "attach": {
@@ -8869,7 +8897,7 @@
     "offer_title": "Toevoeg-code",
     "offer_hint": "Scan of plak deze code op het nieuwe apparaat en typ daar de herstelzin. De code is geen geheim — de herstelzin blijft de enige sleutel.",
     "offer_error": "Code maken lukte niet (dit apparaat zit nog in geen enkele kring).",
-    "offer_no_seal": "Dit apparaat kan nog geen code tonen: het is toegevoegd voordat het herstelzegel bestond. Typ er één keer je herstelzin op (Instellingen → Apparaten & sleutels) en probeer het dan opnieuw.",
+    "offer_no_seal": "Dit apparaat kan nog geen code tonen: het is toegevoegd voordat het herstelzegel bestond. Typ er één keer je herstelzin op (Instellingen → Herstel) en probeer het dan opnieuw.",
     "offer_paste_label": "Code van je huidige apparaat (optioneel)",
     "personas_title": "Welke persona's krijgt dit apparaat?",
     "personas_hint": "Alleen wat je aanvinkt komt op dit apparaat. Een apparaat dat minder vertrouwd is, geef je er beter minder.",
@@ -9225,7 +9253,7 @@
           "doc": "Create wizard — the start-minimally option: no release rides onto the new circle. The join wizard's same protective choice."
         },
         "hint": {
-          "text": "Alleen wat deze persona in deze kring deelt, zien de mensen die meedoen — niets wat je niet zelf hebt ingesteld. Later aanpassen kan bij Mij → persona's.",
+          "text": "Alleen wat deze persona in deze kring deelt, zien de mensen die meedoen — niets wat je niet zelf hebt ingesteld. Later aanpassen kan via de personaknop (rechtsboven).",
           "doc": "Create wizard — what founding as a persona shares. Says 'discloses', never 'is': one identity runs, the persona is a lens (ledger L123)."
         }
       },
@@ -10993,6 +11021,10 @@
         "text": "De app opent op",
         "doc": "A setting's label (projected from the parameter register)."
       },
+      "plus_middle": {
+        "text": "Het midden van de +",
+        "doc": "A setting's label (projected from the parameter register): which round button sits on the '+''s own spot."
+      },
       "assistant_memoryDefault": {
         "text": "Hoeveel de assistent onthoudt van een gesprek",
         "doc": "A setting's label (projected from the parameter register)."
@@ -11095,6 +11127,10 @@
       },
       "notify_policy_ask": {
         "text": "Melding: mijn open vraag in de ruimte",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_role": {
+        "text": "Melding: mijn rol in een kring veranderde",
         "doc": "A setting's label (projected from the parameter register)."
       }
     },
@@ -11299,7 +11335,14 @@
     "no_circles": "Je zit nog in geen enkele kring.",
     "connection": "Verbinding",
     "my_data": "Mijn gegevens",
-    "devices_keys": "Apparaten & sleutels"
+    "notifications": "Meldingen",
+    "assistant": "Assistent",
+    "devices": "Apparaten",
+    "recovery": "Herstel",
+    "back": {
+      "text": "← Instellingen",
+      "doc": "Back link from a settings group (and the Advanced screen) to the settings home."
+    }
   },
   "feedback": {
     "plus": {
@@ -11341,6 +11384,10 @@
     "removed": {
       "text": "Je bent verwijderd uit {{circle}}",
       "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "role": {
+      "text": "{{circle}}: {{change}}",
+      "doc": "'Nieuw voor jou': my role in a circle changed (made admin, or no longer); {{change}} is the membership notice's own sentence."
     },
     "many": {
       "text": "{{count}} nieuwe dingen bij {{name}}",
@@ -11425,7 +11472,7 @@
       "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
     },
     "selves_body": {
-      "text": "Je kunt meer dan één persona hebben, bijvoorbeeld \"thuis\" en \"werk\": een naam, een foto en wat je over jezelf deelt. Per kring en per contact kies je welke persona zij zien. Bij Mij zie je wie je waar bent.",
+      "text": "Je kunt meer dan één persona hebben, bijvoorbeeld \"thuis\" en \"werk\": een naam, een foto en wat je over jezelf deelt. Per kring en per contact kies je welke persona zij zien. Achter de personaknop (rechtsboven) zie je wie je waar bent.",
       "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
     },
     "nearby_title": {
@@ -11482,5 +11529,29 @@
       "text": "Gewoon doorgaan",
       "doc": "The first open: three doors the first time the app opens on a device (src/v2/firstOpen.js)."
     }
+  },
+  "persona_button": {
+    "settings": {
+      "text": "Instellingen",
+      "doc": "The settings button's spoken name (the gear beside the persona button, on every tab): it opens the settings home."
+    },
+    "label_with_state": {
+      "text": "Persona, {{state}}",
+      "doc": "The persona button's spoken name with the availability its coloured ring shows ({{state}}, the shared reading words), so the colour is never the only signal."
+    }
+  },
+  "persona_panel": {
+    "close": {
+      "text": "Sluiten",
+      "doc": "The persona panel (behind the persona button): its close button."
+    },
+    "availability_row": {
+      "text": "{{state}} · tik om te wijzigen",
+      "doc": "The persona panel: the one availability row, the state now ({{state}}, the shared reading words) and that a tap changes it; a tap opens the availability screen."
+    }
+  },
+  "back_to": {
+    "text": "← {{place}}",
+    "doc": "Back link to the tab the person came from, named by that tab (the settings home, share my card, shared with me)."
   }
 }

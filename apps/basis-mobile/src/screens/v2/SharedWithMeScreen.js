@@ -19,6 +19,8 @@ export default function SharedWithMeScreen({
   received = [],
   opener = null,   // (text) => plaintext — the recipient's own per-text sealing opener
   onBack,
+  // the tab it returns to, named; it opens from Vandaag's "Wacht op jou" (web parity: sharedWithMe.js backLabel)
+  backLabel = null,
   onOpened,
 }) {
   const theme = useTheme();
@@ -42,7 +44,7 @@ export default function SharedWithMeScreen({
     <View style={styles.page} testID="shared-with-me">
       <View style={styles.bar}>
         <Pressable onPress={onBack} accessibilityRole="button" testID="shared-with-me-back">
-          <Text style={styles.back}>{t('circle.back_mydata')}</Text>
+          <Text style={styles.back}>{backLabel ?? t('circle.back_to', { place: t('circle.tab.vandaag') })}</Text>
         </Pressable>
       </View>
       <Text style={styles.title}>{t('circle.sharedWithMe.title')}</Text>

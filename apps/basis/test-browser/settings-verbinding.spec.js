@@ -14,11 +14,10 @@ test('Verbinding holds the connection settings; Geblokkeerd lives on Contacten',
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('/');
-  await expect(page.locator('[data-tab="mij"]').first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.cc-persona-button__button')).toBeVisible({ timeout: 30_000 });
   await page.waitForFunction(() => typeof window.onderlingCall === 'function', null, { timeout: 60_000 });
 
-  await page.locator('[data-tab="mij"]').first().click();
-  await page.locator('.cc-profile__gear').click();
+  await page.locator('.cc-persona-button__settings').click();
   await page.locator('.cc-settings__group--connection').click();
   for (const id of ['availability', 'connection-points', 'delivery', 'relay']) {
     await expect(page.locator(`[data-section="${id}"]`), id).toBeVisible({ timeout: 15_000 });

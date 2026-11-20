@@ -1,12 +1,10 @@
 /**
- * basis v2 — Mij (web DOM renderer): identity, ONE declared screen.
+ * basis v2 — the short view of the persona panel (web DOM renderer): the declared Me, painted into the panel's body.
  *
- * What Me shows is declared in the manifest, never listed here: the Me actions (`meActions` — share my card, scan)
- * and the Me blocks (`meBlocks` — the identity line with the person's name and readings, their agents and devices),
- * which the host fills through the shared `mijScreenBlocks` and this paints with the screen's own block painter.
- * Below them, one door to My data (where the other doors went) and, behind the developer switch, Advanced. The
- * identity fields and the location are in the person's own editor (the identity line's "Edit"); the overview is on
- * Vandaag.
+ * What it shows is declared in the manifest, never listed here: the Me actions (`meActions` — share my card) and the
+ * Me blocks (`meBlocks` — the identity line with the name and "Aanpassen", the devices and helpers), which the host
+ * fills through the shared `mijScreenBlocks` and this paints with the screen's own block painter. The settings are
+ * behind the settings button beside the persona button; what is about now is on Vandaag.
  *
  * The page's fallback title (no name yet) comes from the manifest PAGE projection: the `me` op declares
  * `surfaces.page`, and its labelKey flows through the shared `pageLabel` selector.
@@ -23,10 +21,6 @@ export function renderCircleProfile(container, {
   blocks = null,
   // what a block's tap means here: `{ kind: 'edit-me' }` (the identity line's door) · `{ kind: 'open-my-data' }`
   onBlockAction,
-  // The gear in Me's header: the person's settings (Instellingen). Absent ⇒ no gear.
-  onSettings,
-  // The advanced surface — surface-less ops + settable params; given only when the developer switch is on.
-  onAdvanced,
   // The Me actions (Share my card · Scan) — DECLARED in the manifest (`meActions`), painted here from the projection;
   // this one callback carries the chosen id back (like the tab bar's handlers). Absent ⇒ none painted.
   onMeAction,
@@ -66,23 +60,6 @@ export function renderCircleProfile(container, {
     container.prepend(heading);
   }
 
-  // ── the gear: the person's settings (Instellingen), top right of Me ──
-  if (typeof onSettings === 'function') {
-    const gear = document.createElement('button');
-    gear.type = 'button';
-    gear.className = 'cc-profile__gear';
-    gear.textContent = '⚙';
-    gear.title = tr('circle.settings_home.title');
-    gear.setAttribute('aria-label', tr('circle.settings_home.title'));
-    gear.addEventListener('click', () => onSettings());
-    const bar = document.createElement('div');
-    bar.className = 'cc-profile__topbar';
-    bar.appendChild(gear);
-    container.prepend(bar);
-  }
-
-  // ── one door to My data; Advanced only behind the developer switch ──
-  if (typeof onAdvanced === 'function') container.appendChild(button(tr('circle.advanced.title'), 'cc-profile__advanced', onAdvanced));
   return container;
 
   function button(text, cls, onClick) {

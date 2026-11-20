@@ -13,11 +13,10 @@ test('Mijn gegevens holds cleanup, most-used and the log report; there is no old
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('/');
-  await expect(page.locator('[data-tab="mij"]').first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.cc-persona-button__button')).toBeVisible({ timeout: 30_000 });
   await page.waitForFunction(() => typeof window.onderlingCall === 'function', null, { timeout: 60_000 });
 
-  await page.locator('[data-tab="mij"]').first().click();
-  await page.locator('.cc-profile__gear').click();
+  await page.locator('.cc-persona-button__settings').click();
   await page.locator('.cc-settings__group--my-data').click();
   for (const id of ['message-cleanup', 'frequent']) {
     await expect(page.locator(`[data-section="${id}"]`), id).toBeVisible({ timeout: 15_000 });
@@ -32,7 +31,7 @@ test('Mijn gegevens holds cleanup, most-used and the log report; there is no old
   await expect(page.locator('.cc-settings__door--log-report'), 'the log report replaced Mijn gegevens').toHaveCount(0, { timeout: 15_000 });
   // there is no old My data page (a group screen hides the tab bar: come back in from the top)
   await page.goto('/');
-  await page.locator('[data-tab="mij"]').first().click();
+  await page.locator('.cc-persona-button__button').click();
   await expect(page.locator('.cc-profile__mydata'), 'Mij has no My data door: the gear is the one way in').toHaveCount(0);
   expect(errs).toEqual([]);
 });

@@ -9,8 +9,7 @@ import { test, expect } from '@playwright/test';
 test.setTimeout(120_000);
 
 const openMyData = async (page) => {
-  await page.locator('[data-tab="mij"]').first().click();
-  await page.locator('.cc-profile__gear').click();
+  await page.locator('.cc-persona-button__settings').click();
   await page.locator('.cc-settings__group--my-data').click();
 };
 const rows = (page) => page.evaluate(() => window.onderlingOwnActions?.() ?? null);

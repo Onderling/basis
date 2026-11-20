@@ -1,5 +1,6 @@
 /**
- * basis v2 — the person's settings (web DOM renderer), behind the gear on Mij: the home lists the declared groups and,
+ * basis v2 — the person's settings (web DOM renderer), behind the settings button (the gear beside the persona button,
+ * on every tab): the home lists the declared groups and,
  * last, the door to the circles' own settings; the chooser lists the person's circles, each opening that circle's
  * settings screen. What is listed and in which order is the manifest's (`settingsHomeFor`); this only paints.
  */
@@ -8,10 +9,11 @@ import { settingsHomeFor } from '../../src/v2/settingsHome.js';
 import { basisManifest } from '../../src/index.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
-export function renderSettingsHome(container, { t, onBack, onOpenGroup, onOpenPerCircle, onOpenDoor, version } = {}) {
+export function renderSettingsHome(container, { t, onBack, backLabel = null, onOpenGroup, onOpenPerCircle, onOpenDoor, onAdvanced, version } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'circleSettingsHome.js');
-  page(container, tr, tr('circle.settings_home.title'), onBack);
+  // its back names the tab the settings button was tapped on (`settingsBackFor`): "← Contacten"
+  page(container, tr, tr('circle.settings_home.title'), onBack, backLabel);
   const list = document.createElement('div');
   list.className = 'cc-settings__list';
   const { groups, perCircle, doors } = settingsHomeFor(basisManifest);
@@ -19,6 +21,8 @@ export function renderSettingsHome(container, { t, onBack, onOpenGroup, onOpenPe
   if (perCircle && typeof onOpenPerCircle === 'function') list.appendChild(door(tr(perCircle.labelKey), 'cc-settings__per-circle', () => onOpenPerCircle(), perCircle.id));
   if (typeof onOpenDoor === 'function') for (const d of doors) list.appendChild(door(tr(d.labelKey), `cc-settings__door-row cc-settings__door-row--${d.id}`, () => onOpenDoor(d), d.id));
   container.appendChild(list);
+  // Advanced (raw parameter keys and values: a developer tool) at the foot, only behind the developer switch
+  if (typeof onAdvanced === 'function') list.appendChild(door(tr('circle.advanced.title'), 'cc-settings__advanced', () => onAdvanced(), 'advanced'));
   // the build this tab runs (the tag the publish baked in; '' on a dev server): "which version are you on" has an answer
   // at the foot of the settings (2026-09-19: a laptop on last week's build looked like a laptop that receives nothing)
   if (typeof version === 'string') {
@@ -34,7 +38,7 @@ export function renderSettingsHome(container, { t, onBack, onOpenGroup, onOpenPe
 export function renderCircleSettingsChooser(container, { t, circles = [], onBack, onOpenCircle } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'circleSettingsHome.js');
-  page(container, tr, tr('circle.settings_home.per_circle'), onBack);
+  page(container, tr, tr('circle.settings_home.per_circle'), onBack, tr('circle.settings_home.back'));
   const list = document.createElement('div');
   list.className = 'cc-settings__list';
   if (!circles.length) {
@@ -48,7 +52,7 @@ export function renderCircleSettingsChooser(container, { t, circles = [], onBack
   return container;
 }
 
-function page(container, tr, titleText, onBack) {
+function page(container, tr, titleText, onBack, backLabel) {
   container.innerHTML = '';
   container.className = 'cc-mydata cc-settings';
   const header = document.createElement('div');
@@ -57,7 +61,7 @@ function page(container, tr, titleText, onBack) {
     const back = document.createElement('button');
     back.type = 'button';
     back.className = 'cc-mydata__back';
-    back.textContent = tr('circle.mydata.back');
+    back.textContent = backLabel ?? tr('circle.settings_home.back');
     back.addEventListener('click', () => onBack());
     header.appendChild(back);
   }

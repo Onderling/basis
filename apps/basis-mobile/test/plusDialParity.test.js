@@ -20,9 +20,9 @@ describe('the docked "+" — parity', () => {
   const launcher = read('../src/screens/v2/CircleLauncherScreen.js');
   const tabs     = read('../src/screens/v2/CircleTabBar.js');
 
-  it('the phone bar holds the "+" in the middle: Vandaag · Kringen · Contacten · + · In de buurt · Mij with a mesh', () => {
+  it('the phone bar holds the "+" in the middle: Vandaag · Kringen · + · Contacten · In de buurt with a mesh', () => {
     const ids = barSlots(basisManifest, { renderer: renderMobile, hasMesh: true }).map((s) => (s.kind === 'plus' ? '+' : s.tab.id));
-    expect(ids).toEqual(['screens', 'circles', 'contacten', '+', 'nearby', 'mij']);
+    expect(ids).toEqual(['screens', 'circles', '+', 'contacten', 'nearby']);
   });
 
   it('both bars paint their slots from the shared `barSlots`, the phone with `renderMobile`', () => {

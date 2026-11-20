@@ -7,6 +7,9 @@
 import { describe, it, expect } from 'vitest';
 import { basisManifest } from '../../src/index.js';
 import { mijScreenBlocks, MIJ_READINGS, identityLineWords, agentRowWords } from '../../src/v2/mijScreen.js';
+import { materializeScreen } from '../../src/v2/userScreenBlocks.js';
+// an identity line that names every reading (a page may still carry one; the persona panel's names none since 2026-11-20)
+const lineWithReadings = (hostOps) => materializeScreen({ screen: { id: 'mij', blocks: [{ id: 'l', type: 'identityLine', config: { readings: [...MIJ_READINGS] } }] }, hostOps });
 import { BLOCK_TYPES } from '../../src/v2/circleRecipe.js';
 import { EventLog } from '../../src/eventLog.js';
 
@@ -37,13 +40,11 @@ function hostCall({ events = [], chores = [] } = {}) {
 }
 
 describe('Mij — the declared screen', () => {
-  it('the manifest declares the Mij blocks, each a known block type placed on Mij', () => {
+  it('the manifest declares the persona panel\'s blocks: the name (no readings: what is about now is on Vandaag), the devices', () => {
     const types = (basisManifest.meBlocks ?? []).map((b) => b.type);
-    expect(types).toEqual(['identityLine', 'awaiting', 'agents']);
+    expect(types).toEqual(['identityLine', 'agents']);
     for (const t of types) expect(BLOCK_TYPES).toContain(t);
-    const readings = basisManifest.meBlocks[0].config.readings;
-    expect(readings.length).toBeGreaterThan(0);
-    for (const r of readings) expect(MIJ_READINGS).toContain(r);
+    expect(basisManifest.meBlocks[0].config.readings).toEqual([]);
   });
 
   it('the identity line: the name, and each reading its config names', async () => {
@@ -52,11 +53,11 @@ describe('Mij — the declared screen', () => {
     log.append({ id: 'm2', ts: 2000, app: 'chat', type: 'chat-message', circleId: 'a', actor: 'bea', payload: { text: 'hoi' } });
     const soon = Date.now() + 3_600_000;
     const nextWeek = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
-    const [line] = await mijScreenBlocks({ hostOps: {
+    const [line] = await lineWithReadings({
       callSkill: hostCall({ events: [{ id: 'e1', title: 'tandarts', startsAt: new Date(soon).toISOString() }] }),
       eventLog: log, circles: [{ id: 'a', name: 'Thuis' }], seenAt: {}, myRefs: ['me'], myWebid: 'me',
       availability: { holiday: { active: true, until: nextWeek } }, online: true,
-    } });
+    });
     expect(line.type).toBe('identityLine');
     expect(line.status).toBe('ok');
     expect(line.content.name).toBe('Frits');
@@ -68,7 +69,7 @@ describe('Mij — the declared screen', () => {
   });
 
   it('a reading with no source says nothing rather than a guess', async () => {
-    const [line] = await mijScreenBlocks({ hostOps: { callSkill: hostCall(), circles: [] } });
+    const [line] = await lineWithReadings({ callSkill: hostCall(), circles: [] });
     const keys = line.content.readings.map((r) => r.key);
     expect(keys).not.toContain('online');
     expect(keys).not.toContain('availability');

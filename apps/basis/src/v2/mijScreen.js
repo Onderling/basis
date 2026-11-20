@@ -1,6 +1,6 @@
 /**
- * Mij = identity: ONE declared screen. The manifest lists its blocks (`meBlocks` — the identity line, the agents
- * list); this fills them through the one screen materializer, over every circle the person is in. Each shell paints
+ * Mij = identity: the PERSONA PANEL behind the persona button, ONE declared short view. The manifest lists its blocks
+ * (`meBlocks` — the identity line, the agents list); this fills them through the one screen materializer, over every circle the person is in. Each shell paints
  * the result with its own block painter, below the declared Me actions — no shell lists a section of Me by hand.
  */
 import { basisManifest } from '../../manifest.js';
@@ -13,6 +13,15 @@ export { identityLineWords, agentRowWords } from './mijWords.js';
 export function mijBlocks(manifest = basisManifest) {
   return (Array.isArray(manifest?.meBlocks) ? manifest.meBlocks : [])
     .map((b, i) => ({ id: `mij-${b.type}-${i}`, type: b.type, config: { ...(b.config ?? {}) } }));
+}
+
+/**
+ * Vandaag's top (above "Nieuw voor jou"): the declared `todayBlocks` — the availability words and "Wacht op jou" — each
+ * with a stable id. The materializer fills them when the shell asks for Vandaag's top (`hostOps.todayTop`).
+ */
+export function todayTopBlocks(manifest = basisManifest) {
+  return (Array.isArray(manifest?.todayBlocks) ? manifest.todayBlocks : [])
+    .map((b, i) => ({ id: `today-${b.type}-${i}`, type: b.type, config: { ...(b.config ?? {}) } }));
 }
 
 /**

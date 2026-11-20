@@ -935,7 +935,7 @@ signature), then `adb install -r signed.apk`.
 
 ## `vitest --root apps/basis` from the repo root breaks the tests that read files by a relative path (2026-11-19)
 
-Some basis tests read a sibling app's source relative to the WORKING DIRECTORY (e.g. `contactsHeaderClearsAvatar`
+Some basis tests read a sibling app's source relative to the WORKING DIRECTORY (e.g. `contactsHeaderClearsPersonaButton`
 reads `../basis-mobile/src/screens/v2/fab.js`). Run from the repo root with `--root apps/basis`, they look one level
 too high and fail with `ENOENT`, which reads like a real failure. Run basis tests from `apps/basis` (as CI does):
 `cd apps/basis && npx vitest run <files>`.

@@ -21,11 +21,11 @@ afterEach(() => { document.body.innerHTML = ''; });
 describe('the "+" docked in the web tab bar', () => {
   it('sits in the middle of the bar, between Kringen and Contacten', () => {
     const el = bar({ dial: plusDialFor(basisManifest), open: false, onPress: () => {} });
-    expect(slots(el)).toEqual(['screens', 'circles', '+', 'contacten', 'mij']);
+    expect(slots(el)).toEqual(['screens', 'circles', '+', 'contacten']);
   });
 
   it('a screen without the "+" gets the bar without it', () => {
-    expect(slots(bar(null))).toEqual(['screens', 'circles', 'contacten', 'mij']);
+    expect(slots(bar(null))).toEqual(['screens', 'circles', 'contacten']);
   });
 
   it('closed: a "+" with its name, and no round buttons; a tap is the press "plus"', () => {

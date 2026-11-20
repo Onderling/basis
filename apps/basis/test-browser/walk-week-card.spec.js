@@ -17,10 +17,9 @@ test('the week overview is switched on in My data, survives a reload, and its ca
   try {
     A = await bootPeer(browser, 'A');
     await gotoCircles(A.page);
-    // the switch sits under the gear on Mij, in Weergave (since 2026-10-23; before that in My data)
+    // the switch sits behind the settings button, in Weergave (since 2026-10-23; before that in My data)
     const openMij = async () => {
-      await A.page.locator('[data-tab="mij"]').first().click();
-      await A.page.locator('.cc-profile__gear').first().click();
+      await A.page.locator('.cc-persona-button__settings').click();
       await A.page.locator('.cc-settings__group--appearance').first().click();
     };
     await openMij();

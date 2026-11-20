@@ -25,12 +25,11 @@ describe('circle availability screen (M3)', () => {
       .withTimeout(60_000);
   });
 
-  // Availability is a door under the gear (Instellingen → Verbinding, 2026-10-24): Mij → the gear → Verbinding →
+  // Availability is a door under the gear (Instellingen → Verbinding, 2026-10-24): the settings button → Verbinding →
   // "Availability"; its Save and its back return to Verbinding.
   async function openAvailability() {
-    await element(by.id('circle-tab-mij')).tap();
-    await waitFor(element(by.id('profile-settings'))).toBeVisible().withTimeout(10_000);
-    await element(by.id('profile-settings')).tap();
+    await waitFor(element(by.id('settings-button'))).toBeVisible().withTimeout(10_000);
+    await element(by.id('settings-button')).tap();
     await waitFor(element(by.id('settings-group-connection'))).toBeVisible().withTimeout(10_000);
     await element(by.id('settings-group-connection')).tap();
     await waitFor(element(by.id('settings-door-availability'))).toBeVisible()

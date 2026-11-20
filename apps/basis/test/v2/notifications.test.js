@@ -73,29 +73,30 @@ describe('Today: "Nieuw voor jou" on top, only when it holds rows', () => {
   const page = { id: 's', name: 'Vandaag', circleFilter: null, blocks: [{ id: 'x', type: 'circlesUnread', config: {} }] };
   it('prepended when there is something; absent when there is not, or when the shell did not ask', async () => {
     const { materializeScreen } = await import('../../src/v2/userScreenBlocks.js');
-    const log = { query: () => [line('m1', 'b', NOW, NOW)] };
-    const asked = await materializeScreen({ screen: page, hostOps: { eventLog: log, circles, myRefs: [], forYou: true, t, now: () => NOW } });
+    // a direct message: addressed to the person (a circle line is "Kringen met nieuws"'s, below)
+    const log = { query: () => [] };
+    const turns = [{ contactId: 'bea', origin: 'bot', ts: NOW - 1000, receivedAt: NOW - 1000, messageId: 'd1', text: 'hallo' }];
+    const asked = await materializeScreen({ screen: page, hostOps: { eventLog: log, turns, circles, myRefs: [], forYou: true, t, now: () => NOW } });
     expect(asked.map((b) => b.type)).toEqual(['forYou', 'circlesUnread']);
-    expect(asked[0].content.items[0].id).toBe('m1');
-    const notAsked = await materializeScreen({ screen: page, hostOps: { eventLog: log, circles, myRefs: [], t, now: () => NOW } });
+    expect(asked[0].content.items[0].id).toBe('d1');
+    const notAsked = await materializeScreen({ screen: page, hostOps: { eventLog: log, turns, circles, myRefs: [], t, now: () => NOW } });
     expect(notAsked.map((b) => b.type)).toEqual(['circlesUnread']);
   });
-  it('rows for EVERY persona on the device, ticked or not, each carrying the persona it is for', async () => {
-    const { materializeScreen } = await import('../../src/v2/userScreenBlocks.js');
+  it('rows for EVERY persona on the device, ticked or not, each carrying the persona it is for (the banner\'s reading: circle lines too)', async () => {
+    const { forYouRows } = await import('../../src/v2/userScreenBlocks.js');
     const both = [{ id: 'c1', name: 'Straat' }, { id: 'c2', name: 'Werk Test' }];
     const lineIn = (id, cid, ts) => ({ id, ts, landedAt: ts, type: 'chat-message', actor: 'b', payload: { circleId: cid, text: 'hoi' } });
     const log = { query: () => [lineIn('m1', 'c1', NOW - 2000), lineIn('m2', 'c2', NOW - 1000)] };
-    const blocks = await materializeScreen({ screen: page, hostOps: {
-      eventLog: log, circles: [both[0]], allCircles: both, myRefs: [], forYou: true, t, now: () => NOW,
+    const rows = forYouRows({
+      eventLog: log, circles: [both[0]], allCircles: both, myRefs: [], t, now: () => NOW,
       selfSet: { on: ['default'], held: [{ id: 'default' }, { id: 'werk', name: 'Werk' }] },
       profileIdOf: (cid) => (cid === 'c2' ? 'werk' : 'default'),
-    } });
-    const rows = blocks[0].content.items;
+    });
     expect(rows.map((r) => [r.id, r.self?.id])).toEqual([['m2', 'werk'], ['m1', 'default']]);
     expect(rows[0].self).toMatchObject({ name: 'Werk' });
     // one persona on the device: no face to tell rows apart, so none is carried
-    const one = await materializeScreen({ screen: page, hostOps: { eventLog: log, circles: both, myRefs: [], forYou: true, t, now: () => NOW } });
-    expect(one[0].content.items.every((r) => r.self == null)).toBe(true);
+    const one = forYouRows({ eventLog: log, circles: both, myRefs: [], t, now: () => NOW });
+    expect(one.every((r) => r.self == null)).toBe(true);
   });
   it('a direct message is under the persona the contact is filed under (its pair circle\'s), else the default', async () => {
     const { materializeScreen } = await import('../../src/v2/userScreenBlocks.js');
@@ -170,5 +171,15 @@ describe('the setting row names who changed it (the roster, through the reveal l
     const blocks = await materializeScreen({ screen: page, hostOps: { eventLog: log, circles, myRefs: ['me'], forYou: true, t, now: () => NOW, callSkill, selfIn: () => 'me' } });
     const row = blocks[0].content.items.find((r) => r.kind === 'setting');
     expect(row.text).toMatch(/"who":"Bea"/);
+  });
+});
+
+describe('"Nieuw voor jou" on Vandaag holds only what is addressed to the person (option B: nothing in both blocks)', () => {
+  it('a circle line is left to "Kringen met nieuws"; a direct message stays; the banner reading keeps both', async () => {
+    const { forYouRows } = await import('../../src/v2/userScreenBlocks.js');
+    const turns = [{ contactId: 'bea', origin: 'bot', ts: NOW - 1000, receivedAt: NOW - 1000, messageId: 'd1', text: 'hallo' }];
+    const hostOps = { eventLog: { query: () => [line('m1', 'b', NOW - 500, NOW - 500)] }, circles, turns, myRefs: ['me'], t, now: () => NOW };
+    expect(forYouRows(hostOps, { addressedOnly: true }).map((r) => r.kind)).toEqual(['dm']);
+    expect(forYouRows(hostOps).map((r) => r.kind).sort()).toEqual(['dm', 'line']);
   });
 });

@@ -42,7 +42,7 @@ test('enrolled with Werk only, a device runs Werk alone and speaks as it', async
     const me = (await call(B, 'pinboard', 'whoAmI'))?.webid;
     expect(me, 'B speaks as someone').toBeTruthy();
     expect(me, 'not as the general persona').not.toBe(general);
-    await B.locator('.cc-header-avatar__button').click();
+    await B.locator('.cc-persona-button__button').click();
     const rows = B.locator('.cc-persona-switcher__row');
     // one self: with a single self the avatar opens the editor, not the switcher — either way, no general-persona row
     expect(await B.locator('.cc-persona-switcher__row[data-self="default"]').count(), 'no general persona on B').toBe(0);

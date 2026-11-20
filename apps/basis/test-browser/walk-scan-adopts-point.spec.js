@@ -34,7 +34,7 @@ test('a no-relay device adopts the scanned card\'s point and stays reachable aft
     const aId = await whoAmI(A.page); const bId = await whoAmI(B.page);
 
     // A opens B's card the way a person does (the shared link), and adds it
-    await B.page.locator('[data-tab="mij"]').first().click(); await B.page.waitForTimeout(1200);
+    await B.page.locator('.cc-persona-button__button').click(); await B.page.waitForTimeout(1200);
     await B.page.locator('.cc-profile__share-contact').click();
     const link = await B.page.locator('.cc-share__link input').inputValue();
     await gotoCircles(B.page);

@@ -43,14 +43,11 @@ describe('renderCircleProfile — the declared screen', () => {
     expect(onBlockAction).toHaveBeenCalledWith({ kind: 'open-my-data' });
   });
 
-  it('the gear is the one settings door; Advanced only behind the developer switch; no hand-listed section', () => {
-    const onSettings = vi.fn();
-    const el = renderCircleProfile(document.createElement('div'), { t, onSettings, blocks: [] });
-    el.querySelector('.cc-profile__gear').click();
-    expect(onSettings).toHaveBeenCalled();
+  it('the persona panel\'s short view holds no settings door and no Advanced (both behind the settings button); no hand-listed section', () => {
+    const el = renderCircleProfile(document.createElement('div'), { t, onSettings: vi.fn(), onAdvanced: vi.fn(), blocks: [] });
+    expect(el.querySelector('.cc-profile__gear')).toBeNull();
     expect(el.querySelector('.cc-profile__mydata'), 'the old My data door is gone').toBeNull();
     expect(el.querySelector('.cc-profile__advanced')).toBeNull();
-    expect(renderCircleProfile(document.createElement('div'), { t, onAdvanced: () => {} }).querySelector('.cc-profile__advanced')).not.toBeNull();
     for (const gone of ['.cc-profile__section', '.cc-profile__availability', '.cc-profile__shared-with-me', '.cc-profile__blocked', '.cc-profile__version', '.cc-profile__handle']) {
       expect(el.querySelector(gone), gone).toBeNull();
     }
@@ -136,15 +133,14 @@ describe('the version line (2026-09-19), at the foot of Instellingen', () => {
 });
 
 describe('renderCircleProfile — the Me actions, from the declaration (share my contact 2026-09-19 · scan 2026-10-09)', () => {
-  it('paints the declared Me actions (share-contact, scan) and hands the chosen id back; none without the seam', () => {
+  it('paints the declared Me action (share-contact; Scan is in the "+") and hands the chosen id back; none without the seam', () => {
     const onMeAction = vi.fn();
     const el = renderCircleProfile(document.createElement('div'), { t, onMeAction });
     const link = el.querySelector('.cc-profile__share-contact');
     expect(link.textContent).toBe('circle.profile.share_contact');
     link.click();
     expect(onMeAction).toHaveBeenCalledWith('share-contact');
-    el.querySelector('.cc-profile__scan').click();
-    expect(onMeAction).toHaveBeenCalledWith('scan');
+    expect(el.querySelector('.cc-profile__scan')).toBeNull();
     expect(renderCircleProfile(document.createElement('div'), { t }).querySelector('.cc-profile__share-contact')).toBeNull();
   });
 });

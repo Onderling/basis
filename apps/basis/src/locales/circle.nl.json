@@ -76,7 +76,7 @@
         "doc": "Fold-in phase C (Q3) — pre-checked, uncheckable wizard line when the joined circle's invite carries the offering-matching signal; checked = disclose offering keys at the coarse 'category' rung for the chosen persona."
       },
       "hint": {
-        "text": "Alleen de categorie wordt gedeeld, nooit de tekst of tags. Vink uit als je je aanbod hier niet wilt delen — later aanpassen kan bij Mij → persona's.",
+        "text": "Alleen de categorie wordt gedeeld, nooit de tekst of tags. Vink uit als je je aanbod hier niet wilt delen — later aanpassen kan via de personaknop (rechtsboven) → Aanpassen.",
         "doc": "Fold-in phase C (Q3) — explains the coarse rung + how to change it later; shown under the pre-checked line."
       }
     },
@@ -241,7 +241,7 @@
           "doc": "Join wizard — default persona option label."
         },
         "hint": {
-          "text": "Alleen wat deze persona in deze kring deelt, wordt gedeeld. Niets bij een eerste keer. Later aanpassen kan bij Mij, persona's.",
+          "text": "Alleen wat deze persona in deze kring deelt, wordt gedeeld. Niets bij een eerste keer. Later aanpassen kan via de personaknop (rechtsboven).",
           "doc": "Join wizard: persona disclosure hint."
         },
         "already_in": {
@@ -614,10 +614,6 @@
   "loading": {
     "text": "Laden…",
     "doc": "Shown while circles are being fetched."
-  },
-  "back_me": {
-    "text": "← Mij",
-    "doc": "Back link from any screen under Me (Mij) to the Me screen — one key for all of them."
   },
   "back_mydata": {
     "text": "← Mijn gegevens",
@@ -1749,7 +1745,7 @@
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     },
     "onboarding_handle_hint": {
-      "text": "Je naam voor mensen in je kringen. Later te veranderen in Mij.",
+      "text": "Je naam voor mensen in je kringen. Later te veranderen via de personaknop (rechtsboven).",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     },
     "onboarding_handle_ph": {
@@ -4307,7 +4303,7 @@
       "doc": "First-time wizard, step 2 and the card editor: copy what the room self offers into the card as tags (a prefill the person sees and can remove)."
     },
     "wizard2_no_offers": {
-      "text": "Je biedt nog niets aan. Dat kan later, bij Mij.",
+      "text": "Je biedt nog niets aan. Dat kan later, via de personaknop (rechtsboven).",
       "doc": "First-time wizard, step 2: in place of the offers switch when nothing is offered yet; Mij/Me is the tab."
     },
     "wizard2_under": {
@@ -7013,7 +7009,7 @@
       "doc": "S2 — personal offerings section. (Web editor retired in fold-in phase C; mobile CircleProfileScreen still renders it until the mobile mirror lands.)"
     },
     "offerings_moved": {
-      "text": "Aanbod staat nu bij Mij → persona's",
+      "text": "Aanbod staat nu achter de personaknop → Aanpassen",
       "doc": "Fold-in phase C — quiet pointer row on the Profiel screen, replacing the retired skills editor; opens the Mij persona surface."
     },
     "no_offerings": {
@@ -7207,10 +7203,6 @@
     "logReport": {
       "text": "Kopieer logboek / Meld een probleem →",
       "doc": "The door on My data that shows this device's log (event codes and numbers only) and lets the person copy it."
-    },
-    "avatar_label": {
-      "text": "Profiel",
-      "doc": "The header avatar's accessible name, top-right on every tab: it opens the person's profile (or the switcher with several selves)."
     },
     "no_name_yet": {
       "text": "Nog geen naam",
@@ -9250,7 +9242,7 @@
           "doc": "Create wizard — the start-minimally option: no release rides onto the new circle. The join wizard's same protective choice."
         },
         "hint": {
-          "text": "Alleen wat deze persona in deze kring deelt, zien de mensen die meedoen — niets wat je niet zelf hebt ingesteld. Later aanpassen kan bij Mij → persona's.",
+          "text": "Alleen wat deze persona in deze kring deelt, zien de mensen die meedoen — niets wat je niet zelf hebt ingesteld. Later aanpassen kan via de personaknop (rechtsboven).",
           "doc": "Create wizard — what founding as a persona shares. Says 'discloses', never 'is': one identity runs, the persona is a lens (ledger L123)."
         }
       },
@@ -11252,7 +11244,11 @@
     "no_circles": "Je zit nog in geen enkele kring.",
     "connection": "Verbinding",
     "my_data": "Mijn gegevens",
-    "devices_keys": "Apparaten & sleutels"
+    "devices_keys": "Apparaten & sleutels",
+    "back": {
+      "text": "← Instellingen",
+      "doc": "Back link from a settings group (and the Advanced screen) to the settings home."
+    }
   },
   "feedback": {
     "plus": {
@@ -11378,7 +11374,7 @@
       "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
     },
     "selves_body": {
-      "text": "Je kunt meer dan één persona hebben, bijvoorbeeld \"thuis\" en \"werk\": een naam, een foto en wat je over jezelf deelt. Per kring en per contact kies je welke persona zij zien. Bij Mij zie je wie je waar bent.",
+      "text": "Je kunt meer dan één persona hebben, bijvoorbeeld \"thuis\" en \"werk\": een naam, een foto en wat je over jezelf deelt. Per kring en per contact kies je welke persona zij zien. Achter de personaknop (rechtsboven) zie je wie je waar bent.",
       "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
     },
     "nearby_title": {
@@ -11435,5 +11431,25 @@
       "text": "Gewoon doorgaan",
       "doc": "The first open: three doors the first time the app opens on a device (src/v2/firstOpen.js)."
     }
+  },
+  "persona_button": {
+    "label": {
+      "text": "Persona",
+      "doc": "The persona button's spoken name, top right on every tab (the persona's picture or initials): it opens the persona panel over the tab."
+    },
+    "settings": {
+      "text": "Instellingen",
+      "doc": "The settings button's spoken name (the gear beside the persona button, on every tab): it opens the settings home."
+    }
+  },
+  "persona_panel": {
+    "close": {
+      "text": "Sluiten",
+      "doc": "The persona panel (behind the persona button): its close button."
+    }
+  },
+  "back_to": {
+    "text": "← {{place}}",
+    "doc": "Back link to the tab the person came from, named by that tab (the settings home, share my card, shared with me)."
   }
 }

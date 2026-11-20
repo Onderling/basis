@@ -10,7 +10,7 @@ assistant-thread build.
 
 - Open the "+" in the tab bar into its round buttons and fold them back with a touch outside, the back gesture (phone)
   or Escape (web). A double tap lands in the chat. Scan is the `scanQr` op and My QR the share-my-contact view, the same
-  doors as on Me. Choose per device which button sits on the "+"'s own spot, or none (then a second tap closes it): the
+  doors as before (share my card is also in the persona panel). Choose per device which button sits on the "+"'s own spot, or none (then a second tap closes it): the
   `plus.middle` setting under Appearance (`src/v2/plusDial.js`).
 - Choose per persona how far the "+" goes (`setPlusCeiling`, kept on the persona as `_plus.ceiling`, inherited from
   the general persona): nothing (no model for it; the "+" and its chat stay), only looking things up, also their own things, or also their

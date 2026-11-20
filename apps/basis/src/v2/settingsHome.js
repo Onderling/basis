@@ -1,5 +1,5 @@
 /**
- * The person's settings behind the gear on Mij, projected from the manifest's one declaration (`settingsGroups`) for
+ * The person's settings behind the settings button (the gear beside the persona button, on every tab), projected from the manifest's one declaration (`settingsGroups`) for
  * both shells: the home's rows (each group, then the door to the circles' own settings), a group's sections in their
  * declared order, and the set of section ids that live under the gear — the old My data page paints none of those.
  * Pure: no shell lists a section by hand, and the order, kinds and custody marks are the manifest's.
@@ -26,6 +26,19 @@ export function settingsHomeFor(manifest) {
     });
   }
   return { groups, perCircle, doors };
+}
+
+/**
+ * Where the settings home's back goes: the tab the person opened the settings button on, named by that tab's own word
+ * ("← Contacten"). A place that is no tab (or none) goes to Vandaag, the home. Both shells read it; neither says "Mij".
+ * @param {string|null} fromTab   the tab showing when the settings button was tapped
+ * @param {object} manifest
+ * @returns {{tab: string, labelKey: string}}
+ */
+export function settingsBackFor(fromTab, manifest) {
+  const tabs = Array.isArray(manifest?.tabs) ? manifest.tabs : [];
+  const tab = tabs.find((x) => x?.id === fromTab) ?? tabs.find((x) => x?.id === 'screens') ?? tabs[0] ?? null;
+  return { tab: tab?.id ?? 'screens', labelKey: tab?.labelKey ?? 'circle.tab.vandaag' };
 }
 
 /** One group, by id, or null. */

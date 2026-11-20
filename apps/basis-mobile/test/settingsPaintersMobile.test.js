@@ -81,7 +81,7 @@ describe('mobile settings painters', () => {
   });
 });
 
-describe('the two moves out of My data, on mobile (web: contactsRoster.js, the awaiting chip)', () => {
+describe('the two moves out of My data, on mobile (web: contactsRoster.js, the awaiting chip on Vandaag)', () => {
   const read = (name) => readFileSync(fileURLToPath(new URL(`../src/screens/v2/${name}`, import.meta.url)), 'utf8');
   it('Contacten has the blocked door, also on an empty roster; the launcher opens the blocked list from it', () => {
     const contacts = read('ContactsScreen.js');
@@ -89,14 +89,14 @@ describe('the two moves out of My data, on mobile (web: contactsRoster.js, the a
     expect(contacts.match(/\{blockedDoor\}/g)?.length).toBe(2);   // the empty roster and the list both
     expect(read('CircleLauncherScreen.js')).toMatch(/onBlocked=\{\(\) => setView\('blocked'\)\}/);
   });
-  it('Mij opens Apparaten & sleutels for its device and agent rows, through the shared settingsGroupForAction', () => {
+  it('the persona panel opens Apparaten & sleutels for its device and agent rows, through the shared settingsGroupForAction', () => {
     expect(read('CircleProfileScreen.js')).toMatch(/else if \(settingsGroupForAction\(a\)\)/);
-    expect(read('CircleLauncherScreen.js')).toMatch(/onSettingsGroup=\{\(id\) => \{ setSettingsGroupId\(id\); setView\('settingsGroup'\); \}\}/);
+    expect(read('CircleLauncherScreen.js')).toMatch(/onSettingsGroup=\{\(id\) => \{ setPanelOpen\(false\); setSettingsGroupId\(id\); setView\('settingsGroup'\); \}\}/);
   });
-  it('Mij opens shared-with-me from its chip, with the count handed in as a source', () => {
-    const profile = read('CircleProfileScreen.js');
-    expect(profile).toMatch(/a\?\.kind === 'open-shared-with-me'\) onSharedWithMe\?\.\(\)/);
-    expect(profile).toMatch(/sharedWithMeCount: sources\.sharedWithMeCount/);
-    expect(read('CircleLauncherScreen.js')).toMatch(/sharedWithMeCount: async \(\) =>/);
+  it('Vandaag opens shared-with-me from its "Wacht op jou" chip, with the count handed in as a source', () => {
+    const launcher = read('CircleLauncherScreen.js');
+    expect(launcher).toMatch(/a\?\.kind === 'open-shared-with-me'\) setView\('sharedWithMe'\)/);
+    expect(launcher).toMatch(/sharedWithMeCount: mijSources\.sharedWithMeCount/);
+    expect(launcher).toMatch(/sharedWithMeCount: async \(\) =>/);
   });
 });

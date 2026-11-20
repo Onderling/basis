@@ -32,7 +32,7 @@ test('B discloses a property and shares it from Mij; A\'s roster row for B carri
     }, gid);
     // …and presses the button under Mij: the release goes out as B's own `member-props` on the circle's lane.
     await gotoCircles(B.page);
-    await B.page.locator('[data-tab="mij"]').first().click(); await B.page.waitForTimeout(1500);
+    await B.page.locator('.cc-persona-button__button').click(); await B.page.waitForTimeout(1500);
     // the per-circle disclosure table lives on the persona panel ("Mij → persona's")
     await B.page.locator('.circle-screen__identity-edit').first().click(); await B.page.waitForTimeout(2000);
     const share = B.page.locator('.cc-mij__cell-action button').first();

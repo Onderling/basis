@@ -142,6 +142,7 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
     case 'forYou':       body = renderForYou(block, onAction, styles); break;
     case 'circlesUnread': body = renderCirclesUnread(block, onAction, styles); break;
     case 'awaiting':      body = renderAwaiting(block, onAction, styles); break;
+    case 'availability':  body = renderAvailability(block, onAction, styles); break;
     case 'onboarding':   body = <OnboardingCards block={block} onAction={onAction} styles={styles} />; break;
     case 'identityLine': body = renderIdentityLine(block, onAction, styles); break;
     case 'agents':       body = renderAgents(block, onAction, styles); break;
@@ -228,6 +229,21 @@ function renderAwaiting(block, onAction, styles) {
           <Text style={styles.noticeText}>{t(it.labelKey, { count: it.count, name: it.name ?? '' })}</Text>
         </Pressable>
       ))}
+    </View>
+  );
+}
+
+// Vandaag's availability words (web parity: circleScreen.js renderAvailability): one row, a tap opens the availability
+// screen. The words are the shared reading words.
+function renderAvailability(block, onAction, styles) {
+  const words = identityLineWords({ readings: block.content?.reading ? [block.content.reading] : [] }, { t, locale: dateLocaleOf(t) }).join(' · ');
+  return (
+    <View>
+      <Text style={styles.blockTitle}>{t(block.titleKey ?? 'circle.availability.title')}</Text>
+      <Pressable style={styles.noticeRow} testID="vandaag-availability" accessibilityRole="button"
+        disabled={typeof onAction !== 'function' || !block.content?.open} onPress={() => onAction?.({ ...block.content.open })}>
+        <Text style={styles.noticeText}>{words}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -661,7 +677,7 @@ const makeStyles = (theme) => StyleSheet.create({
   moreLink:        { color: theme.color.inkSoft, fontSize: 13, textDecorationLine: 'underline', paddingVertical: 2 },
   blockError:      { borderColor: theme.color.accent, backgroundColor: theme.color.paper2 },
   blockErrorText:  { color: theme.color.accentInk, fontSize: 13 },
-  // "Edit" beside the name, as on web (`.cc-mij__head`): at the far edge it sat under the header avatar
+  // "Edit" beside the name, as on web (`.cc-mij__head`): at the far edge it sat under the persona button
   identityHead:   { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
   identityName:   { fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink },
   identityEdit:   { fontSize: 14, fontWeight: '600', color: theme.color.accent },

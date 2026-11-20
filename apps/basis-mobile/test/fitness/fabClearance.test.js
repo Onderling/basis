@@ -17,7 +17,7 @@ const CSS = read('../../../basis/web/v2/circle.css');
 
 /** The screens a tab with the "+" shows — each one's scrolling list must end with the clearance. */
 const UNDER_THE_PLUS = [
-  'CircleProfileScreen', 'CircleBlockedScreen', 'LogReportScreen', 'ShareMyContactScreen', 'CircleAdvancedScreen',
+  'CircleBlockedScreen', 'LogReportScreen', 'ShareMyContactScreen', 'CircleAdvancedScreen',
   'SharedWithMeScreen', 'CircleMyDataScreen', 'CircleAvailabilityScreen', 'ContactsScreen',
 ];
 

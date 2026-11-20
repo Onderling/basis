@@ -28,18 +28,18 @@ describe('Mij — one declared screen on both shells', () => {
   });
 
   it('both fill the declared blocks through the one helper and paint them with their block painter', () => {
-    expect(fnOf(webHost, 'showMij')).toMatch(/mijScreenBlocks\(/);
+    expect(fnOf(webHost, 'showPersonaPanel')).toMatch(/mijScreenBlocks\(/);
     expect(mobileProfile).toMatch(/mijScreenBlocks\(/);
     expect(webProfile).toMatch(/renderCircleScreen\(/);
     expect(mobileProfile).toMatch(/<CircleScreenView\b/);
   });
 
-  it('both keep the declared actions, the gear as the one settings door, and Advanced behind the switch', () => {
+  it('both keep the declared actions; the settings and Advanced are behind the settings button, not in the panel', () => {
     expect(webProfile).toMatch(/meActionsFor\(basisManifest\)/);
     expect(mobileProfile).toMatch(/meActionsMobile\(basisManifest\)/);
     for (const src of [webProfile, mobileProfile]) {
       expect(src).not.toMatch(/circle\.profile\.mydata['"]/);   // the old My data door is gone
-      expect(src).toMatch(/circle\.advanced\.title/);
+      expect(src).not.toMatch(/circle\.advanced\.title/);
     }
   });
 

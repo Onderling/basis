@@ -1320,7 +1320,7 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
   return (
     <ScrollView keyboardShouldPersistTaps="handled" style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }, { paddingBottom: FAB_CLEARANCE }]} testID="circle-settings-group">
       <View style={styles.header}>
-        {typeof onBack === 'function' && <Pressable onPress={onBack} testID="mydata-back"><Text style={styles.back}>{t('circle.mydata.back')}</Text></Pressable>}
+        {typeof onBack === 'function' && <Pressable onPress={onBack} testID="mydata-back"><Text style={styles.back}>{t('circle.settings_home.back')}</Text></Pressable>}
         <Text style={styles.title}>{groupTitle ?? t('circle.settings_home.title')}</Text>
       </View>
       {(Array.isArray(only) ? only : []).map((id) => <React.Fragment key={id}>{painters[id]?.() ?? null}</React.Fragment>)}

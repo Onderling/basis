@@ -35,14 +35,15 @@ describe('what is waiting for you (Mij)', () => {
   });
 });
 
-describe('the block on Mij, through the one screen materializer', () => {
+describe('the block on Vandaag (it left Mij on 2026-11-20), through the one screen materializer', () => {
   it('reads each circle\'s open proposals and appointments, and the device offer, from the host\'s sources', async () => {
-    const { mijScreenBlocks } = await import('../../src/v2/mijScreen.js');
+    const { todayTopBlocks } = await import('../../src/v2/mijScreen.js');
+    const { materializeScreen } = await import('../../src/v2/userScreenBlocks.js');
     const later = new Date(Date.now() + 86_400_000).toISOString();
     const callSkill = async (app, op, args) => (app === 'calendar' && op === 'listEvents' && args.circleId === 'c1'
       ? { ok: true, items: [{ id: 'e1', title: 'Overleg', startsAt: later, createdBy: 'boss' }] } : { ok: true, items: [] });
-    const blocks = await mijScreenBlocks({ hostOps: {
-      callSkill, circles: [{ id: 'c1', name: 'Straat' }], selfIn: () => 'me',
+    const blocks = await materializeScreen({ screen: { id: 'vandaag', blocks: [{ id: 'n', type: 'notes', config: {} }] }, hostOps: {
+      forYou: true, todayTop: todayTopBlocks(), callSkill, circles: [{ id: 'c1', name: 'Straat' }], selfIn: () => 'me',
       openProposals: async () => ({ proposals: [{ proposalId: 'p1', votes: [] }] }),
       pendingDeviceOffer: async () => true,
     } });

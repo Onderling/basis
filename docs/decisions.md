@@ -2215,3 +2215,21 @@ at its start or end, longest first; Basis knows no shop.
 huge too; the words carry it. *The slots on the toolbox's card* would let the toolbox decide what the door hears; the
 words are the operator's, so their slots are too. *A phrase anywhere in the line* takes 'bij ah' out of 'koekjes bij ah
 bonus'.
+
+## 2026-11-20 — A circle's settings changes are kept for good; the rest of the governance lane still compacts (Fable ruled, on Opus's finding)
+
+**Decision:** a `policy-update` statement on the governance lane is RECORD class: it never expires, while rules changes,
+proposals and votes on the same lane keep their audit window and compact into the summary. The exception is one declared
+table (`RECORD_STATEMENTS` in `@onderling/item-store`'s `entryKinds.js`), read by the event log's prune through
+`retentionOfEntry`; the governance catch-up serves those statements first, so a joiner or a long-away device gets the
+whole settings history, never a head alone.
+
+**Why:** a circle's switches bind on every member's device by judging a content statement under the settings in force
+when it was made (the content line: each settings change names the content lanes' tips). With the changes compacted
+after 14 days, "which settings applied" became unknowable for anything older, and the circle's creation settings (the
+first change) lived nowhere durable. A settings change holds no content: the settings, the version, its author, the
+proposal that decided it, and the lanes' tips. They are rare and small.
+
+**Alternatives:** *keep the head only* (as before) cannot place a line. *Make the whole governance lane record* keeps
+every vote forever for no reader. **Not migrated:** circles whose older changes already compacted keep what they hold
+(fresh circles before the alpha); a device holding only a head treats everything older as unknown.

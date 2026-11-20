@@ -193,6 +193,7 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
+import { plusDialFor, plusPress, PLUS_MIDDLE_KEY, PLUS_MIDDLE_CHOICES } from '../../src/v2/plusDial.js';
 import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
 import { createPlusDoor, conversationSelf, plusRouteLine } from '../../src/assistant/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
@@ -3043,6 +3044,7 @@ function hideTabBar() {
   _vandaagHead?.hide();
   _mijHead?.hide();
   _mijShown += 1;
+  _plusOpen = false;   // a screen without the bar has no "+" to keep open
   hideCircleTabBar(tabBarEl);
 }
 
@@ -3053,19 +3055,43 @@ function showTabBar(active) {
   if (active !== 'screens') _vandaagHead?.hide();   // Vandaag is not shown: a change waits for the next landing
   if (active !== 'mij') _mijHead?.hide();
   _activeTab = active;
+  paintTabBar();
+  // the last tab used on this device, for the start-screen setting's "last used" (a convenience, not a setting)
+  try { window.localStorage.setItem(LAST_TAB_STORAGE_KEY, active); } catch { /* private window: the default stands */ }
+  paintHeaderAvatar();
+  if (!_headerAvatar) refreshHeaderAvatar();
+}
+
+/** The bar as it stands: the active tab, its counts, and the docked "+" (open or closed). */
+function paintTabBar() {
   renderCircleTabBar(tabBarEl, {
-    active, t,
+    active: _activeTab, t,
     onScreens: showScreens,
     onCircles: showLauncher,
     onNearby: showNearby,
     onContacts: showContacts,
     onMij: showMijTab,
     badges: { contacten: totalUnread(_contactUnread) },
+    plus: { dial: plusDialNow(), open: _plusOpen, onPress: onPlusPress },
   });
-  // the last tab used on this device, for the start-screen setting's "last used" (a convenience, not a setting)
-  try { window.localStorage.setItem(LAST_TAB_STORAGE_KEY, active); } catch { /* private window: the default stands */ }
-  paintHeaderAvatar();
-  if (!_headerAvatar) refreshHeaderAvatar();
+}
+
+// THE "+", docked in the bar (manifest `plus`, shared plusDial.js): which button sits where, and what a press does, are
+// the shared model's; this shell keeps whether it is open and runs the target a press hands back.
+let _plusOpen = false;
+const plusDialNow = () => plusDialFor(basisManifest, { middle: circleHouseholdAgent?.getParamValue?.(PLUS_MIDDLE_KEY) });
+function onPlusPress(pressed) {
+  const r = plusPress(_plusOpen, plusDialNow(), pressed);
+  _plusOpen = r.open;
+  if (tabBarEl?.childElementCount) paintTabBar();
+  if (r.run) runPlusTarget(r.run);
+}
+/** A dial button's declared target: an op through the waist, or the view this shell paints for a nav name. */
+function runPlusTarget(button) {
+  const target = button?.target;
+  if (target?.kind === 'op') { Promise.resolve(rawCallSkill('basis', target.opId, {})).catch(() => {}); return; }
+  const views = { plusThread: () => showVandaagPlus(), shareContact: () => showShareMyContact() };
+  views[target?.to]?.();
 }
 
 // THE HEADER AVATAR — top-right on every tab: the persona's picture or initials; a tap opens the person's own editor.
@@ -4580,7 +4606,7 @@ async function _showVandaag({ landing = false } = {}) {
     edit.textContent = t('circle.vandaag.customise');
     edit.addEventListener('click', () => showVandaagCustomise());
     head.appendChild(edit);
-    // the "+" is no longer here: one floating button on every tab (`mountPlusButton`)
+    // the "+" is no longer here: it is docked in the tab bar (`paintTabBar`)
   }
   rootEl.appendChild(head);
   if (!screen) return;
@@ -4739,21 +4765,6 @@ let _pendingPinOpen = null;
 function runMeAction(id) {
   if (id === 'share-contact') { showShareMyContact(); return; }
   if (id === 'scan') { Promise.resolve(rawCallSkill('basis', 'scanQr', {})).catch(() => {}); }
-}
-
-/** THE "+" — one floating button on every tab: the person's own entry (their line, their acts, their Me actions). */
-function mountPlusButton() {
-  const had = document.querySelector('.cc-fab');
-  const b = had ?? document.createElement('button');
-  // its words, in the current language: mounted after localisation, and named again on a language change
-  b.title = t('circle.vandaag.plus');
-  b.setAttribute('aria-label', t('circle.vandaag.plus'));
-  if (had) return;
-  b.type = 'button';
-  b.className = 'cc-fab circle-vandaag__plus';
-  b.textContent = '+';
-  b.addEventListener('click', () => showVandaagPlus());
-  document.body.appendChild(b);
 }
 
 // the "+" is the person's kept assistant thread: its turns are the bot's own turn entries on THIS shell's log (the
@@ -5411,7 +5422,6 @@ async function showMyData(opts) {
     try { localStorage.setItem('circle.app.lang', lng); } catch { /* best-effort */ }
     circleHouseholdAgent?.callSkill?.('params', 'set-param', { key: 'app.lang', value: lng })
       .catch(() => { /* the cache stands */ });
-    mountPlusButton();   // the "+" says its name in the new language
     if (group) showMyData({ group: group.id }); else showMij();
   };
   // Display theme: persist + stamp data-theme live (the pre-paint hook in
@@ -5573,6 +5583,12 @@ async function showMyData(opts) {
     startScreen: { value: circleHouseholdAgent?.getParamValue?.('home.startScreen') ?? 'vandaag', choices: START_SCREEN_CHOICES },
     onSetStartScreen: async (value) => {
       try { await circleHouseholdAgent.callSkill('params', 'set-param', { key: 'home.startScreen', value }); } catch { /* the row re-reads the truth */ }
+      rerender();
+    },
+    // which button sits on the "+"'s own spot on this device (a user param; the same write as every setting)
+    plusMiddle: { value: plusDialNow().middle?.id ?? 'none', choices: PLUS_MIDDLE_CHOICES },
+    onSetPlusMiddle: async (value) => {
+      try { await circleHouseholdAgent.callSkill('params', 'set-param', { key: PLUS_MIDDLE_KEY, value }); } catch { /* the row re-reads the truth */ }
       rerender();
     },
     historyMirror: {
@@ -9626,7 +9642,6 @@ async function boot() {
   // pre-boot cache of app.lang
   let _storedAppLang = null; try { _storedAppLang = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ }
   await initLocalisation({ lng: (_storedAppLang === 'nl' || _storedAppLang === 'en') ? _storedAppLang : detectDeviceLang() });
-  mountPlusButton();   // after localisation: mounted before it, the button was named by its key
   // A hosted build links back to its site, above everything else (no frame ⇒ nothing).
   renderHostFrame(document.body, { frame: HOST_FRAME, t });
   placeHeaderAvatar();   // the person button below the line just painted (it may already be on screen)

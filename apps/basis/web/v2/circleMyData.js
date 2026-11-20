@@ -49,6 +49,9 @@ export function renderCircleMyData(container, {
   devicesNeedPhrase = false,
   startScreen = null,
   onSetStartScreen,
+  // which round button sits on the docked "+"'s own spot (`plus.middle`, shared plusDial.js): `{value, choices}`
+  plusMiddle = null,
+  onSetPlusMiddle,
   // The nodes this person owns (a companion they claimed): `[{node, short}]`. `onOpenCompanionGrant(node)` reads what
   // the picker shows (`loadCompanionGrantPicker`: `{ok, targets, choices}` or `{ok: false, message}`);
   // `onGrantCompanion({node, to, families})` grants and resolves to the line to show. Absent ⇒ the section is omitted.
@@ -194,6 +197,28 @@ export function renderCircleMyData(container, {
         sel.addEventListener('change', () => onSetStartScreen(sel.value));
         sec0.appendChild(sel);
         container.appendChild(sec0);
+      }
+    },
+    'plus-middle': () => {
+      // which button a second tap on the "+" runs (chat by default), or none: then a second tap closes it
+      if (plusMiddle && typeof onSetPlusMiddle === 'function') {
+        const sec = section(tr('circle.params.key.plus_middle'));
+        const hint = document.createElement('p');
+        hint.className = 'cc-mydata__hint';
+        hint.textContent = tr('circle.plus.middle_hint');
+        sec.appendChild(hint);
+        const sel = document.createElement('select');
+        sel.dataset.role = 'plus-middle';
+        for (const c of plusMiddle.choices ?? []) {
+          const o = document.createElement('option');
+          o.value = c.value;
+          o.textContent = tr(c.labelKey);
+          if (c.value === plusMiddle.value) o.selected = true;
+          sel.appendChild(o);
+        }
+        sel.addEventListener('change', () => onSetPlusMiddle(sel.value));
+        sec.appendChild(sel);
+        container.appendChild(sec);
       }
     },
     'bot-actions': () => {

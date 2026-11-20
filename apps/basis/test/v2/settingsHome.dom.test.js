@@ -21,6 +21,7 @@ const allSettingsProps = () => ({
   onSetTheme: vi.fn(), themePref: 'system',
   onSetAppLang: vi.fn(), appLang: 'nl',
   startScreen: { value: 'vandaag', choices: [{ value: 'vandaag', labelKey: 'x' }] }, onSetStartScreen: vi.fn(),
+  plusMiddle: { value: 'chat', choices: [{ value: 'chat', labelKey: 'x' }] }, onSetPlusMiddle: vi.fn(),
   onSetSurfacePref: vi.fn(), surfacePref: 'inline',
   weekOverview: { on: true, onToggle: vi.fn() },
   notifications: { supported: true, subscribed: false }, onToggleNotifications: vi.fn(),

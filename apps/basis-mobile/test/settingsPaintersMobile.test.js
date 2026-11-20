@@ -21,6 +21,7 @@ const OWN_TITLE = {
   'theme': 'circle.mydata.theme',
   'language': 'circle.mydata.language',
   'start-screen': 'circle.mydata.start_title',
+  'plus-middle': 'circle.params.key.plus_middle',
   'bot-actions': 'circle.mydata.surface_pref',
   'week-overview': 'circle.profile.week_switch',
   'notifications': 'circle.mydata.notifications',

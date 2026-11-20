@@ -48,6 +48,8 @@ import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/res
 import RecoveryFileWizardModal from '../../../../basis/src/rn/wizards/recoveryFileWizardModal.js';
 import { historyStatusLine } from '../../../../basis/src/v2/historyMirror.js';
 import { START_SCREEN_CHOICES } from '../../../../basis/src/v2/startScreen.js';
+import { plusDialFor, PLUS_MIDDLE_KEY, PLUS_MIDDLE_CHOICES, PLUS_MIDDLE_NONE } from '../../../../basis/src/v2/plusDial.js';
+import { renderMobile } from '@onderling/app-manifest';
 import { forgetCircleSealStrategies } from '../../core/circlePods.js';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
@@ -490,6 +492,32 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
       </>
     ),
     // only for a person with a bot that acts (a contact bot other than Help): the launcher reads it (showsBotActionsSetting)
+    'plus-middle': () => (
+      <>
+        {/* Which round button sits on the docked "+"'s own spot (the `plus.middle` setting, shared plusDial.js), or none:
+            then a second tap closes it. Written through set-param like every setting. Web parity: circleMyData.js. */}
+        {agent && typeof agent.getParamValue === 'function' ? (
+          <Section title={t('circle.params.key.plus_middle')}>
+            <Text style={styles.relayHint}>{t('circle.plus.middle_hint')}</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {PLUS_MIDDLE_CHOICES.map((c) => {
+                const on = (plusDialFor(basisManifest, { middle: agent.getParamValue(PLUS_MIDDLE_KEY), renderer: renderMobile }).middle?.id ?? PLUS_MIDDLE_NONE) === c.value;
+                return (
+                  <Pressable key={c.value} style={[styles.action, on && { borderColor: theme.color.ink }]} testID={`mydata-plus-middle-${c.value}`}
+                    accessibilityState={{ selected: on }}
+                    onPress={async () => {
+                      try { await callSkill('params', 'set-param', { key: PLUS_MIDDLE_KEY, value: c.value }); } catch { /* the row re-reads the truth */ }
+                      setHistoryTick((n) => n + 1);
+                    }}>
+                    <Text style={styles.actionLabel}>{t(c.labelKey)}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Section>
+        ) : null}
+      </>
+    ),
     'bot-actions': () => (showBotActions ? (
       <>
         <Section title={t('circle.mydata.surface_pref')}>

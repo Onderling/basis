@@ -50,7 +50,7 @@ import Constants from 'expo-constants';
 import { View, Text, Pressable, ScrollView, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState, Image, Share } from 'react-native';
 import { useTheme } from './themeContext.js';
 import DeliveryChip from '../../rn/DeliveryChip.js';
-import { FAB, FAB_CLEARANCE, HEADER_AVATAR } from './fab.js';
+import { FAB_CLEARANCE, HEADER_AVATAR } from './fab.js';
 // The status bar overlaps a full-screen View on Android/iOS. Every screen in this file draws its own
 // header bar at the very top of `styles.page`, so the inset belongs to that style — see `makeStyles`.
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -149,7 +149,7 @@ import { isAppSurfaceEnabled } from '../../../../basis/src/v2/appFeature.js';
 // the capability gate + the affordance matrix (web≡mobile, shared core).
 import { effectiveCapabilities, checkCapability } from '../../../../basis/src/v2/capabilityGate.js';
 import { gateRefusalKey } from '../../../../basis/src/v2/circleActGate.js';   // a refusal's words, the same for a typed line and a tap
-import { buildCapabilityMatrix } from '@onderling/app-manifest';
+import { buildCapabilityMatrix, renderMobile } from '@onderling/app-manifest';
 // S6.C — per-user surface preference (inline / screen / minimal), shared selector + the mobile store.
 import { selectSurfaceButtons } from '../../../../basis/src/v2/surfacePref.js';
 import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../../basis/src/v2/addressSharing.js';
@@ -300,7 +300,8 @@ import CircleFolioScreen from './CircleFolioScreen.js';
 import CircleRulesScreen from './CircleRulesScreen.js';
 import { changeRulesDoor, readCircleRules, rulesForSave } from '../../../../basis/src/v2/governanceDoors.js';
 import CircleRulesConsentScreen from './CircleRulesConsentScreen.js';
-import CircleTabBar from './CircleTabBar.js';
+import CircleTabBar, { PlusDialButtons } from './CircleTabBar.js';
+import { plusDialFor, plusPress, PLUS_MIDDLE_KEY } from '../../../../basis/src/v2/plusDial.js';
 import CircleScreenView from './CircleScreenView.js';
 import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
@@ -475,7 +476,7 @@ function PersonaPanel({
   );
 }
 
-function WithTabBar({ active, onSelect, badges, avatar = null, onAvatar = null, overlay = null, hasMesh = false, onPlus = null, plusSheet = null, children }) {
+function WithTabBar({ active, onSelect, badges, avatar = null, onAvatar = null, overlay = null, hasMesh = false, plus = null, plusSheet = null, children }) {
   // The tab frame paints the app's GROUND. It used to be a bare `flex: 1` View, which is transparent,
   // so any screen inside it that themed its text but not its background showed the platform's default
   // white — themed (light) ink on white, unreadable, and glaring beside an otherwise dark app. The
@@ -488,15 +489,15 @@ function WithTabBar({ active, onSelect, badges, avatar = null, onAvatar = null, 
       {/* the header avatar, top-right on every tab: the persona's picture or initials; a tap opens the person's editor */}
       {avatar ? <HeaderAvatar avatar={avatar} onPress={onAvatar} /> : null}
       {overlay}
-      {/* THE "+": one floating button on every tab, bottom-right above the tab bar — the one accent (web twin: .cc-fab) */}
-      {onPlus ? (
-        <Pressable onPress={onPlus} accessibilityRole="button" accessibilityLabel={t('circle.vandaag.plus')} testID="vandaag-plus-open"
-          style={{ position: 'absolute', right: 20, bottom: FAB.bottom, width: FAB.size, height: FAB.size, borderRadius: FAB.size / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.accentInk, elevation: 4 }}>
-          <Text style={{ color: theme.color.accentContrast, fontSize: 28, lineHeight: 30 }}>+</Text>
-        </Pressable>
+      {/* THE "+" is docked in the tab bar (manifest `plus`, shared plusDial.js). Open, the screen is dimmed: a touch on it
+          folds the buttons back and presses nothing under it (web twin: .circle-plusdial__backdrop) */}
+      {plus?.open ? (
+        <Pressable onPress={() => plus.onPress?.('outside')} accessibilityLabel={t('circle.plus.close')} testID="plus-dial-outside"
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }} />
       ) : null}
+      <PlusDialButtons plus={plus} />
       {plusSheet}
-      <CircleTabBar active={active} onSelect={onSelect} badges={badges} hasMesh={hasMesh} />
+      <CircleTabBar active={active} onSelect={onSelect} badges={badges} hasMesh={hasMesh} plus={plus} />
     </View>
   );
 }
@@ -811,6 +812,7 @@ export default function CircleLauncherScreen({
   const [expandedBlockId, setExpandedBlockId] = useState(null);
   const [customiseOpen, setCustomiseOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);   // Vandaag's "+": the person's own acts
+  const [plusDialOpen, setPlusDialOpen] = useState(false);   // THE "+" in the bar, opened into its round buttons
   const [plusEdit, setPlusEdit] = useState(null);     // …opened on an own row: `{ act, id, values, asSelf }` (shared `plusEditFor`)
   // …and, when its act shares, the contacts it can go to (the shared `plusShareTargets`; read when the sheet opens on it)
   const [plusShareList, setPlusShareList] = useState(null);
@@ -1855,6 +1857,8 @@ export default function CircleLauncherScreen({
   // inline to cancel).
   useEffect(() => {
     const handler = () => {
+      // the open "+" folds back first, and nothing else happens (the web's Escape)
+      if (plusDialOpen) { setPlusDialOpen(false); return true; }
       // β.5 — tile context menu open → close it.  Highest priority since
       // any subsequent state-based pop would feel wrong while the modal
       // is on top.
@@ -1897,7 +1901,7 @@ export default function CircleLauncherScreen({
     };
     const sub = BackHandler.addEventListener('hardwareBackPress', handler);
     return () => sub.remove();
-  }, [view, selected, creating, menuCircle, expandedBlockId]);
+  }, [view, selected, creating, menuCircle, expandedBlockId, plusDialOpen]);
 
   // Bottom tab bar (Screens / Circles / Mij).  α.3 — Screens is the
   // new primary; Stroom is retired (now lives as the seeded "Stream"
@@ -1991,6 +1995,28 @@ export default function CircleLauncherScreen({
         .catch((err) => Alert.alert(t('circle.profile.scan'), String(err?.message ?? err)));
     }
   };
+
+  // THE "+", docked in the bar (manifest `plus`, shared plusDial.js): which button sits where, and what a press does, are
+  // the shared model's; this shell keeps whether it is open and runs the target a press hands back (web twin: circleApp
+  // paintTabBar / onPlusPress / runPlusTarget). The person's middle-spot choice is the `plus.middle` device setting.
+  const plusDial = plusDialFor(basisManifest, { middle: bundle?.agent?.getParamValue?.(PLUS_MIDDLE_KEY), renderer: renderMobile });
+  const runPlusTarget = (button) => {
+    const target = button?.target;
+    if (target?.kind === 'op') {
+      Promise.resolve(bundle?.callSkill?.('basis', target.opId, {}))
+        .then((r) => { if (r?.ok === false || r?.error) Alert.alert(t(button.labelKey), String(r?.error?.message ?? r?.error ?? '')); })
+        .catch((err) => Alert.alert(t(button.labelKey), String(err?.message ?? err)));
+      return;
+    }
+    const views = { plusThread: () => { setPlusEdit(null); setPlusOpen(true); }, shareContact: () => setView('shareContact') };
+    views[target?.to]?.();
+  };
+  const onPlusPress = (pressed) => {
+    const r = plusPress(plusDialOpen, plusDial, pressed);
+    setPlusDialOpen(r.open);
+    if (r.run) runPlusTarget(r.run);
+  };
+  const plusBar = { dial: plusDial, open: plusDialOpen, onPress: onPlusPress };
 
   // THE FIRST OPEN's door, once the app is up: the one scanner (the scanQr op, as Me's Scan) or the introduction's cards
   // over Today (marked seen as "Lees meer" does); "just continue" asks for nothing (web twin: showFirstOpen)
@@ -2382,7 +2408,7 @@ export default function CircleLauncherScreen({
     // when there is more than one; "Pas aan" opens the customise sheet (every control a screen op). Web: circleApp.js.
     const active = getActiveScreen(screensBook);
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="screens" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="screens" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         {/* clear the status bar: the day's header sat under the clock */}
         <View style={{ flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper }}>
           {/* the day this page is about, above everything: a day, not a list (web twin: circle-vandaag__day) */}
@@ -2466,7 +2492,7 @@ export default function CircleLauncherScreen({
   // Mij = identity, the declared screen; its other doors are behind My data.
   if (view === 'profile') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} head={mijHead} landedByTab={mijByTab} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onSettings={() => setView('settingsHome')} onSettingsGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }} onSharedWithMe={() => setView('sharedWithMe')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
         <PersonaPanel
           personaId={myPersona} onClose={() => { setMyPersona(null); refreshHeaderAvatar(); }} styles={styles}
@@ -2479,7 +2505,7 @@ export default function CircleLauncherScreen({
   // its only undo, in a place a person can find without being any circle's admin.
   if (view === 'blocked') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <CircleBlockedScreen callSkill={bundle?.callSkill} circles={circles} onBack={() => setView('contacten')} />
       </WithTabBar>
     );
@@ -2487,7 +2513,7 @@ export default function CircleLauncherScreen({
   // This device's log, to copy — a My data sub-view (web parity: showLogReport); nothing is sent from it.
   if (view === 'logReport') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <LogReportScreen onBack={() => { setSettingsGroupId('my-data'); setView('settingsGroup'); }} />
       </WithTabBar>
     );
@@ -2495,7 +2521,7 @@ export default function CircleLauncherScreen({
   // Share my contact — a Mij sub-view (web parity: showShareMyContact); back returns to profile.
   if (view === 'shareContact') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <ShareMyContactScreen callSkill={bundle?.callSkill} onBack={() => setView('profile')} />
       </WithTabBar>
     );
@@ -2504,7 +2530,7 @@ export default function CircleLauncherScreen({
   // op + the settable params, from the shared projections; back returns to profile.
   if (view === 'advanced') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <CircleAdvancedScreen manifestsByOrigin={buildManifestsByOrigin()} callSkill={bundle?.callSkill} onBack={() => setView('profile')} />
       </WithTabBar>
     );
@@ -2517,7 +2543,7 @@ export default function CircleLauncherScreen({
   // built from the encapsulated identity secret). A null opener makes a row tap a deny-safe no-op.
   if (view === 'sharedWithMe') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <SharedWithMeScreen
           received={sharedWithMeList}
           opener={bundle?.sharedWithMeOpener ?? null}
@@ -2536,7 +2562,7 @@ export default function CircleLauncherScreen({
   // The person's settings behind the gear on Mij (web parity: showSettingsHome / showSettingsCircleChooser).
   if (view === 'settingsHome') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <SettingsHomeScreen onBack={() => setView('profile')}
           onOpenGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }}
           onOpenPerCircle={() => setView('settingsCircles')}
@@ -2556,14 +2582,14 @@ export default function CircleLauncherScreen({
   if (view === 'settingsGroup') {
     const group = settingsGroupFor(basisManifest, settingsGroupId);
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         {myDataScreen({ only: group ? group.sections.map((sec) => sec.id) : [], groupTitle: group ? t(group.labelKey) : null, onBack: () => setView('settingsHome') })}
       </WithTabBar>
     );
   }
   if (view === 'settingsCircles') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <CircleSettingsChooserScreen circles={circles ?? []} onBack={() => setView('settingsHome')}
           onOpenCircle={(c) => { setSelected(c); setView('settings'); }} />
       </WithTabBar>
@@ -2571,7 +2597,7 @@ export default function CircleLauncherScreen({
   }
   if (view === 'availability') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <CircleAvailabilityScreen
           store={availabilityStore}
           onBack={() => { setSettingsGroupId('connection'); setView('settingsGroup'); }}
@@ -2602,7 +2628,7 @@ export default function CircleLauncherScreen({
       );
     }
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="contacten" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="contacten" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <ContactsScreen bundle={bundle} unread={contactUnread}
           helpAvailable={circles.some((c) => c.id === HELP_CIRCLE_ID)}
           onOpen={(c) => { const target = contactOpenTarget(c); if (target.kind === 'circle') { const hc = circles.find((x) => x.id === target.circleId); if (hc) openCircle(hc); } else openContactThread(c); }}
@@ -2736,7 +2762,7 @@ export default function CircleLauncherScreen({
     // On a device with no discovering transport the surface is honest about it rather than silent:
     // the banner says "unavailable" instead of the screen looking like an empty room.
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="nearby" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="nearby" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
         <NearbyScreenHost
           bundle={bundle}
           heldSelves={heldSelves}
@@ -2980,7 +3006,7 @@ export default function CircleLauncherScreen({
 
   const listPaint = launcherListPaint({ loading, settled: launcherSettled, count: circles.length, bootError });
   return (
-    <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="circles" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
+    <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="circles" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
       <View style={styles.page} testID="circle-launcher">
         {/* no "← chat" button (no chat shell to navigate to). */}
         <Text style={styles.title}>{t('circle.title')}</Text>

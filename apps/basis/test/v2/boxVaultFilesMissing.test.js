@@ -6,23 +6,32 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { vaultFilesMissing, startFailures } from '../../src/v2/boxStorage.js';
+import { vaultFilesMissing, startFailures, startBackoffMs, failureIsPermanent } from '../../src/v2/boxStorage.js';
 
 const D = '/data';
 const has = (...names) => (p) => names.some((n) => p === path.join(D, n));
 
 describe('the box\'s vault files (L1115)', () => {
-  it('an empty folder is a first start', () => {
+  it('no box-started mark: a first start (also one cut short half-way): go on', () => {
     expect(vaultFilesMissing(D, has())).toEqual([]);
+    expect(vaultFilesMissing(D, has('vault.json', 'registry', 'agent-vaults'))).toEqual([]);   // killed before chat-vault.json
   });
-  it('both vault files beside the rest: go on', () => {
-    expect(vaultFilesMissing(D, has('vault.json', 'chat-vault.json', 'registry', 'device-log'))).toEqual([]);
+  it('a folder that ran a box (its mark) with both vault files: go on', () => {
+    expect(vaultFilesMissing(D, has('box-started', 'vault.json', 'chat-vault.json', 'registry'))).toEqual([]);
   });
-  it('the chat vault missing beside a device log and the other vault: a loss', () => {
-    expect(vaultFilesMissing(D, has('vault.json', 'device-log', 'household-items.json'))).toEqual(['chat-vault.json']);
+  it('a folder that ran a box, its chat vault missing (a backup put back without it): a loss', () => {
+    expect(vaultFilesMissing(D, has('box-started', 'vault.json', 'device-log'))).toEqual(['chat-vault.json']);
   });
-  it('both missing beside a box\'s content (a restored data folder without its vaults): a loss', () => {
-    expect(vaultFilesMissing(D, has('registry', 'settings.json'))).toEqual(['vault.json', 'chat-vault.json']);
+});
+
+describe('back-off and what holds (L1115)', () => {
+  it('waits 1, 2, 4 … minutes, at most two hours', () => {
+    expect([1, 2, 3, 4].map(startBackoffMs)).toEqual([60_000, 120_000, 240_000, 480_000]);
+    expect(startBackoffMs(20)).toBe(2 * 60 * 60_000);
+  });
+  it('only a key that fails to decrypt cannot pass by itself', () => {
+    expect(failureIsPermanent(Object.assign(new Error('a key'), { cause: new Error('VaultEncrypted: decrypt failed') }))).toBe(true);
+    expect(failureIsPermanent(Object.assign(new Error('a key'), { cause: new Error('EIO: read failed') }))).toBe(false);
   });
 });
 
@@ -36,6 +45,8 @@ describe('failed starts in a row (L1115)', () => {
       const b = f.note('host-key', new Date('2026-11-20T10:01:00Z'));
       expect(a).toMatchObject({ count: 1, since: '2026-11-20T10:00:00.000Z' });
       expect(b).toMatchObject({ count: 2, since: '2026-11-20T10:00:00.000Z', last: 'host-key' });
+      // a failure further than the window from the last starts a new run
+      expect(f.note('content-key', new Date('2026-11-21T10:00:00Z'))).toMatchObject({ count: 1, since: '2026-11-21T10:00:00.000Z' });
       f.clear();
       expect(f.read()).toBe(null);
       expect(f.note('content-key').count).toBe(1);

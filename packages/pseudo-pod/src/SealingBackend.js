@@ -62,9 +62,14 @@
  * @param {() => ({seal:Function, open:Function}|null|Promise<{seal:Function, open:Function}|null>)} a.getStrategy
  *   resolves this device's content-seal strategy, or null while none is available (no identity yet).
  * @param {(msg: string, err?: unknown) => void} [a.onWarn]  where an unopenable value is reported.
+ * @param {string} [a.markScope]  the storage's own name, so the refusal outlives a new wrapper over the same storage
  * @returns {object} the same port, sealed
  */
-export function createSealingBackend({ backend, getStrategy, onWarn = null } = {}) {
+/** The refs whose record would not open, per storage name, else per backend object (L1115). */
+const UNOPENED = new WeakMap();
+const UNOPENED_BY_NAME = new Map();
+
+export function createSealingBackend({ backend, getStrategy, onWarn = null, markScope = null } = {}) {
   if (!backend || typeof backend.put !== 'function' || typeof backend.get !== 'function') {
     throw new Error('createSealingBackend: a StorageBackend (put/get/list) is required');
   }
@@ -78,7 +83,14 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null } = {
   let cached = null;
   // THE REFS WHOSE RECORD WOULD NOT OPEN (L1115): `get` answers null for them (one bad row must not take a store down),
   // and null is what absent means, so a write to such a ref is refused until a read of it opens or it is deleted.
-  const unopened = new Set();
+  // Kept per BACKEND object (not per wrapper): a store that wraps the same backend again per open still sees the mark,
+  // and a delete does not lift it (delete-then-put is a save), the same rule as the key-value stores (localStoreSeal.js)
+  // `markScope` (the storage's own name: an IndexedDB database, an AsyncStorage scope, a folder) keeps the mark across a
+  // NEW backend object over the same storage (a circle's store is rebuilt on a posture change); else the object itself
+  const markKey = typeof markScope === 'string' && markScope ? markScope : backend;
+  const table = typeof markKey === 'string' ? UNOPENED_BY_NAME : UNOPENED;
+  let unopened = table.get(markKey);
+  if (!unopened) { unopened = new Set(); table.set(markKey, unopened); }
   const refuseOverUnopened = (ref) => {
     if (!unopened.has(ref)) return;
     warn(`[at-rest] ${ref}: a write was refused; the stored record could not be opened and is kept`, null);
@@ -217,12 +229,10 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null } = {
       }
     },
 
-    /** Deleted on purpose: a fresh write to the ref may follow (forwarded; the refusal for it ends). */
+    /** Forwarded; a delete does NOT lift the refusal (delete-then-put would write over it just the same). */
     async delete(ref, ...rest) {
       if (typeof backend.delete !== 'function') throw new Error('SealingBackend: this backend has no delete');
-      const r = await backend.delete(ref, ...rest);
-      unopened.delete(ref);
-      return r;
+      return backend.delete(ref, ...rest);
     },
   };
 

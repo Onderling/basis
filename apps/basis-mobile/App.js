@@ -467,7 +467,7 @@ export default function App() {
         } catch { /* a clear that cannot run never blocks a launch */ }
 
         const deviceLogIo = backendSnapshotIo(
-          sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-device-log' })),
+          sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-device-log' }), { scope: 'cc-device-log' }),
         );
         const SEED_FLAG = 'cc.firstBootSeeded.v1';
         const alreadySeeded = await AsyncStorage.getItem(SEED_FLAG).catch(() => null) === '1';

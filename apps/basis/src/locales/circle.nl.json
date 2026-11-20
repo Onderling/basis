@@ -6010,6 +6010,8 @@
     "value_delete": "weggooien",
     "value_own": "je eigen",
     "screen_confirm_toolbox": "{{label}} wil koppelen voor toolbox {{toolbox}}.",
+    "box_stopped_trying": "De box van het huishouden is gestopt: {{count}} keer kon hij zijn sleutels niet ontsleutelen, en dat gaat niet vanzelf over. Er is niets veranderd en de bot antwoordt nu niet. Wie de box beheert: zie zijn log voor de uitweg (de gegevensmap opzij zetten en met de herstelzin opnieuw inschrijven).",
+    "box_cannot_start": "De box van het huishouden kan niet starten: {{count}} keer achter elkaar kon hij zijn sleutels niet lezen. Er is niets veranderd; hij blijft het proberen, met steeds meer tijd ertussen. Wie de box beheert: kijk in zijn log.",
     "screen_toolbox_not_on": "De toolbox {{toolbox}} staat niet aan in dit huishouden, dus zijn pagina kan niet koppelen. Vraag de beheerder hem aan te zetten (/toolbox).",
     "toolbox_not_yours": "Deze pagina mag alleen zijn eigen toolbox gebruiken, niet {{toolbox}}.",
     "screen_confirm_question": "Een scherm wil koppelen als jou. Welke code staat op dat scherm? Tik die code. Zie je hem niet, of deed je dit niet zelf: tik \"Geen van deze\".",

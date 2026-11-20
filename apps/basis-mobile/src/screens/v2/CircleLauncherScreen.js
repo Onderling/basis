@@ -394,7 +394,7 @@ const CIRCLE_LLM_APPS = (process.env.EXPO_PUBLIC_CIRCLE_LLM_APPS || '').split(',
 // path is exercised there). The remaining path — a real signed-in Solid pod —
 // stays the live-pod tail.
 const circleSearchVectorStore = (AsyncStorage && typeof AsyncStorage.getItem === 'function')
-  ? sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-circle-rag' }))
+  ? sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-circle-rag' }), { scope: 'cc-circle-rag' })
   : createMemoryBackend();
 
 // Sealed media: the per-circle composition (ONE dev bucket per app session, the compositions cached per circle) lives

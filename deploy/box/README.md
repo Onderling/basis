@@ -197,20 +197,25 @@ The assistant (`apps/basis/bin/device-runner.mjs`) never makes a new key over on
 start it stops, writing nothing, when:
 
 - a key or marker in its vaults is there but will not read (a wrong passphrase, a damaged file, a storage error):
-  `device-runner: a key on this box could not be read (<which>); nothing was changed. Stopping; ...`;
-- `vault.json` or `chat-vault.json` is MISSING while the data folder holds a box's other state (a backup restored
-  without them, a folder that did not mount): `device-runner: chat-vault.json is missing in <dir> ...`.
+  `device-runner: a key on this box could not be read (<which>); nothing was changed. Stopping. ...`;
+- `vault.json` or `chat-vault.json` is MISSING in a data folder that ran a box before (it holds `box-started`, written
+  last at a start that came up): a backup put back without them. A folder without that mark is a first start (also one
+  that was cut short), so an interrupted first start simply goes on. **Not caught:** a data folder that did not mount
+  (an empty mount point reads as a first start).
 
-**What restarts it:** the `assistant` role's container (`deploy/roles/assistant.yml`, `restart: unless-stopped`):
-Docker starts it again after each stop, with a growing delay. A failure that passes (a storage hiccup) is gone at the
-next start.
+**What restarts it:** the `assistant` role's container (`deploy/roles/assistant.yml`, `restart: unless-stopped`).
+Before it exits, a failed start **backs off**: 1, 2, 4 … minutes, at most two hours (`box.startBackoffMs` and its window
+`box.startFailureWindowMs`), so a cause that passes by itself (a slow mount, a storage hiccup) is retried without a
+tight loop. `<data dir>/start-failures.json` counts the failed starts in the window, said in each stop's line, and is
+removed when the assistant comes up.
 
-**A failure that repeats is counted,** not only logged once per start: `<data dir>/start-failures.json` holds how many
-starts in a row stopped and since when, and each stop's line says it (`Failed starts in a row: 7, since ...`). The file
-is removed when the assistant comes up (`device-runner: up`). After **3** failed starts in a row (the parameter
-`box.startFailuresBeforeHold`) the assistant **stops trying**: it says `STOPPED TRYING ...` once and stays up without
-running, so the container does not restart it in a loop. A person then fixes the files (the missing file back, the right
-mount) or restores the box from the phrase (`--enrol`), and restarts the container.
+**It holds only for a key that fails to decrypt** (that does not pass by itself): after 3 such starts
+(`box.startFailuresBeforeHold`) it says `STOPPED TRYING ...` once and stays up without running. The bot's admin line in
+Telegram hears it once at the third failure and once at the hold, when `TG_BOT_TOKEN` and `TG_ADMIN_UID` are set.
+
+**The way out the lines name:** fix the data folder (the missing or damaged file back, the right mount), or start the
+box over from the phrase: stop the container, move the data folder aside (keep it), and run the enrol (`--enrol`) on an
+empty folder; its circles come back from the members. The enrol never counts as a failed start.
 
 ## Backups (role `backup`)
 

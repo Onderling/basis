@@ -60,7 +60,7 @@ export function fileStorageBackend(dir) {
  * @param {string} dir
  */
 export function boxDeviceLogIo(dir, { legacyFile = null } = {}) {
-  const io = backendSnapshotIo(sealedLocalBackend(fileStorageBackend(dir)));
+  const io = backendSnapshotIo(sealedLocalBackend(fileStorageBackend(dir), { scope: dir }));
   if (!legacyFile) return io;
   // THE ONE-TIME IMPORT of the plain `device-log.json` a box kept before this: the device log is the record its
   // lanes and memberships ride, and a box that came up without it would return to its circles as if it had never
@@ -127,27 +127,52 @@ export function boxStores(dataDir) {
 
 /** The box's two vault files: the owner root's side and the chat side (the content key, the delegation record). */
 export const BOX_VAULT_FILES = Object.freeze(['vault.json', 'chat-vault.json']);
-/** What says this data folder has held a running box (any one of them): a missing vault file beside it is a loss. */
-const BOX_STATE_MARKS = Object.freeze(['vault.json', 'chat-vault.json', 'registry', 'agent-vaults', 'device-log', 'device-log.json', 'household-items.json', 'settings.json', 'circle-policy.json', 'bot-threads.json']);
+/** Written LAST in a start that came up (`device-runner: up`): the one proof that this data folder ran a box before. */
+export const BOX_STARTED_FILE = 'box-started';
 
 /**
- * A vault file that is MISSING while the data folder holds other state is a failure, not a first start (L1115): a
- * partly restored backup or an unmounted folder would otherwise read as "nothing stored" and mint new keys over a
- * household. A folder with none of the marks is a first start. Pure over `exists`, so a test needs no disk.
+ * A vault file that is MISSING in a data folder that ran a box before (its `box-started`, written last at a start that
+ * came up) is a loss, not a first start (L1115): a partly restored backup would otherwise read as "nothing stored" and
+ * mint new keys over a household. Without the mark it is a first start, also one that was cut short half-way (it goes
+ * on). NOT caught: an unmounted data folder (an empty mount point carries no mark and reads as a first start). Pure over
+ * `exists`, so a test needs no disk.
  * @param {string} dataDir @param {(p: string) => boolean} exists
- * @returns {string[]} the vault files that are missing beside other state (empty: go on)
+ * @returns {string[]} the vault files that are missing in a folder that ran a box (empty: go on)
  */
 export function vaultFilesMissing(dataDir, exists) {
-  const held = BOX_STATE_MARKS.some((m) => exists(path.join(dataDir, m)));
-  return held ? BOX_VAULT_FILES.filter((f) => !exists(path.join(dataDir, f))) : [];
+  if (!exists(path.join(dataDir, BOX_STARTED_FILE))) return [];
+  return BOX_VAULT_FILES.filter((f) => !exists(path.join(dataDir, f)));
+}
+
+/** The mark a start that came up leaves (idempotent). */
+export function markBoxStarted(dataDir) {
+  try { writeFileSync(path.join(dataDir, BOX_STARTED_FILE), new Date().toISOString(), { mode: 0o600 }); } catch { /* the next start writes it */ }
 }
 
 /**
- * After this many failed starts in a row the box STOPS TRYING (L1115): it says so once, with what to do, and stays up
- * without running, so its container does not restart it in a loop. A person fixes the files (or restores) and restarts
- * the container; the next start that comes up clears the count.
+ * A box that cannot read its keys at a start backs off before it exits for the container's restart, so a cause that
+ * passes by itself (a slow mount, a storage hiccup) is retried in minutes, then hours, never in a tight loop (L1115).
+ * Only a key that fails to DECRYPT, after this many failed starts within the window, HOLDS the box until a person acts:
+ * that cause cannot pass by itself.
  */
 export const BOX_START_FAILURES_BEFORE_HOLD = param({ key: 'box.startFailuresBeforeHold', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
+/** Failures further apart than this start a new run (the count begins again). */
+export const BOX_START_FAILURE_WINDOW_MS = param({ key: 'box.startFailureWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 6 * 60 * 60_000 });
+/** The longest back-off before a failed start exits. */
+export const BOX_START_BACKOFF_MAX_MS = param({ key: 'box.startBackoffMaxMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2 * 60 * 60_000 });
+
+/** How long the Nth failed start in a run waits before it exits: 1, 2, 4 … minutes, at most `BOX_START_BACKOFF_MAX_MS`. */
+export function startBackoffMs(count) {
+  return Math.min(Number(BOX_START_BACKOFF_MAX_MS), 60_000 * 2 ** Math.max(0, Number(count) - 1));
+}
+
+/** Whether a start's failure cannot pass by itself: a key that is there but fails to decrypt (not a storage error, not a missing file). */
+export function failureIsPermanent(err) {
+  for (let e = err, i = 0; e && i < 6; e = e.cause, i += 1) {
+    if (/decrypt|secretbox|authenticat|bad tag|wrong key/i.test(String(e?.message ?? ''))) return true;
+  }
+  return false;
+}
 
 /**
  * THE STARTS IN A ROW THAT COULD NOT READ THE BOX'S KEYS (L1115): the container restarts a box that stops, so one line
@@ -159,10 +184,12 @@ export function startFailures(dataDir) {
   const file = path.join(dataDir, 'start-failures.json');
   const read = () => { try { const v = JSON.parse(readFileSync(file, 'utf8')); return v && typeof v.count === 'number' ? v : null; } catch { return null; } };
   return {
-    /** One more failed start: `{count, since}`. */
+    /** One more failed start: `{count, since}`. A failure further from the last than the window starts a new run. */
     note(what, now = new Date()) {
-      const cur = read();
-      const next = { count: (cur?.count ?? 0) + 1, since: cur?.since ?? now.toISOString(), last: what };
+      const prev = read();
+      const fresh = !prev || !prev.at || (now.getTime() - Date.parse(prev.at)) > Number(BOX_START_FAILURE_WINDOW_MS);
+      const cur = fresh ? null : prev;
+      const next = { count: (cur?.count ?? 0) + 1, since: cur?.since ?? now.toISOString(), last: what, at: now.toISOString() };
       try { writeFileSync(file, JSON.stringify(next), { mode: 0o600 }); } catch { /* said in the log either way */ }
       return next;
     },

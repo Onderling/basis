@@ -45,15 +45,24 @@ describe('SealingBackend: what it could not open (L1115)', () => {
     expect((await inner.get('log')).bytes).toBe(before);
   });
 
-  it('a ref never read, or deleted on purpose, can be written', async () => {
+  it('a ref never read can be written; a delete does NOT lift the refusal; a second wrapper over the same backend still refuses', async () => {
     const inner = createMemoryBackend();
     await createSealingBackend({ backend: inner, getStrategy: async () => keyed('A'), onWarn: quiet }).put('old', { v: 1 });
     const b = createSealingBackend({ backend: inner, getStrategy: async () => keyed('B'), onWarn: quiet });
     await b.put('fresh', { v: 1 });
     expect(await b.get('old')).toBe(null);
+    const again = createSealingBackend({ backend: inner, getStrategy: async () => keyed('B'), onWarn: quiet });
+    await expect(again.put('old', { v: 2 })).rejects.toMatchObject({ code: 'stored-value-unreadable' });
     await b.delete('old');
-    await b.put('old', { v: 2 });
-    const got = await b.get('old');
-    expect(got?.bytes ?? got).toEqual({ v: 2 });
+    await expect(b.put('old', { v: 2 })).rejects.toMatchObject({ code: 'stored-value-unreadable' });
+  });
+  it('a store rebuilt over the same storage (a new backend object, the same name) still refuses', async () => {
+    const shared = createMemoryBackend();
+    const over = (b) => ({ get: (...a) => shared.get(...a), put: (...a) => shared.put(...a), delete: (...a) => shared.delete(...a), list: (...a) => shared.list(...a) });
+    await createSealingBackend({ backend: over(), getStrategy: async () => keyed('A'), onWarn: quiet, markScope: 'cc-circle-x' }).put('row', { v: 1 });
+    const b1 = createSealingBackend({ backend: over(), getStrategy: async () => keyed('B'), onWarn: quiet, markScope: 'cc-circle-x' });
+    expect(await b1.get('row')).toBe(null);
+    const b2 = createSealingBackend({ backend: over(), getStrategy: async () => keyed('B'), onWarn: quiet, markScope: 'cc-circle-x' });
+    await expect(b2.put('row', { v: 2 })).rejects.toMatchObject({ code: 'stored-value-unreadable' });
   });
 });

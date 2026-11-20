@@ -115,8 +115,9 @@ const unopenedOf = (storage) => {
  * @param {object} backend  a `StorageBackend` (IndexedDB on web, AsyncStorage on mobile, memory in tests)
  * @returns {object} the same port, sealed
  */
-export function sealedLocalBackend(backend) {
-  return createSealingBackend({ backend, getStrategy: () => shellContentSeal() });
+export function sealedLocalBackend(backend, { scope = null } = {}) {
+  // `scope`: the storage's own name, so a value it could not open stays refused across a rebuilt store (L1115)
+  return createSealingBackend({ backend, getStrategy: () => shellContentSeal(), ...(scope ? { markScope: scope } : {}) });
 }
 
 /**

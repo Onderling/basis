@@ -28,6 +28,9 @@ export function renderCircleTabBar(container, { active, t, onScreens, onCircles,
   const open = !!(plus && plus.open);
   const press = (what) => { if (typeof plus?.onPress === 'function') plus.onPress(what); };
   stopEscape(container);
+  // the "+" node survives the repaint (the bar repaints whenever a count lands): a tap begun on it before a repaint must
+  // end on the same node, or the browser fires no click and the tap is lost
+  const keptPlus = [...container.children].find((n) => n.classList?.contains('circle-tabbar__plus')) ?? null;
   container.innerHTML = '';
   container.className = open ? 'circle-tabbar is-dial-open' : 'circle-tabbar';
   if (open) {
@@ -38,7 +41,7 @@ export function renderCircleTabBar(container, { active, t, onScreens, onCircles,
     container.appendChild(backdrop);
   }
   for (const slot of barSlots(basisManifest, { plus: !!plus })) {
-    if (slot.kind === 'plus') { container.appendChild(plusSpot(plus, open, tr, press)); continue; }
+    if (slot.kind === 'plus') { container.appendChild(plusSpot(keptPlus, plus, open, tr, press)); continue; }
     const tab = slot.tab;
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -84,9 +87,14 @@ export function renderCircleTabBar(container, { active, t, onScreens, onCircles,
 }
 
 /** The "+"'s own spot: closed, the "+"; open, the middle button (or, with none, the "+" that closes). */
-function plusSpot(plus, open, tr, press) {
-  const b = document.createElement('button');
-  b.type = 'button';
+function plusSpot(kept, plus, open, tr, press) {
+  const b = kept ?? document.createElement('button');
+  if (!kept) {
+    b.type = 'button';
+    // one listener for the node's life; each paint hands it the press of now
+    b.addEventListener('click', () => b._plusPress?.('plus'));
+  }
+  b._plusPress = press;
   b.className = 'circle-tabbar__plus cc-fab circle-vandaag__plus';
   b.setAttribute('aria-expanded', open ? 'true' : 'false');
   const middle = open ? plus.dial?.middle : null;
@@ -94,13 +102,15 @@ function plusSpot(plus, open, tr, press) {
     b.dataset.dial = middle.id;
     b.classList.add('is-middle');
     b.textContent = tr(middle.labelKey);
+    b.removeAttribute('title');
+    b.removeAttribute('aria-label');
   } else {
+    delete b.dataset.dial;
     b.textContent = open ? '×' : '+';
     const name = open ? tr('circle.plus.close') : tr('circle.vandaag.plus');
     b.title = name;
     b.setAttribute('aria-label', name);
   }
-  b.addEventListener('click', () => press('plus'));
   return b;
 }
 

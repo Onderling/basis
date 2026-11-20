@@ -80,6 +80,23 @@ describe('the "+" docked in the web tab bar', () => {
     expect(onPress).toHaveBeenLastCalledWith('outside');
   });
 
+  it('a repaint keeps the "+" itself: a press begun before a repaint (a count landing) still ends on it', () => {
+    // A tap is mousedown + mouseup on ONE node; the bar repaints whenever a count lands. If the repaint replaced the "+",
+    // the mouseup fell on a new node and the browser fired no click: the second tap was lost, the dial stayed open.
+    const onPress = vi.fn();
+    const el = document.createElement('nav');
+    document.body.appendChild(el);
+    const plus = { dial: plusDialFor(basisManifest, { middle: PLUS_MIDDLE_NONE }), open: true, onPress };
+    renderCircleTabBar(el, { active: 'screens', t, plus });
+    const before = el.querySelector('.circle-tabbar__plus');
+    renderCircleTabBar(el, { active: 'screens', t, plus, badges: { contacten: 2 } });
+    const after = el.querySelector('.circle-tabbar__plus');
+    expect(after).toBe(before);
+    after.click();
+    expect(onPress).toHaveBeenCalledTimes(1);   // one listener, not one per paint
+    expect(onPress).toHaveBeenCalledWith('plus');
+  });
+
   it('Escape is heard only while open: a repaint closed stops listening', () => {
     const onPress = vi.fn();
     const el = document.createElement('nav');

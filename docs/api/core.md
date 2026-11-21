@@ -3660,6 +3660,26 @@ parentsOf(e)
 The parents of an event over the deps-DAG: its author's own previous head (`parentHash`) UNION the
 cross-author frontier (`deps`). This is the edge set reachability + causal depth walk. Domain-independent.
 
+### `causalOrder`
+
+**Kind:** function · **Import:** `causalOrder` from `'@onderling/core'`
+
+```js
+causalOrder(events)
+```
+
+The events in CAUSAL order: every event after the events it names as parents (`parentsOf`), events with no order
+between them (concurrent) by hash. The same answer on every device for the same set, whatever order a log reads in
+(the device log reads newest-first, a test's fake oldest-first): a reader that wants "the earlier first" or "the
+last one wins" takes this, never the reading order. A parent not in the set is ignored; an event without a hash keeps
+no place and comes last, in the order given.
+
+**Parameters**
+
+- `events` `object[]`
+
+**Returns:** `object[]`
+
 ### `frontier`
 
 **Kind:** function · **Import:** `frontier` from `'@onderling/core'`

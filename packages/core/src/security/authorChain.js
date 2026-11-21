@@ -61,6 +61,46 @@ export function parentsOf(e) {
 }
 
 /**
+ * The events in CAUSAL order: every event after the events it names as parents (`parentsOf`), events with no order
+ * between them (concurrent) by hash. The same answer on every device for the same set, whatever order a log reads in
+ * (the device log reads newest-first, a test's fake oldest-first): a reader that wants "the earlier first" or "the
+ * last one wins" takes this, never the reading order. A parent not in the set is ignored; an event without a hash keeps
+ * no place and comes last, in the order given.
+ * @param {object[]} events
+ * @returns {object[]}
+ */
+export function causalOrder(events) {
+  const list = Array.isArray(events) ? events : [];
+  const hashed = list.filter((e) => e && typeof e.hash === 'string' && e.hash);
+  const rest = list.filter((e) => !(e && typeof e.hash === 'string' && e.hash));
+  const byHash = new Map();
+  for (const e of hashed) if (!byHash.has(e.hash)) byHash.set(e.hash, e);
+  const waitingOn = new Map();   // hash -> parents in the set not yet placed
+  const children = new Map();
+  for (const [h, e] of byHash) {
+    const ps = parentsOf(e).filter((p) => p !== h && byHash.has(p));
+    waitingOn.set(h, new Set(ps));
+    for (const p of ps) { if (!children.has(p)) children.set(p, []); children.get(p).push(h); }
+  }
+  const ready = [...byHash.keys()].filter((h) => waitingOn.get(h).size === 0).sort();
+  const out = [];
+  while (ready.length) {
+    const h = ready.shift();
+    out.push(byHash.get(h));
+    for (const c of children.get(h) ?? []) {
+      const w = waitingOn.get(c);
+      if (!w || !w.delete(h) || w.size) continue;
+      let i = 0; while (i < ready.length && ready[i] < c) i += 1;
+      ready.splice(i, 0, c);
+    }
+  }
+  // a cycle (a forged parent loop) keeps no causal place: by hash, after the rest
+  const placed = new Set(out.map((e) => e.hash));
+  for (const h of [...byHash.keys()].filter((x) => !placed.has(x)).sort()) out.push(byHash.get(h));
+  return [...out, ...rest];
+}
+
+/**
  * The DAG frontier: the hashes of events NOT referenced as a parent (parentHash or deps) by any event in
  * the set — the current tips across ALL authors. A new event by an author uses its own tip as `parentHash`
  * and the remaining tips (concurrent other-author branches) as `deps`. Domain-independent.

@@ -6586,6 +6586,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
       callSkill: (...a) => callSkill(...a),
       storeFor: (circleId) => (isOwnLane(circleId) ? ownStoreNow : (householdService.stores.has(circleId) ? householdService.stores.getStore(circleId) : null)),
+      // the circle's switches bind on arrival: each statement judged by the settings at its place (`contentJudge.js`),
+      // against the same manifests the sender's gate reads
+      judge: { manifests: () => allManifests() },
       // the person's own scope: between their own devices only (see the own store above)
       // …one lane per self this device holds: each signed, carried and verified as that self's devices
       own: {

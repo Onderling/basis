@@ -1223,6 +1223,23 @@ up exactly as they catch up the roster, and a device keeps the winning statement
 audit window — so a policy is the same on every member's device, not a per-device setting that only a settings save
 ever broadcast.
 
+**A circle's switches bind on every member's device, not only in the sender's app** (2026-11-21). The settings say
+which apps, features and acts are on; the sender's gate asks them, and so does every receiving device. Each settings
+change names the content lanes' tips as the admin's device held them (`contentUpTo`); a content statement is judged by
+the settings after the newest change it is not behind, and one behind every change by the creation settings. Only an
+admin's signed line puts a statement "before" a change, so nothing a sender writes can backdate it, and the verdict is
+the same on every device in any arrival order (`contentLine.js`). On the items lane the rail judges every statement
+before it reaches the store, whatever brought it (the live fan, a catch-up, the re-apply when a store opens):
+refused, it stays on the log and is not applied; where its place is unknown and the readings differ, it waits; a later
+settings change that refuses one already applied takes it back by rebuilding the row from its statements still
+allowed, on the author's device too (`itemsRail.js`, `contentJudge.js`). What a device proved about a statement's
+place, which act the statement was when it arrived, and, only where a take-back needs it, the row as it was, it keeps
+on its own log as a silent kind (`content-judged`) that no door accepts and nothing carries. A head SERVED at catch-up
+(a row whose statements aged out) is not an act: it carries `served` inside its signed body, is taken only in answer to
+this device's own ask, is judged only by its app being on, and goes through the store's causal merge. Chat binds by
+the circle's conversation kinds, a view filter every reader asks. What this does not bind is named in
+[enforceability.md](conventions/enforceability.md).
+
 Anything that must be *agreed* is computed identically everywhere (the tally, the caretaker), never decided
 locally — the same discipline the hash-chain enforces. Full record: [decisions.md](decisions.md) (2026-07-25).
 

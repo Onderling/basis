@@ -50,6 +50,10 @@ const REPLAY_AUTO_ALLOW = param({ key: 'replay.autoAllow', scope: PARAM_SCOPE.DE
 // waits this long for an answer before it asks the next few (the start burst, 2026-11-20).
 export const CATCHUP_ASK_FEW = param({ key: 'replay.askFew', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
 const CATCHUP_ASK_WAIT_MS = param({ key: 'replay.askWaitMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 4_000 });
+// How long an ask stays this device's own: a batch from that peer for that circle within it is ASKED (the rail then
+// takes a head the peer served, not only statements its writers signed). A request held for an offline peer that is
+// answered later than this is asked again at the next start.
+const CATCHUP_ASKED_WINDOW_MS = param({ key: 'replay.askedWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 * 60_000 });
 /** A shuffled copy (Fisher-Yates over Math.random): a different pick at each start, never a fixed or supplied list. */
 function shuffled(list) {
   const a = [...list];
@@ -83,6 +87,7 @@ export function makeFrontierReplay({
   // at each start — widening to the next few after `askWaitMs` of silence, or at once when an answer leaves a gap.
   // Absent: every member is asked, as before (the deny-wins lanes keep that).
   askFew = null, askWaitMs = CATCHUP_ASK_WAIT_MS, ownAddressFor = null, shuffle = shuffled,
+  askedWindowMs = CATCHUP_ASKED_WINDOW_MS, now = Date.now,
 } = {}) {
   if (!rail || typeof rail.storedStatements !== 'function' || typeof rail.ingest !== 'function') {
     throw new Error('frontierReplay: a rail (storedStatements + ingest) is required');
@@ -173,19 +178,36 @@ export function makeFrontierReplay({
     } catch { /* serving is best-effort — the requester retries on its next reconnect */ }
   }
 
+  /**
+   * WHAT THIS DEVICE ASKED, per peer and circle, until that peer's last batch for it or the window passes. An asked batch
+   * is handed to the rail as `{asked: true}`: a lane may take from it what it takes from nobody else (the items lane: a
+   * head the peer SERVED for a row whose statements aged out). A batch nobody asked for is ingested as any statement.
+   */
+  const askedAt = new Map();   // `${peer}|${circleId}` → when this device asked
+  const askKey = (peer, circleId) => `${peer}|${circleId}`;
+  function wasAsked(peer, circleId) {
+    const at = askedAt.get(askKey(peer, circleId));
+    if (typeof at !== 'number') return false;
+    if (now() - at > Number(askedWindowMs)) { askedAt.delete(askKey(peer, circleId)); return false; }
+    return true;
+  }
+
   /** RECEIVE — every statement passes the rail's full ingest gate; on a `more` tail with real progress,
    *  page on with the advanced frontier. */
   async function onBatch(fromPeerAddr, payload) {
     if (!payload || payload.subtype !== BATCH) return;
     const { circleId, statements } = payload;
     if (typeof circleId !== 'string' || !circleId || !Array.isArray(statements)) return;
+    const ctx = { asked: wasAsked(fromPeerAddr, circleId) };
+    // the ask is answered with the last chunk; paging on below asks again
+    if (payload.done) askedAt.delete(askKey(fromPeerAddr, circleId));
     let landed = 0;
     const refused = [];
     for (const s of statements) {
       // Only a NEW statement counts as progress — a re-delivered duplicate (`existed`) must not feed the
       // paging guard, or a provider that can no longer relate to our frontier would loop us forever.
       try {
-        const r = await rail.ingest(circleId, s);
+        const r = await rail.ingest(circleId, s, ctx);
         if (r?.ok && !r.existed) landed += 1;
         // A refusal is silent to the sender by design and must not be silent here: said through the
         // seam, so a device can log why it is behind.
@@ -204,7 +226,7 @@ export function makeFrontierReplay({
       setTimeout(async () => {
         let relanded = 0;
         for (const s of refused) {
-          try { const r = await rail.ingest(circleId, s); if (r?.ok && !r.existed) relanded += 1; } catch { /* still refused → next pull */ }
+          try { const r = await rail.ingest(circleId, s, ctx); if (r?.ok && !r.existed) relanded += 1; } catch { /* still refused → next pull */ }
         }
         if (relanded > 0 && typeof onChange === 'function') {
           try { onChange(circleId); } catch { /* re-render is best-effort */ }
@@ -243,6 +265,7 @@ export function makeFrontierReplay({
   /** Ask one peer for one circle's missing statements (this device's frontier + window + any allowance). */
   const requestFrom = (peerAddr, circleId) => {
     const allowance = granted.get(`${peerAddr}|${circleId}`) ?? 0;
+    askedAt.set(askKey(peerAddr, circleId), now());
     // One slot per lane per circle: a request held for an offline peer is superseded by the next boot's,
     // never stacked — the frontier in the newest is the only one worth answering.
     // Spoken as this circle's identity — see `governanceCatchUp.requestFrom` for why a canonical request

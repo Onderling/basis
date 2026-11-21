@@ -683,6 +683,9 @@ if (relayUrl) {
     writePolicy: (cid, policy) => circlePolicyStore.update(cid, policy),
     membersOf: membersOfViaSkill(callSkill),   // the roster the receiver gate counts
   });
+  // the lane is handed its rail at boot (web and phone alike): a content rail that finds a circle's kept settings changes
+  // not known asks the lane, and a quiet start brings no settings statement that would make it apply by itself
+  if (govRail) circlePolicyLane.useRail(govRail);
   // A landed governance statement may be a rules-update or a policy-update: fold it into this device's heads — the
   // same reaction for a catch-up batch and a live statement.
   const govChanged = (cid) => {

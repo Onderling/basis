@@ -98,20 +98,22 @@ describe('the items lane is plumbing, not conversation', () => {
     const wire = [];
     const ada = await device('webid:ada', rosterAll, wire);
     const bo  = await device('webid:bo',  rosterAll, wire);
+    // bo asked ada's catch-up: a head ada serves is taken only in answer to bo's own ask (`frontierReplay` says so)
+    const ASKED = { asked: true };
 
     // A head ada holds WITHOUT a stored statement (written directly, as the seed and the legacy paths do):
     // the serve has to synthesize a snapshot for it, on every round.
     await ada.store.put({ id: 'task-direct', type: 'task', text: 'fix the gate', createdBy: 'webid:ada' }, { by: 'webid:ada', sync: false });
 
-    for (const s of await ada.rail.catchUpStatements(CIRCLE)) await bo.rail.ingest(CIRCLE, s);
+    for (const s of await ada.rail.catchUpStatements(CIRCLE)) await bo.rail.ingest(CIRCLE, s, ASKED);
     const afterOne = laneEntries(bo.eventLog).length;
     expect(afterOne).toBe(1);
-    for (const s of await ada.rail.catchUpStatements(CIRCLE)) await bo.rail.ingest(CIRCLE, s);
+    for (const s of await ada.rail.catchUpStatements(CIRCLE)) await bo.rail.ingest(CIRCLE, s, ASKED);
     expect(laneEntries(bo.eventLog).length, 'a second round adds nothing for an unchanged head').toBe(afterOne);
 
     // …and a CHANGED head is a new statement, as it should be.
     await ada.store.put({ id: 'task-direct', type: 'task', text: 'fix the gate, properly', createdBy: 'webid:ada' }, { by: 'webid:ada', sync: false });
-    for (const s of await ada.rail.catchUpStatements(CIRCLE)) await bo.rail.ingest(CIRCLE, s);
+    for (const s of await ada.rail.catchUpStatements(CIRCLE)) await bo.rail.ingest(CIRCLE, s, ASKED);
     expect(laneEntries(bo.eventLog).length).toBe(afterOne + 1);
     expect((await bo.store.get('task-direct'))?.text).toBe('fix the gate, properly');
   });

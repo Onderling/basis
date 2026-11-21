@@ -50,6 +50,8 @@ export const APPENDERS = {
   notification:      { file: 'apps/basis/src/core/handlers/circlePost.js', needle: "type: 'notification'" },
   // the landing of a row someone else wrote: written at the items rail's applied hook in the shared agent
   'item-landed':     { file: 'apps/basis/src/core/agent/realAgent.js', needle: 'landingEntryFor' },
+  // what a device proved about an items statement, written by the content judge's memory on the device's own log
+  'content-judged':  { file: 'apps/basis/src/v2/contentJudgments.js', needle: 'kind: CONTENT_JUDGED' },
   'nearby-line':     { file: 'apps/basis/src/v2/nearbyKept.js', needle: 'type: LINE_KIND' },
   'nearby-card':     { file: 'apps/basis/src/v2/nearbyKept.js', needle: 'type: CARD_KIND' },
   'intention-done':  { file: 'apps/basis/src/v2/intentionRunner.js', needle: 'INTENTION_DONE_KIND' },

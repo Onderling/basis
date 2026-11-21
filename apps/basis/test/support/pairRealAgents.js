@@ -89,6 +89,8 @@ import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '..
 import { makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
 import { narrowReportStatements } from '../../src/v2/reportLane.js';
 import { applyRulesUpdates } from '../../src/v2/rulesUpdateLane.js';
+import { makeCirclePolicyLane, makePolicyHeadStore, membersOfViaSkill } from '../../src/v2/policyUpdateLane.js';
+import { createCirclePolicyStore } from '../../src/v2/circlePolicyStore.js';
 
 import {
   initialState as createGroupInitialState,
@@ -147,7 +149,7 @@ const LIVE_NODES = new Set();
  * makes — so an address-revoke fanned to it lands; two walks had wired that by hand. The full suite
  * stayed green: the equilibrium tests keep the minimal composition, which has no rail.)
  */
-export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null, itemsLane = false, contactChannel = false, pairRoster: wantPairRoster = true, podWebId = null, centralPod = null } = {}) {
+export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null, itemsLane = false, settingsLane = false, contactChannel = false, pairRoster: wantPairRoster = true, podWebId = null, centralPod = null } = {}) {
   const routerRef = { fn: null };
   // A CENTRAL POD (opt-in, `makeCentralPod()`): the shared custody module both shells compose
   // (`createCirclePodCustody`), over ONE pod every node of the walk is handed, with the posture the walk names.
@@ -374,6 +376,9 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   pairSeams.bindSelf = (circleId) => bindCircleAddresses([nodeRef.current], circleId);
   const nodeRef = { current: null };
   const carryToSiblings = typeof agent.siblingCarry?.carry === 'function' ? (p, o) => agent.siblingCarry.carry(p, o) : null;
+  const settingsSeams = { current: null };   // the settings lane, when asked for (`settingsLane`)
+  const itemsCatchUpRef = { current: null };  // the items lane's catch-up, as composed below
+  const govCatchUpRef = { current: null };    // the governance catch-up, as composed below
   const handlers = {
     // as every shell composes it (`circleLanes.js`): a statement that landed from a member, or passed without being
     // kept, goes on to my other devices by the one sibling carry (a no-op on a one-device person)
@@ -439,9 +444,31 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       // binding for this path lands with the membership rider) — a repro that fans signed governance
       // supplies the binding explicitly rather than weakening the verify.
       const govRail = makeGovernanceRail({ eventLog: chatEventLog, circleIdentityFor: agent.circleIdentityFor, myRef: '', callSkill, verifyBinding: verifyGovernanceBinding ?? undefined });
+      // THE SETTINGS LANE (opt-in `settingsLane`), composed as the three shells compose it (`makeCirclePolicyLane` over this
+      // device's policy store, the roster read through the waist, handed its governance rail at boot): an admin states a
+      // settings change through it, every landed governance statement applies it, and the content rails judge by the
+      // changes it kept. Over in-memory stores here; a shell's are local storage.
+      if (settingsLane) {
+        const mem = new Map();
+        const io = { getItem: async (k) => mem.get(k) ?? null, setItem: async (k, v) => { mem.set(k, v); } };
+        const policies = createCirclePolicyStore({ load: async (id) => (mem.has(`p:${id}`) ? JSON.parse(mem.get(`p:${id}`)) : null), save: async (id, p) => { mem.set(`p:${id}`, JSON.stringify(p)); } });
+        const lane = makeCirclePolicyLane({
+          emitter: () => agent.emitPolicyUpdate ?? null,
+          headStore: makePolicyHeadStore(io),
+          readPolicy: (cid) => policies.get(cid),
+          writePolicy: (cid, p) => policies.update(cid, p),
+          membersOf: membersOfViaSkill(callSkill),
+        });
+        lane.useRail(govRail);
+        settingsSeams.current = { lane, policies, govRail };
+      }
       // The rules-update rider's receive half, exactly as the shells: a landed statement may carry
       // a new rules doc — fold it into this node's local rules head (cheap pre-scan; vote churn no-ops).
-      const onChange = (cid) => { applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {}); };
+      // …and with the settings lane, the policy-update rider's (the shells' `govChanged`).
+      const onChange = (cid) => {
+        applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {});
+        settingsSeams.current?.lane.apply(cid, govRail).catch(() => {});
+      };
       // …and the governance CATCH-UP pair the shells compose (circleLanes.js `gov`): a member who joins after a statement
       // was made (an admin's policy update before the invite) asks for it, and this node serves it. Without it a joiner
       // never received a policy signed before it joined (found 2026-11-13 by the phone's '+' walk: lists stayed off).
@@ -450,6 +477,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
         rail: govRail, sendToPeer: sendPeer, onChange,
         narrowServe: (statements, who) => narrowReportStatements(statements, who, { callSkill: (...a) => agent.callSkill(...a) }),
       });
+      govCatchUpRef.current = govCatchUp;
       return {
         'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog: chatEventLog, rail: govRail, onChange }),
         [govCatchUp.subtypes.request]: govCatchUp.onRequest,
@@ -471,6 +499,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
         statementsFor: (circleId) => agent.itemsRail.catchUpStatements(circleId),
         mayServe: (_fromPeerAddr, circleId) => circleId !== OWN_DEVICES_SCOPE,
       });
+      itemsCatchUpRef.current = cu;
       return {
         [cu.subtypes.request]: cu.onRequest,
         [cu.subtypes.batch]:   cu.onBatch,
@@ -569,7 +598,9 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     handlerSubtypes: Object.keys(handlers),
     // this device's presence in a circle: its per-circle address bound on its transport (the shells' `registerCirclePresence`)
     registerPresence: (cid) => pairSeams.bindSelf?.(cid),
-    keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatRail, chatCatchUp, podChatCatchUp, podCustody, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, returned, _routerRef: routerRef };
+    keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatRail, chatCatchUp, podChatCatchUp, podCustody, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, returned, _routerRef: routerRef,
+    // the settings lane (`settingsLane`: {lane, policies, govRail}) and the items catch-up, for a walk that drives them
+    settings: settingsSeams.current, itemsCatchUp: itemsCatchUpRef.current, govCatchUp: govCatchUpRef.current };
   nodeRef.current = node;
   // a re-key moved this persona's circle addresses: register them as the shells do
   agent.onCircleRootMoved?.(async ({ circleIds }) => { await bindCircleAddresses([node], circleIds); });

@@ -1873,9 +1873,11 @@ if (typeof window !== 'undefined') {
    * question is "what does someone see", and useless when the question is "what does the roster say".
    * A walk needs both, so both are published rather than one pretending to be the other.
    */
-  window.onderlingCall = (appOrigin, opId, args = {}) => (
+  // `ctx` (optional): the door the call names, as a tap names it (`{door: 'tap'}`): only a person's act passes the
+  // circle's own gate at the outer waist (`circleActGate.js`); a door-less call is background work and is not asked
+  window.onderlingCall = (appOrigin, opId, args = {}, ctx = undefined) => (
     typeof rawCallSkill === 'function'
-      ? Promise.resolve(rawCallSkill(appOrigin, opId, args)).catch((e) => ({ error: String(e?.message ?? e) }))
+      ? Promise.resolve(ctx ? rawCallSkill(appOrigin, opId, args, ctx) : rawCallSkill(appOrigin, opId, args)).catch((e) => ({ error: String(e?.message ?? e) }))
       : Promise.resolve({ error: 'callSkill-not-ready' })
   );
   // A circle's policy as this device holds it — read and patched through the store, since the stored values are sealed

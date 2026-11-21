@@ -382,7 +382,8 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
   const checkEntry = (entry) => !!entry && entry.type === entryKind && typeof entry.circleId === 'string'
     && checkSigned(entry.circleId, entry.payload);
 
-  return { entryKind, append, ingest, verify, readVerified, readVerifiedBodies, storedStatements, compact, checkSigned, checkEntry };
+  // `deviceLog`: what a judge keyed per device reads by (the content judge's kept settings changes)
+  return { entryKind, deviceLog: eventLog, append, ingest, verify, readVerified, readVerifiedBodies, storedStatements, compact, checkSigned, checkEntry };
 }
 
 export default makeCircleEntryRail;

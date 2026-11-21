@@ -10,6 +10,9 @@ catalogue baseline until it is.
 - Join a circle with an invite; once their join stands on the circle's membership lane, a sealed circle's key is
   wrapped for them, and their devices that prove an address in the circle are added to the key's audience.
 - Be removed, or leave: the key rotates past them, and no later grant puts them back, whichever device makes it.
+- Post and change items in a circle (tasks, lists, appointments) where its switches allow it; a switch the circle
+  turned off holds on every member's device, also against a changed app (the receiving device judges each statement:
+  [governance.md](governance.md), "The switches on arrival").
 - Be invited again after a removal (a NEW invite: the old code refuses someone removed) and rejoin: the key follows
   the new join.
 

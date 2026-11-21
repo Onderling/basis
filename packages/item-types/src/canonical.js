@@ -199,10 +199,32 @@ export const LEGACY_ALIASES = Object.freeze({
  */
 export const LISTS_TYPES = Object.freeze(['list', 'list-item', 'board']);
 
+/**
+ * WHO MAY CHANGE AND REMOVE A ROW, per type (`changedBy`), judged by every receiving device (the items lane):
+ *   • 'author': the member who added the row, and any admin (a person's own words, asks, answers);
+ *   • 'circle': any member of the circle (a shared list and its entries, a task, an appointment).
+ * A type with no value counts as 'author'; the guard test (`changedBy.test.js`) is red for a registered type that has
+ * none, so every type is decided on purpose. Types that never ride a circle's items lane (the own scope, membership,
+ * governance) are 'author' for completeness. A type may add a finer rule on top (the tasks role rule).
+ */
+export const CHANGED_BY = Object.freeze({
+  task: 'circle', 'inbox-item': 'circle', 'calendar-event': 'circle',
+  list: 'circle', 'list-item': 'circle', board: 'circle', 'removed-list': 'circle', 'removed-entry': 'circle',
+  claim: 'circle',
+  note: 'author', 'chat-message': 'author', 'chat-thread': 'author', offer: 'author', request: 'author',
+  contact: 'author', announcement: 'author', 'reveal-request': 'author', 'neighbourhood-job': 'author', view: 'author',
+  'shared-ref': 'author', media: 'author', intention: 'author', rsvp: 'author',
+  circle: 'author', 'device-link': 'author', 'membership-code': 'author', 'post-answers': 'author', 'read-marks': 'author',
+  'message-request': 'author', 'shared-card': 'author', 'membership-redemption': 'author', 'group-rules': 'author',
+});
+
+/** A schema with its type's `changedBy` on it (unchanged when the type has none). */
+export const withChangedBy = (name, schema, value = CHANGED_BY[name]) => (value ? { ...schema, changedBy: value } : schema);
+
 /** Register every canonical type (with its legacy aliases) on a type registry. */
 export function registerCanonicalTypes(registry) {
   for (const [name, schema] of Object.entries(CANONICAL_TYPES)) {
     const aliases = LEGACY_ALIASES[name];
-    registry.registerType(name, schema, aliases ? { aliases } : undefined);
+    registry.registerType(name, withChangedBy(name, schema), aliases ? { aliases } : undefined);
   }
 }

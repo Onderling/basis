@@ -79,7 +79,7 @@ circle policy. The register never persists; it declares + routes.
 
 ```js
 class CircleItemStore
-new CircleItemStore({ dataSource, rootContainer, registry, resolution, originOf } = {})
+new CircleItemStore({ dataSource, rootContainer, registry, resolution, originOf, makerRef } = {})
 ```
 
 Generic, per-circle, type-indexed item store over an injected `core.DataSource`: typed
@@ -593,7 +593,7 @@ back to last-received-wins so pre-metadata peers still ingest. See `causalMerge.
 **Kind:** function · **Import:** `createCircleStores` from `'@onderling/item-store'`
 
 ```js
-createCircleStores({ dataSource, registry, resolution, rootPrefix = 'mem://circles/', onStore, dataSourceFor, originOf } = {})
+createCircleStores({ dataSource, registry, resolution, rootPrefix = 'mem://circles/', onStore, dataSourceFor, originOf, makerFor } = {})
 ```
 
 Lazy per-circle registry of `CircleItemStore`s over ONE shared `dataSource`: `getStore(circleId)`

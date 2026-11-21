@@ -29,6 +29,7 @@ const RELATIONS = new Set(['behind', 'not-behind']);
 const relationId = (circleId, hash, changeId) => `${CONTENT_JUDGED}:${circleId}:${hash}:${changeId}`;
 const previousId = (circleId, hash) => `${CONTENT_JUDGED}:${circleId}:${hash}:previous`;
 const actId = (circleId, hash) => `${CONTENT_JUDGED}:${circleId}:${hash}:act`;
+const adminId = (circleId, hash) => `${CONTENT_JUDGED}:${circleId}:${hash}:admin`;
 const ACTS = new Set(['add', 'change']);
 
 function entryOf(log, id) {
@@ -87,6 +88,16 @@ export function contentJudgmentsOn(deviceLog, circleId) {
     noteAct(hash, act) {
       if (!ok || !named(hash) || !ACTS.has(act)) return;
       write(deviceLog, circleId, actId(circleId, hash), { hash, act });
+    },
+    /** Whether this device first took the statement BY ADMIN AUTHORITY (its author an admin when it was judged here):
+     *  a later re-apply takes it again without asking the roster as it stands then (a demotion does not undo it). */
+    adminTaken(hash) {
+      if (!ok || !named(hash)) return false;
+      return entryOf(deviceLog, adminId(circleId, hash))?.payload?.admin === true;
+    },
+    noteAdminTaken(hash) {
+      if (!ok || !named(hash)) return;
+      write(deviceLog, circleId, adminId(circleId, hash), { hash, admin: true });
     },
   };
 }

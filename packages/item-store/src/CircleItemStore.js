@@ -63,6 +63,10 @@ export class CircleItemStore {
   // so a store built without a manifest still dispatches identically to the pre-declaration behaviour.
   /** @type {{ hasChannel:(t:string,r:string)=>boolean }} */ #resolution;
   /** @type {(() => object|null) | null} */ #originOf;
+  // WHO MADE A ROW (`madeBy`): this device's circle-scoped self, the SAME ref the items lane signs with (handed down at
+  // composition), stamped on a LOCAL write of a NEW row only (one with no `createdAt` yet). Every receiving device sets
+  // it from the verified author of that row's first statement; so the maker's own device and every other agree.
+  /** @type {(() => string|null) | null} */ #makerRef = null;
   // What this store holds of its items (id → {text, type}) and the source revision it is current at; null = nothing
   // held (never read, a source without a revision, or a change beneath it). See the module doc.
   /** @type {Map<string, {text: string, type: string|undefined}>|null} */ #held = null;
@@ -83,7 +87,7 @@ export class CircleItemStore {
    *        every host that holds it can tell — and cleared by a local write made without one. An inbound write
    *        keeps the origin it arrived with.
    */
-  constructor({ dataSource, rootContainer, registry, resolution, originOf } = {}) {
+  constructor({ dataSource, rootContainer, registry, resolution, originOf, makerRef } = {}) {
     if (!dataSource || typeof dataSource.read !== 'function' || typeof dataSource.write !== 'function') {
       throw new Error('CircleItemStore: dataSource (core.DataSource: read/write/delete/list) required');
     }
@@ -95,6 +99,7 @@ export class CircleItemStore {
     this.#validate = registry && typeof registry.validate === 'function' ? registry.validate : null;
     this.#resolution = (resolution && typeof resolution.hasChannel === 'function') ? resolution : defaultResolutionRegistry();
     this.#originOf = typeof originOf === 'function' ? originOf : null;
+    this.#makerRef = typeof makerRef === 'function' ? makerRef : null;
   }
 
   /** A local write's origin: the provider's, or none (an earlier one is cleared). */
@@ -207,6 +212,11 @@ export class CircleItemStore {
     // The content-LWW coordinate: a LOCAL write TICKS the per-circle Lamport counter (counter + 1); an ORIGIN
     // (inbound) write PRESERVES the payload's `clock` (already spread above) and advances the counter to
     // max(local, incoming) — MAX-ON-RECEIVE — so a later local write out-clocks everything seen. See causalMerge.
+    if (!origin && stored.madeBy == null && item.createdAt == null && this.#makerRef) {
+      let maker = null;
+      try { maker = this.#makerRef(); } catch { maker = null; }
+      if (typeof maker === 'string' && maker) stored.madeBy = maker;
+    }
     if (origin) this.#observeClock(item.clock);
     else { stored.clock = this.#nextClock(); this.#stampOrigin(stored); }
     if (this.#validate) {

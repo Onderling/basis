@@ -22,10 +22,10 @@ const settle = async () => { for (let i = 0; i < 12; i += 1) await new Promise((
 
 const ROSTER = () => [{ webid: 'webid:ada', role: 'member' }, { webid: 'webid:xavi', role: 'member' }, { webid: 'webid:yara', role: 'admin' }];
 
-function freshStores() {
+function freshStores(makerFor) {
   const registry = createRegistry();
   registerCanonicalTypes(registry);
-  return createCircleStores({ dataSource: memoryDataSource(), registry });
+  return createCircleStores({ dataSource: memoryDataSource(), registry, makerFor });
 }
 
 /** One device: its own log, its own store; `open()` says whether the circle's store is open yet (it peeks, as the agent's does). */
@@ -33,8 +33,9 @@ async function device(ref, roster, wire, { eventLog = new EventLog({ initial: []
   const cid = identity ?? await AgentIdentity.generate(new VaultMemory());
   const row = roster.find((m) => m.webid === ref);
   if (row) row.circleAddress = cid.pubKey;
-  const stores = freshStores();
-  const rail = makeItemsRail({
+  let rail = null;
+  const stores = freshStores((circleId) => rail?.selfRefFor(circleId) ?? null);   // the shells' wiring: one function
+  rail = makeItemsRail({
     eventLog,
     circleIdentityFor: async () => cid,
     myRef: ref,
@@ -117,5 +118,26 @@ describe('whose item it is, judged by each receiving device', () => {
     await settle(); await flush(wire, xavi, yara);
     expect((await yara.store.get(task.id)).madeBy).toBe('webid:xavi');
     expect((await yara.store.get(task.id)).text).toBe('mine');
+  });
+
+  it('the maker\'s own device and every receiver hold the same maker (one function stamps and signs)', async () => {
+    const { wire, ada, xavi, yara } = await three();
+    const note = await xavi.store.put({ type: 'note', text: 'mine', body: 'mine' }, { by: 'webid:xavi' });
+    await settle(); await flush(wire, ada, yara);
+    const held = (await xavi.store.get(note.id)).madeBy;
+    expect(held).toBe(xavi.rail.selfRefFor(CIRCLE));
+    expect((await ada.store.get(note.id)).madeBy).toBe(held);
+    expect((await yara.store.get(note.id)).madeBy).toBe(held);
+  });
+
+  it('a change that carries NO maker keeps the held one', async () => {
+    const { wire, ada, xavi, yara } = await three();
+    const task = await xavi.store.put({ type: 'task', text: 'mine' }, { by: 'webid:xavi' });
+    await settle(); await flush(wire, ada, yara);
+    const { madeBy, ...noMaker } = await ada.store.get(task.id);
+    await ada.store.put({ ...noMaker, text: 'changed' }, { by: 'webid:ada' });
+    await settle(); await flush(wire, xavi, yara);
+    expect((await yara.store.get(task.id)).text).toBe('changed');
+    expect((await yara.store.get(task.id)).madeBy).toBe(madeBy);
   });
 });

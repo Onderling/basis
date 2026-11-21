@@ -187,16 +187,8 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     if (typeof changedByOf !== 'function') return null;   // not composed with the declarations: no whose-check here
     try { return changedByOf(type) === 'circle' ? 'circle' : 'author'; } catch { return 'author'; }
   };
-  /**
-   * The maker of a held row: its `madeBy`, else the verified author of the first statement of that row this device's log
-   * holds, in arrival order (the row was written here, or arrived before makers were kept): the statement that added it.
-   */
-  function makerOf(circleId, previous) {
-    if (previous?.madeBy != null) return previous.madeBy;
-    let bodies = [];
-    try { bodies = base.storedStatements(circleId).map((st) => st?.body).filter((b) => b?.kind === 'snapshot' && rowIdOf(circleId, b) === previous?.id && !isServedHead(circleId, b)); } catch { bodies = []; }
-    return inArrivalOrder(bodies)[0]?.payload?.authorRef ?? null;
-  }
+  /** The maker of a held row (`madeBy`); null when not known here (made before makers were kept, or served without one). */
+  const makerOf = (_circleId, previous) => previous?.madeBy ?? null;
   /** Why this statement may not change the row (a code), or null. `previous` is the row as held here (null: not held). */
   async function whoseRefusal(circleId, item, body, previous, { remove = false } = {}) {
     if (isOwn(circleId) || !previous) return null;   // a new row: its maker is its author (`fixMaker`)
@@ -535,6 +527,9 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
 
   return {
     ...base,
+    /** The ref this device signs a circle's item statements with (null on an own lane): the maker a local new row is
+     *  stamped with (`madeBy`), so the maker's own device and every receiver hold the same one. */
+    selfRefFor: (circleId) => (isOwn(circleId) ? null : refIn(circleId)),
     /** The one write path; on the own scope the item is sealed to the person (or nothing is written to the lane). */
     async append(circleId, opts = {}) {
       if (!isOwn(circleId)) {

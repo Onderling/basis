@@ -37,7 +37,7 @@ import { CircleItemStore } from './CircleItemStore.js';
  * @returns {{getStore: (circleId: string) => object, has: (circleId: string) => boolean,
  *   rootFor: (circleId: string) => string}}
  */
-export function createCircleStores({ dataSource, registry, resolution, rootPrefix = 'mem://circles/', onStore, dataSourceFor, originOf } = {}) {
+export function createCircleStores({ dataSource, registry, resolution, rootPrefix = 'mem://circles/', onStore, dataSourceFor, originOf, makerFor } = {}) {
   if (!dataSource || typeof dataSource.read !== 'function') {
     throw new Error('createCircleStores: a shared core.DataSource (read/write/delete/list) is required');
   }
@@ -58,7 +58,7 @@ export function createCircleStores({ dataSource, registry, resolution, rootPrefi
         // backing (today's behaviour). The store row stays THE materialised head either way (G-C1) — only
         // its medium differs, which is the "pod is truth, local cache is reality" posture for a pod circle.
         const backing = (typeof dataSourceFor === 'function' && dataSourceFor(circleId)) || dataSource;
-        store = new CircleItemStore({ dataSource: backing, rootContainer: rootFor(circleId), registry, resolution, originOf });
+        store = new CircleItemStore({ dataSource: backing, rootContainer: rootFor(circleId), registry, resolution, originOf, makerRef: typeof makerFor === 'function' ? () => makerFor(circleId) : null });
         stores.set(circleId, store);
         if (typeof onStore === 'function') { try { onStore(circleId, store); } catch { /* best-effort wiring */ } }
       }
@@ -92,7 +92,7 @@ export function createCircleStores({ dataSource, registry, resolution, rootPrefi
       if (open && !ownBacking) return open;   // a shared-backing circle: its store IS on the local backing
       let local = locals.get(circleId);
       if (!local) {
-        local = new CircleItemStore({ dataSource, rootContainer: rootFor(circleId), registry, resolution, originOf });
+        local = new CircleItemStore({ dataSource, rootContainer: rootFor(circleId), registry, resolution, originOf, makerRef: typeof makerFor === 'function' ? () => makerFor(circleId) : null });
         locals.set(circleId, local);
       }
       return local;
@@ -106,7 +106,7 @@ export function createCircleStores({ dataSource, registry, resolution, rootPrefi
       const open = stores.get(circleId);
       if (open) return open;
       const backing = (typeof dataSourceFor === 'function' && dataSourceFor(circleId)) || dataSource;
-      return new CircleItemStore({ dataSource: backing, rootContainer: rootFor(circleId), registry, resolution, originOf });
+      return new CircleItemStore({ dataSource: backing, rootContainer: rootFor(circleId), registry, resolution, originOf, makerRef: typeof makerFor === 'function' ? () => makerFor(circleId) : null });
     },
     /**
      * Forget ONE circle on this device: its rows go from the backing it lives on and its cached store with them. The

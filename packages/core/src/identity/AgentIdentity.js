@@ -317,7 +317,6 @@ export class AgentIdentity {
     return key;
   }
 
-  /** Return the BIP39 mnemonic for the current seed (reads from vault). */
   /**
    * Zero and drop every shared key remembered with a peer (`#sharedKeyWith`): for when this identity leaves the device
    * (a persona removed here, a start-over) before the process ends. The next box or unbox derives them again.
@@ -327,6 +326,7 @@ export class AgentIdentity {
     this.#sharedKeys.clear();
   }
 
+  /** Return the BIP39 mnemonic for the current seed (reads from vault). */
   async getMnemonic() {
     if (!this.#vault) return null;
     const raw = await this.#vault.get('agent-privkey');

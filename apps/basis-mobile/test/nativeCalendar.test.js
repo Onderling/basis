@@ -5,7 +5,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { groupKeyStrategy } from '@onderling/pod-client';
-import { setShellContentSeal } from '../../basis/src/v2/localStoreSeal.js';
+import { setShellContentSeal, openStoredValue } from '../../basis/src/v2/localStoreSeal.js';
 // the id map seals at rest (ledger L1083): a content key is published, as after a boot
 const SEAL = groupKeyStrategy({ groupKey: Buffer.from(new Uint8Array(32).fill(7)).toString('base64url') });
 setShellContentSeal(SEAL);
@@ -89,7 +89,7 @@ describe('applyDiff — calendar API + storage map', () => {
     expect(next.A).toBe('evt-A1');
     // sealed at rest: the stored value is not readable, and it opens with the key (and through loadEventIdMap)
     expect(stored.get(_internal.STORAGE_KEY)).not.toContain('evt-A1');
-    const persisted = JSON.parse(SEAL.open(stored.get(_internal.STORAGE_KEY)));
+    const persisted = JSON.parse(openStoredValue(SEAL, _internal.STORAGE_KEY, stored.get(_internal.STORAGE_KEY)));
     expect(persisted.A).toBe('evt-A1');
     expect((await loadEventIdMap({ storage })).A).toBe('evt-A1');
   });

@@ -1480,7 +1480,12 @@ for one JSON value per key, `sealedJsonIo`, which also answers a read before the
 overwriting anything and reseals an old plain value at its first read. A value nothing reads in a start would stay
 plain, so a strict store can name the keys it owns (`resealAtStart`): once the content key is there they are listed and
 read once, which reseals a plain one and writes nothing for a sealed one (the policy heads, on web, phone and box, and
-the availability do; the other strict stores are a follow-up). A store of a person's content uses the strict
+the availability do; the other strict stores are a follow-up). The seal is bound to its key and to the device's
+history: the storage key is sealed inside every value, so a value copied under another key does not open there; and a
+content key minted from now on is stored with a form mark (`kv1:`), on which device a plain or unbound value was
+planted and is refused ("not readable", kept). A bare key is an older one, whose plain and unbound values are the
+upgrade's, read once and rewritten sealed and bound (`localStoreSeal.js`, `openStoredValue` for a tool that reads raw
+storage). A store of a person's content uses the strict
 mode: a read before the key, or of a value that will not open with this key, answers "not readable yet" and writes
 nothing over it; where an empty answer would be read as "nothing there" (the page book, a contact's name, the
 person's availability, the pins, the contact seen-marks) the read waits for the key instead.

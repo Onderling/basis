@@ -156,7 +156,7 @@ import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGr
 import { createPairRoster } from '../src/v2/pairRoster.js';
 import { makeCircleReachable } from '../src/v2/householdRosterPairing.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../src/v2/rulesUpdateLane.js';
-import { makeCirclePolicyLane, makePolicyHeadStore, membersOfViaSkill } from '../src/v2/policyUpdateLane.js';
+import { makeCirclePolicyLane, membersOfViaSkill } from '../src/v2/policyUpdateLane.js';
 import { createCirclePolicyStore, localStoragePolicyIo } from '../src/v2/circlePolicyStore.js';
 import { makeGovernanceRail } from '../src/v2/governanceAppWiring.js';
 import { runPendingForget } from '../src/v2/enrolForgets.js';
@@ -678,7 +678,7 @@ if (relayUrl) {
   const circlePolicyStore = createCirclePolicyStore(localStoragePolicyIo(circlePolicyKv));
   const circlePolicyLane = makeCirclePolicyLane({
     emitter: () => agent.emitPolicyUpdate ?? null,
-    headStore: makePolicyHeadStore(circlePolicyKv),
+    headStore: stores.policyHeadStore,
     readPolicy: (cid) => circlePolicyStore.get(cid),
     writePolicy: (cid, policy) => circlePolicyStore.update(cid, policy),
     membersOf: membersOfViaSkill(callSkill),   // the roster the receiver gate counts

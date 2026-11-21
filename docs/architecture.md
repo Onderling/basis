@@ -1477,7 +1477,10 @@ unchanged store writes nothing; a row it cannot open (sealed under another key) 
 byte, never handed on as content, until the caller writes that key itself. A small key-value store goes through
 `sealedKeyValue` (values sealed, keys legible, a write before the key refused rather than stored in the clear) or,
 for one JSON value per key, `sealedJsonIo`, which also answers a read before the key as "nothing kept" without
-overwriting anything and reseals an old plain value at its first read. A store of a person's content uses the strict
+overwriting anything and reseals an old plain value at its first read. A value nothing reads in a start would stay
+plain, so a strict store can name the keys it owns (`resealAtStart`): once the content key is there they are listed and
+read once, which reseals a plain one and writes nothing for a sealed one (the policy heads, on web, phone and box, and
+the availability do; the other strict stores are a follow-up). A store of a person's content uses the strict
 mode: a read before the key, or of a value that will not open with this key, answers "not readable yet" and writes
 nothing over it; where an empty answer would be read as "nothing there" (the page book, a contact's name, the
 person's availability, the pins, the contact seen-marks) the read waits for the key instead.

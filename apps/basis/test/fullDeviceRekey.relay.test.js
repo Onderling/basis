@@ -10,7 +10,7 @@ import { VaultMemory } from '@onderling/vault';
 import { startJourneyRelay } from './support/testRelay.js';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle, bindCircleAddresses,
-  sealCircleViaProducer, postSealed, readSealed, until, untilHoldsCurrentKey, teardown,
+  sealCircleViaProducer, postSealed, readSealed, until, untilHoldsCurrentKey, memberSealingPubKey, teardown,
 } from './support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../src/v2/householdRosterPairing.js';
 import { stashEnrollOffer, consumeEnrollOffer } from '../src/v2/enrollOffer.js';
@@ -212,5 +212,40 @@ describe('the surviving full devices take the next root', () => {
     // a device added AFTER the re-key is handed the current epoch (from the offer's sealed part), not epoch 0
     A4 = await enrolFull({ A, label: 'A4', relay, circle: C3, phrase });
     expect(A4.agent.circleAddressFor(C3), 'a device added after the re-key presents the retired address').toBe(newAddr);
+  }, 400_000);
+});
+
+describe('the revoked device was the point', () => {
+  const C4 = 'rekey-revoked-point';
+  let relay; let A; let B; let A2; let A3; let phrase; let oldAddr;
+  afterAll(async () => { await teardown(A, B, A2, A3); try { await relay?.close?.(); } catch { /* */ } });
+
+  it('the phone revokes the laptop that was the point: the phone takes the point, its re-key waits for the catch-up, and then it seals with a key for its new address', async () => {
+    ({ relay, A, B, A2, phrase, oldAddr } = await setup(C4));
+    A3 = await enrolFull({ A, label: 'A3', relay, circle: C4, phrase });
+    const laptopId = A3.agent.persona('default').enrolledDevice?.deviceId;
+    // the laptop is the person's point, and the phone knows it
+    expect((await A3.agent.spinePoint?.claim?.())?.ok, 'the laptop could not take the point').toBe(true);
+    expect(await until(() => (A.agent.spinePointClaim()?.deviceId === laptopId ? true : null), { timeout: 15000, step: 200 }), 'the phone does not know the laptop is the point').toBe(true);
+    const signedByOld = async () => ((await B.agent.membershipRail.readVerifiedBodies(C4))?.bodies ?? []).filter((b) => (b?.authorKey ?? b?.author) === oldAddr).map((b) => b.hash);
+    const oldBefore = await signedByOld();
+    expect(oldBefore.length, 'Bea holds nothing the old address signed: the check below proves nothing').toBeGreaterThan(0);
+    const r = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: laptopId, circleIds: [C4] });
+    expect(r?.ok, JSON.stringify(r)).toBe(true);
+    // most runs the re-key waits for the phone's catch-up (r.rekey.rotated[0].waiting); a fast catch-up signs it at once
+    expect(A.agent.circleAddressFor(C4), 'the phone did not move').not.toBe(oldAddr);
+    expect(await untilHoldsCurrentKey(A, C4, { timeout: 45000 }), `the phone holds no key for its new address: its versions ${JSON.stringify(A.keyEventStore.list(C4).map((e) => e.version))}`).toBeTruthy();
+    // A ROTATION NEVER LEAVES THE ROTATING POINT OUT: every version past the first goes to the address the phone presents
+    const mineKey = memberSealingPubKey(A, C4);
+    const later = A.keyEventStore.list(C4).filter((e) => e.version > 1);
+    expect(later.length, 'no rotation happened').toBeGreaterThan(0);
+    expect(later.filter((e) => !(e.recipients ?? []).includes(mineKey)).map((e) => e.version), 'a rotation left the phone (the point) out').toEqual([]);
+    const env = await postSealed({ admin: A, members: [B], groupId: C4, text: 'na de laptop' });
+    expect(await until(() => { try { return readSealed(B, env, C4) === 'na de laptop' ? true : null; } catch { return null; } }, { timeout: 15000, step: 200 }), 'Bea cannot read what the phone seals').toBe(true);
+    let laptopRead = null; try { laptopRead = readSealed(A3, env, C4); } catch { laptopRead = null; }
+    expect(laptopRead, 'the revoked laptop read what came after').not.toBe('na de laptop');
+    // what the old address signed before it was retired still verifies at Bea's (the retired list keeps it verifiable)
+    const oldAfter = await signedByOld();
+    expect(oldBefore.filter((h) => !oldAfter.includes(h)), 'statements the retired address signed stopped verifying').toEqual([]);
   }, 400_000);
 });

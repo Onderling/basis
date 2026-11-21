@@ -1133,8 +1133,13 @@ connection: a token bucket per socket (`relay.msgRatePerSec` 30, `relay.msgRateB
 refused at once with `OVER_RATE`, written only to the socket it came in on and naming only that frame's envelope id,
 so it says nothing about the receiver. `RelayTransport` keeps each frame it wrote for a short while
 (`transports.overRateKeepMs`, 10 s) and re-sends a refused one after a second, one at a time at 10 a second, at most
-five sends in all; after that, or when the frame was no longer kept, or the socket closed with it queued, it tells
-the give-up path (`onUndelivered`, reason `over-rate`), and the bubble says failed. Order is kept among re-sent
+five sends in all; after that, or when the frame was no longer kept, or the transport is stopped with it queued, it
+tells the give-up path (`onUndelivered`, reason `over-rate`), and the bubble says failed. A waiting frame is also given
+up and said when it is too old to be taken (`transports.overRateMaxAgeMs`, 5 min from its signed `_ts`, under the
+receivers' 10 min replay window; checked while the socket is down too: reason `over-rate-too-old`) or when the queue
+is full (`transports.overRateQueueMax`, 1000: `over-rate-queue-full`). A frame written in the last two seconds before
+its socket closed (`transports.unansweredAtCloseMs`) may have lost its refusal with the socket: it is sent once more on
+the next socket, never twice for a close; a receiver drops a copy it already holds by its id. Order is kept among re-sent
 frames, not between a re-sent frame and a newer one. A relay that names no frame in `OVER_RATE` gets no re-send. The
 second limit is the hold for a receiver that is not connected: the relay keeps the frame for up to 24 h
 (`relay.queueTtlMs`, capped in count per address) and, when it gives up, sends the sender an `undelivered` frame with

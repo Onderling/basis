@@ -3105,6 +3105,14 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   /** The point signs a sibling's spine act: from a live device of this person only, a declared membership kind only, as
    *  the circle's own self, on this device's own head. */
+  /** A WRITE INTO ANOTHER CIRCLE than the one a door asked (an appointment's copy into a pair circle, a share's copy
+   *  into its source circle) asks that circle as its receivers will: its kept settings changes on this device, its
+   *  settings through the shell's reader (`writeIntoRefusal`). Null = the write may go, else the door's refusal. */
+  const mayWriteInto = async (circleId, { type, act = 'add' } = {}) => {
+    const kept = keptPolicyChangesOf(opts.deviceLog, circleId);
+    if (kept === undefined) requestKeptPolicyChanges(opts.deviceLog, circleId);
+    return writeIntoRefusal({ circleId, type, act, manifests: allManifests(), inputs: opts.circleCapabilityInputs ?? null, kept });
+  };
   const spineActHandler = async (fromAddr, payload) => {
     if (payload?.subtype !== SPINE_ACT_SUBTYPE) return;
     const actId = typeof payload.actId === 'string' ? payload.actId : null;
@@ -8681,9 +8689,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const store = householdService.stores.getStore(pairCircleId);
       const existing = await store.get(copyId).catch(() => null);
       // the pair circle's own switches, asked here as its members' devices will ask them (the door asked only the op's)
-      const kept = keptPolicyChangesOf(opts.deviceLog, pairCircleId);
-      if (kept === undefined) requestKeptPolicyChanges(opts.deviceLog, pairCircleId);
-      const refusal = await writeIntoRefusal({ circleId: pairCircleId, type: 'calendar-event', act: existing ? 'change' : 'add', manifests: allManifests(), inputs: opts.circleCapabilityInputs ?? null, kept });
+      const refusal = await mayWriteInto(pairCircleId, { type: 'calendar-event', act: existing ? 'change' : 'add' });
       if (refusal) return { ok: false, code: refusal.code, error: tr(gateRefusalKey(refusal.code)), refusal };
       const fields = sharedFieldsOf(ev);
       if (existing) {
@@ -10780,6 +10786,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     /** The migration to one address per persona: this device's own old address — retired here (root), else asked. */
     retireDeviceCircleAddresses,
     ownAddressRetireHandler,
+    /** A share's copy into its source circle asks that circle first, as its receivers will (both shells hand it to the
+     *  share functions, which the shells call directly). */
+    mayWriteInto,
     spineActHandler,
     spineAckHandler,
     spineAckSubtype: SPINE_ACK_SUBTYPE,

@@ -192,9 +192,12 @@ function fakeCanonicalShare() {
 }
 
 describe('makeCircleShareEnforcement — canonical branch (objective L)', () => {
-  it('WITHOUT canonicalShare: the binder shape is byte-identical (only { onShare, policy })', () => {
+  it('WITHOUT canonicalShare: the binder shape is { onShare, policy, resealsInPlace } and no canonical hooks', () => {
     const enf = makeCircleShareEnforcement({ sharing: { grant() {}, list() {} }, resourceUriFor: () => 'u' });
-    expect(Object.keys(enf).sort()).toEqual(['onShare', 'policy']);
+    expect(Object.keys(enf).sort()).toEqual(['onShare', 'policy', 'resealsInPlace']);
+    // the grant hook rewrites the source in place only with a re-sealer (a share asks the source a change then)
+    expect(enf.resealsInPlace).toBe(false);
+    expect(makeCircleShareEnforcement({ sharing: { grant() {}, list() {} }, resourceUriFor: () => 'u', seal: (x) => x }).resealsInPlace).toBe(true);
     expect(enf.onShareCanonical).toBeUndefined();
     expect(enf.revokeCanonical).toBeUndefined();
   });

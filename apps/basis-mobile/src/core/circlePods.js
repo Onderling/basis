@@ -85,6 +85,11 @@ export function setCirclePodSession(sessionOrRef) { podSessionRef = sessionOrRef
 // doesn't). It backs `sealingKeyForRecipient`: an out-of-circle grantee's sealing key is RE-DERIVED from their
 // published network key, so a revoke can evict exactly that grantee instead of rotating away from all of them.
 // Absent ⇒ the enforcement falls back to the conservative roster-only rotation (safe, lossy).
+/** The agent's gate for a share's own write into its source circle (`agent.mayWriteInto`), set by the bundle at boot. */
+let _writeGate = null;
+export function setCircleWriteGate(fn) { _writeGate = typeof fn === 'function' ? fn : null; }
+const mayWriteInto = async (circleId, act) => (_writeGate ? (await _writeGate(circleId, act)) ?? null : null);
+
 let _contactsSource = null;
 export function setCircleContactsSource(fn) { _contactsSource = typeof fn === 'function' ? fn : null; }
 
@@ -538,7 +543,7 @@ export async function shareItemIntoCircle({
     resolveService: resolveService ?? r.resolveService,
     enforcementFor: enforcementFor ?? r.enforcementFor,
     policyOf: r.policyOf,
-    recipientKeys, sealCopy,
+    recipientKeys, sealCopy, mayWriteInto,
     // objective L — thread the signed-in member's WebID as the initiator (mirrors web's `by ?? LOCAL_ACTOR`),
     // so the source circle's initiator gate sees a real actor. Null when signed out ⇒ deny-by-default holds.
     itemId, fromCircleId, toCircleId, by: by ?? getCircleActorWebId() ?? undefined, recipient, recipients,
@@ -565,6 +570,7 @@ export async function shareItemToPublishedKey({
     // adapter, kept out of shared src). `sealingKeyFromNetworkKey` derives the recipient's sealing key.
     sealCopy: _sealCopyToRecipients,
     sealingKeyFromNetworkKey: podSealingPublicKeyFromNetworkKey,
+    mayWriteInto,
     // NOTICE emitters routed by the circle's `notifyOutOfCircle` setting (mirror of web circleApp.js).
     // `notify` (admins) → @onderling/notify-envelope wiring is a follow-up; today it records the event.
     notify: (payload) => { try { console.info?.('[share] out-of-circle', payload); } catch { /* noop */ } },

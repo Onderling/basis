@@ -11,6 +11,14 @@ import { setShellContentSeal } from '../../src/v2/localStoreSeal.js';
 import { sealedPolicyHeadStore, POLICY_HEAD_KEY } from '../../src/v2/policyUpdateLane.js';
 import { localStorageAvailabilityIo } from '../../src/v2/memberAvailability.js';
 import { boxStores } from '../../src/v2/boxStorage.js';
+import { actionFrequencyIo, ACTION_FREQ_KEY } from '../../src/v2/actionFrequency.js';
+import { sealedAskMatchSkipsIo } from '../../src/v2/askMatches.js';
+import { localStorageOverrideIo } from '../../src/v2/circlePolicyStore.js';
+import { localStoragePinIo } from '../../src/v2/circlePinStore.js';
+import { localStorageSharedWithMeIo } from '../../src/v2/sharedWithMeStore.js';
+import { localStorageScreenIo } from '../../src/v2/userScreens.js';
+import { sealedContactNameStore, CONTACT_NAMES_KEY } from '../../src/v2/contactsSource.js';
+import { sealedContactSeenStore, CONTACT_SEEN_KEY } from '../../src/v2/contactUnread.js';
 import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -94,4 +102,24 @@ describe('an old plain value is resealed at the start', () => {
     expect(isPlainJson(raw), 'the head in the box file is sealed').toBe(false);
     expect((await stores.policyHeadStore.read('c1')).version).toBe(3);
   });
+
+  // the sweep: every strict store of a person's content declares the keys it owns
+  for (const [label, make, key] of [
+    ['the action frequency', actionFrequencyIo, ACTION_FREQ_KEY],
+    ['the ask-match skips', sealedAskMatchSkipsIo, 'cc.askMatchSkips'],
+    ['the member overrides', localStorageOverrideIo, 'cc.circleOverride.c1'],
+    ['the circle pins', localStoragePinIo, 'cc.circlePinned'],
+    ['shared with me', localStorageSharedWithMeIo, 'cc.sharedWithMe'],
+    ['the page book', localStorageScreenIo, 'cc.userScreens'],
+    ['contact names', sealedContactNameStore, CONTACT_NAMES_KEY],
+    ['contact seen-marks', sealedContactSeenStore, CONTACT_SEEN_KEY],
+  ]) {
+    it(`${label}: an old plain value is resealed at the start`, async () => {
+      const s = phoneStorage({ [key]: JSON.stringify({ old: 'plain' }) });
+      make(s);
+      seal();
+      await tick(60);
+      expect(isPlainJson(s._m.get(key)), `${key} sealed`).toBe(false);
+    });
+  }
 });

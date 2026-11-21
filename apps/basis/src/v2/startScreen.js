@@ -19,7 +19,7 @@ export const START_SCREEN_CHOICES = Object.freeze([
 /** Where a shell keeps the last tab used (plain storage, this device only). */
 export const LAST_TAB_STORAGE_KEY = 'cc.lastTab';
 
-const TABS = new Set(['screens', 'circles', 'contacten', 'mij']);
+const TABS = new Set(['screens', 'circles', 'contacten']);
 
 /**
  * Whether the start screen may still be applied once the agent is there. A person who moved during the cold start
@@ -47,7 +47,7 @@ export function firstFrameTab() {
  * The tab the app opens on.
  * @param {string|null|undefined} choice   the setting's value
  * @param {string|null|undefined} lastTab  the last tab used on this device
- * @returns {'screens'|'circles'|'contacten'|'mij'}
+ * @returns {'screens'|'circles'|'contacten'}
  */
 export function startTabFor(choice, lastTab) {
   if (choice === 'circles') return 'circles';

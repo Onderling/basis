@@ -57,26 +57,41 @@ export async function circleActRefusal({ app, op, args = {}, ctx = {}, manifests
     given = null;
   }
   if (!given) return null;
+  const v = circleCapabilityVerdict({ app, op: declared, args, manifests, policy: given.policy ?? {}, optOuts: given.override?.capabilityOptOuts });
+  return v.allow ? null : refuse('availability', v.code);
+}
+
+/**
+ * THE ONE DECISION a circle's switches make about an act, pure: the sender's gate above asks it for a person's op, and
+ * the receiving rails ask it for a statement that arrived (a circle's switches bind on every member's device), with
+ * the settings the content line picked (contentLine.js) and WITHOUT a member's opt-outs, which bind only that member's
+ * own device. Either an `op` (its verb and nouns read from the manifest) or an explicit `atom` + `noun`.
+ * @param {object} a
+ * @param {string} a.app
+ * @param {object} [a.op]  the manifest op declaration
+ * @param {string} [a.atom] @param {string} [a.noun]
+ * @param {object} [a.args]
+ * @param {object[]} a.manifests
+ * @param {object} a.policy  the circle's settings to judge by
+ * @param {object} [a.optOuts]  the member's own opt-outs (the sender's gate only)
+ * @returns {{allow: true, reason?: 'no-row'}|{allow: false, code: 'app-disabled'|'capability-denied'}}
+ */
+export function circleCapabilityVerdict({ app, op = null, atom = null, noun = null, args = {}, manifests = [], policy = {}, optOuts = null }) {
+  const sources = (Array.isArray(manifests) ? manifests : []).map((x) => ({ manifest: x, appOrigin: x?.app }));
   // the app is on in this circle, read as the typed path reads it (`isAppSurfaceEnabled` over the circle's policy)
-  const appOn = isAppSurfaceEnabled(app, given.policy ?? {}, isFeatureEnabled);
-  const eff = effectiveCapabilities(manifests.map((x) => ({ manifest: x, appOrigin: x?.app })), {
-    apps: appOn ? [app] : [],
-    capabilities: given.policy?.capabilities,
-    optOuts: given.override?.capabilityOptOuts,
-  });
-  const r = checkCapability({ op: declared, appOrigin: app, args }, eff);
-  if (r.allow) return null;
-  // A circle refuses only what it CAN switch off. Refused even with the app on and nothing switched off, the op has no
+  const appOn = isAppSurfaceEnabled(app, policy ?? {}, isFeatureEnabled);
+  const eff = effectiveCapabilities(sources, { apps: appOn ? [app] : [], capabilities: policy?.capabilities, optOuts });
+  const ask = { op, appOrigin: app, args, ...(op ? {} : { atom, noun }) };
+  const r = checkCapability(ask, eff);
+  if (r.allow) return { allow: true };
+  // A circle refuses only what it CAN switch off. Refused even with the app on and nothing switched off, the act has no
   // row a circle could turn (posting an offer, setting a role: the rows the capability set still lacks); that is not
   // this circle's decision, so the act goes on and the log says so in codes, for the row to be added.
-  if (r.code === 'capability-denied') {
-    const possible = effectiveCapabilities(manifests.map((x) => ({ manifest: x, appOrigin: x?.app })), { apps: [app] });
-    if (!checkCapability({ op: declared, appOrigin: app, args }, possible).allow) {
-      processRefusalLog().note({ tag: 'gate', lane: 'availability', check: 'circle-capability', reason: 'no-row' });
-      return null;
-    }
+  if (r.code === 'capability-denied' && !checkCapability(ask, effectiveCapabilities(sources, { apps: [app] })).allow) {
+    processRefusalLog().note({ tag: 'gate', lane: 'availability', check: 'circle-capability', reason: 'no-row' });
+    return { allow: true, reason: 'no-row' };
   }
-  return refuse('availability', r.code);
+  return { allow: false, code: r.code };
 }
 
 /**

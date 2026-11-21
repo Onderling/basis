@@ -1,5 +1,5 @@
 /**
- * HOW FAR THE "+" GOES, chosen on the persona's card (ledger L977, D.3b). The person's editor (the header avatar) shows
+ * HOW FAR THE "+" GOES, chosen on the persona's card (ledger L977, D.3b). The person's editor (the persona button) shows
  * each persona's card with the four choices; 3 is in force by default; a tap sets it on that persona through its own op,
  * read back through the waist (`agents.getPlusCeiling`), and the card then marks the new choice.
  *
@@ -15,7 +15,9 @@ test('a persona card offers how far the "+" goes; a tap sets it on that persona'
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
 
-  await page.locator('.cc-header-avatar__button').click();
+  // the persona button opens the panel; its "Aanpassen" opens the persona's own editor (the persona cards)
+  await page.locator('.cc-persona-button__button').click();
+  await page.locator('.circle-screen__identity-edit').click();
   const choice = (n) => page.locator(`[data-testid="mij-plus-ceiling-default-${n}"]`);
   await expect(choice(3), 'a circle\'s things after a yes: in force by default').toHaveAttribute('aria-pressed', 'true', { timeout: 20_000 });
   await expect(choice(1)).toHaveAttribute('aria-pressed', 'false');

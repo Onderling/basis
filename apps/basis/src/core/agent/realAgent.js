@@ -52,6 +52,7 @@ import { contactRelayScope } from '../../v2/connectionPoints.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity, sealStrategyForRecipients } from '../../v2/sharedCopyOpener.js'; // seal-to-self for settings + recipient-widened seal for view lanes
 import { contentSealStrategy } from '../../v2/contentAtRest.js';   // the device's content-at-rest key — a person's own words on their own disk
+import { KeyUnreadable } from './keyUnreadable.js';   // a key that is there but will not read: the boot stops, nothing is minted (L1115)
 import { createSealingBackend } from '@onderling/pseudo-pod';            // the seal above a blind local store
 import { setShellContentSeal } from '../../v2/localStoreSeal.js';        // hand the content key to the shell's own stores
 import { wireEventLogPersistence } from '../../v2/eventLogPersistence.js';   // the device log hydrates HERE, where the key is
@@ -134,7 +135,7 @@ import { makePolicyUpdateEmitter, denyWinsMerge, POLICY_UPDATE_KIND } from '../.
 import { normalizeCirclePolicy, decisionClassFor } from '../../v2/circlePolicy.js';
 import { chainOfBodies, judgePolicyChain, membershipGateFor, proposalsOn } from '../../v2/governanceReceiverGate.js';   // the governed gate's host half
 import { processRefusalLog } from '../../v2/refusalLog.js';   // every refusal says why
-import { onEarlierCircleLink } from '@onderling/core';
+import { onEarlierCircleLink, frontier } from '@onderling/core';
 // a link proof made before the member was named in it says so in the device log (no circle id, no address)
 onEarlierCircleLink(() => processRefusalLog().note({ tag: 'identity', lane: 'circle-link', check: 'link-proof', reason: 'earlier-link-proof' }));
 import { makeKeyRail, makeKeyEmitter, KEY_CATCHUP_SUBTYPES } from '../../v2/keyRail.js';   // the group-key lane — sealed key events as signed spine statements
@@ -242,12 +243,12 @@ function makeBrowserVault(prefix, { durabilityMatters = false } = {}) {
  * (Host-only helper; createSecureAgent handles this for the chat side.)
  */
 async function restoreOrGenerate(vault) {
-  try {
-    if (await vault.has('agent-privkey')) {
-      return await AgentIdentity.restore(vault);
-    }
-  } catch { /* fall through to generate */ }
-  return AgentIdentity.generate(vault);
+  // generate ONLY when the vault says nothing is stored: a key that is there but will not read (a wrong at-rest key, a
+  // storage error) stops the boot, never a new host key over the one issuer's (L1115)
+  let held;
+  try { held = await vault.has('agent-privkey'); } catch (err) { throw new KeyUnreadable('host-key', err); }
+  if (!held) return AgentIdentity.generate(vault);
+  try { return await AgentIdentity.restore(vault); } catch (err) { throw new KeyUnreadable('host-key', err); }
 }
 
 /**
@@ -539,7 +540,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // strand its entries under a key the next boot no longer derives.
   const sealedBackings = [];
   const sealedVault = async (backing) => {
-    await migrateVaultToEncrypted({ backing, key: atRestKey, fingerprint: rootFingerprint });
+    // the sentinel's read is the boot's first read of a sealed vault: a storage error there is the same "could not read"
+    // as a key's, said with the same words (L1115), never the generic failure
+    try { await migrateVaultToEncrypted({ backing, key: atRestKey, fingerprint: rootFingerprint }); }
+    catch (err) { throw new KeyUnreadable('vault-sentinel', err); }
     sealedBackings.push(backing);
     return new VaultEncrypted({ backing, key: atRestKey });
   };
@@ -659,13 +663,22 @@ export async function createRealHouseholdAgent(opts = {}) {
   // own key, so sealed history opens on the replacement with nobody else online. Keys wrapped only to a
   // retired device's random vault key are not recoverable this way — an admin re-grant is the route.
   const historyKeysVault = await sealedVault(opts.historyKeysVault ?? pickVault('cc-history-keys:'));
-  const historyKeyChainFor = async (circleId) => {
-    try { const raw = await historyKeysVault.get(`chain:${circleId}`); return raw ? JSON.parse(raw) : []; }
-    catch { return []; }
+  // the STRICT read: nothing stored is an empty chain; a chain that is there but will not read (a decrypt failure, not
+  // JSON, not a list) throws, so nothing is written over it (L1115): the history keys are not re-derivable
+  const readHistoryChain = async (circleId) => {
+    let raw;
+    try { raw = await historyKeysVault.get(`chain:${circleId}`); } catch (err) { throw new KeyUnreadable('history-keys', err); }
+    if (raw == null || raw === '') return [];
+    let chain;
+    try { chain = JSON.parse(raw); } catch (err) { throw new KeyUnreadable('history-keys', err); }
+    if (!Array.isArray(chain)) throw new KeyUnreadable('history-keys');
+    return chain;
   };
+  // the readers' view: what opens, else nothing (a reader never writes)
+  const historyKeyChainFor = async (circleId) => { try { return await readHistoryChain(circleId); } catch { return []; } };
   const absorbHistoryKeys = async (circleId, chain) => {
     if (!Array.isArray(chain) || !chain.length) return 0;
-    const cur = await historyKeyChainFor(circleId);
+    const cur = await readHistoryChain(circleId);   // throws on an unreadable chain: the merge is not written over it
     const byVersion = new Map(cur.map((k) => [k.version, k]));
     let added = 0;
     for (const k of chain) { if (!byVersion.has(k.version)) { byVersion.set(k.version, k); added += 1; } }
@@ -1383,6 +1396,13 @@ export async function createRealHouseholdAgent(opts = {}) {
   //   INBOUND — peer envelopes ingest back into THIS circle store (`wireCircleStoreInbound`, id-preserving,
   //             no echo). Best-effort (the op still runs locally). This is the SINGLE fan-out path for the
   //   circle: tasks ride it too now (tasks-v0's own substrate mirror is skipped when the store is injected).
+  // The restart's re-fan state (`reFanOwedChat`, below) lives HERE, above this function: the household circle is wired
+  // eagerly at boot, and its wiring asks for the re-fan; declared below that call, the read threw "before
+  // initialization", the household's wiring was caught as "NOT wired", and its re-fan never ran (2026-08-20 to 2026-11-20).
+  const reFannedCircles = new Set();
+  // (circleId) → the re-tell learns, from the log, what a restart still owes across it; bound with the membership rail
+  // further down — a circle opened before that is kept in `pending` and seeded when it binds
+  const seedWaitingRef = { current: null, pending: new Set() };
   async function ensureCircleSync(circleId) {
     const id = (typeof circleId === 'string' && circleId) ? circleId : 'household';
     if (circleSyncWired.has(id)) return;
@@ -1525,10 +1545,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // circle each boot, re-fan my own recent chat statements that have no logged receipt. A restart
   // therefore cannot silently break the hold promise: what was still owed goes out again, receivers'
   // rails dedup what they already have, and receipt-keyed removal stops the copies that arrive.
-  const reFannedCircles = new Set();
-  // (circleId) → the re-tell learns, from the log, what a restart still owes across it; bound with the membership rail
-  // further down — a circle opened before that is kept in `pending` and seeded when it binds
-  const seedWaitingRef = { current: null, pending: new Set() };
+  // (Its state, `reFannedCircles` and `seedWaitingRef`, is declared above `ensureCircleSync`.)
   function reFanOwedChat(circleId) {
     if (!opts.deviceLog || reFannedCircles.has(circleId)) return;
     // A circle is wired at boot BEFORE this factory has built its chat rail and composed its API (further down): a send
@@ -3209,7 +3226,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     const { event, groupKey } = rotateKeyEvent({ groupId: circleId, priorEvents: events, recipients });
     const statement = await keyEmitRef.current(circleId, event);
     if (!statement) return null;
-    await absorbHistoryKeys(circleId, [{ version: event.version, groupKey }]);
+    // the new version is kept beside the old ones; a chain that will not read is not written over, said in the log (L1115)
+    try { await absorbHistoryKeys(circleId, [{ version: event.version, groupKey }]); }
+    catch (err) { console.warn(`[keys] ${String(circleId).slice(0, 12)}: the new key version was not kept locally; the stored history keys could not be read (${err?.what ?? err?.message ?? err})`); }
     await callSkill('pinboard', 'broadcastCircleKeyStatement', {
       groupId: circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now(),
     }).catch(() => {});
@@ -6749,6 +6768,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       .finally(() => siblingCarry.carry({ subtype: 'circle-governance-broadcast', circleId, event: statement, msgId: `policy:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
     // where my membership chain in the circle stood (the line the receivers judge my earlier removals and role changes by)
     membershipUpToFor: (circleId) => authorChainTip(circleId, circleAddressFor(circleId)),
+    // where the content lanes stood on this device (the line the receivers judge content by: contentLine.js). A lane this
+    // device cannot read gives no line (null), and the emitter then fails the change rather than state an empty one.
+    contentUpToFor: (circleId) => {
+      if (typeof itemsRail?.storedStatements !== 'function' || typeof chatRail?.storedStatements !== 'function') return null;
+      return {
+        items: frontier(itemsRail.storedStatements(circleId).map((s) => s.body)),
+        chat: frontier(chatRail.storedStatements(circleId).map((s) => s.body)),
+      };
+    },
   });
   /**
    * THE circle-scoped send — every piece of circle traffic leaves through it: the chat/noticeboard fan

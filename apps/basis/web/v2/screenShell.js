@@ -10,7 +10,8 @@
  *   - then the ops this screen may do, grouped as `/help` groups them, each a button — a form when it has params, the
  *     op's own confirm where it declares one (`src/v2/screenPaint.js`).
  */
-import { makeBrowserScreenAgent } from '../../src/web/screenAgent.js';
+import { makeBrowserScreenAgent, forgetScreenKey } from '../../src/web/screenAgent.js';
+import { isKeyUnreadable } from '../../src/core/agent/keyUnreadable.js';
 import { initLocalisation, t, detectDeviceLang } from '../../src/index.js';
 import { createScreenView, screenAddressFor, HOUSEHOLD_SETTLE_MS } from '../../src/v2/screenView.js';
 import { screenPanelsForGrant, screenReplies, screenPickerFetcher, screenActionForm } from '../../src/v2/screenPaint.js';
@@ -182,9 +183,16 @@ export async function startScreenShell(win = window) {
   });
 
 
+  // THIS SCREEN'S OWN KEY WILL NOT READ (L1115): said, with the way out (forget it here, then connect again); never
+  // replaced on its own
+  const keyLost = () => say(
+    el('p', { 'data-screen': 'key_unreadable' }, t('circle.connectScreen.key_unreadable')),
+    el('button', { type: 'button', 'data-screen': 'forget_key', onclick: () => { forgetScreenKey(win.localStorage); win.location.reload(); } }, t('circle.connectScreen.forget_key')),
+  );
+
   // a later visit: the kept grant, back on the relay — no pairing
   if (link.resumeOnly) {
-    try { if (await view.resume()) { showOps(); return; } } catch { /* falls through to "not valid" */ }
+    try { if (await view.resume()) { showOps(); return; } } catch (e) { if (isKeyUnreadable(e)) { keyLost(); return; } /* else falls through to "not valid" */ }
     say(el('p', { 'data-screen': 'invalid' }, t('circle.connectScreen.not_a_link')));
     return;
   }
@@ -201,6 +209,7 @@ export async function startScreenShell(win = window) {
       await view.granted();
       showOps();
     } catch (e) {
+      if (isKeyUnreadable(e)) { keyLost(); return; }
       const why = e?.message === 'refused' ? 'launch_refused' : (e?.message === 'timed-out' ? 'timed_out' : null);
       say(why ? el('p', { 'data-screen': why }, t(`circle.connectScreen.${why}`))
         : el('p', { 'data-screen': 'failed' }, t('circle.connectScreen.failed', { reason: String(e?.message ?? e) })));
@@ -222,6 +231,7 @@ export async function startScreenShell(win = window) {
       await view.granted();
       showOps();
     } catch (e) {
+      if (isKeyUnreadable(e)) { keyLost(); return; }
       const why = e?.message === 'refused' ? 'refused' : (e?.message === 'timed-out' ? 'timed_out' : null);
       say(why ? el('p', { 'data-screen': why }, t(`circle.connectScreen.${why}`))
         : el('p', { 'data-screen': 'failed' }, t('circle.connectScreen.failed', { reason: String(e?.message ?? e) })));

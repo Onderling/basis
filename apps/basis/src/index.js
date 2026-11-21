@@ -315,7 +315,7 @@ export {
 } from './v2/deliverySettings.js';
 export {
   defaultConversationKinds, availableConversationKinds, TEMPLATE_CONVERSATION_KINDS,
-  resolveConversationKinds, setConversationKind,
+  resolveConversationKinds, setConversationKind, conversationKindsOf,
   // The kind a chat line IS — named once so a surface that has to recognise one (e.g. a shell deciding
   // whether an inbound entry should refresh its conversation) cannot hardcode a second copy of the string.
   CHAT_KIND,
@@ -422,3 +422,6 @@ export {
 export { sharedCircleLocale, sharedConsequenceLocale, sharedRoleLocale, sharedHostLocale, sharedNounLocale, sharedLocale, mergeShared } from './locales/index.js';
 export { fieldAfterLoad } from './v2/fieldAfterLoad.js';
 export { itemKindChip } from './v2/embedChips.js';
+
+// an admin's settings save: stated to the circle, written here only when that went out (web and phone)
+export { statingPolicyStore } from './v2/policyUpdateLane.js';

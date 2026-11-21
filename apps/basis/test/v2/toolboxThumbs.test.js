@@ -47,4 +47,15 @@ describe('the box fetches a toolbox\'s pictures', () => {
     const eleven = await fetchThumbs(many, { endpoint: ENDPOINT, key: 'k', fetch: fakeFetch({ 'https://box.example:8443/ok.jpg': JPEG }) });
     expect(eleven.filter((x) => x.thumb).length).toBe(10);
   });
+  it('the rows that will be CARDS get theirs first (the first 3 per shop), not the first ten of the answer (Frits, 2026-11-19)', async () => {
+    // a toolbox that answers shop by shop: 8 of one, then 8 of the other
+    const rows = [...Array.from({ length: 8 }, (_, i) => ({ label: `AH ${i + 1}`, seller: 'Albert Heijn', image: 'https://box.example:8443/ok.jpg' })),
+      ...Array.from({ length: 8 }, (_, i) => ({ label: `Jumbo ${i + 1}`, seller: 'Jumbo', image: 'https://box.example:8443/ok.jpg' }))];
+    const out = await fetchThumbs(rows, { endpoint: ENDPOINT, key: 'k', fetch: fakeFetch({ 'https://box.example:8443/ok.jpg': JPEG }) });
+    const pictured = out.filter((x) => x.thumb).map((x) => x.label);
+    expect(pictured).toEqual(expect.arrayContaining(['AH 1', 'AH 2', 'AH 3', 'Jumbo 1', 'Jumbo 2', 'Jumbo 3']));
+    // the cap per reply still holds; what is left of it goes to the rows behind "meer", in order
+    expect(pictured).toHaveLength(10);
+    expect(pictured).toEqual(['AH 1', 'AH 2', 'AH 3', 'AH 4', 'AH 5', 'AH 6', 'AH 7', 'Jumbo 1', 'Jumbo 2', 'Jumbo 3']);
+  });
 });

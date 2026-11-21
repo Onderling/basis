@@ -550,7 +550,7 @@ to 6, follows from that (`opWeight`, `packages/app-manifest/src/atoms.js`): a re
 circle's content 3, the person's control 4, a circle's control 5, keys 6. A door reads the weight instead of keeping
 its own list of what is too much, and an op with no weight is not offered. The person's own "+" offers nothing above
 its ceiling (`withinWeight`, `src/assistant/plusDoor.js`): 3 by default (a circle's things, after a yes on the card),
-set per persona on Mij to 0 (off), 1 (reads) or 2 (own things), kept on the persona as `_plus.ceiling` and inherited
+set per persona in the persona's editor (behind the persona button) to 0 (no model; the "+" stays), 1 (reads) or 2 (own things), kept on the persona as `_plus.ceiling` and inherited
 from the general persona. A turn with several selves ticked holds to the strictest, and the ceiling cuts both what
 the model is handed and every other way in (a slash line, a phrase, a form). In the own place an op whose widest
 scope is a circle weighs as the person's own (`ownPlaceWeight`), since its write lands in the person's store. The
@@ -804,7 +804,7 @@ written in plaintext (invariant #7).
   feed stays for a reader that is no node.
 - **The receiver — "shared with me".** A silent copy is pushed over the relay straight to the recipient's peer;
   their device receives it into a per-user, *tiered* store (local, mirrored to the pod when signed in) surfaced
-  on the **Mij** screen. Opening it needs the device's own sealing key — derived from its network secret, which
+  behind Vandaag's "Wacht op jou" chip. Opening it needs the device's own sealing key — derived from its network secret, which
   stays **encapsulated** in the agent identity: the kernel exposes only an opener *closure* (`sharedCopyOpener`
   hands the secret to an injected builder internally and returns just the closure), and the pod-client adapter
   supplies the derivation. The secret never leaves the identity.
@@ -1699,6 +1699,15 @@ error is never treated as a mismatch. When both sides hold different values, the
 *Everything a person (or model) touches compiles to the same `{opId, args}` — the manifest is the
 contract, and every surface is a projection of it.*
 
+**The frame.** The tab bar is Vandaag · Kringen · **+** · Contacten · In de buurt, declared in the manifest's `tabs`
+with the "+"'s place and buttons in `plus` (`src/v2/plusDial.js`). Top right on every tab sit the **persona button**,
+which opens the persona panel over the tab (the declared `meActions` and `meBlocks`, one tab per persona when there
+are several; `src/v2/personaPanel.js`), and beside it the **settings button**, which opens the settings home from
+anywhere and returns to the tab it came from. What Me said about now moved: "Wacht op jou" is first on Vandaag's top
+(`todayBlocks`), titled by the kinds in it now ("Stemmen en uitnodigingen", `awaitingTitle`), hidden when empty; the person's presence is a coloured ring around the persona button (`availabilityRing`: away > quiet > available and
+connected > available but not connected, the connection being the relay fact `connectedAtRelay`; existing theme tokens;
+the button's label names the state) and one row in the persona panel, the state in words and a tap to change it.
+
 **One declaration, six projections.** An app's manifest declares its operations once; pure projectors
 turn that declaration into the chat tool, the slash command, the deterministic gate verbs, the attach
 menu, the ops another agent may invoke, and the web/mobile screens. Neither AI nor GUI is privileged —
@@ -1708,7 +1717,7 @@ The coverage snapshot records which op has which surface, and its guard fails wh
 manifests (the guard is in the `npm run guards` aggregate, which CI runs as the first job of the merge gate).
 
 **Every op has a default place, by construction.** An op with no bespoke screen is still visible and
-reachable: the **advanced surface** (Mij → Geavanceerd, both platforms) lists exactly the
+reachable: the **advanced surface** (the settings home → Geavanceerd, behind the developer switch, both platforms) lists exactly the
 coverage-matrix's complement — a no-argument op runs straight through the waist from there; an
 argument-taking op shows its chat form, because the chat route is the argument-taking executor every op
 already has. The same surface exposes the parameter register: every user-tunable value, editable

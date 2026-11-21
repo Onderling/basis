@@ -1,12 +1,19 @@
 /**
  * Mij = identity: ONE declared screen. The manifest lists its blocks (`meBlocks`: the identity line, the agents list);
- * the one screen materializer fills them. The identity line is the person's name with the readings its config names
- * (availability · online · unread · open chores · next appointment); the agents block lists this person's devices,
- * their companions and the bots linked to them, one row each.
+ * the one screen materializer fills them. The identity line is the person's name, nothing else (its readings went
+ * 2026-11-20: availability to Vandaag, the counts dropped); the agents block lists this person's devices, their
+ * companions and the bots linked to them, one row each.
  */
 import { describe, it, expect } from 'vitest';
 import { basisManifest } from '../../src/index.js';
-import { mijScreenBlocks, MIJ_READINGS, identityLineWords, agentRowWords } from '../../src/v2/mijScreen.js';
+import * as mijScreen from '../../src/v2/mijScreen.js';
+import * as mijWords from '../../src/v2/mijWords.js';
+import * as screenBlocks from '../../src/v2/userScreenBlocks.js';
+import { materializeScreen } from '../../src/v2/userScreenBlocks.js';
+const { mijScreenBlocks, agentRowWords } = mijScreen;
+const { availabilityWords } = mijWords;
+// an identity line on a stored page that still names readings in its config (from before 2026-11-20)
+const lineWithOldReadings = (hostOps) => materializeScreen({ screen: { id: 'mij', blocks: [{ id: 'l', type: 'identityLine', config: { readings: ['availability', 'online', 'unread', 'open', 'next'] } }] }, hostOps });
 import { BLOCK_TYPES } from '../../src/v2/circleRecipe.js';
 import { EventLog } from '../../src/eventLog.js';
 
@@ -37,42 +44,27 @@ function hostCall({ events = [], chores = [] } = {}) {
 }
 
 describe('Mij — the declared screen', () => {
-  it('the manifest declares the Mij blocks, each a known block type placed on Mij', () => {
+  it('the manifest declares the persona panel\'s blocks: the name (no readings: what is about now is on Vandaag), the devices', () => {
     const types = (basisManifest.meBlocks ?? []).map((b) => b.type);
-    expect(types).toEqual(['identityLine', 'awaiting', 'agents']);
+    expect(types).toEqual(['identityLine', 'agents']);
     for (const t of types) expect(BLOCK_TYPES).toContain(t);
-    const readings = basisManifest.meBlocks[0].config.readings;
-    expect(readings.length).toBeGreaterThan(0);
-    for (const r of readings) expect(MIJ_READINGS).toContain(r);
+    expect(basisManifest.meBlocks[0].config).toEqual({});
   });
 
-  it('the identity line: the name, and each reading its config names', async () => {
+  it('the identity line is the name, and nothing else: the readings are gone, also on a page whose config still names them', async () => {
     const log = new EventLog({ initial: [], muted: [] });
     log.append({ id: 'm1', ts: 1000, app: 'chat', type: 'chat-message', circleId: 'a', actor: 'bea', payload: { text: 'hoi' } });
-    log.append({ id: 'm2', ts: 2000, app: 'chat', type: 'chat-message', circleId: 'a', actor: 'bea', payload: { text: 'hoi' } });
-    const soon = Date.now() + 3_600_000;
     const nextWeek = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
-    const [line] = await mijScreenBlocks({ hostOps: {
-      callSkill: hostCall({ events: [{ id: 'e1', title: 'tandarts', startsAt: new Date(soon).toISOString() }] }),
-      eventLog: log, circles: [{ id: 'a', name: 'Thuis' }], seenAt: {}, myRefs: ['me'], myWebid: 'me',
+    const [line] = await lineWithOldReadings({
+      callSkill: hostCall(), eventLog: log, circles: [{ id: 'a', name: 'Thuis' }], seenAt: {}, myRefs: ['me'], myWebid: 'me',
       availability: { holiday: { active: true, until: nextWeek } }, online: true,
-    } });
+    });
     expect(line.type).toBe('identityLine');
     expect(line.status).toBe('ok');
-    expect(line.content.name).toBe('Frits');
-    const byKey = Object.fromEntries(line.content.readings.map((r) => [r.key, r]));
-    expect(byKey.availability).toMatchObject({ state: 'away', until: nextWeek });
-    expect(byKey.online).toMatchObject({ on: true });
-    expect(byKey.unread).toMatchObject({ count: 2 });
-    expect(byKey.next).toMatchObject({ title: 'tandarts' });
-  });
-
-  it('a reading with no source says nothing rather than a guess', async () => {
-    const [line] = await mijScreenBlocks({ hostOps: { callSkill: hostCall(), circles: [] } });
-    const keys = line.content.readings.map((r) => r.key);
-    expect(keys).not.toContain('online');
-    expect(keys).not.toContain('availability');
-    expect(keys).not.toContain('next');
+    expect(line.content).toEqual({ name: 'Frits' });
+    expect(mijScreen.MIJ_READINGS, 'no reading list left to name').toBeUndefined();
+    expect(screenBlocks.MIJ_READINGS).toBeUndefined();
+    expect(mijWords.identityLineWords, 'the words are the availability block\'s only').toBeUndefined();
   });
 
   it('the agents block: live devices (this one marked), companions, linked bots — no revoked device, no person', async () => {
@@ -93,10 +85,10 @@ describe('Mij — the declared screen', () => {
     expect(agents.content.items.filter((r) => r.here)).toHaveLength(1);
   });
 
-  it('both shells word the line and the rows through one helper, in the declared order', () => {
+  it('both shells word the availability block and the rows through one helper', () => {
     const t = (k, v) => `${k}${v ? JSON.stringify(v) : ''}`;
-    const words = identityLineWords({ readings: [{ key: 'online', on: false }, { key: 'unread', count: 3 }, { key: 'nope' }] }, { t });
-    expect(words).toEqual(['circle.profile.reading_offline', 'circle.profile.reading_unread{"count":3}']);
+    expect(availabilityWords({ key: 'availability', state: 'available' }, { t })).toBe('circle.profile.reading_available');
+    expect(availabilityWords(null, { t })).toBe('');
     expect(agentRowWords({ kind: 'device', label: null, here: true }, t)).toBe('circle.profile.agent_here');
     expect(agentRowWords({ kind: 'bot', label: 'Huishoudbot' }, t)).toBe('circle.profile.agent_bot{"label":"Huishoudbot"}');
   });

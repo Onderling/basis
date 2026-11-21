@@ -14,7 +14,7 @@ test('a list nobody holds: the "+" asks to make it; the yes makes an own list, n
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   const line = page.locator('.circle-vandaag-plus__line');
   await line.fill('zet melk op boodschappen');
   await line.press('Enter');
@@ -38,7 +38,7 @@ test('a list nobody holds: the "+" asks to make it; the yes makes an own list, n
 test('the yes puts the item on the new list too; a no is said and makes nothing', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   const line = page.locator('.circle-vandaag-plus__line');
   const card = page.locator('.circle-vandaag-plus__card');
   const last = () => page.locator('.circle-vandaag-plus__turn--assistant').last();

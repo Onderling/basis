@@ -44,7 +44,8 @@ describe('the built screen client, on the booted box over the relay', () => {
     const dataDir = mkdtempSync(path.join(tmpdir(), 'basis-screen-client-'));
     cleanup.push(() => rmSync(dataDir, { recursive: true, force: true }));
     mkdirSync(path.join(dataDir, 'toolboxes'));
-    writeFileSync(path.join(dataDir, 'toolboxes', 'boodschappen.json'), JSON.stringify({ name: 'boodschappen', url: tb.base, words: [{ word: 'zoek', tool: 'products.choices', field: 'query' }] }));
+    // its PAGE (L1113): the address the operator placed, and the household ops it may use beside its toolbox
+    writeFileSync(path.join(dataDir, 'toolboxes', 'boodschappen.json'), JSON.stringify({ name: 'boodschappen', url: tb.base, words: [{ word: 'zoek', tool: 'products.choices', field: 'query' }], page: 'https://boodschappen.example/pagina', ops: ['lists.listEntries', 'lists.addToList'] }));
     writeFileSync(path.join(dataDir, 'toolboxes', 'boodschappen.key'), TOOLBOX_KEY);
     // a SECOND toolbox, on too: the case the binding guards (a page reading another toolbox that is there)
     writeFileSync(path.join(dataDir, 'toolboxes', 'recepten.json'), JSON.stringify({ name: 'recepten', url: tb.base, words: [{ word: 'recept', tool: 'products.choices', field: 'query' }] }));
@@ -88,8 +89,21 @@ describe('the built screen client, on the booted box over the relay', () => {
     const makeAgent = async () => { const a = await createSecureAgent({ vault: new VaultMemory(), transportMode: 'relay', warnOnInsecure: false }); agents.push(a); return a; };
     cleanup.push(async () => { for (const a of agents) await a.stop?.().catch(() => {}); });
 
-    // the page for the toolbox that is on: pasted, the question names it, the code picked, granted
-    const page = createScreenClient({ toolbox: 'boodschappen', bot, label: 'boodschappenpagina', storage: memoryStorage(), makeAgent });
+    // a toolbox page opened from Basis's own start address carries no ticket: refused in words, nothing asked (L1113)
+    const unticketed = createScreenClient({ toolbox: 'boodschappen', bot, storage: memoryStorage(), makeAgent });
+    const u = await unticketed.startPairing();
+    const needsLink = await ask(u.paste);
+    expect(textOf(needsLink)).toContain('/scherm boodschappen');
+    expect(buttonsOf(needsLink).filter((b) => b.startsWith('/koppelen'))).toEqual([]);
+
+    // `/scherm boodschappen`: the link to the toolbox's own placed page, with its one-use ticket
+    const pageLine = textOf(await ask('/scherm boodschappen'));
+    const pageLink = (/https:\/\/boodschappen\.example\/pagina#scherm-nieuw=\S+/.exec(pageLine) ?? [])[0];
+    expect(pageLink, `the toolbox page's link:\n${pageLine}`).toBeTruthy();
+
+    // the page for the toolbox that is on, opened from that link: pasted, the question names it and what it may do, the
+    // code picked, granted: useTool and the placed ops, not the admin's whole column
+    const page = createScreenClient({ toolbox: 'boodschappen', bot: pageLink, label: 'boodschappenpagina', storage: memoryStorage(), makeAgent });
     const p = await page.startPairing();
     expect(p.paste).toMatch(/^\/koppel-scherm onderling-connect:\/\//);
     const asked = await ask(p.paste);
@@ -99,6 +113,11 @@ describe('the built screen client, on the booted box over the relay', () => {
     expect(await page.waitForGrant()).toBe('granted');
     expect(page.state()).toBe('connected');
     expect(page.ops()).toContain('tools.useTool');
+    // exactly useTool and the placed ops the admin's column holds: an empty grant does not pass this
+    expect([...page.ops()].sort(), page.ops().join(', ')).toEqual(['lists.addToList', 'lists.listEntries', 'tools.useTool']);
+    // the same link a second time: its ticket is spent
+    const again = createScreenClient({ toolbox: 'boodschappen', bot: pageLink, storage: memoryStorage(), makeAgent });
+    expect(textOf(await ask((await again.startPairing()).paste))).toContain('/scherm boodschappen');
 
     const found = await page.call('tools.useTool', { toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'melk' } });
     expect(found, JSON.stringify(found).slice(0, 400)).toMatchObject({ ok: true, output: { '@type': 'ItemList' } });

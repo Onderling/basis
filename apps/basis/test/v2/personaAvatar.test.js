@@ -1,11 +1,11 @@
 /**
- * The header avatar: the active persona's picture (the `profilePicture` attribute) or, without one, its initials from
+ * The persona button: the active persona's picture (the `profilePicture` attribute) or, without one, its initials from
  * the name. One loader both shells call; the picture is a sealed ref each shell opens with its own opener.
  */
 import { describe, it, expect } from 'vitest';
 import { initialsOf, pictureRefOf, loadPersonaAvatar } from '../../src/v2/personaAvatar.js';
 
-describe('the header avatar', () => {
+describe('the persona button', () => {
   it('initials: the first letters of up to two words, upper case; a handle alone gives one', () => {
     expect(initialsOf('Frits de Roos')).toBe('FD');
     expect(initialsOf('  anna ')).toBe('A');

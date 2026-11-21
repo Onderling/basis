@@ -1,12 +1,12 @@
 /**
- * `/scherm` and `/koppel-scherm` at the door: the admin's `/scherm` (by default) sends the start address — no secret —
- * and a member's the one-time link; `/scherm link` gives anyone the link; `/koppel-scherm` takes a screen's own offer
+ * `/scherm` and `/koppel-scherm` at the door: the admin's `/scherm` (by default) sends the start address with a one-use
+ * ticket (a pasted offer pairs only with one, L1113) and a member's the one-time link; `/scherm link` gives anyone the link; `/koppel-scherm` takes a screen's own offer
  * and asks the question, a garbled one is answered with the usage line.
  */
 import { describe, it, expect } from 'vitest';
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
-import { createBotScreens } from '../src/v2/botScreens.js';
+import { createBotScreens, parseScreenStartLink } from '../src/v2/botScreens.js';
 import { screenCode } from '../src/v2/screenDoor.js';
 import { encodePairingOffer } from '../src/v2/connectionPairing.js';
 import { EventLog } from '../src/eventLog.js';
@@ -25,7 +25,9 @@ function door() {
   });
   const call = withAssistantOps({ callSkill: async () => ({ ok: true }), threads, t, refusal: async () => null, admin: { screens, users: async () => users } });
   const as = (who, op, args = {}) => call('assistant', op, args, { caller: who, threadId: who, chatId: who.split(':')[1] });
-  return { as, privately, asked };
+  // the admin's /scherm, as the screen reads it: the ticket its start address carries
+  const ticket = async () => { await as('telegram:9', 'assistant-screen'); return parseScreenStartLink(/https?:\/\/\S+/.exec(privately.at(-1).text)[0]).ticket; };
+  return { as, privately, asked, ticket };
 }
 
 describe('the paste route at the door', () => {
@@ -44,7 +46,10 @@ describe('the paste route at the door', () => {
     const d = door();
     const bad = await d.as('telegram:9', 'assistant-screen-paste', { offer: 'hallo' });
     expect(bad.error.message).toContain('screen_paste_usage');
-    const ok = await d.as('telegram:9', 'assistant-screen-paste', { offer: encodePairingOffer({ viewPubKey: 'VIEWKEY', nonce: 'abc', label: 'laptop' }) });
+    const unticketed = await d.as('telegram:9', 'assistant-screen-paste', { offer: encodePairingOffer({ viewPubKey: 'VIEWKEY', nonce: 'abc', label: 'laptop' }) });
+    expect(unticketed.error.message).toContain('screen_paste_needs_link');
+    expect(d.asked).toHaveLength(0);
+    const ok = await d.as('telegram:9', 'assistant-screen-paste', { offer: encodePairingOffer({ viewPubKey: 'VIEWKEY', nonce: 'abc', label: 'laptop', ticket: await d.ticket() }) });
     expect(ok.message).toContain('screen_paste_asked');
     expect(d.asked).toHaveLength(1);
     expect(d.asked[0].codes).toHaveLength(3);
@@ -52,7 +57,7 @@ describe('the paste route at the door', () => {
 
   it('connected: the yes says where the screen is from now on (its own link); /schermen says it again', async () => {
     const d = door();
-    await d.as('telegram:9', 'assistant-screen-paste', { offer: encodePairingOffer({ viewPubKey: 'VIEWKEY', nonce: 'abc', label: 'laptop' }) });
+    await d.as('telegram:9', 'assistant-screen-paste', { offer: encodePairingOffer({ viewPubKey: 'VIEWKEY', nonce: 'abc', label: 'laptop', ticket: await d.ticket() }) });
     const code = await screenCode('VIEWKEY', 'abc');
     const done = await d.as('telegram:9', 'assistant-screen-confirm', { answer: code });
     expect(done.ok, JSON.stringify(done)).toBe(true);

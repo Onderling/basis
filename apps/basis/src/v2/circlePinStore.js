@@ -61,7 +61,7 @@ export function localStoragePinIo(storage = globalThis.localStorage) {
   const KEY = 'cc.circlePinned';
   // SEALED at rest (ledger L1083: which circles the person pinned), on web and phone alike. A read before the content
   // key WAITS for it: pins not known yet are not "no pins", and a toggle before it never writes a fresh map over them.
-  const kv = sealedKeyValue(storage, { name: 'the circle pins', strict: true, waitForKey: true });
+  const kv = sealedKeyValue(storage, { name: 'the circle pins', strict: true, waitForKey: true, said: true });
   return {
     // a storage error comes through (the store tells "could not read" from "nothing pinned"); not JSON / not openable
     // with this key reads as nothing

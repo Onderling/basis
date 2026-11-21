@@ -25,6 +25,32 @@
       "doc": "Global tab bar: the Nearby screen (the room this device is in)."
     }
   },
+  "plus": {
+    "chat": {
+      "text": "Chat",
+      "doc": "The opened '+' (docked in the tab bar): the button to the person's own conversation, on the '+''s own spot by default."
+    },
+    "scan": {
+      "text": "Scan",
+      "doc": "The opened '+': scan a QR code (the scanQr op)."
+    },
+    "my_qr": {
+      "text": "My QR",
+      "doc": "The opened '+': show my own QR code to share my contact (the share-my-contact view). Frits: it must say it is the QR."
+    },
+    "close": {
+      "text": "Close",
+      "doc": "The opened '+' with nothing on its middle spot: the '+' itself, whose tap folds the buttons back (its spoken label)."
+    },
+    "middle_hint": {
+      "text": "What a second tap on the + opens",
+      "doc": "Settings, Appearance: one line under that heading, saying what the choice does."
+    },
+    "middle_none": {
+      "text": "Nothing (a second tap closes)",
+      "doc": "Settings, Appearance: the choice to put no button on the '+''s middle spot (a second tap on the '+' then closes it)."
+    }
+  },
   "create_unavailable": {
     "text": "Can't create a circle yet — the app is still starting.",
     "doc": "SP-13.1 — surfaced when createCircle is invoked before the agent bundle has booted."
@@ -50,7 +76,7 @@
         "doc": "Fold-in phase C (Q3) — pre-checked, uncheckable wizard line when the joined circle's invite carries the offering-matching signal; checked = disclose offering keys at the coarse 'category' rung for the chosen persona."
       },
       "hint": {
-        "text": "Only the kind is shown, never the text or tags. Untick it if you would rather not show it here. You can change this later under Me → personas.",
+        "text": "Only the kind is shown, never the text or tags. Untick it if you would rather not show it here. You can change this later with the persona button (top right) → Edit.",
         "doc": "Fold-in phase C (Q3) — explains the coarse rung + how to change it later; shown under the pre-checked line."
       }
     },
@@ -215,7 +241,7 @@
           "doc": "Join wizard — default persona option label."
         },
         "hint": {
-          "text": "Only what this persona shares in this circle is shared. Nothing on a first join. You can change it later under Me, personas.",
+          "text": "Only what this persona shares in this circle is shared. Nothing on a first join. You can change it later with the persona button (top right).",
           "doc": "Join wizard: persona disclosure hint."
         },
         "already_in": {
@@ -588,10 +614,6 @@
   "loading": {
     "text": "Loading…",
     "doc": "Shown while circles are being fetched."
-  },
-  "back_me": {
-    "text": "← Me",
-    "doc": "Back link from any screen under Me (Mij) to the Me screen — one key for all of them."
   },
   "back_mydata": {
     "text": "← My data",
@@ -1720,7 +1742,7 @@
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     },
     "onboarding_handle_hint": {
-      "text": "Your name for people in your circles. You can change it later in Me.",
+      "text": "Your name for people in your circles. You can change it later with the persona button (top right).",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     },
     "onboarding_handle_ph": {
@@ -2944,6 +2966,10 @@
         "text": "Storage can't be turned back off once it's on (this is one-way by design).",
         "doc": "§4 — storage-policy bridge: pinboard one-way downgrade guard."
       }
+    },
+    "not_stated": {
+      "text": "Not saved: the change could not be sent to the circle. Nothing changed here. Try again.",
+      "doc": "A circle settings save whose signed statement to the circle failed: nothing is written on this device, so it never differs from the other members'."
     },
     "feat": {
       "chat": {
@@ -4276,7 +4302,7 @@
       "doc": "First-time wizard, step 2 and the card editor: copy what the room self offers into the card as tags (a prefill the person sees and can remove)."
     },
     "wizard2_no_offers": {
-      "text": "You offer nothing yet. You can add that later, under Me.",
+      "text": "You offer nothing yet. You can add that later, with the persona button (top right).",
       "doc": "First-time wizard, step 2: in place of the offers switch when nothing is offered yet; Mij/Me is the tab."
     },
     "wizard2_under": {
@@ -5983,6 +6009,21 @@
     "value_delete": "delete",
     "value_own": "their own",
     "screen_confirm_toolbox": "{{label}} wants to connect for the toolbox {{toolbox}}.",
+    "box_stopped_trying": "The household's box has stopped: {{count}} starts could not decrypt its keys, which does not pass by itself. Nothing was changed and the bot does not answer now. Whoever runs the box: see its log for the way out (move the data folder aside and enrol from the phrase).",
+    "box_cannot_start": "The household's box cannot start: {{count}} times in a row it could not read its keys. Nothing was changed; it keeps trying, further apart. Whoever runs the box: look at its log.",
+    "screen_confirm_toolbox_ops": "It may then do this, as you:",
+    "screen_toolbox_needs_link": "The page of the toolbox {{toolbox}} connects only from the link the bot sends you. Type /scherm {{toolbox}} and open the page from that link (it works once, for a short while).",
+    "screen_toolbox_link": "The page of the toolbox {{toolbox}}: {{link}}\nOpen it on the device you want to use; it works once, for {{minutes}} minutes. Then pick the code the page shows.",
+    "screen_toolbox_no_page": "The toolbox {{toolbox}} has no page here (or it is not on).",
+    "toolbox_page_refused_title": "No entry",
+    "toolbox_page_refused_body": "This page opens only with a link from the household bot. Ask for a new one: type /scherm {{toolbox}} in your own chat with the bot.",
+    "toolbox_page_not_found_title": "Not found",
+    "toolbox_page_not_found_body": "There is nothing here.",
+    "screen_toolbox_grant_ended": "The page of the toolbox {{toolbox}} was disconnected: a toolbox's page now connects only from the link the bot sends, and may do only what its toolbox needs. Type /scherm {{toolbox}} to connect it again.",
+    "screen_paste_remembered": "I sent you a link to connect a screen by pasting its code.",
+    "screen_toolbox_link_remembered": "I sent you the link to the page of the toolbox {{toolbox}}.",
+    "screen_paste_needs_link": "That connect code does not come from a link I sent you (or the link was used or ran out). Type /scherm for a new one and make the code on that page.",
+    "screen_confirm_toolbox_use": "• use the toolbox {{toolbox}}",
     "screen_toolbox_not_on": "The toolbox {{toolbox}} is not on in this household, so its page cannot connect. Ask the admin to switch it on (/toolbox).",
     "toolbox_not_yours": "This page may only use its own toolbox, not {{toolbox}}.",
     "screen_confirm_question": "A screen wants to connect as you. Which code does that screen show? Tap that code. If you do not see it, or did not do this yourself: tap \"None of these\".",
@@ -6095,7 +6136,7 @@
       }
     },
     "admission_failed": "Letting you in went wrong on the bot's side. Try again in a few minutes; if it still fails, ask the admin.",
-    "screen_paste_link": "Open this on the screen you want to connect (in your own browser): {{link}}\nTap \"Make a connect code\" there, copy the line that appears and send it here. No secret goes through this chat this way.",
+    "screen_paste_link": "Open this on the screen you want to connect (in your own browser): {{link}}\nTap \"Make a connect code\" there, copy the line that appears and send it here. The link works once, for {{minutes}} minutes.",
     "screen_paste_usage": "Paste the screen's connect code: /koppel-scherm onderling-connect://…",
     "screen_paste_asked": "Received. I am asking you now which code that screen shows.",
     "settings_confirm": "This changes it for everyone in the house. Are you sure?",
@@ -6237,8 +6278,12 @@
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
     "toolbox_card": {
-      "text": "{{title}} is placed at {{url}}.\nWords: {{words}}.\n{{receives}}\nSwitch it on?",
-      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+      "text": "{{title}} is placed at {{url}}.\nWords: {{words}}.{{slots}}\n{{receives}}\nSwitch it on?",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035). {{slots}}: one toolbox_card_slot line per slot, each starting on a new line, or empty."
+    },
+    "toolbox_card_slot": {
+      "text": "With {{word}}, these phrases fill {{param}}: {{phrases}}.",
+      "doc": "One line of the /toolbox card per slot of a word: the tool parameter and, per value, the phrases that fill it (e.g. 'ah: bij albert heijn / bij ah; jumbo: bij jumbo')."
     },
     "toolbox_receives_question": {
       "text": "It receives the words of a question, and nothing about who asks.",
@@ -6325,7 +6370,7 @@
       "doc": "A \"meer\" tapped after its list of things was replaced or went old: nothing to page; search again (ledger L1035)."
     },
     "toolbox_found_row": {
-      "text": "{{label}} \u00b7 {{more}}",
+      "text": "{{label}} · {{more}}",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
     "toolbox_pick_button": {
@@ -6985,7 +7030,7 @@
       "doc": "S2 — personal offerings section. (Web editor retired in fold-in phase C; mobile CircleProfileScreen still renders it until the mobile mirror lands.)"
     },
     "offerings_moved": {
-      "text": "What you offer now lives under Me → personas",
+      "text": "What you offer now lives behind the persona button → Edit",
       "doc": "Fold-in phase C — quiet pointer row on the Profiel screen, replacing the retired skills editor; opens the Mij persona surface."
     },
     "no_offerings": {
@@ -7035,10 +7080,6 @@
     "loc_clear": {
       "text": "Clear location",
       "doc": "S2 — clear the saved location."
-    },
-    "availability": {
-      "text": "Availability →",
-      "doc": "S2 — open the availability/quiet-hours screen."
     },
     "sharedWithMe": {
       "text": "Shared with me →",
@@ -7132,26 +7173,6 @@
       "text": "quiet until {{until}}",
       "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
     },
-    "reading_online": {
-      "text": "online",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. This device is connected at its relays."
-    },
-    "reading_offline": {
-      "text": "offline",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. This device is not connected at its relays."
-    },
-    "reading_unread": {
-      "text": "{{count}} unread",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
-    },
-    "reading_open": {
-      "text": "{{count}} open",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. What is the person's and still open, across circles — over every noun that declares whose it is and when it is done."
-    },
-    "reading_next": {
-      "text": "next: {{title}} {{when}}",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. The soonest thing still to come, over every noun whose moment is scheduled."
-    },
     "agent_here": {
       "text": "this device",
       "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
@@ -7180,13 +7201,17 @@
       "text": "Copy log / report a problem →",
       "doc": "The door on My data that shows this device's log (event codes and numbers only) and lets the person copy it."
     },
-    "avatar_label": {
-      "text": "Profile",
-      "doc": "The header avatar's accessible name, top-right on every tab: it opens the person's profile (or the switcher with several selves)."
-    },
     "no_name_yet": {
       "text": "No name yet",
       "doc": "Me's title while the person has no handle — never the tab's own word in its place."
+    },
+    "reading_available_connected": {
+      "text": "available, connected",
+      "doc": "The persona button ring and panel row: available, and this device is connected at one of its relays (presenceWords)."
+    },
+    "reading_available_offline": {
+      "text": "available, not connected",
+      "doc": "The persona button ring and panel row: available, but this device is not connected at any relay (presenceWords)."
     }
   },
   "blocked": {
@@ -7327,10 +7352,6 @@
     "usage": {
       "text": "Usage",
       "doc": "S5 — usage metrics section."
-    },
-    "keys": {
-      "text": "Keys & backup",
-      "doc": "S5 — key-management section heading."
     },
     "view_mnemonic": {
       "text": "View recovery phrase",
@@ -7602,7 +7623,7 @@
       "doc": "My data → keys: the member's CHOICE of which device others deliver to first (sync-policy §12, 2026-09-16). Announces this device's address in every circle with the primary flag; a boot announce never moves the slot."
     },
     "make_primary_no_point": {
-      "text": "Direct messages now land on this device ({{count}} circles told). It cannot sign your circle changes yet: type your recovery phrase on it once (Settings → Devices & keys).",
+      "text": "Direct messages now land on this device ({{count}} circles told). It cannot sign your circle changes yet: type your recovery phrase on it once (Settings → Recovery).",
       "doc": "After the main-device tap on a device without the circle root: direct messages land here, but it cannot be the point that signs the spine."
     },
     "make_primary_done": {
@@ -7669,6 +7690,10 @@
     "connection_offer_not-a-connect-uri": {
       "text": "That is not a pairing code.",
       "doc": "Refusal: wrong kind of code pasted."
+    },
+    "connection_offer_toolbox-page": {
+      "text": "This page belongs to a toolbox. Connect it from the household's bot: type /scherm and the toolbox's name there, and open the page from that link.",
+      "doc": "Apparaten & sleutels (ledger L1113): a toolbox page's offer pasted into the app is refused; it pairs with the bot from /scherm <toolbox>."
     },
     "connection_offer_unreadable": {
       "text": "This pairing code is damaged — copy it again.",
@@ -8508,7 +8533,7 @@
     },
     "plus_ceiling": {
       "text": "What the + may do for me",
-      "doc": "mij#personas \u2014 a persona card: heading of how far the person's own + goes for this persona (the ceiling, _plus.ceiling)."
+      "doc": "mij#personas — a persona card: heading of how far the person's own + goes for this persona (the ceiling, _plus.ceiling)."
     },
     "plus_ceiling_0": {
       "text": "Nothing. The + is off for this persona.",
@@ -8709,6 +8734,36 @@
     "driver_remove": {
       "text": "Remove {{what}}",
       "doc": "Mij → a driver chip's remove button (aria label): what is taken off."
+    },
+    "awaiting_kind": {
+      "vote": {
+        "text": "votes",
+        "doc": "The \"Wacht op jou\" block title: the word for the vote kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "rsvp": {
+        "text": "invitations",
+        "doc": "The \"Wacht op jou\" block title: the word for the rsvp kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "task": {
+        "text": "tasks",
+        "doc": "The \"Wacht op jou\" block title: the word for the task kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "question": {
+        "text": "questions",
+        "doc": "The \"Wacht op jou\" block title: the word for the question kind (lower case, plural), joined with the other kinds in it (awaitingTitle)."
+      },
+      "other": {
+        "text": "other requests",
+        "doc": "The \"Wacht op jou\" block title: ONE word for device offers and shared copies together, last in the order (awaitingTitle)."
+      }
+    },
+    "awaiting_title_separator": {
+      "text": ", ",
+      "doc": "The \"Wacht op jou\" block title: between the kinds before the last."
+    },
+    "awaiting_title_last": {
+      "text": "{{list}} and {{last}}",
+      "doc": "The \"Wacht op jou\" block title: the kinds before the last ({{list}}) and the last one ({{last}})."
     }
   },
   "attach": {
@@ -8871,7 +8926,7 @@
     "offer_title": "Add-device code",
     "offer_hint": "Scan or paste this code on the new device, then type the recovery phrase there. The code is not a secret — the phrase stays the only key.",
     "offer_error": "Could not build the code (this device is not in any circle yet).",
-    "offer_no_seal": "This device cannot show a code yet: it was added before the recovery seal existed. Type your recovery phrase on it once (Settings → Devices & keys), then try again.",
+    "offer_no_seal": "This device cannot show a code yet: it was added before the recovery seal existed. Type your recovery phrase on it once (Settings → Recovery), then try again.",
     "offer_paste_label": "Code from your current device (optional)",
     "personas_title": "Which personas does this device get?",
     "personas_hint": "Only what you tick comes to this device. A device you trust less is better given less.",
@@ -9227,7 +9282,7 @@
           "doc": "Create wizard — the start-minimally option: no release rides onto the new circle. The join wizard's same protective choice."
         },
         "hint": {
-          "text": "Only what this persona discloses in this circle is shared with the people who join — nothing you have not set. Adjust later under Me → personas.",
+          "text": "Only what this persona discloses in this circle is shared with the people who join — nothing you have not set. Adjust later with the persona button (top right).",
           "doc": "Create wizard — what founding as a persona shares. Says 'discloses', never 'is': one identity runs, the persona is a lens (ledger L123)."
         }
       },
@@ -9689,6 +9744,112 @@
       }
     }
   },
+  "boot_content_unreadable": {
+    "text": "Your data on this device could not be opened. Nothing was changed: it is all still here. Try again; if this keeps happening, restore from your recovery phrase (that starts this device over and brings your circles back).",
+    "doc": "Launcher (ledger L1115): the content key is stored but could not be read at the start; nothing was minted or written. Try again first, the phrase second."
+  },
+  "boot_retry": {
+    "text": "Try again",
+    "doc": "Launcher (ledger L1115): the button under a start failure that can pass on a second try; starts the app again."
+  },
+  "stored_value_unreadable": {
+    "text": "A change was not saved: the value it would replace could not be opened on this device, so it was kept. Try again after restarting the app; if this keeps happening, restore from your recovery phrase.",
+    "doc": "Launcher (ledger L1115): a save the person made was refused because the stored value it would replace could not be opened with this device's key; it was kept, not overwritten."
+  },
+  "stored_value_unreadable_ok": {
+    "text": "OK",
+    "doc": "Launcher (ledger L1115): dismisses the refused-save notice; it is said once a session."
+  },
+  "start_over": {
+    "lede": {
+      "text": "Type your recovery phrase (24 words). Nothing is removed until it is checked and you confirm.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "resumed": {
+      "text": "Starting this device over was cut short. Type your recovery phrase again to finish it; nothing more is removed until you do.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "phrase_label": {
+      "text": "Your recovery phrase",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "submit": {
+      "text": "Check the phrase",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "working": {
+      "text": "Starting this device over…",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "error_invalid": {
+      "text": "That is not a valid recovery phrase (24 words). Nothing was changed.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "error_other_phrase": {
+      "text": "This is another phrase than this device's. Nothing was changed.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "error_storage": {
+      "text": "Starting over did not finish. Start the app again: it goes on where it stopped.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "not_confirmed": {
+      "text": "Nothing was changed.",
+      "doc": "Web: the start-over page (ledger L1115): the phrase first and checked, the confirm, then the shared order."
+    },
+    "button": {
+      "text": "Start this device over from your phrase",
+      "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    },
+    "confirm_title": {
+      "text": "Start this device over?",
+      "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    },
+    "confirm_body": {
+      "text": "Everything Basis keeps on this device is removed, and your phrase sets it up again.\n\nWhat comes back: your circles and what is in them, from the other members; your own things, from your other devices.\n\nWhat is lost: whatever was only on this device and never reached another device or member (a message that was not sent yet, a draft, this device's own settings).",
+      "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    },
+    "confirm_no": {
+      "text": "Not now",
+      "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    },
+    "confirm_yes": {
+      "text": "Start over",
+      "doc": "The way out of a start that cannot read a key (ledger L1115): the second door after Try again; its confirm says what is lost and what comes back."
+    },
+    "confirm_unknown": {
+      "text": "This device cannot check that this phrase is its own. If it is another person's phrase, this device comes back as that person.",
+      "doc": "Start this device over (ledger L1115): said in the confirm when the device could not name its own root (an unreadable marker or key door): any valid phrase is taken."
+    },
+    "cancel_cleared_title": {
+      "text": "Stop starting over?",
+      "doc": "Start this device over (ledger L1115): cancel on a start-over cut short AFTER the device was cleared."
+    },
+    "cancel_cleared_body": {
+      "text": "Starting over stopped halfway here, so this device may already be cleared, in part or in full. Without your phrase it may start as a new person, with none of your circles. You can still restore your phrase later.",
+      "doc": "Start this device over (ledger L1115): cancel on ANY start-over cut short: a stop inside the clear leaves no sure sign of how far it got, so the device may come up as a new identity."
+    },
+    "cancel_cleared_yes": {
+      "text": "Start as a new person",
+      "doc": "Start this device over (ledger L1115): cancel on a start-over cut short after the clear: confirm."
+    },
+    "cancel_cleared_no": {
+      "text": "Back to the phrase",
+      "doc": "Start this device over (ledger L1115): cancel on a start-over cut short after the clear: go back."
+    },
+    "web_stays": {
+      "text": "Other things on this website (the public pages, a screen page paired with a toolbox) stay.",
+      "doc": "Web: the start-over confirm (ledger L1115): the clear takes only Basis's own storage by name; the rest of the origin stays."
+    },
+    "error_blocked": {
+      "text": "Basis is open in another tab. Close the other tabs and try again: nothing more was removed.",
+      "doc": "Web: the start-over page (ledger L1115): a database delete was blocked by another tab; the start-over stopped, its mark kept."
+    },
+    "error_cannot_list": {
+      "text": "This browser cannot list what Basis keeps here, so it cannot remove all of it. Nothing was removed. Use another browser, or clear this site's data in the browser's settings and then restore your phrase.",
+      "doc": "Web: the start-over page (ledger L1115): the browser has no indexedDB.databases(), so per-circle stores could not be found; refused before anything was touched."
+    }
+  },
   "boot_failed": {
     "text": "The app could not start ({{reason}}). Your data is still on this device — nothing here is empty, it is unread.",
     "doc": "Launcher: a failed agent boot is SAID where the person looks, instead of degrading into \"No circles yet.\" (the walk's W28/W29)."
@@ -10004,11 +10165,7 @@
     },
     "more_of": {
       "text": "More from {{shop}} ({{n}})",
-      "doc": "Telegram: the one button under a shop's photo cards that shows the rest of that shop's things (ledger L1035)."
-    },
-    "more_of_line": {
-      "text": "{{n}} more from this shop:",
-      "doc": "Telegram: the line the more_of button stands under."
+      "doc": "Telegram: the one button in the message under a shop's album of cards that shows the rest of that shop's things (ledger L1035)."
     },
     "refresh": {
       "text": "Refresh",
@@ -10512,6 +10669,8 @@
     "connected": "Connected to {{bot}}. This is your management screen: bookmark this page to come back to it. This screen can do this for you:",
     "run": "Do",
     "failed": "Connecting did not work: {{reason}}",
+    "key_unreadable": "This screen's own key in this browser could not be read, so it cannot connect. Nothing was changed. Forget it here and connect this screen again (a new /scherm link).",
+    "forget_key": "Forget this screen here",
     "not_a_link": "This link is not (or no longer) valid. Ask the bot for a new one: /scherm.",
     "refused": "Not connected: another code, or \"none of these\", was picked in your chat with the bot. Ask for a new link: /scherm.",
     "timed_out": "Not connected: no answer came within ten minutes. Ask for a new link: /scherm.",
@@ -10919,6 +11078,10 @@
         "text": "The app opens on",
         "doc": "A setting's label (projected from the parameter register)."
       },
+      "plus_middle": {
+        "text": "The middle of the +",
+        "doc": "A setting's label (projected from the parameter register): which round button sits on the '+''s own spot."
+      },
       "assistant_memoryDefault": {
         "text": "How much the assistant remembers of a conversation",
         "doc": "A setting's label (projected from the parameter register)."
@@ -11021,6 +11184,10 @@
       },
       "notify_policy_ask": {
         "text": "Notify: my open question in the room",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_role": {
+        "text": "Notify: my role in a circle changed",
         "doc": "A setting's label (projected from the parameter register)."
       }
     },
@@ -11225,7 +11392,14 @@
     "no_circles": "You are not in any circle yet.",
     "connection": "Connection",
     "my_data": "My data",
-    "devices_keys": "Devices & keys"
+    "notifications": "Notifications",
+    "assistant": "Assistant",
+    "devices": "Devices",
+    "recovery": "Recovery",
+    "back": {
+      "text": "← Settings",
+      "doc": "Back link from a settings group (and the Advanced screen) to the settings home."
+    }
   },
   "feedback": {
     "plus": {
@@ -11267,6 +11441,10 @@
     "removed": {
       "text": "You were removed from {{circle}}",
       "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "role": {
+      "text": "{{circle}}: {{change}}",
+      "doc": "'Nieuw voor jou': my role in a circle changed (made admin, or no longer); {{change}} is the membership notice's own sentence."
     },
     "many": {
       "text": "{{count}} new things in {{name}}",
@@ -11351,7 +11529,7 @@
       "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
     },
     "selves_body": {
-      "text": "You can have more than one persona, for example \"home\" and \"work\": a name, a photo and what you share about yourself. Per circle and per contact you choose which persona they see. Under Me you see who you are where.",
+      "text": "You can have more than one persona, for example \"home\" and \"work\": a name, a photo and what you share about yourself. Per circle and per contact you choose which persona they see. Behind the persona button (top right) you see who you are where.",
       "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
     },
     "nearby_title": {
@@ -11408,5 +11586,29 @@
       "text": "Just continue",
       "doc": "The first open: three doors the first time the app opens on a device (src/v2/firstOpen.js)."
     }
+  },
+  "persona_button": {
+    "settings": {
+      "text": "Settings",
+      "doc": "The settings button's spoken name (the gear beside the persona button, on every tab): it opens the settings home."
+    },
+    "label_with_state": {
+      "text": "Persona, {{state}}",
+      "doc": "The persona button's spoken name with the availability its coloured ring shows ({{state}}, the shared reading words), so the colour is never the only signal."
+    }
+  },
+  "persona_panel": {
+    "close": {
+      "text": "Close",
+      "doc": "The persona panel (behind the persona button): its close button."
+    },
+    "availability_row": {
+      "text": "{{state}} · tap to change",
+      "doc": "The persona panel: the one availability row, the state now ({{state}}, the shared reading words) and that a tap changes it; a tap opens the availability screen."
+    }
+  },
+  "back_to": {
+    "text": "← {{place}}",
+    "doc": "Back link to the tab the person came from, named by that tab (the settings home, share my card, shared with me)."
   }
 }

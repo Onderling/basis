@@ -21,6 +21,8 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 const ON_KEY = 'tools.on';
 const NAME = /^[a-z][a-z0-9-]{0,31}$/;
 const WORD = /^[a-zà-ÿ][a-zà-ÿ0-9-]{0,23}$/;
+/** An op of the household's door as a placed file names it: `app.op`. */
+const OP_ID = /^[a-z][a-zA-Z0-9-]{0,31}\.[a-zA-Z][a-zA-Z0-9-]{0,63}$/;
 
 /** A placed file as the operator wrote it, or null when it is not one (a bad name, address or words). */
 function readPlaced(p) {
@@ -30,10 +32,17 @@ function readPlaced(p) {
     .filter((w) => w && WORD.test(String(w.word ?? '').toLowerCase()) && typeof w.tool === 'string' && w.tool)
     .map((w) => ({
       word: String(w.word).toLowerCase(), tool: w.tool, ...(typeof w.field === 'string' && w.field ? { field: w.field } : {}),
+      // the phrases that fill a tool parameter ('bij AH' → stores: ['ah']), taken off the line by the gate rule
+      ...(() => { const s = readSlots(w.slots, typeof w.field === 'string' && w.field ? w.field : 'query'); return s.length ? { slots: s } : {}; })(),
       // what the word does, in a person's words per language (the operator's: 'zoekt producten'), for /help and the welcome
       ...(w.says && typeof w.says === 'object' ? { says: Object.fromEntries(Object.entries(w.says).filter(([, v]) => typeof v === 'string' && v.trim())) } : {}),
     }));
-  return { name, url: String(p.url), words };
+  // A TOOLBOX'S PAGE (L1113): the address where the operator placed its page (`page`, https only), and the ops of the
+  // household's door that page may use beside `tools.useTool` for this toolbox (`ops`, `app.op`, the OPERATOR's words:
+  // never read from the toolbox's own card). A page's grant is useTool + these, cut to the person's own role column.
+  const ops = [...new Set((Array.isArray(p?.ops) ? p.ops : []).map((o) => String(o ?? '').trim()).filter((o) => OP_ID.test(o) && o !== 'tools.useTool'))];
+  const page = /^https:\/\/[^\s/]+/.test(String(p?.page ?? '')) ? String(p.page) : null;
+  return { name, url: String(p.url), words, ...(ops.length ? { ops } : {}), ...(page ? { page } : {}) };
 }
 
 /**
@@ -44,8 +53,8 @@ function readPlaced(p) {
  * @param {Function} [a.fetch]
  * @param {(...a: unknown[]) => void} [a.log]   codes only
  */
-/** What the admin's yes covered: the placed address and words, as one comparable string (a change means a new yes). */
-const shownOf = (p) => JSON.stringify({ url: p.url, words: p.words });
+/** What the admin's yes covered: the placed address and words (and a page's address and ops), as one comparable string (a change means a new yes). */
+const shownOf = (p) => JSON.stringify({ url: p.url, words: p.words, ...(p.ops ? { ops: p.ops } : {}), ...(p.page ? { page: p.page } : {}) });
 /** The origin of a URL, or null. */
 const originOf = (u) => { try { return new URL(u).origin; } catch { return null; } };
 
@@ -67,6 +76,15 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
     async load() { await remember(await readOn()); },
     /** The words that reach a tool now (ON toolboxes only): `{word, tool, field?, toolbox, title}`. No key, no address. */
     wordsNow: () => words,
+    /**
+     * A toolbox's page, for the screen door (L1113): `{page, ops}` of a toolbox that is ON now and has a placed page,
+     * else null. `ops` are the operator's; the door cuts them to the person's role column.
+     */
+    pageOf: async (name) => {
+      const n = String(name ?? '').trim(); const live = (await readOn())[n]; const p = (await placed()).find((x) => x.name === n);
+      if (!live || !p || live.shown !== shownOf(p) || !p.page) return null;
+      return { page: p.page, ops: p.ops ?? [] };
+    },
     /** Is this toolbox on now (the egress gate asks before a call leaves)? */
     isOn: async (name) => {
       const n = String(name ?? '').trim(); const live = (await readOn())[n]; const p = (await placed()).find((x) => x.name === n);
@@ -153,6 +171,74 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
   };
 }
 
+const PARAM = /^[A-Za-z][A-Za-z0-9_-]{0,31}$/;
+
+/**
+ * A word's SLOTS as the operator placed them (`slots: [{param, list?, values: {value: [phrases]}}]`): the phrases that
+ * mean a value of a tool parameter ('bij albert heijn' → stores: ah). Cleaned: phrases lower case, spaces folded, at most
+ * 40 characters, 50 per value, 50 values and 5 slots; a slot without a param, with the word's own field as its param, or
+ * without any phrase is dropped. The toolbox's own data: Basis knows no shop.
+ */
+function readSlots(slots, field) {
+  const out = [];
+  for (const s of (Array.isArray(slots) ? slots : []).slice(0, 5)) {
+    const p = String(s?.param ?? '');
+    if (!PARAM.test(p) || p === field || !s.values || typeof s.values !== 'object' || Array.isArray(s.values)) continue;
+    const values = {};
+    for (const [value, phrases] of Object.entries(s.values).slice(0, 50)) {
+      const clean = [...new Set((Array.isArray(phrases) ? phrases : []).slice(0, 50).map((x) => String(x ?? '').normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim()).filter((x) => x && x.length <= 40))];
+      if (value && clean.length) values[value] = clean;
+    }
+    if (Object.keys(values).length) out.push({ param: p, ...(s.list === true ? { list: true } : {}), values });
+  }
+  return out;
+}
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const NOT_IN_WORD = '[\\p{L}\\p{N}]';
+
+/**
+ * Take a word's slot phrases off a line: a phrase counts only as whole words (any case) at the START or the END of the
+ * line, the longest first, again until none is left; one in the middle is part of the question ('koekjes bij ah bonus'),
+ * and one inside a longer word never matches ('bij ahornsiroop'). A phrase is not taken when nothing would be left to
+ * ask. A `list` slot gathers every value it found (`stores: ['jumbo', 'ah']`), a plain one keeps the first.
+ * @param {string} line
+ * @param {Array<{param: string, list?: boolean, values: Record<string, string[]>}>} [slots]
+ * @returns {{rest: string, filled: Record<string, string|string[]>}}
+ */
+export function takeSlots(line, slots) {
+  // one form for what was typed and what was placed (a combining accent typed is the precomposed one written)
+  let rest = String(line ?? '').normalize('NFC').replace(/\s+/g, ' ').trim();
+  const filled = {};
+  const phrases = (Array.isArray(slots) ? slots : []).flatMap((s) => Object.entries(s?.values ?? {}).flatMap(([value, ps]) => (Array.isArray(ps) ? ps : []).map((p) => ({ slot: s, value, phrase: String(p ?? '').normalize('NFC').trim() }))))
+    .filter((p) => p.phrase)
+    .sort((a, b) => b.phrase.length - a.phrase.length);
+  if (!phrases.length) return { rest, filled };
+  // a sentence's marks at either end ('bij ah?', 'bij Albert Heijn.') never hide a phrase
+  const edges = (s) => s.replace(/^[\s?.!,]+|[\s?.!,]+$/gu, '');
+  rest = edges(rest) || rest;
+  const fill = ({ slot, value }) => {
+    if (slot.list) { const had = Object.hasOwn(filled, slot.param) ? filled[slot.param] : []; if (!had.includes(value)) filled[slot.param] = [...had, value]; }
+    else if (!Object.hasOwn(filled, slot.param)) filled[slot.param] = value;
+  };
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const p of phrases) {
+      const body = p.phrase.split(' ').map(escapeRe).join('\\s+');
+      const lead = new RegExp(`^${body}(?!${NOT_IN_WORD})`, 'iu').exec(rest);
+      const tail = lead ? null : new RegExp(`(?<!${NOT_IN_WORD})${body}$`, 'iu').exec(rest);
+      const hit = lead ?? tail;
+      if (!hit) continue;
+      // a comma between the phrase and the question ('melk, bij jumbo') goes with the phrase
+      const left = edges(lead ? rest.slice(hit[0].length) : rest.slice(0, hit.index));
+      if (!left) continue;
+      rest = left; fill(p); changed = true;
+      break;
+    }
+  }
+  return { rest, filled };
+}
+
 /**
  * The deterministic gate's rule for a toolbox's words: a line that starts with a word the admin named (with or without
  * its slash) and asks something after it becomes `useTool`, the rest of the line in the tool's named field (`query`).
@@ -166,8 +252,9 @@ export function toolboxGateRule(getWords) {
     if (!m) return null;
     const w = (typeof getWords === 'function' ? getWords() : []).find((x) => x.word === m[1].toLowerCase());
     if (!w) return null;
-    const rest = m[2].replace(/\s+/g, ' ');
-    return { opId: 'useTool', appOrigin: 'tools', args: { toolbox: w.toolbox, tool: w.tool, input: { [w.field ?? 'query']: rest } } };
+    // the word's slots ('bij Albert Heijn' → stores: ['ah']) come off the line first; what is left is the question
+    const { rest, filled } = takeSlots(m[2].replace(/\s+/g, ' '), w.slots);
+    return { opId: 'useTool', appOrigin: 'tools', args: { toolbox: w.toolbox, tool: w.tool, input: { [w.field ?? 'query']: rest, ...filled } } };
   };
   return { name: 'tools:useTool(word)', test: (text) => Boolean(command(text)), command };
 }

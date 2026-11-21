@@ -63,13 +63,15 @@ const b64url = {
  * @param {string} [a.label]        what the view calls itself ("laptop", "keukentablet")
  * @returns {string} an `onderling-connect://…` URI
  */
-export function encodePairingOffer({ viewPubKey, relayUrl = null, nonce, label = null, toolbox = null } = {}) {
+export function encodePairingOffer({ viewPubKey, relayUrl = null, nonce, label = null, toolbox = null, ticket = null } = {}) {
   if (typeof viewPubKey !== 'string' || !viewPubKey) throw new Error('encodePairingOffer: viewPubKey required');
   if (typeof nonce !== 'string' || !nonce) throw new Error('encodePairingOffer: nonce required');
   return CONNECT_SCHEME + b64url.encode({
     v: 1, k: viewPubKey, ...(relayUrl ? { r: relayUrl } : {}), n: nonce, ...(label ? { l: label } : {}),
     // a toolbox's page names its toolbox: the grant is for that toolbox only (L1049)
     ...(toolbox ? { t: String(toolbox) } : {}),
+    // and hands back the one-use ticket its link carried: the bot reads the toolbox from that ticket, not from `t` (L1113)
+    ...(ticket ? { x: String(ticket) } : {}),
   });
 }
 
@@ -78,7 +80,7 @@ export function encodePairingOffer({ viewPubKey, relayUrl = null, nonce, label =
  * object, because a half-understood pairing offer is the kind of thing a UI would happily act on.
  *
  * @param {string} uri
- * @returns {{ok:true, viewPubKey:string, relayUrl:?string, nonce:string, label:?string, toolbox:?string}
+ * @returns {{ok:true, viewPubKey:string, relayUrl:?string, nonce:string, label:?string, toolbox:?string, ticket:?string}
  *          |{ok:false, reason:'not-a-connect-uri'|'unreadable'|'wrong-version'|'incomplete'}}
  */
 export function parsePairingOffer(uri) {
@@ -98,6 +100,7 @@ export function parsePairingOffer(uri) {
     nonce: body.n,
     label: typeof body.l === 'string' && body.l ? body.l : null,
     toolbox: typeof body.t === 'string' && body.t ? body.t : null,
+    ticket: typeof body.x === 'string' && body.x ? body.x : null,
   };
 }
 
@@ -128,4 +131,16 @@ export function acceptConnectionGrant(payload, { nonce, viewPubKey } = {}) {
     issuer: tokens[0].issuer,          // the owner's key — how the view learns whose screen it is
     label: payload.label ?? null,
   };
+}
+
+/**
+ * A line with a pairing offer or a screen start link in it, with their bodies cut (L1113): an offer carries the one-use
+ * ticket its link held, a start link the ticket itself. What a thread REMEMBERS and what the log keeps get this, never
+ * the line as typed.
+ * @param {string} text @returns {string}
+ */
+export function redactPairingSecrets(text) {
+  return String(text ?? '')
+    .replace(/onderling-connect:\/\/[A-Za-z0-9_-]+/g, 'onderling-connect://…')
+    .replace(/#scherm-nieuw=[A-Za-z0-9_-]+/g, '#scherm-nieuw=…');
 }

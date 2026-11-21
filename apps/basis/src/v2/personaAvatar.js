@@ -1,5 +1,5 @@
 /**
- * The header avatar (top-right on every tab): the active persona's picture — the `profilePicture` attribute, a sealed
+ * The persona button (top-right on every tab): the active persona's picture — the `profilePicture` attribute, a sealed
  * ref each shell opens with its own opener — or, without one, its initials. One loader both shells call; with one
  * persona the avatar is the person's, and a tap opens their own editor.
  */

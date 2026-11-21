@@ -71,10 +71,12 @@ const OVER_RATE_RESEND_PER_SEC = param({ key: 'transports.overRateResendPerSec',
 const OVER_RATE_MAX_ATTEMPTS = param({ key: 'transports.overRateMaxAttempts', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 });
 // THIS TRANSPORT PACES ITS OWN SENDS UNDER THE RELAY'S LIMIT (the start burst, 2026-11-20): the relay counts `send` frames per socket in
 // a token bucket (30 a second, a burst of 60, `relay.msgRatePerSec` / `relay.msgRateBurst`) and refuses what is over it.
-// This keeps its own bucket below that, so a start's burst is held here and sent as it allows, never refused there. A
+// This keeps its own bucket WELL below that, so a start's burst is held here and sent as it allows. Well below, because the
+// relay counts frames on ARRIVAL and paced writes can arrive bunched: on the Samsung at 25 a second with a burst of 50 a
+// cold start was still refused (76, 8); at 20 with a burst of 20 it was not (0, 0) bar one bunch over adb reverse. A
 // test pins that these stay at or under the relay's.
-const RELAY_SEND_PER_SEC = param({ key: 'transports.relaySendPerSec', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 25 });
-const RELAY_SEND_BURST = param({ key: 'transports.relaySendBurst', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 50 });
+const RELAY_SEND_PER_SEC = param({ key: 'transports.relaySendPerSec', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 20 });
+const RELAY_SEND_BURST = param({ key: 'transports.relaySendBurst', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 20 });
 /** The pace this transport keeps on `send` frames (for the agreement test with the relay's own limit). */
 export const RELAY_SEND_RATE = Object.freeze({ perSec: RELAY_SEND_PER_SEC, burst: RELAY_SEND_BURST });
 

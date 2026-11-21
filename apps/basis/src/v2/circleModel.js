@@ -12,6 +12,7 @@
 
 /** Normalise one circle-like raw item to a launcher tile, or null if it has no id. */
 import { isPairCircleId } from './pairCircleId.js';
+import { warmConversationKinds } from './conversationKinds.js';
 
 export function normalizeCircle(raw = {}) {
   const id = raw.id ?? raw.circleId ?? raw.circleId ?? raw.groupId ?? null;
@@ -76,14 +77,17 @@ function pickLatest(x, y) {
  * source is tolerated — it contributes nothing rather than breaking the
  * launcher. Result is sorted most-recent-activity first, then by name.
  */
-export async function loadCircles({ fetchTasksCircles, fetchGroups, fetchCircles } = {}) {
+export async function loadCircles({ fetchTasksCircles, fetchGroups, fetchCircles, policyStore = null } = {}) {
   const [tasksCircles, groups, circles] = await Promise.all([
     safe(fetchTasksCircles),
     safe(fetchGroups),
     safe(fetchCircles),
   ]);
   // A pair roster (a contact's, made automatically — `pairRoster.js`) is never a tile.
-  return mergeCircles(tasksCircles, groups, circles).filter((c) => !isPairCircleId(c?.id)).sort(byActivityThenName);
+  const list = mergeCircles(tasksCircles, groups, circles).filter((c) => !isPairCircleId(c?.id)).sort(byActivityThenName);
+  // each circle's conversation kinds known before a tile, Today or the assistant reads a line of it (one filter)
+  await warmConversationKinds(policyStore, list);
+  return list;
 }
 
 /**

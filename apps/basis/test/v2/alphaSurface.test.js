@@ -16,8 +16,8 @@ describe('alphaSurface', () => {
   it('both shells project the same alpha tabs, in manifest order, without the hidden ones', () => {
     const web = circleTabs(basisManifest).map((t) => t.id);
     const mobile = circleTabsMobile(basisManifest).map((t) => t.id);
-    // Vandaag (the screens tab) is the home since 2026-10-15: Vandaag · Kringen · Contacten · Mij
-    expect(web).toEqual(['screens', 'circles', 'contacten', 'mij']);
+    // Vandaag (the screens tab) is the home since 2026-10-15; Mij left the bar on 2026-11-20 (the persona panel)
+    expect(web).toEqual(['screens', 'circles', 'contacten']);
     expect(isAlphaTab('screens')).toBe(true);
     expect(mobile).toEqual(web);
     for (const id of HIDDEN_TABS) { expect(web).not.toContain(id); expect(isAlphaTab(id)).toBe(false); }

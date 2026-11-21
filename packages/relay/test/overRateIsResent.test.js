@@ -82,7 +82,9 @@ describe('a frame refused as over-rate', () => {
     const { url } = await relayAt({ perSec: 20, burst: 5 });
     const rx = await receiver(url);
     const seen = [];
-    const { tx } = await client(url, { onUndelivered: (i) => seen.push(i) });
+    // the transport's own pace is opened wide here: this is the backstop for a relay STRICTER than the pace (a burst
+    // the transport lets through at once is refused there and must still arrive, re-sent in its refusal order)
+    const { tx } = await client(url, { onUndelivered: (i) => seen.push(i), sendPace: { perSec: 1000, burst: N } });
     for (let n = 0; n < N; n += 1) await tx.sendOneWay(rx.tx.address, { n, msgId: `line-${n}`, subtype: 'circle-chat' });
     await waitFor(() => rx.got.length >= N, 20_000);
     expect(rx.got.length).toBe(N);

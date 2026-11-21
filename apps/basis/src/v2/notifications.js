@@ -12,11 +12,11 @@ import { param, PARAM_SCOPE, PARAM_KIND, VIEWER_FACING_SYSTEM_KINDS } from '@ond
 import { landedTimeOf } from '../eventLog.js';
 import { eventCircleId } from './circleStream.js';
 import { isItemLanding } from './itemLanding.js';
-import { countsAsUnread, pickText } from './circleTilePreviews.js';
+import { countsAsUnread, pickText, unreadOnAnyDevice } from './circleTilePreviews.js';
 import { policyChangeLines, policyChangeText, policyPatchBetween } from './policyChangeWords.js';
 import { isAskLive } from './nearbyAsks.js';
 import { itemKindChip, EMBED_TYPE_ICON } from './embedChips.js';
-import { membershipNoticeFor } from './membershipNotices.js';
+import { membershipNoticeFor, MEMBERSHIP_NOTICE_KEYS } from './membershipNotices.js';
 import { NOTIFY_WINDOW_DAYS } from './readMarks.js';
 
 /** A row whose arrival is this long after its sending says it came in later. */
@@ -34,6 +34,7 @@ export const FOR_YOU_KEYS = Object.freeze({
   dm:      'circle.forYou.dm',
   joined:  'circle.forYou.joined',
   removed: 'circle.forYou.removed',
+  role:    'circle.forYou.role',
   many:    'circle.forYou.many',
   late:    'circle.forYou.late',
   news:    'circle.forYou.news',
@@ -44,6 +45,38 @@ export const FOR_YOU_KEYS = Object.freeze({
   anAdmin: 'circle.forYou.an_admin',
   someone: 'circle.forYou.someone',
 });
+
+/**
+ * ADDRESSED TO ME — the one rule, per row kind, for what "Nieuw voor jou" on Vandaag holds; ordinary conversation in a
+ * circle is counted in "Kringen met nieuws" instead, so no thing shows in both (Frits 2026-11-19, option B):
+ *   dm       a direct message to me
+ *   assigned something assigned to me
+ *   ask      my own open question in the room (the answers arrive as direct messages)
+ *   joined   someone I admitted joined (the statement is addressed to its admitter: `membershipNoticeFor`)
+ *   removed  I was removed
+ *   role     my role changed (made admin, or no longer)
+ *   setting  a changed circle setting, only when it changes what I may do (a feature on or off, a rule's option); a
+ *            change the settings screen only counts ("and N other changes": a name, a colour) is not
+ *   line, item  conversation in the circle: not addressed. A REPLY TO ME would be, but a circle line carries no
+ *            reference to the line it answers and no mention, so a reply stays a line (an open question, not guessed
+ *            from the words)
+ * @param {{kind?: string, mayDo?: boolean}|null} row   a row of `notificationRows`
+ */
+export function isAddressedToMe(row) {
+  const kind = row?.kind;
+  if (kind === 'setting') return row.mayDo === true;
+  return ADDRESSED_KINDS.has(kind);
+}
+const ADDRESSED_KINDS = new Set(['dm', 'assigned', 'ask', 'joined', 'removed', 'role']);
+
+/**
+ * The row kind a counted circle event becomes (an event `countsAsUnread` passes): something assigned to me, an item that
+ * landed, a line. What lets the circle block leave out what "Nieuw voor jou" holds, by the same predicate.
+ */
+export function newsKindOf(event) {
+  if (isItemLanding(event)) return event.payload?.reason === 'assigned' ? 'assigned' : 'item';
+  return 'line';
+}
 
 const clip = (s) => { const x = String(s ?? '').replace(/\s+/g, ' ').trim(); return x.length > MAX_TEXT ? `${x.slice(0, MAX_TEXT - 1).trimEnd()}…` : x; };
 
@@ -60,6 +93,7 @@ const clip = (s) => { const x = String(s ?? '').replace(/\s+/g, ' ').trim(); ret
  * @param {number} [a.now]
  * @param {number} [a.windowDays]
  * @param {(kind: string) => boolean} [a.keepKind]  false drops the kind (the person set it to off)
+ * @param {(row: object) => boolean} [a.keepRow]  false drops the row (Vandaag keeps only what `isAddressedToMe`)
  * @param {Array<{ask: object, heard?: number}>} [a.asks]  my live asks in the Nearby room (the room binding's `myAsks()`)
  * @param {(circleId: string, ref: string) => string|null} [a.actorLabel]  who someone is in a circle (the roster's label)
  * @param {boolean} [a.fold]  false: one row per thing, no folding (the banner reads them one by one)
@@ -69,13 +103,14 @@ const clip = (s) => { const x = String(s ?? '').replace(/\s+/g, ' ').trim(); ret
  */
 export function notificationRows({
   events = [], turns = [], circles = [], contactName = null, viewerIdIn = null, myRefs = [], readIds = null, t,
-  now = Date.now(), windowDays = NOTIFY_WINDOW_DAYS, selfOf = null, fold = true, keepKind = null, asks = [], actorLabel = null,
+  now = Date.now(), windowDays = NOTIFY_WINDOW_DAYS, selfOf = null, fold = true, keepKind = null, keepRow = null, asks = [], actorLabel = null,
 } = {}) {
   if (typeof t !== 'function') return [];
   const mine = new Set(myRefs ?? []);
   const shown = new Map((circles ?? []).filter((c) => c?.id).map((c) => [c.id, c.name ?? null]));
   const since = now - (Number.isFinite(windowDays) && windowDays > 0 ? windowDays : NOTIFY_WINDOW_DAYS) * DAY_MS;
-  const fresh = (at, id) => at >= since && !(readIds && readIds.has(id));
+  // the one read rule, the circle block's too: inside the window, read on none of my devices
+  const fresh = (at, id) => unreadOnAnyDevice({ id, landedAt: at }, { readIds, since });
   const rows = [];
   const selfFor = (group) => (typeof selfOf === 'function' ? (selfOf(group) ?? null) : null);
   const push = (r) => rows.push({ ...r, self: selfFor(r.group), late: r.saidAt > 0 && r.at - r.saidAt > LATE_AFTER_MS, ids: [{ id: r.id, at: r.saidAt || r.at }] });
@@ -105,8 +140,10 @@ export function notificationRows({
       const id = landing ? e.payload.itemId : e.id;
       if (!fresh(at, id)) continue;
       const chip = itemKindChip(landing ? e.payload.kind : (e.payload?.kind ?? null));
-      if (landing && e.payload.reason === 'assigned') {
-        // a task given to me (`assignedEntryFor`): its own row, read by the entry's id (one per assignment)
+      if (newsKindOf(e) === 'assigned') {
+        // a task given to me (`assignedEntryFor`): its own row, read by the entry's id (one per assignment) — the row's
+        // mark clears it, as does opening the circle (which marks the task's own id, above)
+        if (!fresh(at, e.id)) continue;
         push({ id: e.id, kind: 'assigned', group, open, icon: chip?.icon ?? '✅', at, saidAt: e.payload.saidAt ?? 0,
           text: t(FOR_YOU_KEYS.assigned, { circle: group.name ?? '' }) });
         continue;
@@ -136,7 +173,14 @@ export function notificationRows({
       const isMe = (ref) => typeof ref === 'string' && (ref === viewerId || mine.has(ref));
       const asViewer = body && isMe(body.author) ? body.author : (body && isMe(body.subject) ? body.subject : viewerId);
       const hit = asViewer ? membershipNoticeFor(body, { viewerId: asViewer }) : null;
-      if (!hit || !['joined', 'removed', 'removedWithReason'].includes(hit.notice) || !fresh(at, e.id)) continue;
+      if (!hit || !fresh(at, e.id)) continue;
+      // MY ROLE CHANGED (made admin, or no longer): a statement about me by someone else
+      if ((hit.notice === 'promoted' || hit.notice === 'demoted') && !isMe(body.author)) {
+        push({ id: e.id, kind: 'role', group, open, icon: '🔑', at, saidAt: typeof e.ts === 'number' ? e.ts : 0,
+          text: t(FOR_YOU_KEYS.role, { circle: group.name ?? '', change: t(MEMBERSHIP_NOTICE_KEYS[hit.notice]) }) });
+        continue;
+      }
+      if (!['joined', 'removed', 'removedWithReason'].includes(hit.notice)) continue;
       if (hit.notice === 'joined' && isMe(body.subject)) continue;
       const kind = hit.notice === 'joined' ? 'joined' : 'removed';
       if (kind === 'joined' && typeof body.payload?.peerDisplay === 'string' && body.payload.peerDisplay) hit.args = { ...(hit.args ?? {}), name: body.payload.peerDisplay };   // the handle they presented, never their id
@@ -158,7 +202,9 @@ export function notificationRows({
       if (mine.has(body.author) || !fresh(at, e.id)) continue;
       const lines = policyChangeLines(policyPatchBetween(byVersion[i - 1].e.payload.body.payload?.policy, body.payload?.policy));
       if (!lines.length) continue;
-      push({ id: e.id, kind: 'setting', group, open, icon: '⚙️', at, saidAt: typeof e.ts === 'number' ? e.ts : 0,
+      // what I may do changed when a line names a feature or a rule's option; "N other changes" alone does not say so
+      const mayDo = lines.some((l) => l.key !== 'circle.settings.change_other');
+      push({ id: e.id, kind: 'setting', mayDo, group, open, icon: '⚙️', at, saidAt: typeof e.ts === 'number' ? e.ts : 0,
         text: t(FOR_YOU_KEYS.setting, { who: (typeof actorLabel === 'function' ? actorLabel(group.id, body.author) : null) ?? t(FOR_YOU_KEYS.anAdmin), circle: group.name ?? '', change: policyChangeText(lines, t) }) });
     }
   }
@@ -169,8 +215,8 @@ export function notificationRows({
     const ask = entry?.ask;
     if (!ask?.id || !isAskLive(ask, () => now)) continue;
     const id = `ask:${ask.id}`;
-    if (readIds && readIds.has(id)) continue;
     const at = Number.isFinite(ask.createdAt) ? ask.createdAt : now;
+    if (!unreadOnAnyDevice({ id, landedAt: at }, { readIds })) continue;   // a live ask is shown however old: no window
     push({ id, kind: 'ask', group: { kind: 'nearby', id: 'room', name: null }, open: { kind: 'nearby', id: 'room' }, icon: '🙋', at, saidAt: at,
       text: t(FOR_YOU_KEYS.ask, { text: clip(ask.text ?? ''), heard: Number.isFinite(entry.heard) ? entry.heard : 0 }) });
   }
@@ -189,7 +235,11 @@ export function notificationRows({
   // newest arrival first; more than FOLD_AFTER rows of one group fold into one row with a count
   rows.sort((a, b) => b.at - a.at);
   // the person's table: a kind set to off is no row at all (filtered before folding, so a count never includes it)
-  if (typeof keepKind === 'function') { for (let i = rows.length - 1; i >= 0; i -= 1) if (!keepKind(rows[i].kind)) rows.splice(i, 1); }
+  if (typeof keepKind === 'function' || typeof keepRow === 'function') {
+    for (let i = rows.length - 1; i >= 0; i -= 1) {
+      if ((typeof keepKind === 'function' && !keepKind(rows[i].kind)) || (typeof keepRow === 'function' && !keepRow(rows[i]))) rows.splice(i, 1);
+    }
+  }
   if (!fold) return rows;
   const byGroup = new Map();
   for (const r of rows) {

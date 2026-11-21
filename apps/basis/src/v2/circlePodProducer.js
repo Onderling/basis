@@ -166,11 +166,16 @@ export async function createCirclePodProducer({
   // persistent backend / real pod is the durability follow-up).
   const ckKey = `${controllerKeyPrefix}:${circleId}`;
   let controllerKey = null;
-  const stored = await vault.get(ckKey);
-  if (stored) { try { controllerKey = JSON.parse(stored); } catch { controllerKey = null; } }
-  if (!controllerKey?.publicKey || !controllerKey?.privateKey) {
+  const stored = await vault.get(ckKey);   // a read that fails throws through: never "absent"
+  if (stored == null || stored === '') {
     controllerKey = generateKeypair();
     await vault.set(ckKey, JSON.stringify(controllerKey));
+  } else {
+    // there, but not a keypair: NOT replaced (the group key is wrapped to it); the circle's producer is not built (L1115)
+    try { controllerKey = typeof stored === 'string' ? JSON.parse(stored) : stored; } catch { controllerKey = null; }
+    if (!controllerKey?.publicKey || !controllerKey?.privateKey) {
+      throw Object.assign(new Error(`The circle's controller key on this device could not be read; nothing was changed (${circleId})`), { code: 'key-unreadable', what: 'controller-key' });
+    }
   }
 
   const podClient = await makePodClient(circleId);

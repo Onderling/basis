@@ -2194,3 +2194,69 @@ shape it cannot know.
 
 **Consequences:** `docs/catalogue/tools.md`. A screen holds no content key, so what it keeps in the browser is a bearer
 credential; that is why a toolbox's page lives on an origin of its own (the entry above).
+
+---
+
+## 2026-11-20 — A toolbox's page may be served from the box itself: localhost only, entered with a one-use entry from the bot's link (Frits decided the reach; Fable ruled the shape)
+
+**Status:** decided; the page server and the entry built (`apps/basis/src/v2/toolboxPages.js`); the https server in
+front, its certificate and the address on the home network are the operator's and not built.
+
+**Context:** a toolbox's page needs https (its client uses the browser's `crypto.subtle`) and should be reachable on the
+home network only, by the people of the household only. Until now the box opened no port at all.
+
+**Decision:** the box serves a placed toolbox's page from `<data-dir>/toolboxes/<name>/page/`, on 127.0.0.1 only and
+only while that toolbox is on; an https server in front, run by the operator, is what the home network reaches. The
+link `/scherm <toolbox>` sends carries an ENTRY in its query beside the pairing ticket in its fragment, made together and
+equally short-lived, but only when the box serves that page itself. The page server spends the entry once into a cookie
+for that toolbox's path (`HttpOnly; Secure; SameSite=Strict`, 30 days) and asks on every request whether the person is
+still in the household and their role may use the toolbox. Entries and cookies are rows in a sealed store of the box,
+removed when the person is revoked or the toolbox switched off. They decide only who may load the page's files; the
+page's data still comes only through its paired grant.
+
+**Alternatives / why:** *serving on the home network directly* needs a certificate in the box's own process and opens a
+port before anything checks it. *The ticket alone* would put the pairing secret in the server's request line and logs;
+the fragment keeps it in the browser. *A cookie without a server-side row* could not be ended when a person leaves.
+*An entry for every placed page* would hand a working secret to a host that is not this box.
+
+**Consequences:** `docs/catalogue/tools.md`. One origin per toolbox (the entry of 2026-11-19) is the front server's to
+give (one name or one port per toolbox); the box's page server routes by path and cannot enforce it.
+
+---
+
+## 2026-11-20 — A toolbox's cards: an album per shop with one message under it; slot words in the operator's file (Frits said yes to all three; Fable shaped them)
+
+**Status:** settled and built (`thingCards.js`, `fetchThumbs`, `takeSlots` in `apps/basis/src/v2/`).
+
+**Context:** Frits's first look in Telegram: few pictures, the photos drawn huge (a lone photo is drawn at the chat's
+width), and `zoek hagelslag bij Albert Heijn` found a gift card because the whole line went on as the query.
+
+**Decision:** the box fetches pictures for the rows shown as cards first (3 per shop), within the existing caps. Per
+shop a door that shows pictures sends ONE group of pictures (Telegram: an album) and ONE message with the numbered
+lines and the buttons, since an album carries no buttons; fewer than two pictures send no group. The shared model
+(`thingCardGroups`) decides; a door only sends. Phrases that fill a tool parameter are SLOTS on a word in the
+operator's placed file (`slots: [{param, list?, values: {value: [phrases]}}]`), taken off the line only as whole words
+at its start or end, longest first; Basis knows no shop.
+
+**Alternatives / why:** *one photo per card* is what came out huge. *One picture alone* when a shop has one is drawn
+huge too; the words carry it. *The slots on the toolbox's card* would let the toolbox decide what the door hears; the
+words are the operator's, so their slots are too. *A phrase anywhere in the line* takes 'bij ah' out of 'koekjes bij ah
+bonus'.
+
+## 2026-11-20 — A circle's settings changes are kept for good; the rest of the governance lane still compacts (Fable ruled, on Opus's finding)
+
+**Decision:** a `policy-update` statement on the governance lane is RECORD class: it never expires, while rules changes,
+proposals and votes on the same lane keep their audit window and compact into the summary. The exception is one declared
+table (`RECORD_STATEMENTS` in `@onderling/item-store`'s `entryKinds.js`), read by the event log's prune through
+`retentionOfEntry`; the governance catch-up serves those statements first, so a joiner or a long-away device gets the
+whole settings history, never a head alone.
+
+**Why:** a circle's switches bind on every member's device by judging a content statement under the settings in force
+when it was made (the content line: each settings change names the content lanes' tips). With the changes compacted
+after 14 days, "which settings applied" became unknowable for anything older, and the circle's creation settings (the
+first change) lived nowhere durable. A settings change holds no content: the settings, the version, its author, the
+proposal that decided it, and the lanes' tips. They are rare and small.
+
+**Alternatives:** *keep the head only* (as before) cannot place a line. *Make the whole governance lane record* keeps
+every vote forever for no reader. **Not migrated:** circles whose older changes already compacted keep what they hold
+(fresh circles before the alpha); a device holding only a head treats everything older as unknown.

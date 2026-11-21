@@ -12,6 +12,14 @@
 #   /data/assistant/toolboxes/<name>.json   {"name": "<name>", "url": "http://<container>:<port>",
 #                                            "words": [{"word": "zoek", "tool": "products.choices", "field": "query",
 #                                                       "says": {"nl": "zoekt producten bij Boodschappen", "en": "finds products at Boodschappen"}}]}
+#   A word may carry SLOTS: phrases that fill a parameter of its tool, taken off the question when they stand at its
+#   start or end as whole words (any case, the longest first; never from inside a product name). `list: true` sends
+#   the values as a list. E.g. on the word above, so `zoek hagelslag bij Albert Heijn` asks
+#   {"query": "hagelslag", "stores": ["ah"]}:
+#                                            "slots": [{"param": "stores", "list": true,
+#                                                       "values": {"ah": ["bij albert heijn", "bij ah"], "jumbo": ["bij jumbo"]}}]
+#   The values are the toolbox's own (Basis knows no shop). Changing a word or its slots switches the toolbox off until
+#   the admin's next yes, like any change to the file.
 #   /data/assistant/toolboxes/<name>.key    the toolbox's bearer key, one line (or the env value TOOLBOX_KEY_<NAME>,
 #                                           which then has to be listed under `environment:` below)
 # A placed toolbox is OFF until the household's admin says yes in their own private chat (`/toolbox <name> aan`).

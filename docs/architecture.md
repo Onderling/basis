@@ -1240,6 +1240,16 @@ this device's own ask, is judged only by its app being on, and goes through the 
 the circle's conversation kinds, a view filter every reader asks. What this does not bind is named in
 [enforceability.md](conventions/enforceability.md).
 
+**Whose item it is binds on every member's device too** (2026-11-21). Each item type declares who may change and remove
+a row (`changedBy` on its schema, `packages/item-types/src/canonical.js`): `author` (the member who added it, and any
+admin: a post, a note, an ask, a message) or `circle` (any member: a list and its entries, a task, an appointment); a
+type with none counts as `author`, and a test is red for a canonical type without one. The maker of record is `madeBy`:
+the verified author of the statement that added the row (the circle-scoped ref the items lane checked), stamped by the
+store on a local new row with the lane's own signing ref and set by every receiver from that statement; `createdBy`
+stays the writer's own id, for display. On arrival a change must keep the held `madeBy`, and for an `author` type a
+change or a removal is taken only from the maker or an admin (`itemsRail.js`, `whoseRefusal`). A served catch-up head
+is not an act; a row whose maker is not known here takes any member's change (`docs/conventions/enforceability.md`).
+
 Anything that must be *agreed* is computed identically everywhere (the tally, the caretaker), never decided
 locally — the same discipline the hash-chain enforces. Full record: [decisions.md](decisions.md) (2026-07-25).
 

@@ -63,6 +63,12 @@ It is also a useful design tool. Asking the question tells you *where the gate a
     kind the circle has off (a ping, nothing shows). A circle whose settings a device does not know yet filters
     nothing until they arrive. The record of each circle's conversation kinds is held per process (a box running
     several agents shares it).
+- **Whose item it is binds on the receiving device** (`madeBy`, `changedBy`): a member's device that skips its own
+  check cannot change or remove another member's note, post or ask on anyone else's device. What is left: a row whose
+  maker is not known there (made before makers were kept, or served by catch-up without one) takes any member's change
+  (lenient on purpose for the alpha: strict would refuse honest edits of old rows on a late joiner); an admin is judged
+  by the roster as it stands, not at the statement's own place; a served head carries the maker as the serving member
+  holds it (`apps/basis/src/v2/itemsRail.js`).
 
 ## The inverse failure
 

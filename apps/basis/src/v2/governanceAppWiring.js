@@ -7,6 +7,7 @@
  * `governance` (payload = the event); the full membership is assembled from the roster op
  * plus this device's own row (listGroupRoster excludes the caller).
  */
+import { causalOrder } from '@onderling/core';
 import { selfRefIn } from './selfRef.js';
 import { makeCircleGovernance } from './governanceHost.js';
 import { removeCircleMember } from './circleMembershipHygiene.js';
@@ -223,7 +224,8 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
   const readReportEvents = async (circleId) => {
     let bodies = [];
     try { ({ bodies = [] } = await rail.readVerifiedBodies(circleId)); } catch { return []; }
-    return bodies.filter((b) => isReportStatementKind(b?.kind)).map(reportEventOf).filter(Boolean);
+    // in causal order: the fold's last resolution wins, and the log reads newest-first
+    return causalOrder(bodies.filter((b) => isReportStatementKind(b?.kind))).map(reportEventOf).filter(Boolean);
   };
   // The circle's ADMIN refs — who a report may be shown to. Read from the same membership the governance
   // fold uses, so "admin" means one thing in this file.

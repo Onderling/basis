@@ -28,7 +28,7 @@
  * only when the previous round actually landed something new (the no-progress guard, so two peers that
  * have diverged beyond each other's windows never ping-pong).
  */
-import { frontier } from '@onderling/core';
+import { frontier, causalOrder } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { chunkItems, DEFAULT_CHUNK_SIZE } from './chunking.js';
 import { catchUpTargets } from './catchUpTargets.js';
@@ -145,7 +145,12 @@ export function makeFrontierReplay({
       const known = reachableFrom(payload.frontier, all);
       // only what this device can still vouch for (checked here, now): an unchecked one would be refused there and
       // leave the receiver a hole it cannot explain
-      const missing = sendOnOnlyChecked(all.filter((s) => s?.body?.hash && !known.has(s.body.hash)), circleId, rail);
+      // OLDEST FIRST by the statements' own causal links, never the log's reading order (the device log reads
+      // newest-first): a remove served before its add would let the add put the row back, and the round cap below
+      // must keep the earliest, not the newest
+      const unsent = all.filter((s) => s?.body?.hash && !known.has(s.body.hash));
+      const atBody = new Map(unsent.map((s) => [s.body, s]));
+      const missing = sendOnOnlyChecked(causalOrder(unsent.map((s) => s.body)).map((b) => atBody.get(b)), circleId, rail);
       // nothing to serve: say so — an empty answer, so the asker can tell "nothing new" from "not reached" (it widens only
       // on silence); an older asker reads it as a batch that landed nothing and stops paging, as before
       if (missing.length === 0) {

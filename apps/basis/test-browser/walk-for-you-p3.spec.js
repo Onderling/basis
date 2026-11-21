@@ -1,6 +1,7 @@
 /**
  * "Nieuw voor jou", the rows that are not posts or lines, two real apps over the relay:
- *   1. A (admin) changes a circle setting: B gets "Een beheerder veranderde <circle>: …".
+ *   1. A (admin) changes a circle setting (the calendar on/off, a switch step 2 does not depend on): B gets
+ *      "Een beheerder veranderde <circle>: …".
  *   2. A gives B a task: B gets "Een taak in <circle> is nu van jou"; A renaming it afterwards adds nothing.
  *
  *   PEER_TEST_PORT=5273 PEER_TEST_RELAY=ws://127.0.0.1:8797 npx playwright test --project=relay test-browser/walk-for-you-p3.spec.js
@@ -30,12 +31,15 @@ test('a setting someone else changed, and a task given to me, are rows; a rename
     const gid = (await surface(A.page))?.where?.circleId ?? null;
     expect(gid).toBeTruthy();
 
-    // 1 · A changes a setting and states it on the lane, as a settings save does
+    // 1 · A changes a setting and states it on the lane, as a settings save does. The setting is the calendar, NOT tasks:
+    // a fresh circle has tasks on, and B judges each arriving item against the circle's switches, so turning tasks off
+    // here makes B rightly refuse step 2's task (verdict `app-disabled`). Step 2 needs tasks on; it is checked below.
     const before = await A.page.evaluate((cid) => window.onderlingCirclePolicy.get(cid), gid);
-    const on = Boolean(before?.features?.tasks);
+    expect(before?.features?.tasks, `tasks on in a fresh circle: ${JSON.stringify(before?.features)}`).toBe(true);
+    const on = Boolean(before?.features?.calendar);
     await A.page.evaluate(async ([cid, flip]) => {
       const cur = await window.onderlingCirclePolicy.get(cid);
-      await window.onderlingCirclePolicy.update(cid, { features: { ...(cur?.features ?? {}), tasks: flip } });
+      await window.onderlingCirclePolicy.update(cid, { features: { ...(cur?.features ?? {}), calendar: flip } });
       await window.onderlingCirclePolicy.state(cid);
     }, [gid, !on]);
     await expect.poll(() => forYou(B.page), { timeout: 90_000, message: 'B: a setting row' }).toContainEqual(expect.stringMatching(/^setting\|/));

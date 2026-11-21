@@ -61,7 +61,9 @@ export function fileStorageBackend(dir) {
  * @param {string} dir
  */
 export function boxDeviceLogIo(dir, { legacyFile = null } = {}) {
-  const io = backendSnapshotIo(sealedLocalBackend(fileStorageBackend(dir), { scope: dir }));
+  // the refusal marks by the folder; the name sealed into each row is the device log's own, as on web and phone, so a
+  // data folder restored elsewhere still opens
+  const io = backendSnapshotIo(sealedLocalBackend(fileStorageBackend(dir), { scope: dir, name: 'cc-device-log' }));
   if (!legacyFile) return io;
   // THE ONE-TIME IMPORT of the plain `device-log.json` a box kept before this: the device log is the record its
   // lanes and memberships ride, and a box that came up without it would return to its circles as if it had never

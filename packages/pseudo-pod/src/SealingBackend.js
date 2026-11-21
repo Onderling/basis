@@ -67,9 +67,10 @@ const UNOPENED_BY_NAME = new Map();
  *   resolves this device's content-seal strategy, or null while none is available (no identity yet).
  * @param {(msg: string, err?: unknown) => void} [a.onWarn]  where an unopenable value is reported.
  * @param {string} [a.markScope]  the storage's own name, so the refusal outlives a new wrapper over the same storage
+ * @param {string} [a.bindName]  the name sealed into each row (default `markScope`): stable across a moved folder
  * @returns {object} the same port, sealed
  */
-export function createSealingBackend({ backend, getStrategy, onWarn = null, markScope = null } = {}) {
+export function createSealingBackend({ backend, getStrategy, onWarn = null, markScope = null, bindName = null } = {}) {
   if (!backend || typeof backend.put !== 'function' || typeof backend.get !== 'function') {
     throw new Error('createSealingBackend: a StorageBackend (put/get/list) is required');
   }
@@ -123,6 +124,36 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null, mark
     return `${TAGS.JSON}${JSON.stringify(value)}`;
   }
 
+  // A ROW OPENS ONLY UNDER ITS OWN ID, IN ITS OWN STORE: the store's name (`markScope`) and the row's ref are sealed
+  // inside the row (`onderling-row1\n<scope length>:<scope><ref length>:<ref>\n` before the tagged value), so a row's
+  // sealed body put under another id, or carried from another store, does not open here. A row sealed before this
+  // (unbound) or written plain is the upgrade's: read on an older content key, refused on one minted since
+  // (`plainRefused` on the strategy, the same rule as the sealed key-value stores). Not rewritten on a read (a backend
+  // write can mark the row for sync): it is bound at its next write.
+  const BOUND = 'onderling-row1\n';
+  // the store's name sealed into each row: `bindName` when the mark's scope is not a stable name (a folder path that a
+  // restore may move), else the mark's scope
+  const scopeName = typeof bindName === 'string' ? bindName : (typeof markScope === 'string' ? markScope : '');
+  const bindRow = (ref, text) => `${BOUND}${scopeName.length}:${scopeName}${String(ref).length}:${ref}\n${text}`;
+  /** The tagged text of a row opened for `ref`, or `{ refused }` when it was sealed for another row or store. */
+  function unbindRow(ref, opened) {
+    if (!opened.startsWith(BOUND)) return { unbound: true, text: opened };
+    let rest = opened.slice(BOUND.length);
+    const take = () => {
+      const c = rest.indexOf(':');
+      const n = c > 0 ? Number(rest.slice(0, c)) : NaN;
+      if (!Number.isInteger(n) || n < 0) return null;
+      const v = rest.slice(c + 1, c + 1 + n);
+      rest = rest.slice(c + 1 + n);
+      return v;
+    };
+    const scope = take();
+    const at = take();
+    if (scope === null || at === null || !rest.startsWith('\n')) return { refused: true };
+    if (scope !== scopeName || at !== String(ref)) return { refused: true };
+    return { text: rest.slice(1) };
+  }
+
   function decode(text) {
     const tag = text.slice(0, 1);
     const rest = text.slice(1);
@@ -150,7 +181,7 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null, mark
       refuseOverUnopened(ref);
       const s = await strategy();
       if (!s) throw new Error(`SealingBackend: refusing to store "${ref}" unsealed — no content key yet`);
-      return backend.put(ref, s.seal(encode(bytes)), ...rest);
+      return backend.put(ref, s.seal(bindRow(ref, encode(bytes))), ...rest);
     },
 
     /** The compare-and-swap write — sealed exactly as `put` (forwarding it verbatim would store plain text). */
@@ -158,7 +189,7 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null, mark
       refuseOverUnopened(ref);
       const s = await strategy();
       if (!s) throw new Error(`SealingBackend: refusing to store "${ref}" unsealed — no content key yet`);
-      const sealed = s.seal(encode(bytes));
+      const sealed = s.seal(bindRow(ref, encode(bytes)));
       if (typeof backend.putIf === 'function') return backend.putIf(ref, sealed, ifMatch);
       const cur = await backend.get(ref);
       if ((cur?.etag ?? null) !== ifMatch) return { conflict: true };
@@ -219,7 +250,15 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null, mark
         // would have its first character eaten as a tag. Nothing stored here starts that way today (these
         // are JSON bodies), which is precisely why it would have sat unnoticed until something did.
         const openedText = s.open(carried);
-        const opened = openedText === carried ? carried : decode(openedText);
+        const plain = openedText === carried;
+        const row = plain ? { unbound: true, text: carried } : unbindRow(ref, openedText);
+        // another row's or another store's body, or (on a key minted since) a plain or unbound one: not this row's
+        if (row.refused || (row.unbound && s.plainRefused === true)) {
+          warn(`[at-rest] ${ref}: a stored record that is not this row's (another id or store, or plain on a new key); kept, not written over`, null);
+          unopened.add(ref);
+          return null;
+        }
+        const opened = plain ? carried : decode(row.text);
         unopened.delete(ref);
         return (rec && typeof rec === 'object' && 'bytes' in rec) ? { ...rec, bytes: opened } : opened;
       } catch (err) {

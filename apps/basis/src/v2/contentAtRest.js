@@ -39,6 +39,12 @@ import { KeyUnreadable, isKeyUnreadable } from '../core/agent/keyUnreadable.js';
 /** The reserved vault entry holding this device's content key. */
 export const CONTENT_AT_REST_VAULT_KEY = 'content-at-rest-key';
 
+// THE KEY'S OWN RECORD SAYS WHETHER A PLAIN VALUE CAN BE GENUINE HERE. A key minted from now on is stored as
+// `kv1:<key>`: this device has never written a plain or unbound value into a sealed store, so one found there was
+// planted and is refused. A bare key is an older one, whose plain values are the upgrade's (read once, rewritten sealed
+// and bound). The mark is part of the key's own entry, so it cannot be deleted alone to make the device read as old.
+const KEY_FORM_PLAIN_REFUSED = 'kv1:';
+
 /** 32 random bytes, from whichever CSPRNG this platform has. Never `Math.random` — this is a key. */
 function randomContentKey() {
   const out = new Uint8Array(32);
@@ -75,17 +81,31 @@ export const isContentKeyUnreadable = isKeyUnreadable;
  * @returns {Promise<string>} the key as b64url, the form `groupKeyStrategy` takes.
  */
 export async function ensureContentKey(sealedVault) {
+  return (await ensureContentKeyRecord(sealedVault)).key;
+}
+
+/**
+ * The content key and what its record says: `plainRefused` true for a key minted with the form mark (this build on),
+ * false for a bare, older key. Same minting rule as `ensureContentKey`.
+ * @returns {Promise<{key: string, plainRefused: boolean}>}
+ */
+export async function ensureContentKeyRecord(sealedVault) {
   if (!sealedVault || typeof sealedVault.get !== 'function' || typeof sealedVault.set !== 'function') {
     throw new Error('ensureContentKey: a sealed vault is required');
   }
   let existing;
   try { existing = await sealedVault.get(CONTENT_AT_REST_VAULT_KEY); }
   catch (err) { throw new ContentKeyUnreadable(err); }
-  if (typeof existing === 'string' && existing.length > 0) return existing;
+  if (typeof existing === 'string' && existing.length > 0) {
+    if (!existing.startsWith(KEY_FORM_PLAIN_REFUSED)) return { key: existing, plainRefused: false };
+    const key = existing.slice(KEY_FORM_PLAIN_REFUSED.length);
+    if (!key) throw new ContentKeyUnreadable();
+    return { key, plainRefused: true };
+  }
   if (existing != null && existing !== '') throw new ContentKeyUnreadable();
   const minted = seedToString(randomContentKey());
-  await sealedVault.set(CONTENT_AT_REST_VAULT_KEY, minted);
-  return minted;
+  await sealedVault.set(CONTENT_AT_REST_VAULT_KEY, `${KEY_FORM_PLAIN_REFUSED}${minted}`);
+  return { key: minted, plainRefused: true };
 }
 
 /**
@@ -96,8 +116,9 @@ export async function ensureContentKey(sealedVault) {
  * noise, and nothing has to walk a live store at boot.
  *
  * @param {{get:Function, set:Function}} sealedVault
- * @returns {Promise<{seal:(t:string)=>string, open:(t:string)=>string}>}
+ * @returns {Promise<{seal:(t:string)=>string, open:(t:string)=>string, plainRefused: boolean}>}
  */
 export async function contentSealStrategy(sealedVault) {
-  return groupKeyStrategy({ groupKey: await ensureContentKey(sealedVault) });
+  const { key, plainRefused } = await ensureContentKeyRecord(sealedVault);
+  return { ...groupKeyStrategy({ groupKey: key }), plainRefused };
 }

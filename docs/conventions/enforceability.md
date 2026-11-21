@@ -36,6 +36,12 @@ It is also a useful design tool. Asking the question tells you *where the gate a
   (newest `hiddenAt` wins) and each device stamps its own clock, so a laptop ten minutes behind can lose its
   newer unhide. Accepted, and said on the field (`apps/pinboard/manifest.js`, `setContactHidden.hiddenAt`): it is a
   filter on what you see, and it gets the log's order when the contact book becomes an item type.
+- **A sealed local value opens only under its own key, and a planted plain value is refused** on a device whose content
+  key was minted with its form mark. What is left: a value copied into ANOTHER storage under the same key name still
+  opens (the binding is the key, not the store, so a renamed store keeps reading); on a device with an older key a
+  plain value still reads as the upgrade's until the alpha build drops that path; and anyone who can write the storage
+  can still delete or roll back a value to an older sealed one of the same key. The person's device is the boundary
+  (`apps/basis/src/v2/localStoreSeal.js`).
 - **A proof that a device holds an address names the relay it dialled**, and a relay counts only names its operator
   set (`RELAY_NAMES`): the Host header is the caller's to write, so a relay that took its name from it would accept an
   answer a hostile relay obtained for itself. What is left: with no names set, a relay takes a PRIVATE name (localhost,

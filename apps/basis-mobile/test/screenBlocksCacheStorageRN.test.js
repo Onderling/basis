@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { groupKeyStrategy } from '@onderling/pod-client';
-import { setShellContentSeal } from '../../basis/src/v2/localStoreSeal.js';
+import { setShellContentSeal, openStoredValue } from '../../basis/src/v2/localStoreSeal.js';
 import {
   asyncStorageScreenBlocksCacheIo,
   makeScreenBlocksCacheRN,
@@ -35,7 +35,7 @@ describe('δ.1 — screenBlocksCacheStorageRN', () => {
     const io = asyncStorageScreenBlocksCacheIo(storage);
     const blocks = [{ blockId: 'b1', type: 'noticeboard', status: 'ok' }];
     await io.save('s1', blocks);
-    expect(seal.open(storage.map.get('cc.screenBlocksCache.s1'))).toBe(JSON.stringify(blocks));
+    expect(openStoredValue(seal, 'cc.screenBlocksCache.s1', storage.map.get('cc.screenBlocksCache.s1'))).toBe(JSON.stringify(blocks));
     expect(await io.load('s1')).toEqual(blocks);
   });
 

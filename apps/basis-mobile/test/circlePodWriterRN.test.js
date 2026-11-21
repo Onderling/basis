@@ -14,7 +14,7 @@
 // The real `createPodWriter` + `discoverPodRoot` are injected as fakes,
 // so this test never touches the network.
 import { groupKeyStrategy } from '@onderling/pod-client';
-import { setShellContentSeal } from '../../basis/src/v2/localStoreSeal.js';
+import { setShellContentSeal, openStoredValue } from '../../basis/src/v2/localStoreSeal.js';
 const SEAL = groupKeyStrategy({ groupKey: 'A'.repeat(43) });
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
@@ -134,7 +134,7 @@ describe('5.4c makeCirclePolicyStoreRN with getPodWriter thunk', () => {
     // Local (canonical) write landed under the cc.circlePolicy.<id> key.
     expect([...storage.map.keys()]).toContain('cc.circlePolicy.circle-1');
     // sealed at rest: opened with the device's content key
-    const localValue = JSON.parse(SEAL.open(storage.map.get('cc.circlePolicy.circle-1')));
+    const localValue = JSON.parse(openStoredValue(SEAL, 'cc.circlePolicy.circle-1', storage.map.get('cc.circlePolicy.circle-1')));
     expect(localValue.pod).toBe('shared');
     expect(localValue.llmTool).toBe('local');
 

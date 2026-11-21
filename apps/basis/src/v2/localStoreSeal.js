@@ -99,6 +99,49 @@ function refuse(name, key, said = false) {
  * fresh wrapper for each read and each write still sees the read's verdict at its write.
  */
 const unopened = new WeakMap();
+
+// A VALUE OPENS ONLY UNDER ITS OWN KEY (the independent read, 2026-11-20). secretbox has no associated data, so the
+// storage key is sealed INSIDE the value: `onderling-kv1\n<key length>:<key>\n<value>`. A sealed value copied under
+// another key opens to the wrong key and is "not readable" there.
+const BOUND = 'onderling-kv1\n';
+const bindToKey = (key, value) => `${BOUND}${String(key).length}:${key}\n${value}`;
+
+/**
+ * Open a stored value and say what it is: `plain` (not sealed at all), `unbound` (sealed before values were bound),
+ * `bound` (sealed under THIS key), `other-key` (sealed under another key). Throws when it will not open.
+ */
+function openStored(s, key, stored) {
+  const text = String(stored);
+  const opened = s.open(text);
+  if (opened === text) return { kind: 'plain', value: opened };
+  if (!opened.startsWith(BOUND)) return { kind: 'unbound', value: opened };
+  const rest = opened.slice(BOUND.length);
+  const colon = rest.indexOf(':');
+  const n = colon > 0 ? Number(rest.slice(0, colon)) : NaN;
+  if (!Number.isInteger(n) || n < 0 || rest[colon + 1 + n] !== '\n') return { kind: 'other-key' };
+  if (rest.slice(colon + 1, colon + 1 + n) !== String(key)) return { kind: 'other-key' };
+  return { kind: 'bound', value: rest.slice(colon + 2 + n) };
+}
+
+/**
+ * What a stored value holds, opened with `strategy` under `key`, by the same rule every read uses; `null` when this
+ * device would not hand it on. For a tool or a test that reads raw storage: never open a stored value by hand.
+ */
+export function openStoredValue(strategy, key, stored) {
+  try { const v = judgeStored(strategy, openStored(strategy, key, stored)); return v.ok ? v.value : null; } catch { return null; }
+}
+
+/**
+ * The one rule for what a read may hand on: a value bound to this key, always; a plain or unbound one only on a
+ * device whose content key is older than this rule (`plainRefused` false: the upgrade's values, rewritten bound at
+ * that read); never one bound to another key. Answers `{ ok, value, rewrite }`.
+ */
+function judgeStored(s, r) {
+  if (r.kind === 'bound') return { ok: true, value: r.value, rewrite: false };
+  if (r.kind === 'other-key') return { ok: false };
+  if (s.plainRefused === true) return { ok: false };
+  return { ok: true, value: r.value, rewrite: true };
+}
 const unopenedOf = (storage) => {
   let set = unopened.get(storage);
   if (!set) { set = new Set(); unopened.set(storage, set); }
@@ -181,28 +224,37 @@ export function sealedKeyValue(storage, { name = 'a store', strict = false, wait
       if (!strict) {
         const s = shellContentSeal();
         if (!s) return v;
-        try { const plain = s.open(v); unopenedOf(storage).delete(key); return plain; } catch (err) {
+        let verdict;
+        try { verdict = judgeStored(s, openStored(s, key, v)); } catch (err) {
           if (!overwritable) unopenedOf(storage).add(key);
           throw err;   // as before: the caller's own catch decides what it reads; the write after it is refused
         }
+        if (!verdict.ok) {
+          if (!overwritable) unopenedOf(storage).add(key);
+          throw new Error(`sealedKeyValue: ${name}: a stored value that is not genuine here (plain, or another key's); kept`);
+        }
+        unopenedOf(storage).delete(key);
+        if (verdict.rewrite) { try { await storage.setItem(key, s.seal(bindToKey(key, verdict.value))); } catch { /* the next read tries again */ } }
+        return verdict.value;
       }
       const s = shellContentSeal() ?? (waitForKey ? await keyArrives() : null);
       if (!s) return null;
-      let plain;
-      try { plain = s.open(String(v)); } catch {
+      let verdict;
+      try { verdict = judgeStored(s, openStored(s, key, v)); } catch { verdict = { ok: false }; }
+      if (!verdict.ok) {
         if (!overwritable) unopenedOf(storage).add(key);   // not written over until it reads (L1115)
-        console.warn(`[at-rest] ${name}: a stored value this device cannot open; it is kept, not written over`);
+        console.warn(`[at-rest] ${name}: a stored value this device cannot take (will not open, plain, or another key's); it is kept, not written over`);
         return null;
       }
       unopenedOf(storage).delete(key);
-      if (plain === v) {   // it was plain: seal it now, once
-        try { await storage.setItem(key, s.seal(plain)); } catch { /* the next read tries again */ }
+      if (verdict.rewrite) {   // the upgrade's plain or unbound value: sealed and bound now, once
+        try { await storage.setItem(key, s.seal(bindToKey(key, verdict.value))); } catch { /* the next read tries again */ }
       }
-      return plain;
+      return verdict.value;
     },
     async setItem(key, value) {
       if (!overwritable && unopened.get(storage)?.has(key)) throw refuse(name, key, said);
-      await storage.setItem(key, strategy().seal(String(value)));
+      await storage.setItem(key, strategy().seal(bindToKey(key, String(value))));
     },
     // a remove does NOT lift the refusal: remove-then-set is a common save, and would write over the value just the same
     // (Fable's review, L1115). The mark lives this session; a later start that finds nothing there writes freely.
@@ -278,7 +330,7 @@ export function sealedLocalVault(vault) {
       if (unopened.get(vault)?.has(key)) throw refuse('a circle key vault', key);
       const s = strategy();
       if (!s) throw new Error(`sealedLocalVault: refusing to store "${key}" unsealed — no content key yet`);
-      return vault.set(key, s.seal(typeof value === 'string' ? value : JSON.stringify(value)));
+      return vault.set(key, s.seal(bindToKey(key, typeof value === 'string' ? value : JSON.stringify(value))));
     },
 
     async get(key) {
@@ -286,21 +338,22 @@ export function sealedLocalVault(vault) {
       if (stored == null) return null;
       const s = strategy();
       if (!s) return stored;
-      let opened;
-      try { opened = s.open(String(stored)); }
-      catch (err) {
-        console.warn(`[at-rest] ${key}: a circle key is stored here that this device cannot open; kept, not written over`, err);
+      let verdict;
+      try { verdict = judgeStored(s, openStored(s, key, stored)); }
+      catch (err) { verdict = { ok: false, err }; }
+      if (!verdict.ok) {
+        console.warn(`[at-rest] ${key}: a circle key is stored here that this device cannot take (will not open, plain, or another key's); kept, not written over`, verdict.err ?? '');
         unopenedOf(vault).add(key);
         return null;
       }
       unopenedOf(vault).delete(key);
-      // Written before sealing began: seal it now, on the way past. See the header for why key material
-      // gets this and content does not.
-      if (opened === String(stored)) {
-        try { await vault.set(key, s.seal(opened)); }
+      // Written before sealing (or before binding) began: sealed and bound now, on the way past. See the header for
+      // why key material gets this.
+      if (verdict.rewrite) {
+        try { await vault.set(key, s.seal(bindToKey(key, verdict.value))); }
         catch { /* best-effort — the value is still readable either way */ }
       }
-      return opened;
+      return verdict.value;
     },
 
     async delete(key) {

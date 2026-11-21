@@ -62,7 +62,7 @@ const wait  = (ms) => new Promise(r => setTimeout(r, ms));
  */
 // v2 names the relay the client dialled (the host of its url), as @onderling/core's addressPossessionMessage does
 const POSSESSION_V2 = (relay, address, nonce) => `onderling-address-possession-v2|${relay}|${address}|${nonce}`;
-const relayNameOf = (url) => { try { return new URL(String(url)).host || 'localhost'; } catch { return 'localhost'; } };
+const relayNameOf = (url) => { try { return new globalThis.URL(String(url)).host || 'localhost'; } catch { return 'localhost'; } };
 function makeIdentity() {
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
   const spki = publicKey.export({ type: 'spki', format: 'der' });

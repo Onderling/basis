@@ -1246,6 +1246,39 @@ relayNameOf(url)
 
 A relay's name as a device dials it: the host (with its port) of the ws(s) address; `localhost` for a local socket.
 
+### `isPrivateRelayName`
+
+**Kind:** function · **Import:** `isPrivateRelayName` from `'@onderling/core'`
+
+```js
+isPrivateRelayName(name)
+```
+
+A name that cannot be a relay on the public internet: `localhost` or another single-label name (a compose service
+such as `relay`), or a loopback, private-range, link-local or
+shared-range (100.64/10: carrier NAT, Tailscale) address literal, with any port. Only such a name may be taken from
+the Host a connection came in on; a public name must be configured by the relay's operator.
+
+### `relayOwnNames`
+
+**Kind:** function · **Import:** `relayOwnNames` from `'@onderling/core'`
+
+```js
+relayOwnNames({ names = [] } = {})
+```
+
+Which names a relay answers to. Its names are its OPERATOR's (`names`, RELAY_NAMES), never the caller's: the Host
+header is written by whoever dials, so a hostile relay dialling an honest one would choose it. When names are
+configured, only they count. Without them the Host is used only for a private name (`isPrivateRelayName`), which keeps
+the dev relay, the tests and a home-network box working with no setting; a public name that is not configured is
+refused.
+
+**Parameters**
+
+- `[o]` `{names?: string[]}`
+
+**Returns:** `(name: string, host?: string) => boolean` — is `name` (from a proof) one of this relay's, on a connection that came in under `host`
+
 ### `signAddressPossession`
 
 **Kind:** function · **Import:** `signAddressPossession` from `'@onderling/core'`

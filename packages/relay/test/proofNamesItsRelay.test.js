@@ -10,7 +10,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import WebSocket, { WebSocketServer } from 'ws';
 import { randomBytes } from 'node:crypto';
-import { AgentIdentity, signAddressPossession } from '@onderling/core';
+import { AgentIdentity, signAddressPossession, isPrivateRelayName, relayOwnNames } from '@onderling/core';
 import { RelayTransport } from '@onderling/transports';
 import { startRelay } from '../src/server.js';
 
@@ -19,8 +19,8 @@ let relay; const sockets = [];
 afterEach(async () => { for (const s of sockets.splice(0)) { try { s.close(); } catch { /* */ } } await relay?.stop?.(); relay = null; });
 
 /** Register `identity`'s address on the relay, answering the challenge for the relay named `signFor`. */
-async function registerNaming(identity, signFor, { send = signFor } = {}) {
-  const ws = new WebSocket(`ws://127.0.0.1:${relay.port}`);
+async function registerNaming(identity, signFor, { send = signFor, host } = {}) {
+  const ws = new WebSocket(`ws://127.0.0.1:${relay.port}`, host ? { headers: { Host: host } } : undefined);
   sockets.push(ws);
   await new Promise((r, j) => { ws.once('open', r); ws.once('error', j); });
   return new Promise((resolve) => {
@@ -61,6 +61,28 @@ describe('the proof of an address names the relay it was answered for', () => {
     expect(await registerNaming(id, 'relay.example.org')).toBe('registered');
   });
 
+  it('THE CALLER\'S Host is never a source of a public name: a hostile relay dialling under its own Host is refused', async () => {
+    relay = await startRelay({ port: 0 });
+    const id = await AgentIdentity.fromSeed(new Uint8Array(randomBytes(32)), throwawayVault());
+    // the device dialled hostile.example and signed that name; the hostile relay dials the honest one AS hostile.example
+    expect(await registerNaming(id, 'hostile.example', { host: 'hostile.example' })).toBe('PROOF_INVALID');
+  });
+
+  it('with configured names, a Host outside them is refused too', async () => {
+    relay = await startRelay({ port: 0, relayNames: ['relay.example.org'] });
+    const id = await AgentIdentity.fromSeed(new Uint8Array(randomBytes(32)), throwawayVault());
+    expect(await registerNaming(id, 'hostile.example', { host: 'hostile.example' })).toBe('PROOF_INVALID');
+    expect(await registerNaming(id, 'relay.example.org', { host: 'relay.example.org' })).toBe('registered');
+  });
+
+  it('a private name is taken from Host with no setting (a home-network box, the dev relay)', async () => {
+    relay = await startRelay({ port: 0 });
+    const id = await AgentIdentity.fromSeed(new Uint8Array(randomBytes(32)), throwawayVault());
+    expect(await registerNaming(id, '192.168.1.20:8787', { host: '192.168.1.20:8787' })).toBe('registered');
+    // but only the one this connection came in under
+    expect(await registerNaming(id, '192.168.1.21:8787', { host: '192.168.1.20:8787' })).toBe('PROOF_INVALID');
+  });
+
   it('a host name is case-insensitive on both sides', async () => {
     relay = await startRelay({ port: 0, relayNames: ['Relay.Example.org'] });
     const id = await AgentIdentity.fromSeed(new Uint8Array(randomBytes(32)), throwawayVault());
@@ -68,18 +90,51 @@ describe('the proof of an address names the relay it was answered for', () => {
   });
 });
 
+describe('which names cannot be a relay on the public internet', () => {
+  it('localhost, loopback, private, link-local and shared-range literals, with any port', () => {
+    for (const n of ['localhost', 'localhost:8787', 'relay:8787', '127.0.0.1:1', '10.0.0.5', '172.16.0.1:443', '172.31.255.255', '192.168.1.1:8787',
+      '169.254.1.1', '100.73.134.19:8787', '[::1]:8787', '::1', '[fd12::1]:8787', '[fe80::1]', '[::ffff:192.168.1.2]:1']) {
+      expect(isPrivateRelayName(n), n).toBe(true);
+    }
+    for (const n of ['relay.example.org', 'relay.example.org:443', '8.8.8.8', '172.32.0.1', '100.128.0.1', '192.169.1.1',
+      '[2001:db8::1]:443', '127.0.0.1.example.org', 'localhost.example.org', '', '999.1.1.1']) {
+      expect(isPrivateRelayName(n), n).toBe(false);
+    }
+  });
+
+  it('relayOwnNames: configured names only when there are any; else a private name only as the Host it came in under', () => {
+    const own = relayOwnNames({ names: ['Relay.Example.org'] });
+    expect(own('relay.example.org', 'anything')).toBe(true);
+    expect(own('hostile.example', 'hostile.example')).toBe(false);
+    expect(own('localhost'), 'configured = those names only').toBe(false);
+    const none = relayOwnNames();
+    expect(none('hostile.example', 'hostile.example')).toBe(false);
+    expect(none('localhost')).toBe(true);
+    expect(none('10.0.0.2:1', '10.0.0.2:1')).toBe(true);
+    expect(none('10.0.0.2:1', '10.0.0.3:1')).toBe(false);
+    expect(none(undefined, 'localhost')).toBe(false);
+  });
+});
+
 describe('the attack end to end: a hostile relay passes an honest relay\'s challenge to a real device', () => {
   let hostile;
   afterEach(async () => { if (hostile) { for (const c of hostile.clients) c.terminate(); await new Promise((r) => hostile.close(() => r())); hostile = null; } });
 
-  it('the device answers for the relay it dialled, so the honest relay refuses to give the hostile one its address', async () => {
-    relay = await startRelay({ port: 0, host: '127.0.0.1' });
+  for (const [label, relayOpts, ownHost] of [
+    ['dialling with the honest relay\'s own Host', {}, false],
+    // the review's case: the Host header is the caller's, so the hostile relay writes the name the device signed;
+    // the honest relay is configured as a deploy is (RELAY_NAMES), so the Host is never a source of a name
+    ['dialling under the hostile relay\'s OWN Host', { relayNames: ['relay.example.org'] }, true],
+  ]) it(`the device answers for the relay it dialled, so the honest relay refuses the hostile one its address (${label})`, async () => {
+    relay = await startRelay({ port: 0, host: '127.0.0.1', ...relayOpts });
     // the hostile relay: every frame both ways is passed on to the honest relay, which it dials as itself
     hostile = new WebSocketServer({ port: 0, host: '127.0.0.1' });
     await new Promise((r) => hostile.once('listening', r));
     const upstreamSaid = [];
+    const upstreamHost = ownHost ? `127.0.0.1:${hostile.address().port}` : null;
     hostile.on('connection', (down) => {
-      const up = new WebSocket(`ws://127.0.0.1:${relay.port}`);
+      // it dials the honest relay under ITS OWN name (the Host header is the caller's to write)
+      const up = new WebSocket(`ws://127.0.0.1:${relay.port}`, upstreamHost ? { headers: { Host: upstreamHost } } : undefined);
       const pending = [];
       up.on('open', () => { while (pending.length) up.send(pending.shift()); });
       down.on('message', (d) => { const t = String(d); if (up.readyState === 1) up.send(t); else pending.push(t); });

@@ -36,6 +36,12 @@ It is also a useful design tool. Asking the question tells you *where the gate a
   (newest `hiddenAt` wins) and each device stamps its own clock, so a laptop ten minutes behind can lose its
   newer unhide. Accepted, and said on the field (`apps/pinboard/manifest.js`, `setContactHidden.hiddenAt`): it is a
   filter on what you see, and it gets the log's order when the contact book becomes an item type.
+- **A proof that a device holds an address names the relay it dialled**, and a relay counts only names its operator
+  set (`RELAY_NAMES`): the Host header is the caller's to write, so a relay that took its name from it would accept an
+  answer a hostile relay obtained for itself. What is left: with no names set, a relay takes a PRIVATE name (localhost,
+  a LAN or loopback literal) from Host, so two relays reached under the same private address in two networks answer
+  to the same name, and a device that moves between them could be proxied from one to the other. Both are then the
+  operator's own or a LAN's; accepted (`packages/core/src/identity/addressPossession.js`, `relayOwnNames`).
 
 ## The inverse failure
 

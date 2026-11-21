@@ -18,6 +18,7 @@ the same compose file and can be added later with one command — step 9 shows h
 | | value | used for |
 |---|---|---|
 | `RELAY_DOMAIN` | **`<relay-domain>`** (e.g. `relay.<your-domain>`) | what clients connect to: `wss://<relay-domain>` |
+| `RELAY_NAMES` | nothing: the compose file derives it (`<relay-domain>`, plus `relay:8787` and `127.0.0.1:8787` for the companion and the health check) | the only names the relay answers to: a device's proof of its address names the relay it dialled. Set it in `.env` only to add a name (a LAN address devices dial); it then replaces the whole list |
 | `POD_DOMAIN` | **`pod.onderling.org`** (suggested) | the Solid pod later — **create its DNS record now anyway**, see step 1 |
 
 Write down your VPS's **public IPv4** from the TransIP control panel (*VPS → your VPS → the

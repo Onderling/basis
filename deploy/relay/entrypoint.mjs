@@ -31,9 +31,11 @@
  *                            (DEFAULT empty = NOBODY; a real deploy sets this)
  *
  *   -- push wake (enable by setting PUSH_PROVIDER=expo) --
- *   RELAY_NAMES              comma-separated host names this relay answers to, for a proxy that REWRITES Host:
- *                            a device's address proof names the relay it dialled; the Host a connection came in
- *                            on is accepted, plus these. Unset is right behind a proxy that passes Host on.
+ *   RELAY_NAMES              comma-separated names (host, with a port when not the default) this relay answers
+ *                            to: a device's address proof names the relay it dialled, and only these count (the
+ *                            Host header is the caller's, never a source of a name). Unset = only private names
+ *                            (localhost, a compose service name, a LAN or loopback literal) as the Host they came
+ *                            in under. The compose files derive it from RELAY_DOMAIN.
  *   PEER_DISCOVERY           '1' broadcasts the connected-address list to every client (OFF by default; disclose when on)
  *   PUSH_PROVIDER            'expo' to enable Expo push wake (else no push)
  *   EXPO_ACCESS_TOKEN        optional Expo enhanced-security access token
@@ -135,8 +137,9 @@ if (process.env.QUEUE_DB) {
   forwardStore = new SqliteForwardStore({ path: process.env.QUEUE_DB, Database });
 }
 
+const relayNamesList = (process.env.RELAY_NAMES ?? '').split(',').map((x) => x.trim()).filter(Boolean);
 const { port: boundPort, tls, feeds: feedInfo } = await startRelay({
-  relayNames: (process.env.RELAY_NAMES ?? '').split(',').map((x) => x.trim()).filter(Boolean),
+  relayNames: relayNamesList,
   peerDiscovery: process.env.PEER_DISCOVERY === '1',   // OFF by default — a presence + linkage oracle; disclose when on
   port,
   host,
@@ -157,6 +160,7 @@ console.log('  ─────────────────────�
 console.log(`  Listening:  http://${host}:${boundPort}  (proxy terminates TLS → ${wsScheme}://)`);
 console.log(`  Media edge: ${blobGate ? `ON  route=${blobGate.route}  uploaders=${blobGate.uploaders.length}` : 'off (set R2_* to enable)'}`);
 console.log(`  Push wake:  ${pushSender ? `ON (expo)${pushTokenRegistry ? `  tokens=${process.env.PUSH_TOKENS_DB}` : '  tokens=memory (lost on redeploy)'}` : 'off (set PUSH_PROVIDER=expo to enable)'}`);
+console.log(`  Names:      ${relayNamesList.length ? relayNamesList.join(', ') : 'none set: private names only (set RELAY_NAMES for a public one)'}`);
 console.log(`  Feeds:      /feed/<node>/… forwarded to the node over its session — nothing held, nothing logged; seat ${feedInfo?.seatAddress ?? '—'} (README: the seat)`);
 const lan = getLanIp();
 if (lan) console.log(`  LAN:        ws://${lan}:${boundPort}`);

@@ -40,7 +40,7 @@ import { WebSocketServer } from 'ws';
 // Transport is a peer dependency resolved from @onderling/core.
 import {
   Transport, senderVerdict,
-  newAddressChallenge, verifyAddressPossession, ADDRESS_CHALLENGE_TTL_MS,
+  newAddressChallenge, verifyAddressPossession, relayOwnNames, ADDRESS_CHALLENGE_TTL_MS,
 } from '@onderling/core';
 
 import { ForwardQueue } from './ForwardQueue.js';
@@ -49,6 +49,7 @@ import { parseUntrustedJson } from '@onderling/core';
 export class WsServerTransport extends Transport {
   #wss  = null;
   #port;
+  #isOwnRelayName;
 
   // Map<address, WebSocket>
   #clients = new Map();
@@ -63,11 +64,14 @@ export class WsServerTransport extends Transport {
    * @param {number} [opts.port=0]                — 0 = OS-assigned port
    * @param {string} opts.address                 — relay's own pubKey / address
    * @param {number} [opts.offlineQueueTtl=300000] — ms to buffer for offline peers
+   * @param {string[]} [opts.relayNames=[]]        — the names this relay answers to (its operator's); without them only a
+   *                                                 private name (localhost, a LAN literal) is taken from Host
    */
-  constructor({ port = 0, address, offlineQueueTtl = 300_000 } = {}) {
+  constructor({ port = 0, address, offlineQueueTtl = 300_000, relayNames = [] } = {}) {
     if (!address) throw new Error('WsServerTransport requires address');
     super({ address });
     this.#port    = port;
+    this.#isOwnRelayName = relayOwnNames({ names: relayNames });
     this.#forward = new ForwardQueue({
       ttlMs:        offlineQueueTtl,
       topicAware:   false,
@@ -152,9 +156,9 @@ export class WsServerTransport extends Transport {
           ws.send(JSON.stringify({ type: 'error', message: 'CHALLENGE_EXPIRED', address }));
           return;
         }
-        // the proof must name the relay this connection dialled (its Host): one answered for another relay is refused
-        const dialled = typeof req?.headers?.host === 'string' && req.headers.host ? req.headers.host.toLowerCase() : 'localhost';
-        if (!verifyAddressPossession({ address, nonce, proof, relay: msg.relay, isOwnRelayName: (n) => typeof n === 'string' && n.toLowerCase() === dialled })) {
+        // the proof must name one of this relay's own names (never taken from the caller's Host, except a private one)
+        const dialled = typeof req?.headers?.host === 'string' && req.headers.host ? req.headers.host : 'localhost';
+        if (!verifyAddressPossession({ address, nonce, proof, relay: msg.relay, isOwnRelayName: (n) => this.#isOwnRelayName(n, dialled) })) {
           ws.send(JSON.stringify({ type: 'error', message: 'PROOF_INVALID', address }));
           return;
         }

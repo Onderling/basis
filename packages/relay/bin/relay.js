@@ -22,10 +22,10 @@
  *   PEER_DISCOVERY   '1' broadcasts the connected-address list to every registered client (and
  *                    answers peer-list requests). OFF by default: it is a presence and linkage
  *                    oracle (see server.js). An operator who turns it on must disclose it.
- *   RELAY_NAMES      comma-separated host names (with a port when not the default) this relay answers to, for a proxy
- *                    in front of it that REWRITES the Host header. A device's proof of its address names the relay it
- *                    dialled; the relay accepts the Host a connection came in on, plus these. Unset is right behind a
- *                    proxy that passes Host on (Caddy's reverse_proxy does).
+ *   RELAY_NAMES      comma-separated names (host, with a port when not the default) this relay answers to. A device's
+ *                    proof of its address names the relay it dialled, and only these count: the Host header is written
+ *                    by the caller, so it is never a source of a public name. Unset = only private names (localhost,
+ *                    a LAN or loopback literal) as the Host they came in under: right for a relay on a home network.
  *
  * Usage:
  *   npx @onderling/relay
@@ -83,6 +83,7 @@ if (process.env.QUEUE_DB) {
   forwardStore = new SqliteForwardStore({ path: process.env.QUEUE_DB, Database });
 }
 
+const relayNamesList = (process.env.RELAY_NAMES ?? '').split(',').map((x) => x.trim()).filter(Boolean);
 const { tls, feeds: feedInfo } = await startRelay({
   port, host,
   tlsCert, tlsKey,
@@ -92,7 +93,7 @@ const { tls, feeds: feedInfo } = await startRelay({
   ...(pushTokenRegistry ? { pushTokenRegistry } : {}),
   forwardStore,
   peerDiscovery: process.env.PEER_DISCOVERY === '1',
-  relayNames: (process.env.RELAY_NAMES ?? '').split(',').map((x) => x.trim()).filter(Boolean),
+  relayNames: relayNamesList,
   // a person's agenda link, GET /feed/<node>/<id>.<k>.ics, forwarded to the node that holds it; nothing held here
   feeds: true,
   log: true,
@@ -108,6 +109,7 @@ console.log('  ─────────────────────�
 console.log(`  Local:    ${scheme}://localhost:${port}`);
 console.log(`  Peers:    ${process.env.PEER_DISCOVERY === '1' ? 'discovery ON — the connected-address list is broadcast to every client; disclose it' : 'discovery off (default) — no address list leaves this relay'}`);
 console.log(`  Push:     ${pushSender ? `expo wake enabled${process.env.PUSH_TOKENS_DB ? ` (tokens: ${process.env.PUSH_TOKENS_DB})` : ' (tokens: memory — lost on restart)'}` : 'off (no wake, no provider contact)'}`);
+console.log(`  Names:    ${relayNamesList.length ? relayNamesList.join(', ') : 'none set: private names only (set RELAY_NAMES for a public one)'}`);
 console.log(`  Feeds:    /feed/<node>/… forwarded to the node over its session — nothing held, nothing logged; seat ${feedInfo?.seatAddress ?? '—'} (README: the seat)`);
 if (lanIp) {
   console.log(`  Network:  ${scheme}://${lanIp}:${port}`);

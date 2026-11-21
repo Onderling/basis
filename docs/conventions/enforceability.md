@@ -40,8 +40,10 @@ It is also a useful design tool. Asking the question tells you *where the gate a
   set (`RELAY_NAMES`): the Host header is the caller's to write, so a relay that took its name from it would accept an
   answer a hostile relay obtained for itself. What is left: with no names set, a relay takes a PRIVATE name (localhost,
   a LAN or loopback literal) from Host, so two relays reached under the same private address in two networks answer
-  to the same name, and a device that moves between them could be proxied from one to the other. Both are then the
-  operator's own or a LAN's; accepted (`packages/core/src/identity/addressPossession.js`, `relayOwnNames`).
+  to the same name, and a device that moves between them could be proxied from one to the other. The same holds for a
+  relay with no names set that is also reachable publicly: a hostile relay the device dialled under a private name
+  (its LAN address) can pass that relay's challenge on under the same private Host. Set `RELAY_NAMES` on any relay
+  reachable from the internet. Both cases need the device to dial a private name it was handed; accepted (`packages/core/src/identity/addressPossession.js`, `relayOwnNames`).
 
 ## The inverse failure
 

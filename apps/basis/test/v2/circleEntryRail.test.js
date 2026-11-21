@@ -404,6 +404,10 @@ describe('the rail — a statement checked on one read is not checked again on t
     // a statement damaged after it landed is a different statement: checked again, refused
     log.entries[1].payload = { ...log.entries[1].payload, body: { ...log.entries[1].payload.body, subject: 'v-x' } };
     const { bodies } = await reader.readVerifiedBodies(CIRCLE);
-    expect(causalOrder(bodies).map((b) => b.subject), 'in their own order: the reading order is the log\'s').toEqual(['v-0', 'v-2']);
+    expect(bodies.map((b) => b.subject).sort(), 'the damaged statement is refused, the other two stand').toEqual(['v-0', 'v-2']);
+    // with v-1 gone, v-0 and v-2 have no order between them (v-2's parent is not in the set), so `causalOrder` places them
+    // by hash: the same on every device whatever order the log reads in. Not the log's order: the hashes differ per run,
+    // so asserting v-0 first failed about one run in two.
+    expect(causalOrder([...bodies].reverse()).map((b) => b.hash), 'the order depends on the reading order').toEqual(causalOrder(bodies).map((b) => b.hash));
   });
 });

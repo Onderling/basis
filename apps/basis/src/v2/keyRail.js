@@ -241,7 +241,9 @@ export async function keyEventsFromRail(rail, circleId) {
   };
   return kept
     .map((b, i) => ({ b, i, d: depthOf(b) }))
-    .sort((x, y) => (x.d - y.d) || (x.i - y.i))
+    // ties (two statements at one depth) by hash, never by reading order: the last one wins the fold, and the same set must
+    // fold the same on every device
+    .sort((x, y) => (x.d - y.d) || String(x.b.hash ?? '').localeCompare(String(y.b.hash ?? '')) || (x.i - y.i))
     .map(({ b }) => b.payload.event);
 }
 

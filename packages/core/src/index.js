@@ -68,7 +68,7 @@ export { hashHex, hmacBase64Url } from './hashHex.js';
 // their own body-serialization rather than each reimplementing the chaining/fork detection.
 export {
   createAuthorChain, isChained, authorHead, makeForkProof,
-  parentsOf, frontier, reachability,
+  parentsOf, frontier, causalOrder, reachability,
 } from './security/authorChain.js';
 // NOTE: IdentityPodStore, IdentitySync and migrateVaultToPod were extracted OUT
 // of core into `@onderling/pod-client` — they store/migrate/sync identity ON a pod

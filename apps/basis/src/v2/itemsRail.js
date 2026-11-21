@@ -155,8 +155,11 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
    * judging cannot tell it from the log: the row's making may have aged out, and a sender chooses its own links.
    * `held`: the row as the statements before this one left it (a re-judge); `undefined`: read it from the store.
    * `unknownAct`: no kept act and no earlier statement of the row here: judged as both, and the same answer or none.
+   * `keptAct`: whether the kept act is the truth. Only for a row's FIRST statement on this log (nothing older here can
+   * say what came before it); every later statement of the row is the act `held` makes it, so a change whose add was
+   * taken back is an add of a row no longer held.
    */
-  async function verdictFor(circleId, body, { held = undefined, linksOf = null, fresh = false, unknownAct = false } = {}) {
+  async function verdictFor(circleId, body, { held = undefined, linksOf = null, fresh = false, unknownAct = false, keptAct = true } = {}) {
     if (!judging || isOwn(circleId) || (body?.kind !== 'snapshot' && body?.kind !== 'remove')) return { verdict: 'apply' };
     const judgments = judgmentsOf(circleId);
     let row = held;
@@ -167,7 +170,7 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     let acts; let type;
     if (body.kind === 'snapshot') {
       type = itemOf(circleId, body)?.type ?? null;
-      const known = judgments.act(body.hash);
+      const known = keptAct ? judgments.act(body.hash) : undefined;
       if (known) acts = [known];
       else if (fresh) { acts = [row ? 'change' : 'add']; judgments.noteAct(body.hash, acts[0]); }
       else acts = unknownAct ? ['add', 'change'] : [row ? 'change' : 'add'];
@@ -193,12 +196,27 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
    * allowed change survives a take-back. No allowed statement left: an add taken back is dropped (no tombstone); a row
    * older than the log goes back to the copy kept before the refused change, when this device kept one.
    */
-  async function rejudge(circleId) {
-    if (!judging || isOwn(circleId)) return;
+  /**
+   * Oldest arrival first. The device log reads most-recent-first; a statement's place on it (`atSeq`, stamped where it
+   * landed) is the order it arrived here in. A log without places (a minimal one) is taken in the order it reads.
+   */
+  function inArrivalOrder(bodies) {
+    return bodies.map((b, i) => ({ b, i, at: Number.isFinite(b?.atSeq) ? b.atSeq : null }))
+      .sort((x, y) => ((x.at !== null && y.at !== null) ? x.at - y.at : x.i - y.i))
+      .map(({ b }) => b);
+  }
+
+  /**
+   * `reapply` (the store opened, `rebuildHead`): every row is put to the head again, not only the rows a verdict
+   * touched, so a statement that arrived while the store was not open lands now. Returns the statements applied.
+   */
+  async function rejudge(circleId, { reapply = false } = {}) {
+    if (!judging || isOwn(circleId)) return 0;
     const store = storeFor(circleId);
-    if (!store) return;
+    if (!store) return 0;
     let bodies = [];
-    try { ({ bodies = [] } = await base.readVerifiedBodies(circleId)); } catch { return; }
+    try { ({ bodies = [] } = await base.readVerifiedBodies(circleId)); } catch { return 0; }
+    bodies = inArrivalOrder(bodies);
     const linksOf = linksIndex(bodies);
     const byRow = new Map();
     for (const b of bodies) {
@@ -207,9 +225,10 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
       if (typeof id === 'string' && id) (byRow.get(id) ?? byRow.set(id, []).get(id)).push(b);
     }
     const waiting = parkedIn(circleId);
+    let applied = 0;
     for (const [rowId, list] of byRow) {
-      // in log order: whether the row is held at a statement follows from the ones taken before it, and the first one
-      // here is the act it was when it arrived (kept; a change: the row was held before it)
+      // in arrival order: whether the row is held at a statement follows from the ones taken before it, and the first
+      // one here is the act it was when it arrived (kept; a change: the row was held before it)
       const first = list[0];
       const firstAct = first?.kind === 'snapshot' ? judgmentsOf(circleId).act(first.hash) : null;
       let held = null;
@@ -219,30 +238,38 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
       }
       const judged = [];
       for (const b of list) {
-        const v = await verdictFor(circleId, b, { held, linksOf, unknownAct: b === first && first.kind === 'snapshot' && !firstAct });
+        const v = await verdictFor(circleId, b, { held, linksOf, keptAct: b === first, unknownAct: b === first && first.kind === 'snapshot' && !firstAct });
         judged.push({ b, v });
         if (v.verdict === 'apply') held = b.kind === 'snapshot' ? (itemOf(circleId, b) ?? held) : null;
       }
       const touched = judged.some(({ b, v }) => v.verdict !== 'apply' || waiting.has(b.hash));
-      if (!touched) continue;
+      if (!touched) {
+        if (!reapply) continue;
+        for (const { b } of judged) {
+          try { await landOnHead(circleId, store, b); applied += 1; } catch { /* one bad body must not stop the rest */ }
+        }
+        continue;
+      }
       for (const { b, v } of judged) {
         if (v.verdict === 'park') waiting.set(b.hash, b);
         else waiting.delete(b.hash);
         if (v.verdict === 'refuse') saySwitchRefusal(circleId, b.payload?.authorRef, v.code);
       }
-      await rebuildRow(circleId, store, rowId, judged);
+      applied += await rebuildRow(circleId, store, rowId, judged);
     }
+    return applied;
   }
 
   async function rebuildRow(circleId, store, rowId, judged) {
     const allowed = judged.filter(({ v }) => v.verdict === 'apply').map(({ b }) => b);
     let before = null;
     try { before = (await store.get?.(rowId)) ?? null; } catch { before = null; }
-    try { await store.delete(rowId, { sync: false }); } catch { return; }
+    try { await store.delete(rowId, { sync: false }); } catch { return 0; }
     for (const b of allowed) {
       if (b.kind === 'snapshot') {
         const item = itemOf(circleId, b);
-        if (item) { try { await store.put(item, { sync: false, origin: true }); } catch { /* a type not held here */ } }
+        // the same refusals as a landing (a lane-carried row, an announcement by a non-admin): a rebuild is no back door
+        if (item && !(await refusedOnHead(circleId, item, b))) { try { await store.put(item, { sync: false, origin: true }); } catch { /* a type not held here */ } }
       } else {
         try { await store.delete(rowId, { sync: false }); } catch { /* already gone */ }
       }
@@ -259,6 +286,7 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     let after = null;
     try { after = (await store.get?.(rowId)) ?? null; } catch { after = null; }
     if (!after && before && typeof onItemRemoved === 'function') { try { await onItemRemoved(circleId, rowId); } catch { /* never fails */ } }
+    return allowed.length;
   }
 
   if (judging) onKeptPolicyChanges(base.deviceLog, (cid) => { rejudge(cid).catch(() => {}); });
@@ -279,21 +307,32 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
       if (body?.hash) parkedIn(circleId).delete(body.hash);
       if (v.verdict === 'refuse') { saySwitchRefusal(circleId, body.payload?.authorRef, v.code); return; }
     }
+    await landOnHead(circleId, store, body, { fresh });
+  }
+
+  /** Whether a snapshot's row may not land here whatever the switches say (true: refused, and said where it is news). */
+  async function refusedOnHead(circleId, item, body) {
+    // on an own lane, only that lane's self's items (one lane never writes another self's into the shared own store)
+    if (isOwn(circleId) && !ownBelongs(circleId, item)) return true;
+    // A roster row never lands through this lane: its addresses are proven facts patched in place,
+    // and a peer's snapshot of "the person's row" is that peer's view, not this device's — nor does the circle's
+    // rules head, which its own lane carries past an admin check. Refused here whatever served it (`rosterTrail.js`).
+    if (isLaneCarriedItem(item)) return true;
+    // An ANNOUNCEMENT is the store door's, but an admin's word: one whose author the folded roster does not name an
+    // admin is refused here, on the receiving device — the writer's own admin check binds only the writer's app.
+    if (item.type === 'announcement' && !(await authorIsAdmin(circleId, body.payload?.authorRef))) {
+      refusedOnce(circleId, body.payload?.authorRef);
+      return true;
+    }
+    return false;
+  }
+
+  /** Put a statement the switches allow (or that no switch judges) on the circle's head: the store's causal merge. */
+  async function landOnHead(circleId, store, body, { fresh = false } = {}) {
     if (body.kind === 'snapshot') {
       const item = itemOf(circleId, body);
       if (!item || typeof item.id !== 'string' || !item.id) return;
-      // on an own lane, only that lane's self's items (one lane never writes another self's into the shared own store)
-      if (isOwn(circleId) && !ownBelongs(circleId, item)) return;
-      // A roster row never lands through this lane: its addresses are proven facts patched in place,
-      // and a peer's snapshot of "the person's row" is that peer's view, not this device's — nor does the circle's
-      // rules head, which its own lane carries past an admin check. Refused here whatever served it (`rosterTrail.js`).
-      if (isLaneCarriedItem(item)) return;
-      // An ANNOUNCEMENT is the store door's, but an admin's word: one whose author the folded roster does not name an
-      // admin is refused here, on the receiving device — the writer's own admin check binds only the writer's app.
-      if (item.type === 'announcement' && !(await authorIsAdmin(circleId, body.payload?.authorRef))) {
-        refusedOnce(circleId, body.payload?.authorRef);
-        return;
-      }
+      if (await refusedOnHead(circleId, item, body)) return;
       // sync:false — an ingest never re-publishes (the echo loop); origin:true — the causal merge keeps
       // the writer's clock and runs the claim fold, exactly like the legacy mirror's inbound path.
       // whether this device held the row before: a snapshot that is an UPDATE (a claim, an edit) is not a new arrival.
@@ -394,10 +433,16 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
    * head is already current: a re-applied snapshot re-merges to the same result, and a re-applied
    * remove re-deletes nothing (the same idempotence `ingest` already relies on).
    *
+   * A circle whose switches are judged here re-applies through the same per-row pass as a re-judge: the statements of a
+   * row in arrival order, each the act the allowed ones before it make it (the kept act is the truth only for the row's
+   * first statement on this log). Statement by statement, a change whose add was taken back would be read against the
+   * store and its kept act, and put back a row the re-judge had dropped.
+   *
    * @returns {Promise<number>} statements applied (0 when the store still is not there)
    */
   async function rebuildHead(circleId) {
     if (!storeFor(circleId)) return 0;
+    if (judging && !isOwn(circleId)) return rejudge(circleId, { reapply: true });
     let bodies = [];
     try { ({ bodies = [] } = await base.readVerifiedBodies(circleId)); } catch { return 0; }
     let applied = 0;

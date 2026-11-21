@@ -38,7 +38,9 @@ was started 2026-11-18 with the first toolbox, a grocery search.
   one (`toolbox-not-yours` otherwise). Every refusal has a fixed code and a call never throws; a grant that ran out and one taken
   away are one code, `grant-expired` (pair again).
   **How the page is reached and what it may do (L1113).** The housemate types `/scherm <toolbox>`; the bot sends, in
-  their own private chat only, a link to the page where the operator placed it, carrying a one-use ticket (short-lived,
+  their own private chat only, a link to the page where the operator placed it (an https address, or a loopback
+  address `http://localhost:<port>/…` or `http://127.0.0.1:<port>/…`, which works on the same device only; plain
+  http on any other host is not kept), carrying a one-use ticket (short-lived,
   bound to that housemate and that toolbox). The page hands the ticket back in its offer; the bot reads the toolbox from
   the ticket, never from the page's own words, and then asks the housemate for the code as for any screen. A toolbox
   offer without a ticket, with a used, expired or someone else's ticket, or naming another toolbox, is refused in words

@@ -24,6 +24,18 @@ const WORD = /^[a-zà-ÿ][a-zà-ÿ0-9-]{0,23}$/;
 /** An op of the household's door as a placed file names it: `app.op`. */
 const OP_ID = /^[a-z][a-zA-Z0-9-]{0,31}\.[a-zA-Z][a-zA-Z0-9-]{0,63}$/;
 
+/**
+ * May a toolbox's page live at this address: https, or plain http on THIS device's loopback (`localhost` or
+ * `127.0.0.1`, exactly; a port and a path are fine; no userinfo), so a page served by a local web server on the
+ * same device pairs through the same link and ticket. Plain http on any other host is refused; `[::1]` is not admitted.
+ */
+function pageAddressOk(s) {
+  if (/^https:\/\/[^\s/]+/.test(s)) return true;
+  if (/\s/.test(s)) return false;
+  let u; try { u = new URL(s); } catch { return false; }
+  return u.protocol === 'http:' && !u.username && !u.password && (u.hostname === 'localhost' || u.hostname === '127.0.0.1');
+}
+
 /** A placed file as the operator wrote it, or null when it is not one (a bad name, address or words). */
 function readPlaced(p) {
   const name = String(p?.name ?? '').trim();
@@ -37,11 +49,11 @@ function readPlaced(p) {
       // what the word does, in a person's words per language (the operator's: 'zoekt producten'), for /help and the welcome
       ...(w.says && typeof w.says === 'object' ? { says: Object.fromEntries(Object.entries(w.says).filter(([, v]) => typeof v === 'string' && v.trim())) } : {}),
     }));
-  // A TOOLBOX'S PAGE (L1113): the address where the operator placed its page (`page`, https only), and the ops of the
+  // A TOOLBOX'S PAGE (L1113): the address where the operator placed its page (`page`, https or this device's loopback), and the ops of the
   // household's door that page may use beside `tools.useTool` for this toolbox (`ops`, `app.op`, the OPERATOR's words:
   // never read from the toolbox's own card). A page's grant is useTool + these, cut to the person's own role column.
   const ops = [...new Set((Array.isArray(p?.ops) ? p.ops : []).map((o) => String(o ?? '').trim()).filter((o) => OP_ID.test(o) && o !== 'tools.useTool'))];
-  const page = /^https:\/\/[^\s/]+/.test(String(p?.page ?? '')) ? String(p.page) : null;
+  const page = pageAddressOk(String(p?.page ?? '')) ? String(p.page) : null;
   return { name, url: String(p.url), words, ...(ops.length ? { ops } : {}), ...(page ? { page } : {}) };
 }
 

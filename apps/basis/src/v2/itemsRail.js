@@ -38,6 +38,25 @@ export const ITEMS_RAIL_KINDS = entryKindRegistryFromManifests(itemsManifest).ki
  * either (`routeItemsMirror`); catch-up below serves every row the store has a head for.
  */
 
+/**
+ * Oldest arrival first. The device log reads most-recent-first; a statement's place on it (`atSeq`, stamped where it
+ * landed, never by a writer) is the order it arrived here in. Every statement with a place is taken by its place (equal
+ * places in reading order); one without a place (a minimal log, a test's, reads oldest-first) comes after them, in the
+ * order it reads: its arrival is not known, so it is taken as the newest. One order for any mix (a comparator that
+ * compares places only when both have one is not an order, and the sort's answer would depend on where they started).
+ * @param {object[]} bodies
+ * @returns {object[]}
+ */
+export function inArrivalOrder(bodies) {
+  const placed = [];
+  const unplaced = [];
+  (Array.isArray(bodies) ? bodies : []).forEach((b, i) => {
+    if (Number.isFinite(b?.atSeq)) placed.push({ b, i, at: b.atSeq }); else unplaced.push(b);
+  });
+  placed.sort((x, y) => (x.at - y.at) || (x.i - y.i));
+  return [...placed.map(({ b }) => b), ...unplaced];
+}
+
 /** The wire subtypes for the items lane's fan + catch-up (the governance/membership pairs' sibling). */
 export const ITEMS_BROADCAST = 'circle-items-broadcast';
 export const ITEMS_CATCHUP_SUBTYPES = Object.freeze({
@@ -196,16 +215,6 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
    * allowed change survives a take-back. No allowed statement left: an add taken back is dropped (no tombstone); a row
    * older than the log goes back to the copy kept before the refused change, when this device kept one.
    */
-  /**
-   * Oldest arrival first. The device log reads most-recent-first; a statement's place on it (`atSeq`, stamped where it
-   * landed) is the order it arrived here in. A log without places (a minimal one) is taken in the order it reads.
-   */
-  function inArrivalOrder(bodies) {
-    return bodies.map((b, i) => ({ b, i, at: Number.isFinite(b?.atSeq) ? b.atSeq : null }))
-      .sort((x, y) => ((x.at !== null && y.at !== null) ? x.at - y.at : x.i - y.i))
-      .map(({ b }) => b);
-  }
-
   /**
    * `reapply` (the store opened, `rebuildHead`): every row is put to the head again, not only the rows a verdict
    * touched, so a statement that arrived while the store was not open lands now. Returns the statements applied.
@@ -446,7 +455,9 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     let bodies = [];
     try { ({ bodies = [] } = await base.readVerifiedBodies(circleId)); } catch { return 0; }
     let applied = 0;
-    for (const body of bodies) {
+    // in arrival order: the log reads most-recent-first, and a remove taken before the add it follows would let the add
+    // put the row back (a snapshot's merge is order-free by its clock; a remove is not)
+    for (const body of inArrivalOrder(bodies)) {
       try { await applyToHead(circleId, body); applied += 1; } catch { /* one bad body must not stop the rest */ }
     }
     return applied;

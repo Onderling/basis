@@ -41,6 +41,9 @@ rm -f ~/.config/systemd/user/onderling-tunnel.service ~/.local/bin/onderling-tun
 - ⚠️ The URL is a cloudflared **quick tunnel**, so it **rotates on every (re)start** —
   read `~/.onderling-relay-url` for the current one. It is stable only while the
   service stays up.
+- ⚠️ The relay answers only to the names in `RELAY_NAMES` (a device's proof of its address names the relay it
+  dialled). The tunnel's public host must be in it, so a rotating quick-tunnel name means restarting the relay with
+  the new name; a stable URL (below) is set once.
 
 ## Getting a truly STABLE URL (no card)
 

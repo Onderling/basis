@@ -18,7 +18,7 @@
  * localhost server is still a server that decides where our inbound traffic goes.
  */
 import { Transport } from './Transport.js';
-import { signAddressPossession } from '../identity/addressPossession.js';
+import { signAddressPossession, relayNameOf } from '../identity/addressPossession.js';
 
 /**
  * WebSocket transport to a localhost relay-style server, addressed by port, Unix
@@ -111,7 +111,8 @@ export class LocalTransport extends Transport {
           type:    'register-proof',
           address: this.address,
           nonce:   msg.nonce,
-          proof:   signAddressPossession(this.identity, this.address, msg.nonce),
+          proof:   signAddressPossession(this.identity, this.address, msg.nonce, relayNameOf(this.#url)),
+          relay:   relayNameOf(this.#url),
         }));
         return;
       }

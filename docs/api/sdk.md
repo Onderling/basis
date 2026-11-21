@@ -167,6 +167,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `isEd25519PubKey` | function | [`core.md`](core.md#ised25519pubkey) |
 | `isEnvelope` | function | [`core.md`](core.md#isenvelope) |
 | `isKnownRole` | function | [`core.md`](core.md#isknownrole) |
+| `isPrivateRelayName` | function | [`core.md`](core.md#isprivaterelayname) |
 | `isReservedProfileLabel` | function | [`core.md`](core.md#isreservedprofilelabel) |
 | `isSelfPersonKeyStatement` | function | [`core.md`](core.md#isselfpersonkeystatement) |
 | `isStandardRole` | function | [`core.md`](core.md#isstandardrole) |
@@ -243,6 +244,8 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `registerTunnelOpen` | function | [`core.md`](core.md#registertunnelopen) |
 | `registerTunnelOw` | function | [`core.md`](core.md#registertunnelow) |
 | `registerTunnelReceiveSealed` | function | [`core.md`](core.md#registertunnelreceivesealed) |
+| `relayNameOf` | function | [`core.md`](core.md#relaynameof) |
+| `relayOwnNames` | function | [`core.md`](core.md#relayownnames) |
 | `REPLY_CODES` | constant | [`core.md`](core.md#reply_codes) |
 | `requestSkills` | function | [`core.md`](core.md#requestskills) |
 | `RESERVED_PROFILE_LABELS` | constant | [`core.md`](core.md#reserved_profile_labels) |

@@ -25,7 +25,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { WebSocket } from 'ws';
 import {
-  AgentIdentity, deriveCircleAddress, circleAddressSigner, addressPossessionMessage, b64encode,
+  AgentIdentity, deriveCircleAddress, circleAddressSigner, addressPossessionMessage, b64encode, relayNameOf,
 } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { randomBytes } from 'node:crypto';
@@ -54,7 +54,10 @@ function openClient(url) {
     ws.once('error', reject);
   });
 }
-const send = (ws, obj) => ws.send(JSON.stringify(obj));
+// A proof names the relay the client dialled (the socket's own url); every client here dialled the one relay under test.
+const send = (ws, obj) => ws.send(JSON.stringify(obj.type === 'register-proof' && !('relay' in obj) ? { ...obj, relay: relayNameOf(ws.url) } : obj));
+/** The name of the relay under test, as its clients dialled it: what an honest proof signs. */
+let relayName = 'localhost';
 
 /** The challenge the relay issued for `address` on this socket. */
 async function challengeFor(ws, address) {
@@ -66,7 +69,7 @@ async function challengeFor(ws, address) {
 const ANNA_SEED = new Uint8Array(randomBytes(32));
 const annaAddress = (circleId) => deriveCircleAddress(ANNA_SEED, circleId);
 const annaSign = (circleId, address, nonce) =>
-  circleAddressSigner(ANNA_SEED, circleId)(addressPossessionMessage(address, nonce));
+  circleAddressSigner(ANNA_SEED, circleId)(addressPossessionMessage(address, nonce, relayName));
 
 describe('proof of possession on register', () => {
   let relay; let url;
@@ -74,6 +77,7 @@ describe('proof of possession on register', () => {
   beforeEach(async () => {
     relay = await startRelay({ port: 0, peerDiscovery: true });   // one check below reads the list; discovery is off by default
     url = `ws://127.0.0.1:${relay.port}`;
+    relayName = relayNameOf(url);
   });
   afterEach(async () => { await relay.stop(); });
 
@@ -98,7 +102,7 @@ describe('proof of possession on register', () => {
     const bramNonce = await challengeFor(bram, bramId.pubKey);
     send(bram, {
       type: 'register-proof', address: bramId.pubKey, nonce: bramNonce,
-      proof: b64encode(bramId.sign(addressPossessionMessage(bramId.pubKey, bramNonce))),
+      proof: b64encode(bramId.sign(addressPossessionMessage(bramId.pubKey, bramNonce, relayName))),
     });
     await waitFor(() => bram.messages.some((m) => m.type === 'registered'));
 
@@ -128,7 +132,7 @@ describe('proof of possession on register', () => {
     // the right message: the closest an attacker can get without the private key behind the address.
     send(impostor, {
       type: 'register-proof', address, nonce: stolenNonce,
-      proof: b64encode(impostorId.sign(addressPossessionMessage(address, stolenNonce))),
+      proof: b64encode(impostorId.sign(addressPossessionMessage(address, stolenNonce, relayName))),
     });
     await waitFor(() => impostor.messages.some((m) => m.type === 'error' && m.message === 'PROOF_INVALID'));
     expect(impostor.messages.some((m) => m.type === 'registered')).toBe(false);
@@ -141,7 +145,7 @@ describe('proof of possession on register', () => {
     const bramNonce = await challengeFor(bram, bramId.pubKey);
     send(bram, {
       type: 'register-proof', address: bramId.pubKey, nonce: bramNonce,
-      proof: b64encode(bramId.sign(addressPossessionMessage(bramId.pubKey, bramNonce))),
+      proof: b64encode(bramId.sign(addressPossessionMessage(bramId.pubKey, bramNonce, relayName))),
     });
     await waitFor(() => bram.messages.some((m) => m.type === 'registered'));
     send(bram, { type: 'send', to: address, envelope: { _p: 'OW', _from: bramId.pubKey, payload: { text: 'voor anna' } } });
@@ -274,7 +278,7 @@ describe('proof of possession on register', () => {
     const bn = await challengeFor(bram, bramId.pubKey);
     send(bram, {
       type: 'register-proof', address: bramId.pubKey, nonce: bn,
-      proof: b64encode(bramId.sign(addressPossessionMessage(bramId.pubKey, bn))),
+      proof: b64encode(bramId.sign(addressPossessionMessage(bramId.pubKey, bn, relayName))),
     });
     await waitFor(() => bram.messages.some((m) => m.type === 'registered'));
     for (const c of circles) {

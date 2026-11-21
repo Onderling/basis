@@ -153,7 +153,7 @@ import { networkInterfaces }                 from 'node:os';
 import { WebSocketServer }                   from 'ws';
 import {
   MAX_ENVELOPE_BYTES, senderVerdict,
-  newAddressChallenge, verifyAddressPossession, ADDRESS_CHALLENGE_TTL_MS,
+  newAddressChallenge, verifyAddressPossession, relayOwnNames, isPrivateRelayName, ADDRESS_CHALLENGE_TTL_MS,
 } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND }    from '@onderling/core';
 import { MultiRecipientQueue }               from './MultiRecipientQueue.js';
@@ -324,6 +324,9 @@ const STOP_GRACE_MS = 1_000;
 export async function startRelay(opts = {}) {
   const {
     port            = DEFAULT_PORT,
+    // the names this relay answers to, its operator's (bin/relay.js reads them from RELAY_NAMES); when set, only they
+    // count; unset, only a private name as the Host it came in under (relayOwnNames in core)
+    relayNames      = [],
     host            = '0.0.0.0',
     tlsCert,
     tlsKey,
@@ -359,6 +362,11 @@ export async function startRelay(opts = {}) {
     // A person's agenda link, forwarded to the node that holds it (off by default — the boot doors turn it on).
     feeds                     = false,
   } = opts;
+  // A relay's names are its OPERATOR's, never the caller's: the Host header is written by whoever dials (a hostile
+  // relay dialling this one chooses it). Without configured names only a private name (localhost, a LAN or loopback
+  // literal) is taken from Host.
+  const isOwnRelayNameOn = relayOwnNames({ names: relayNames });
+  let saidSetRelayNames = false;
 
   const effectiveQueueCapTotal = queueCapTotal ?? (queueCap * DEFAULT_QUEUE_CAP_RATIO);
 
@@ -717,7 +725,11 @@ export async function startRelay(opts = {}) {
     });
   }
 
-  wss.on('connection', (socket) => {
+  wss.on('connection', (socket, req) => {
+    // A proof of an address must name one of this relay's own names (`relayNames`, RELAY_NAMES), or, with none set, the
+    // private name this connection came in under; else it was answered for another relay (case-insensitive)
+    const dialled = typeof req?.headers?.host === 'string' && req.headers.host ? req.headers.host : 'localhost';
+    const isOwnRelayName = (name) => isOwnRelayNameOn(name, dialled);
     // G13 — ONE socket may own SEVERAL addresses: a device presents a different address per circle, and
     // (decisions.md 2026-07-27) since the relay can correlate them anyway via the shared push token, one
     // connection carrying N addresses is both the cheap and the correct shape. `registeredAddress` stays as
@@ -928,9 +940,13 @@ export async function startRelay(opts = {}) {
         }
         // THE CHECK. Verified against the ADDRESS, because the address is the public key. No
         // lookup, nothing to substitute, no issuer to consult.
-        if (!verifyAddressPossession({ address, nonce, proof })) {
+        if (!verifyAddressPossession({ address, nonce, proof, relay: msg.relay, isOwnRelayName })) {
           socket.send(JSON.stringify({ type: 'error', message: 'PROOF_INVALID', address }));
-          logLine(`[relay] proof-rejected ${shortId(address)}`);
+          logLine(`[relay] proof-rejected ${shortId(address)}${typeof msg.relay === 'string' && !isOwnRelayName(msg.relay) ? ` (it names another relay: ${String(msg.relay).slice(0, 60)})` : ''}`);
+          if (!saidSetRelayNames && typeof msg.relay === 'string' && !isOwnRelayName(msg.relay) && !isPrivateRelayName(msg.relay)) {
+            saidSetRelayNames = true;
+            logLine('[relay] a proof named a public name this relay was not given: if it is this relay\'s own, set RELAY_NAMES (the relay never takes a public name from the Host header)');
+          }
           // Refuse the FRAME, keep the socket — the same rule as every other register-time refusal
           // that is not the operator's serving policy. One socket legitimately owns many addresses;
           // a device whose signer for ONE circle is broken must not lose the others. The attacker

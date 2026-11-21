@@ -50,6 +50,10 @@ services:
       R2_SECRET_ACCESS_KEY: "${R2_SECRET_ACCESS_KEY:-}"
       R2_REGION: "${R2_REGION:-auto}"
       BLOB_GATE_UPLOADERS: "${BLOB_GATE_UPLOADERS:-}"
+      # the names this relay answers to (a device's address proof names the relay it dialled; the relay never takes a
+      # public name from the caller's Host): the public domain, the compose name the companion dials, and the health
+      # check's own socket. A LAN address devices dial goes in RELAY_NAMES in .env (the whole list then).
+      RELAY_NAMES: "${RELAY_NAMES:-${RELAY_DOMAIN:-},relay:8787,127.0.0.1:8787}"
       PUSH_PROVIDER: "${PUSH_PROVIDER:-}"
       PEER_DISCOVERY: "${PEER_DISCOVERY:-}"
       EXPO_ACCESS_TOKEN: "${EXPO_ACCESS_TOKEN:-}"

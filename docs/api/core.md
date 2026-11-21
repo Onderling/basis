@@ -1219,25 +1219,39 @@ A fresh, single-use challenge nonce (base64url). Verifier-side; never generated 
 **Kind:** function · **Import:** `addressPossessionMessage` from `'@onderling/core'`
 
 ```js
-addressPossessionMessage(address, nonce)
+addressPossessionMessage(address, nonce, relay)
 ```
 
-The canonical message a holder signs. Binds the ADDRESS being claimed to THIS nonce, so a proof
-cannot be lifted onto a different address or replayed against a different challenge.
+The canonical message a holder signs. Binds the ADDRESS being claimed to THIS nonce AND to the RELAY the device
+dialled (the host of its ws(s) address, which TLS proves to the device), so a proof cannot be lifted onto a different
+address, replayed against a different challenge, or carried by a hostile relay to an honest one: a relay passing on
+an honest relay's challenge gets an answer naming ITSELF, which the honest relay refuses (the independent read,
+2026-11-20).
 
 **Parameters**
 
 - `address` `string`
 - `nonce` `string`
+- `relay` `string` — the relay's name as the device dialled it (`relayNameOf(url)`)
 
 **Returns:** `string`
+
+### `relayNameOf`
+
+**Kind:** function · **Import:** `relayNameOf` from `'@onderling/core'`
+
+```js
+relayNameOf(url)
+```
+
+A relay's name as a device dials it: the host (with its port) of the ws(s) address; `localhost` for a local socket.
 
 ### `signAddressPossession`
 
 **Kind:** function · **Import:** `signAddressPossession` from `'@onderling/core'`
 
 ```js
-signAddressPossession(identity, address, nonce)
+signAddressPossession(identity, address, nonce, relay)
 ```
 
 Sign the challenge with an `AgentIdentity` whose `pubKey` IS the address.
@@ -1278,7 +1292,7 @@ the address belongs to, which is the one thing only the caller knows.
 **Kind:** function · **Import:** `signAddressPossessionFromSeed` from `'@onderling/core'`
 
 ```js
-signAddressPossessionFromSeed(derivationSeed, circleId, address, nonce)
+signAddressPossessionFromSeed(derivationSeed, circleId, address, nonce, relay)
 ```
 
 The same thing at the protocol's own level: sign THIS challenge for THIS per-circle address.
@@ -1298,15 +1312,16 @@ For callers that hold a nonce rather than a transport (another wire implementati
 **Kind:** function · **Import:** `verifyAddressPossession` from `'@onderling/core'`
 
 ```js
-verifyAddressPossession({ address, nonce, proof } = {})
+verifyAddressPossession({ address, nonce, proof, relay, isOwnRelayName } = {})
 ```
 
 Verify a presented proof against the address itself — deny-by-default: anything missing,
-malformed or unparseable is `false`, never a throw the caller might treat as "unknown".
+malformed or unparseable is `false`, never a throw the caller might treat as "unknown". The relay the proof names
+must be one this verifier answers to (`isOwnRelayName`), or the proof is refused whatever its signature.
 
 **Parameters**
 
-- `a` `{address?: string, nonce?: string, proof?: string}`
+- `a` `{address?: string, nonce?: string, proof?: string, relay?: string, isOwnRelayName?: (name: string) => boolean}`
 
 **Returns:** `boolean`
 

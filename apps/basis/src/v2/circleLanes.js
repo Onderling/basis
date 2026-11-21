@@ -95,6 +95,9 @@ export function buildCircleLanes({
     chatLanded = NOOP, chatChange = NOOP, chatCatchUpOffer = null, chatRefused = null,
     ownDeviceTurn = null,
   } = on;
+  // A key statement this device WRITES (a rotation on the key lane) reaches no handler below: the shell's key store hears
+  // of it here, or the device that rotated keeps sealing from a key chain without its own new version
+  if (keyChange !== NOOP) agent.onOwnKeyStatement?.(keyChange);
 
   // A landed membership batch changes the roster, so the cached reads must go. A shell may add its own
   // reaction on top; this part is not its choice, which is why it is the default rather than a hook.

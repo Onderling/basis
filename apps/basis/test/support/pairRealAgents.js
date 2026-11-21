@@ -419,6 +419,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // lane's projection — the production shells' exact wiring.
     ...(agent.keyRail ? (() => {
       const refresh = (cid) => projectKeyEventsIntoStore({ rail: agent.keyRail, store: keyEventStore, circleId: cid }).catch(() => {});
+      agent.onOwnKeyStatement?.(refresh);   // as buildCircleLanes does for the shells: a statement written here, too
       const keyCU = makeGovernanceCatchUp({
         rail: agent.keyRail,
         sendToPeer: sendPeer,
@@ -942,6 +943,21 @@ export async function postSealed({ admin, members = [], groupId, text }) {
   await Promise.all(members.map((n) =>
     admin.agent.sendPeerMessage(memberCircleAddress(n, groupId), { type: 'sealed-content', subtype: 'sealed-content', groupId, env }, { ...SEALED_SEND, circleId: groupId })));
   return env;
+}
+
+/**
+ * Wait until `node` holds a group key it can OPEN with the address it presents now (its key log folds to a version
+ * sealed to that address). After a re-key the rotation can reach a device later than its own address moves: the point
+ * catches up first and then rotates, or another device is the point and rotates for it. Resolves with the versions it
+ * held, or null when the wait ran out.
+ */
+export async function untilHoldsCurrentKey(node, groupId, { timeout = 20000 } = {}) {
+  return until(() => {
+    try {
+      const chain = readKeyChain(node.keyEventStore.list(groupId), { groupId, opener: memberOpener(node, groupId) });
+      return currentGroupKey(chain) ? chain.map((c) => c.version) : null;
+    } catch { return null; }
+  }, { timeout, step: 200 });
 }
 
 // ── Sealed circle via the REAL producer + control agent (drives the LIVE removeMember op) ───────────────────

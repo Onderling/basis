@@ -6725,8 +6725,12 @@ export async function createRealHouseholdAgent(opts = {}) {
   // Every key statement this device writes — the shells' sinks and the revoke ceremony all emit through
   // here — also reaches its other devices by the one carry, whichever caller fans it to the members.
   const keyEmitBare = makeKeyEmitter({ rail: keyRail });
+  // …and reaches this device's OWN key store: a shell refreshes its store when a key statement ARRIVES, and one written
+  // here (a rotation on the key lane, as a re-key that waited for its catch-up runs) arrives from nobody
+  const ownKeyStatementListeners = new Set();
   const keyEmit = keyEmitBare ? async (circleId, event) => {
     const statement = await keyEmitBare(circleId, event);
+    if (statement) for (const fn of [...ownKeyStatementListeners]) { try { await fn(circleId); } catch { /* a shell's refresh is its own */ } }
     if (statement) siblingCarry.carry({ subtype: KEY_STATEMENT_BROADCAST, circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now() }).catch(() => {});
     return statement;
   } : null;
@@ -10851,6 +10855,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // catch-up pair over the rail, and refresh their key-event store as the lane's projection.
     keyRail,
     keyEmit,
+    /** `fn(circleId)` after every key statement THIS device writes (it reaches no receive handler here); → unsubscribe. */
+    onOwnKeyStatement: (fn) => { if (typeof fn !== 'function') return () => {}; ownKeyStatementListeners.add(fn); return () => ownKeyStatementListeners.delete(fn); },
     /** State the circle's policy on the governance lane: `{groupId, policy, version}` → the signed statement or null. */
     emitPolicyUpdate: policyUpdateEmit,
     registerSelfIdentity: (address, identity) => sa.registerSelfIdentity?.(address, identity) ?? false,

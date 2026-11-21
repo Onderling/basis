@@ -120,8 +120,8 @@ import { backfillContactPersonas } from '../../v2/contactPersona.js';   // conta
 import { bookRowsOf } from '../../v2/contactsSource.js';   // a listContacts reply's rows, whole
 import { KEEP_DAYS_KEY, roomRetentionMs, makeRoomKeeper, earlierInTheRoom } from '../../v2/nearbyKept.js';
 import { recordOwnAction, ownRetentionMs, OWN_RECORD_KEY, OWN_KEEP_WEEKS_KEY, ownActionRows, ownActionsExport, OWN_ACTION_KIND, noteOwnOutcome } from '../../ownActions.js';   // the person's own acts, at the outer waist
-import { circleActRefusal, writeIntoRefusal, gateRefusalKey } from '../../v2/circleActGate.js';
-import { keptPolicyChangesOf, requestKeptPolicyChanges } from '../../v2/keptPolicyChanges.js';   // a write into another circle judged as its receivers judge it   // a person's write in a circle asks that circle's capability set, at the outer waist
+import { circleActRefusal, writeIntoRefusal, gateRefusalKey } from '../../v2/circleActGate.js';   // a person's write in a circle asks that circle's capability set, at the outer waist
+import { keptPolicyChangesOf, requestKeptPolicyChanges } from '../../v2/keptPolicyChanges.js';   // a write into another circle judged as its receivers judge it
 import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
 import { makeSyncSelection } from '../../v2/syncSelection.js';
 import { leaveCircleLocally } from '../../v2/circleMembershipHygiene.js';

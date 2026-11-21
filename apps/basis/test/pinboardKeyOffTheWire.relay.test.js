@@ -19,7 +19,9 @@ async function startCapturingProxy(relayUrl) {
   const wss = new WebSocketServer({ port: 0 });
   await new Promise((r) => wss.once('listening', r));
   wss.on('connection', (client, req) => {
-    const upstream = new WebSocket(relayUrl + (req.url ?? ''));
+    // the Host the client dialled is passed on, as a reverse proxy in front of a relay does: a device's address proof
+    // names that host, and the relay accepts only a proof naming a name of its own
+    const upstream = new WebSocket(relayUrl + (req.url ?? ''), { headers: { host: req.headers.host } });
     const pending = [];
     upstream.on('open', () => { for (const m of pending.splice(0)) upstream.send(m); });
     client.on('message', (m) => { frames.push(String(m)); if (upstream.readyState === WebSocket.OPEN) upstream.send(m); else pending.push(m); });

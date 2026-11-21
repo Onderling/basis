@@ -58,8 +58,10 @@ async function relayAt(rate) {
 async function idStrippingProxy(upstreamUrl) {
   const wss = new WebSocketServer({ port: 0, host: '127.0.0.1' });
   await new Promise((r) => wss.once('listening', r));
-  wss.on('connection', (down) => {
-    const up = new WebSocket(upstreamUrl);
+  wss.on('connection', (down, req) => {
+    // it passes the Host the client dialled on, as a reverse proxy in front of a relay does: the client's proof names
+    // that host, and the relay accepts only a proof naming a name of its own
+    const up = new WebSocket(upstreamUrl, { headers: { host: req.headers.host } });
     const pending = [];
     up.on('open', () => { while (pending.length) up.send(pending.shift()); });
     down.on('message', (data) => { const s = data.toString(); if (up.readyState === 1) up.send(s); else pending.push(s); });

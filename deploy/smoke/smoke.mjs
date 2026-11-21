@@ -60,7 +60,9 @@ const wait  = (ms) => new Promise(r => setTimeout(r, ms));
  * hold the key behind the address it claims. Node's built-in ed25519 keeps the script's one-dep
  * promise (`ws`); the wire encoding is base64url-unpadded, matching @onderling/core's b64.
  */
-const POSSESSION_V1 = (address, nonce) => `onderling-address-possession-v1|${address}|${nonce}`;
+// v2 names the relay the client dialled (the host of its url), as @onderling/core's addressPossessionMessage does
+const POSSESSION_V2 = (relay, address, nonce) => `onderling-address-possession-v2|${relay}|${address}|${nonce}`;
+const relayNameOf = (url) => { try { return new globalThis.URL(String(url)).host || 'localhost'; } catch { return 'localhost'; } };
 function makeIdentity() {
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
   const spki = publicKey.export({ type: 'spki', format: 'der' });
@@ -94,8 +96,8 @@ class RelayClient {
         // Step 2 of 2: sign the relay's single-use nonce with the key behind the address.
         if (msg.type === 'challenge' && msg.address === this.address) {
           ws.send(JSON.stringify({
-            type: 'register-proof', address: this.address, nonce: msg.nonce,
-            proof: this.identity.sign(POSSESSION_V1(this.address, msg.nonce)),
+            type: 'register-proof', address: this.address, nonce: msg.nonce, relay: relayNameOf(this.url),
+            proof: this.identity.sign(POSSESSION_V2(relayNameOf(this.url), this.address, msg.nonce)),
           }));
           return;
         }

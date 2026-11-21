@@ -72,9 +72,15 @@ It is also a useful design tool. Asking the question tells you *where the gate a
 - **Whose item it is binds on the receiving device** (`madeBy`, `changedBy`): a member's device that skips its own
   check cannot change or remove another member's note, post or ask on anyone else's device. What is left: a row whose
   maker is not known there (made before makers were kept, or served by catch-up without one) takes any member's change
-  (lenient on purpose for the alpha: strict would refuse honest edits of old rows on a late joiner); an admin is judged
-  by the roster as it stands, not at the statement's own place; a served head carries the maker as the serving member
-  holds it (`apps/basis/src/v2/itemsRail.js`).
+  (lenient on purpose for the alpha: strict would refuse honest edits of old rows on a late joiner). An admin's act is
+  judged by the roster when it first reaches a device, and that verdict is KEPT there, so a later demotion does not undo
+  it at a re-apply; but the membership lane is not linked to the items line, so a device that first judges an old admin
+  act after the demotion (a late joiner's catch-up) refuses it, and two devices can stay apart on it (a cross-lane
+  frontier closes it: later). A served catch-up head is not judged at all: a member who answers a catch-up can hand a
+  changed copy of another member's row, taken by its clock (closed by keeping the writer's original statement beside
+  the row). And a row can be claimed on a device that has not received it yet: a changed app that sees a new row can
+  send its own snapshot of that id without naming the add, and a device that receives that one first holds the wrong
+  maker and then refuses the real one (closed by binding a row's id to its maker) (`apps/basis/src/v2/itemsRail.js`).
 
 ## The inverse failure
 

@@ -140,4 +140,27 @@ describe('whose item it is, judged by each receiving device', () => {
     expect((await yara.store.get(task.id)).text).toBe('changed');
     expect((await yara.store.get(task.id)).madeBy).toBe(madeBy);
   });
+
+  it('an admin\'s removal stays removed after the admin is demoted, also when the store is opened again', async () => {
+    const { roster, wire, ada, xavi, yara } = await three();
+    const note = await xavi.store.put({ type: 'note', text: 'mine', body: 'mine' }, { by: 'webid:xavi' });
+    await settle(); await flush(wire, ada, yara);
+    await yara.store.delete(note.id);                 // yara is an admin: taken
+    await settle(); await flush(wire, ada, xavi);
+    expect(await ada.store.get(note.id)).toBeNull();
+    roster.find((m) => m.webid === 'webid:yara').role = 'member';   // demoted
+    await ada.rail.rebuildHead(CIRCLE);               // the store opens again: everything is re-applied
+    await settle();
+    expect(await ada.store.get(note.id), 'the removal stands').toBeNull();
+  });
+
+  it('a removal made AFTER the demotion is refused', async () => {
+    const { roster, wire, ada, xavi, yara } = await three();
+    const note = await xavi.store.put({ type: 'note', text: 'mine', body: 'mine' }, { by: 'webid:xavi' });
+    await settle(); await flush(wire, ada, yara);
+    roster.find((m) => m.webid === 'webid:yara').role = 'member';
+    await yara.store.delete(note.id);
+    await settle(); await flush(wire, ada, xavi);
+    expect(await ada.store.get(note.id)).not.toBeNull();
+  });
 });

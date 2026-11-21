@@ -189,6 +189,21 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
   };
   /** The maker of a held row (`madeBy`); null when not known here (made before makers were kept, or served without one). */
   const makerOf = (_circleId, previous) => previous?.madeBy ?? null;
+  /**
+   * ADMIN AUTHORITY, judged once per statement on this device and KEPT: the first judgment asks the roster (the author an
+   * admin then); a re-apply or rebuild finds the kept verdict and takes the statement again without asking the roster as
+   * it stands now, so demoting an admin does not undo their moderation here. The membership lane is not linked to the
+   * items line, so "an admin at the statement's own place" has no causal answer yet (a cross-lane frontier: later); a
+   * device that first judges an old admin act after the demotion (a late joiner) refuses it (enforceability.md).
+   */
+  async function adminAuthority(circleId, author, body) {
+    const hash = body?.hash;
+    const kept = judging && typeof hash === 'string' && hash ? judgmentsOf(circleId) : null;
+    if (kept?.adminTaken?.(hash)) return true;
+    if (!(await authorIsAdmin(circleId, author))) return false;
+    kept?.noteAdminTaken?.(hash);
+    return true;
+  }
   /** Why this statement may not change the row (a code), or null. `previous` is the row as held here (null: not held). */
   async function whoseRefusal(circleId, item, body, previous, { remove = false } = {}) {
     if (isOwn(circleId) || !previous) return null;   // a new row: its maker is its author (`fixMaker`)
@@ -199,7 +214,7 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     const maker = makerOf(circleId, previous);
     if (!remove && item && item.madeBy != null && maker != null && item.madeBy !== maker) return 'changed-maker';
     if (rule === 'circle' || maker == null || maker === author) return null;
-    if (await authorIsAdmin(circleId, author)) return null;
+    if (await adminAuthority(circleId, author, body)) return null;
     return 'not-yours';
   }
   /** The row as it is put here: a new row's maker is the statement's verified author; a change keeps the held one. */
@@ -377,7 +392,7 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     if (isLaneCarriedItem(item)) return true;
     // An ANNOUNCEMENT is the store door's, but an admin's word: one whose author the folded roster does not name an
     // admin is refused here, on the receiving device — the writer's own admin check binds only the writer's app.
-    if (item.type === 'announcement' && !(await authorIsAdmin(circleId, body.payload?.authorRef))) {
+    if (item.type === 'announcement' && !(await adminAuthority(circleId, body.payload?.authorRef, body))) {
       refusedOnce(circleId, body.payload?.authorRef);
       return true;
     }

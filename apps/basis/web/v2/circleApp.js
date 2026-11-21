@@ -4788,8 +4788,8 @@ function shellGovernance({ myWebid = '' } = {}) {
     circleIdentityFor: circleIdentityForShell,
     spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
     // an enacted settings change: written here, then stated on the lane so every member's device applies it
-    setPolicy: (cid, patch) => policyStore.update(cid, patch),
-    statePolicy: (cid, meta) => circlePolicyLane.state(cid, meta),
+    // a decided change is stated first and written only when stated (the settings save's own rule)
+    saveSettings: (cid, patch, meta) => saveCircleSettings({ lane: circlePolicyLane, circleId: cid, policy: patch, proposalId: meta?.proposalId ?? null }),
     policyVersionOf: (cid) => circlePolicyLane.headVersion(cid),   // a rules change is stamped with the settings version held
   });
 }

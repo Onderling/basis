@@ -43,7 +43,7 @@ describe('one governance binding per shell', () => {
       expect(calls.length).toBe(1);
     });
     it(`${shell}: the binding carries what deciding needs`, () => {
-      for (const opt of ['agent', 'spineGate', 'circleIdentityFor', 'setPolicy', 'statePolicy']) {
+      for (const opt of ['agent', 'spineGate', 'circleIdentityFor', 'saveSettings']) {
         expect(calls[0] ?? '', `${shell} binding lacks ${opt}`).toMatch(new RegExp(`\\b${opt}\\s*[:,]`));
       }
     });

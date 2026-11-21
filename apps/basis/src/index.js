@@ -424,4 +424,4 @@ export { fieldAfterLoad } from './v2/fieldAfterLoad.js';
 export { itemKindChip } from './v2/embedChips.js';
 
 // an admin's settings save: stated to the circle, written here only when that went out (web and phone)
-export { statingPolicyStore } from './v2/policyUpdateLane.js';
+export { statingPolicyStore, saveCircleSettings } from './v2/policyUpdateLane.js';

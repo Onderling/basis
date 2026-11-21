@@ -157,9 +157,14 @@ export function sealedNamedBackend(name, open) {
  *     overwrites in the meantime.
  * @param {object} storage  `getItem` / `setItem` / `removeItem` (sync or async), and whatever listing it offers
  *   (`key(i)` + `length`, or `getAllKeys()`), passed through
- * @param {{name?: string, strict?: boolean, waitForKey?: boolean}} [o]
+ *
+ * `resealAtStart` (strict only): the keys this store owns, as exact keys or prefixes. A plain value is resealed at its
+ * first READ, and a value nothing reads in a start stays plain (the upgrade walk, 2026-11-20: two policy heads and the
+ * availability). So once the content key is there, the store's own keys are listed once and each is read: a plain one
+ * is written back sealed, a sealed one writes nothing, one that will not open is kept (the read's own rules).
+ * @param {{name?: string, strict?: boolean, waitForKey?: boolean, resealAtStart?: string[]}} [o]
  */
-export function sealedKeyValue(storage, { name = 'a store', strict = false, waitForKey = false, said = false, overwritable = false } = {}) {
+export function sealedKeyValue(storage, { name = 'a store', strict = false, waitForKey = false, said = false, overwritable = false, resealAtStart = null } = {}) {
   // EVERY mode keeps what it could not open (L1115): a value that will not open is marked, and a write to it is refused
   // until a read of it opens. `overwritable: true` only for a store whose loss is harmless, its reason at the call site
   // (a cache rebuilt from elsewhere, a remembered "no" that may simply be asked again).
@@ -208,7 +213,27 @@ export function sealedKeyValue(storage, { name = 'a store', strict = false, wait
     Object.defineProperty(kv, 'length', { get: () => storage.length, enumerable: true });
   }
   if (typeof storage.getAllKeys === 'function') kv.getAllKeys = (...a) => storage.getAllKeys(...a);
+  if (strict && Array.isArray(resealAtStart) && resealAtStart.length) {
+    onShellContentSeal(() => { setTimeout(() => { resealOwnKeys(storage, kv, resealAtStart).catch(() => {}); }, 0); });
+  }
   return kv;
+}
+
+/** Every key of `storage` that is one of `owned` or starts with one; '' when the storage cannot list. */
+async function listOwnKeys(storage, owned) {
+  let keys = [];
+  if (typeof storage.getAllKeys === 'function') keys = await storage.getAllKeys();
+  else if (typeof storage.key === 'function') {
+    for (let i = 0; i < Number(storage.length ?? 0); i++) { const k = storage.key(i); if (k != null) keys.push(k); }
+  }
+  return (keys ?? []).filter((k) => typeof k === 'string' && owned.some((p) => k === p || k.startsWith(p)));
+}
+
+/** Read each owned key once through the strict read, which reseals a plain value (and writes nothing else). */
+async function resealOwnKeys(storage, kv, owned) {
+  for (const k of await listOwnKeys(storage, owned)) {
+    try { await kv.getItem(k); } catch { /* one key's failure never stops the others; its own read reports it */ }
+  }
 }
 
 /**

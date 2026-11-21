@@ -377,5 +377,5 @@ export function adminsOfViaSkill(callSkill) {
 /** The policy-head store, SEALED at rest (ledger L1083: it keeps the circle policy's original statement), over
  *  localStorage (web) or AsyncStorage (phone). */
 export function sealedPolicyHeadStore(storage) {
-  return makePolicyHeadStore(sealedKeyValue(storage, { name: 'the policy head', strict: true }));
+  return makePolicyHeadStore(sealedKeyValue(storage, { name: 'the policy head', strict: true, resealAtStart: [POLICY_HEAD_KEY('')] }));
 }

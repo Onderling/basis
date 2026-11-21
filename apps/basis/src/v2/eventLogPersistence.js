@@ -227,6 +227,8 @@ export function fileKeyValueStorage(filePath) {
     getItem: (key) => onePerFile(filePath, async () => (await read())[key] ?? null),
     setItem: (key, value) => onePerFile(filePath, async () => { const m = await read(); m[key] = String(value); await write(m); }),
     removeItem: (key) => onePerFile(filePath, async () => { const m = await read(); delete m[key]; await write(m); }),
+    // listed like AsyncStorage, so a store that reseals its own keys at the start can find them
+    getAllKeys: () => onePerFile(filePath, async () => Object.keys(await read())),
   };
 }
 

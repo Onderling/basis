@@ -192,3 +192,21 @@ describe('what the admin said yes to is what runs (Fable on #1405)', () => {
     expect(await ops.addToolbox({ name: 'boodschappen', confirm: true })).toEqual({ ok: false, code: 'toolbox-word-taken', name: 'boodschappen', word: 'zoek' });
   });
 });
+
+describe('a toolbox page\'s placed address: https, or loopback on the same device', () => {
+  const pageOf = async (page) => { const h = harness({ placed: [{ ...PLACED, page }] }); await on(h); return h.ops.pageOf('boodschappen'); };
+
+  it('keeps an https page and a loopback page (localhost and 127.0.0.1, with a port and a path)', async () => {
+    for (const page of ['https://box.home.example:8443/boodschappen/', 'http://localhost:5173/boodschappen/', 'http://127.0.0.1:8080/b/index.html?x=1']) {
+      expect(await pageOf(page), page).toEqual({ page, ops: [] });
+    }
+  });
+
+  it('drops a plain http page on any other host, a look-alike host, a userinfo trick, and [::1] (not admitted)', async () => {
+    for (const page of ['http://box.home.example/boodschappen/', 'http://192.168.1.5:8080/', 'http://localhost.evil.example/',
+      'http://127.0.0.1.evil.example/', 'http://localhost@evil.example/', 'http://evil.example@localhost:8080/', 'http://[::1]:8080/',
+      'ftp://localhost/', 'localhost:8080/', 'http://localhost:8080/ spatie']) {
+      expect(await pageOf(page), page).toBeNull();
+    }
+  });
+});

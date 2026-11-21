@@ -1,3 +1,4 @@
+import { causalOrder } from '@onderling/core';
 import { describe, it, expect, vi } from 'vitest';
 import { AgentIdentity, signSpine, createSignatureMemo } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
@@ -17,7 +18,7 @@ function fakeEventLog() {
   const byId = new Set();
   return {
     entries,
-    query() { return entries.slice(); },
+    query() { return entries.slice().reverse(); },   // newest-first, as the device log reads
     appendSilentEntry({ circleId, kind, payload, id }) {
       if (byId.has(id)) return entries.find((e) => e.id === id);   // first-write-wins (audit semantics)
       byId.add(id);
@@ -403,6 +404,6 @@ describe('the rail — a statement checked on one read is not checked again on t
     // a statement damaged after it landed is a different statement: checked again, refused
     log.entries[1].payload = { ...log.entries[1].payload, body: { ...log.entries[1].payload.body, subject: 'v-x' } };
     const { bodies } = await reader.readVerifiedBodies(CIRCLE);
-    expect(bodies.map((b) => b.subject)).toEqual(['v-0', 'v-2']);
+    expect(causalOrder(bodies).map((b) => b.subject), 'in their own order: the reading order is the log\'s').toEqual(['v-0', 'v-2']);
   });
 });

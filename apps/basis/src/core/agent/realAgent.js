@@ -656,6 +656,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     dataSourceFor: (id) => circleMedia.get(id) ?? null,
     // what a write is made for, when a planned row made it (`opts.writeOrigin`: the host's runner's ambient origin)
     ...(typeof opts.writeOrigin === 'function' ? { originOf: opts.writeOrigin } : {}),
+    // who made a NEW row written here (`madeBy`): the very ref the items lane signs this circle's statements with, from
+    // the rail's own function (one source, so the maker's device and every receiver agree); none before the rail exists
+    makerFor: (circleId) => itemsRail?.selfRefFor?.(circleId) ?? null,
   });
   // THE HISTORY KEYS (the replace ceremony's re-wrap, held locally): group-key versions this person is
   // entitled to that were wrapped to a RETIRED device's derivable sealing key. The ceremony unwraps them
@@ -6591,6 +6594,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       // the circle's switches bind on arrival: each statement judged by the settings at its place (`contentJudge.js`),
       // against the same manifests the sender's gate reads
       judge: { manifests: () => allManifests() },
+      // whose item it is binds on arrival too: each type's declared `changedBy` ('author' | 'circle'; none = 'author'),
+      // read from the same registry the circle stores validate against
+      changedByOf: (type) => storeRegistry.schema?.(type)?.changedBy,
       // the person's own scope: between their own devices only (see the own store above)
       // …one lane per self this device holds: each signed, carried and verified as that self's devices
       own: {

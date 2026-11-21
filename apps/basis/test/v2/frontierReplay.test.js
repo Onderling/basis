@@ -1,3 +1,4 @@
+import { causalOrder } from '@onderling/core';
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
@@ -15,7 +16,7 @@ function fakeEventLog() {
   const entries = []; const byId = new Set();
   return {
     entries,
-    query() { return entries.slice(); },
+    query() { return entries.slice().reverse(); },   // newest-first, as the device log reads
     appendSilentEntry({ circleId, kind, payload, id, ts }) {
       if (byId.has(id)) return entries.find((e) => e.id === id);
       byId.add(id);
@@ -113,7 +114,9 @@ describe('frontierReplay — the windowed lane catch-up', () => {
     const bo  = await device('webid:bo',  bindings);
     await append(ada, 5);
     // bo already has the first 3 (a previous sync): ingest them directly.
-    for (const s of ada.rail.storedStatements(CIRCLE).slice(0, 3)) await bo.rail.ingest(CIRCLE, s);
+    // the first 3 by the statements' own order (the log reads newest-first)
+    const inOrder = causalOrder(ada.rail.storedStatements(CIRCLE).map((s) => s.body)).map((b) => ada.rail.storedStatements(CIRCLE).find((s) => s.body === b));
+    for (const s of inOrder.slice(0, 3)) await bo.rail.ingest(CIRCLE, s);
 
     const { ra, rb, wires, drain } = connect(ada, bo);
     await rb.requestFrom('peer:ada', CIRCLE);      // lands in ada's queue

@@ -20,7 +20,7 @@ function fakeEventLog() {
   const entries = []; const byId = new Set();
   return {
     entries,
-    query() { return entries.slice(); },
+    query() { return entries.slice().reverse(); },   // newest-first, as the device log reads
     appendSilentEntry({ circleId, kind, payload, id, ts }) {
       if (byId.has(id)) return entries.find((e) => e.id === id);
       byId.add(id);

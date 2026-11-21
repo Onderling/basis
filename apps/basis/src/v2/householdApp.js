@@ -26,7 +26,9 @@ import { householdManifest } from '../../../household/manifest.js';
 export const LIST_TYPES = Object.freeze(['shopping', 'errand', 'repair', 'schedule']);
 const COMPLETABLE = Object.freeze([...LIST_TYPES, 'task']);   // markComplete/removeItem search these (mirrors the manifest appliesTo)
 
+// the household list kinds are shared lists: any member ticks an entry off (`changedBy`, see item-types canonical.js)
 const listTypeSchema = (t) => ({
+  changedBy: 'circle',
   type: 'object',
   properties: { type: { const: t }, text: { type: 'string', minLength: 1 }, completedAt: { type: ['number', 'null'] } },
   required: ['type', 'text'],

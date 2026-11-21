@@ -53,6 +53,9 @@ export function createRegistry() {
   // `iri` is an unknown keyword; declare it explicitly so ajv treats it as a
   // descriptive annotation rather than logging a warning on every schema.
   ajv.addKeyword({ keyword: 'iri', metaSchema: { type: 'string' } });
+  // `changedBy` — who may change and remove a row ('author' | 'circle'), read by the receiving items lane; an
+  // annotation like `iri`, never a property of the item
+  ajv.addKeyword({ keyword: 'changedBy', metaSchema: { enum: ['author', 'circle'] } });
 
   /** @type {Map<string, TypeEntry>}       */ const types       = new Map();
   /** @type {Map<string, (i: any) => boolean>} */ const validators  = new Map();

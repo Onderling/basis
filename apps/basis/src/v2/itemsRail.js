@@ -152,6 +152,7 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
   const manifestsOf = () => { try { return (typeof judge?.manifests === 'function' ? judge.manifests() : judge?.manifests) ?? []; } catch { return []; } };
   const parked = new Map();       // circleId → Map<hash, body>
   const parkedIn = (cid) => parked.get(cid) ?? parked.set(cid, new Map()).get(cid);
+  const storeless = new Set();    // hashes that arrived while their circle's store was not open (their act is read on landing)
   // what this device proved, and the row as it was where a take-back needs it: on the device log (`contentJudgments.js`)
   const judgmentsOf = (cid) => contentJudgmentsOn(base.deviceLog, cid);
   const switchRefused = new Set();
@@ -297,7 +298,17 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
       // in arrival order: whether the row is held at a statement follows from the ones taken before it, and the first
       // one here is the act it was when it arrived (kept; a change: the row was held before it)
       const first = list[0];
-      const firstAct = first?.kind === 'snapshot' ? judgmentsOf(circleId).act(first.hash) : null;
+      let firstAct = first?.kind === 'snapshot' ? judgmentsOf(circleId).act(first.hash) : null;
+      // a row's first statement that arrived while the store was not open lands on the head HERE for the first time: the
+      // act it arrived as is read now, as `ingest` reads it on a landing (a row not held: an add). Left unknown, a later
+      // re-judge that parks it could not tell its own add from a row older than the log, and kept it on the head
+      if (first?.kind === 'snapshot' && !firstAct && storeless.has(first.hash)) {
+        let row = null;
+        try { row = (await store.get?.(rowId)) ?? null; } catch { row = null; }
+        firstAct = row ? 'change' : 'add';
+        judgmentsOf(circleId).noteAct(first.hash, firstAct);
+      }
+      for (const b of list) storeless.delete(b.hash);
       let held = null;
       if (firstAct === 'change' || first?.kind === 'remove') {
         held = judgmentsOf(circleId).previous(first.hash);
@@ -372,7 +383,7 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
 
   async function applyToHead(circleId, body, { fresh = false } = {}) {
     const store = storeFor(circleId);
-    if (!store) return;
+    if (!store) { if (fresh && judging && !isOwn(circleId) && body?.hash) storeless.add(body.hash); return; }
     if (judging && !isOwn(circleId)) {
       const v = await verdictFor(circleId, body, { fresh });
       if (v.verdict === 'park') { if (body?.hash) parkedIn(circleId).set(body.hash, body); return; }

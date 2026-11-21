@@ -34,7 +34,7 @@ function fakeEventLog() {
   };
 }
 
-async function device(ref, rosterAll, wire, { stores = null } = {}) {
+async function device(ref, rosterAll, wire, { stores = null, gate = null } = {}) {
   const cid = await AgentIdentity.generate(new VaultMemory());
   const row = rosterAll.find((m) => m.webid === ref);
   if (row) row.circleAddress = cid.pubKey;
@@ -47,7 +47,8 @@ async function device(ref, rosterAll, wire, { stores = null } = {}) {
     circleIdentityFor: async () => cid,
     myRef: ref,
     callSkill: async (app, op) => (app === 'pinboard' && op === 'listGroupMembers' ? { members: rosterAll.map((m) => ({ ...m })) } : {}),
-    storeFor: (circleId) => held.getStore(circleId),
+    // `gate`: the circle's store is not open on this device until `gate.open` (storeFor peeks, it never builds)
+    storeFor: (circleId) => (!gate || gate.open ? held.getStore(circleId) : null),
     verifyBinding: async ({ author, ref: r }) => rosterAll.some((m) => m.circleAddress === author && m.webid === r),
     judge: { manifests: () => allManifests() },
   });
@@ -146,5 +147,33 @@ describe('the items lane judges what it applies', () => {
     await settle(); await deliver(wire, bo); await settle();
     expect(asked).toBe(1);
     expect((await bo.store.get(t.id))?.text, 'parked, then applied once the lane answered').toBe('while bo started');
+  });
+
+  it('a joiner: a raced add that landed when its store opened is taken back when the settings arrive and park it', async () => {
+    // Order by hand what the three-device test hit 1 run in 6: a joiner gets the raced statement (re-fanned by a member)
+    // before its store is open and before any settings statement is held here. The store opens: the statement lands
+    // through the re-apply, judged by "no settings known here" (empty: filters nothing). Then the settings chain
+    // arrives; the raced statement's links aged out everywhere, so its place is unknown and it parks. A parked add is
+    // not applied: the row must go, as it does for a statement that landed while the store was open.
+    const rosterAll = [{ webid: 'webid:ada', role: 'member' }, { webid: 'webid:dirk', role: 'admin' }];
+    const wire = [];
+    const ada = await device('webid:ada', rosterAll, wire);
+    const gate = { open: false };
+    const dirk = await device('webid:dirk', rosterAll, wire, { gate });
+    const v1 = change(1, ON, null);
+    await addTasks(ada.store, [{ text: 'made while adding was on' }], { actor: 'webid:ada' });
+    await settle();
+    wire.length = 0;                                           // aged out before dirk joined: dirk never holds it
+    const v2 = change(2, ADD_OFF, ada);                        // the line names ada's statement, which dirk does not hold
+    const [raced] = await addTasks(ada.store, [{ text: 'raced' }], { actor: 'webid:ada' });
+    await settle(); await deliver(wire, dirk);
+    expect(dirk.rail.storedStatements(CIRCLE).some((s) => s.body.subject === raced.id), 'on dirk\'s log').toBe(true);
+    noteKeptPolicyChanges(dirk.eventLog, CIRCLE, []);           // the settings lane holds no settings statement yet
+    gate.open = true;
+    await dirk.rail.rebuildHead(CIRCLE);                       // the store opens
+    expect((await dirk.store.get(raced.id))?.text, 'no settings known here yet: filters nothing').toBe('raced');
+    noteKeptPolicyChanges(dirk.eventLog, CIRCLE, [v1, v2]);     // the settings chain arrives
+    await settle();
+    expect(await dirk.store.get(raced.id), 'parked (its place is unknown): not applied, so the add is taken back').toBeFalsy();
   });
 });

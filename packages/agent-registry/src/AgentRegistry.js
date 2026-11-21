@@ -56,6 +56,13 @@ function _serialised(pseudoPod, uri, run) {
   return next;
 }
 
+/** Two stored cards hold the same thing, field by field (key order aside); the timestamp is the caller's to set equal. */
+function sameStoredCard(a, b) {
+  const canon = (v) => (Array.isArray(v) ? v.map(canon)
+    : (v && typeof v === 'object') ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v);
+  return JSON.stringify(canon(a)) === JSON.stringify(canon(b));
+}
+
 /**
  * Build the live agent-registry handle over an injected pseudo-pod: etag-CAS reads/writes of the
  * registry resource with retry, plus optional per-write snapshots via a `versionStore`. Returns
@@ -77,13 +84,6 @@ function _serialised(pseudoPod, uri, run) {
  *                                          every write snapshots the resource (best-effort).
  * @param {() => string} [opts.now]
  */
-/** Two stored cards hold the same thing, field by field (key order aside); the timestamp is the caller's to set equal. */
-function sameStoredCard(a, b) {
-  const canon = (v) => (Array.isArray(v) ? v.map(canon)
-    : (v && typeof v === 'object') ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v);
-  return JSON.stringify(canon(a)) === JSON.stringify(canon(b));
-}
-
 export function createAgentRegistry({
   pseudoPod,
   anchorPodUri,

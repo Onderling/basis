@@ -317,15 +317,18 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     let before = null;
     try { before = (await store.get?.(rowId)) ?? null; } catch { before = null; }
     try { await store.delete(rowId, { sync: false }); } catch { return 0; }
+    // the row as the rebuild has made it so far, tracked here (never read back mid-rebuild: no extra wait in it)
+    let held = null;
     for (const b of allowed) {
       if (b.kind === 'snapshot') {
         const item = itemOf(circleId, b);
         // the same refusals as a landing (a lane-carried row, an announcement by a non-admin): a rebuild is no back door
-        let held = null;
-        try { held = (await store.get?.(rowId)) ?? null; } catch { held = null; }
-        if (item && !(await refusedOnHead(circleId, item, b, held))) { try { await store.put(fixMaker(circleId, item, b, held), { sync: false, origin: true }); } catch { /* a type not held here */ } }
-      } else if (!(await removeRefused(circleId, store, rowId, b))) {
-        try { await store.delete(rowId, { sync: false }); } catch { /* already gone */ }
+        if (item && !(await refusedOnHead(circleId, item, b, held))) {
+          const row = fixMaker(circleId, item, b, held);
+          try { held = (await store.put(row, { sync: false, origin: true })) ?? row; } catch { /* a type not held here */ }
+        }
+      } else if (!(held && await whoseRefusal(circleId, null, b, held, { remove: true }))) {
+        try { await store.delete(rowId, { sync: false }); held = null; } catch { /* already gone */ }
       }
     }
     if (allowed.length === 0) {
@@ -400,17 +403,17 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     if (body.kind === 'snapshot') {
       const item = itemOf(circleId, body);
       if (!item || typeof item.id !== 'string' || !item.id) return;
-      let held = null;
-      try { held = (await store.get?.(item.id)) ?? null; } catch { held = null; }
-      if (await refusedOnHead(circleId, item, body, held)) return;
+      // the row as held here, read ONCE: the whose-check and the merge below see the same row, and no second read sits
+      // between the switches' verdict and the write (a re-judge running in that gap would be overtaken)
+      let previous = null;
+      try { previous = (await store.get?.(item.id)) ?? null; } catch { previous = null; }
+      if (await refusedOnHead(circleId, item, body, previous)) return;
       // sync:false — an ingest never re-publishes (the echo loop); origin:true — the causal merge keeps
       // the writer's clock and runs the claim fold, exactly like the legacy mirror's inbound path.
       // whether this device held the row before: a snapshot that is an UPDATE (a claim, an edit) is not a new arrival.
       // A read then a put: two snapshots of one new row landing in the same tick may both read 'new' (one extra
       // announcement at most, never a missed one).
       // …and the row as it was: an assignment is news only when it changed (`assignedEntryFor`)
-      let previous = null;
-      try { previous = (await store.get?.(item.id)) ?? null; } catch { previous = null; }
       const existed = !!previous;
       // the row as it was, kept only where a take-back would need it: a fresh change of a row whose making is not on the
       // log (it is older than the log, or arrived by catch-up), so no allowed statement could rebuild it

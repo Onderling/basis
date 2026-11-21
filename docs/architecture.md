@@ -1237,7 +1237,10 @@ place, which act the statement was when it arrived, and, only where a take-back 
 on its own log as a silent kind (`content-judged`) that no door accepts and nothing carries. A head SERVED at catch-up
 (a row whose statements aged out) is not an act: it carries `served` inside its signed body, is taken only in answer to
 this device's own ask, is judged only by its app being on, and goes through the store's causal merge. Chat binds by
-the circle's conversation kinds, a view filter every reader asks. What this does not bind is named in
+the circle's conversation kinds, a view filter every reader asks (`showsInConversation`: the thread, the tile's count,
+Today's news, the notification rows, the assistant's recent turns): a line of a kind the circle has off is kept on the
+log and is not shown, counted or notified on any member's device, the sender's own included; switched back on, it
+shows (`chatKindsSwitchThreeDevice.test.js`). What this does not bind is named in
 [enforceability.md](conventions/enforceability.md).
 
 Anything that must be *agreed* is computed identically everywhere (the tally, the caretaker), never decided

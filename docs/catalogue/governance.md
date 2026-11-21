@@ -121,7 +121,9 @@ pinboard: removeMember setMemberRole editGroupRules recordGroupRulesUpdate getGr
   back on the sender's; a backdated one is refused everywhere; all three end equal; the joiner gets the existing rows,
   served in answer to its ask, with adding off), `v2/itemsLaneSwitchesBind.test.js`, `v2/contentJudge.test.js`,
   `v2/contentLine.test.js`, `v2/contentJudgments.test.js` (the kind's four conditions), `v2/itemsServedHeads.test.js`,
-  `v2/itemsLaneQuietStart.test.js`.
+  `v2/itemsLaneQuietStart.test.js`. The chat lane: `chatKindsSwitchThreeDevice.test.js` (three real agents; a changed
+  app sends a chat line where the circle allows asks only: kept on the log, not shown, counted or notified on any
+  device, the sender's own included; back on, it shows), `v2/conversationKindsBind.test.js`.
 - The door on both shells' menus: `alphaSurface.test.js` and the phone's `circleDetailActionsProjection.test.js`.
 - The caretaker over a real relay: `test/v2/caretakerHandover.relay.test.js`; a removed member refused on every
   member's device: `removedMemberRefusedEverywhere.relay.test.js`; the classes and tallies:

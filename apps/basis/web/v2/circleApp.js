@@ -222,7 +222,7 @@ import {
 } from '../../src/v2/deliverySettings.js';
 import { createFallbackOffer, fallbackOfferStateIo } from '../../src/v2/addressFallback.js';
 import { setAddressFallbackReportHook } from '@onderling-app/pinboard';
-import { resolveConversationKinds } from '../../src/v2/conversationKinds.js';
+import { conversationKindsOf, knownConversationKindsOf, showsInConversation } from '../../src/v2/conversationKinds.js';
 // key management: reuse the existing restore wizard
 // (the slash/page renderers) inside My-data, mounted in a lightweight overlay.
 import { renderRestoreFromMnemonicWizard } from '../../src/web/wizards/restoreFromMnemonicWizard.js';
@@ -2942,7 +2942,9 @@ function buildCircleBot(agent) {
     interpret: interpretToCommand,
     // Conversation memory — the recent circle turns, so follow-ups resolve against context.
     recentTurns: () => recentCircleTurns({
-      rows: circleRows({ events: eventLog.query({ excludeMuted: true }), circles: circlesCache, circleId: getActiveCircle() }),
+      // what the circle's conversation shows, as the thread does (the phone reads the thread's own rows)
+      rows: circleRows({ events: eventLog.query({ excludeMuted: true }), circles: circlesCache, circleId: getActiveCircle() })
+        .filter((r) => showsInConversation(r.event, knownConversationKindsOf(getActiveCircle()))),
       limit: 6,
     }),
     embedder: CIRCLE_EMBED_BASEURL ? resolveCircleRagEmbedder : undefined,
@@ -8213,10 +8215,7 @@ function showCircle(id, circle, policy) {
     // Decision 3 (2026-07-29) — from the POLICY, which is where a create writes them (web ≡ mobile).
     // The circle record is the fallback; nothing ever wrote these there, which is why every circle used
     // the permissive default regardless of its template.
-    const kinds = resolveConversationKinds({
-      circleSetting: policy?.conversationKinds ?? circle?.conversationKinds ?? null,
-      templateKind:  policy?.kind ?? circle?.kind ?? null,
-    });
+    const kinds = conversationKindsOf({ policy, circle });
     const rows = withDelivery(
       chatRows({
         events:    eventLog.query({ excludeMuted: true }),
@@ -10085,7 +10084,7 @@ async function boot() {
       // `circleCatalogue` (null until buildCircleBot sets it; makeResolvingCallSkill tolerates
       // a null catalogue by trying all origins).
       resolveSkill = makeResolvingCallSkill(rawCallSkill, DEFAULT_CIRCLE_ORIGINS, () => circleCatalogue);
-      sources = circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name, unnamedCircleName: () => t('circle.launcher.unnamed') });
+      sources = circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name, unnamedCircleName: () => t('circle.launcher.unnamed'), policyStore });
       // Phase 5 — build the circle composer's bot now that the agent (and its manifest) is up.
       try { buildCircleBot(agent); } catch (err) { console.warn('[circleApp] circle bot setup failed:', err?.message ?? err); }
       // Delivery honesty + repaint for a signed chat statement that lands: a LIVE inbound insert answers the sender

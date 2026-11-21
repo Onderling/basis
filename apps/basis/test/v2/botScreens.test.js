@@ -9,7 +9,7 @@ import { screenCode, codeChoices, screenLabel, SCREEN_PAIRING_TTL_MS } from '../
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
 import { EventLog } from '../../src/eventLog.js';
 
-function setup({ tellRefused = null, toolboxesOn = ['boodschappen'], pageOps = ['lists.addToList', 'lists.removeFromList'] } = {}) {
+function setup({ tellRefused = null, toolboxesOn = ['boodschappen'], pageOps = ['lists.addToList', 'lists.removeFromList'], pageEntry = null, pageAt = (name) => `https://${name}.example/page` } = {}) {
   let clock = 1_000_000;
   const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore(), now: () => clock });
   const grants = [];
@@ -19,6 +19,7 @@ function setup({ tellRefused = null, toolboxesOn = ['boodschappen'], pageOps = [
   const refused = [];
   const expected = []; const registeredFirst = [];
   const admitted = new Set(['telegram:1']);
+  const droppedEntries = [];
   let reachable = true;
   const screens = createBotScreens({
     threads,
@@ -26,7 +27,9 @@ function setup({ tellRefused = null, toolboxesOn = ['boodschappen'], pageOps = [
     sendPrivately: async (person, text, remembered) => { if (!reachable) return { ok: false, reason: 'no-private-chat' }; privately.push({ person, text, remembered }); return { ok: true }; },
     columnOf: async (p) => (p === 'telegram:1' ? ['lists.addToList', 'assistant.assistant-overview', 'tools.useTool'] : []),
     toolboxOn: async (name) => toolboxesOn.includes(name),
-    toolboxPage: async (name) => (toolboxesOn.includes(name) ? { page: `https://${name}.example/page`, ops: pageOps } : null),
+    toolboxPage: async (name) => (toolboxesOn.includes(name) ? { page: pageAt(name), ops: pageOps } : null),
+    pageEntry,
+    dropPageEntries: async (person) => { droppedEntries.push(person); },
     grant: async (g) => { grants.push(g); return { ok: true }; },
     revokeView: async (v) => { const i = grants.findIndex((g) => g.viewPubKey === v); if (i < 0) return false; grants.splice(i, 1); return true; },
     listGrants: async () => grants.map((g) => ({ viewPubKey: g.viewPubKey, label: g.label, ops: g.ops, actingAs: g.actingAs })),
@@ -37,7 +40,7 @@ function setup({ tellRefused = null, toolboxesOn = ['boodschappen'], pageOps = [
     where: () => ({ appUrl: 'https://basis.example/app', botAddress: 'BOT', relayUrl: 'wss://relay.example' }),
     now: () => clock,
   });
-  return { threads, screens, grants, told, privately, asked, refused, expected, registeredFirst, admitted, unreachable: () => { reachable = false; }, tick: (ms) => { clock += ms; } };
+  return { threads, screens, grants, told, privately, asked, refused, expected, registeredFirst, admitted, droppedEntries, unreachable: () => { reachable = false; }, tick: (ms) => { clock += ms; } };
 }
 const linkText = (link, minutes) => `link ${link} (${minutes} min)`;
 const start = async (ctx, person = 'telegram:1') => { const r = await ctx.screens.start(person, linkText); return r.ok ? ctx.privately.at(-1).text : null; };
@@ -436,5 +439,45 @@ describe('the upgrade ends the toolbox pages\' grants made before tickets, once,
     now.value = 9000;
     expect(await endPreTicketToolboxGrants(a)).toMatchObject({ ran: true, ended: 1 });
     expect(grants.map((g) => g.viewPubKey)).toEqual(['NEW']);
+  });
+});
+
+describe('a toolbox page the box serves itself: the link carries an entry beside the ticket', () => {
+  it('the entry rides in the query of the placed address, the ticket stays in the fragment, and both are made for this person and toolbox', async () => {
+    const made = [];
+    const ctx = setup({ pageEntry: async (person, toolbox) => { made.push({ person, toolbox }); return 'ENTRY1'; }, pageAt: (name) => `https://box.home.example:8443/${name}/?lang=nl` });
+    const { link, ticket } = await pageTicket(ctx);
+    expect(made).toEqual([{ person: 'telegram:1', toolbox: 'boodschappen' }]);
+    const u = new URL(link);
+    expect(u.pathname).toBe('/boodschappen/');
+    expect(u.searchParams.get('e')).toBe('ENTRY1');
+    expect(u.searchParams.get('lang'), 'the placed query is kept').toBe('nl');
+    expect(u.hash.startsWith('#scherm-nieuw='), 'the ticket is in the fragment, never sent to a server').toBe(true);
+    expect(u.hash).not.toContain('ENTRY1');
+    expect(ticket).toBeTruthy();
+    expect(ctx.privately.at(-1).remembered ?? '').not.toContain('ENTRY1');
+  });
+
+  it('a page the box does not serve (no entry made) is linked as placed, with no entry', async () => {
+    const ctx = setup({ pageEntry: async () => null });
+    const { link } = await pageTicket(ctx);
+    expect(new URL(link).search).toBe('');
+  });
+
+  it('a person who leaves the household loses their page entries and cookies with their screens', async () => {
+    const ctx = setup();
+    await ctx.screens.dropAll('telegram:1');
+    expect(ctx.droppedEntries).toEqual(['telegram:1']);
+  });
+
+  it('who may enter a toolbox\'s page: an admitted person whose role may use that toolbox, while it has a page', async () => {
+    const ctx = setup();
+    expect(await ctx.screens.mayUseToolbox('telegram:1', 'boodschappen')).toBe(true);
+    expect(await ctx.screens.mayUseToolbox('telegram:1', 'recepten'), 'a toolbox with no page here').toBe(false);
+    expect(await ctx.screens.mayUseToolbox('telegram:2', 'boodschappen'), 'not in the household').toBe(false);
+    ctx.admitted.add('telegram:2');
+    expect(await ctx.screens.mayUseToolbox('telegram:2', 'boodschappen'), 'in the household, but the role holds no useTool').toBe(false);
+    ctx.admitted.delete('telegram:1');
+    expect(await ctx.screens.mayUseToolbox('telegram:1', 'boodschappen'), 'left the household').toBe(false);
   });
 });

@@ -121,6 +121,7 @@ import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
 import { opDescription } from '../src/v2/opDescriptions.js';
+import { createPageEntries, createToolboxPages, TOOLBOX_PAGE_PORT } from '../src/v2/toolboxPages.js';
 import { makeToolboxOps, toolboxListLine, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords, makeChoiceKeeper, toolChoicesReply, makePickThing, makeMoreThings, toolChoiceGateRule, choiceThreadOf } from '../src/v2/toolboxes.js';
 import { wrapCallSkillWithEgressGate, isExternalEgressOp } from '../src/core/agent/egressGate.js';   // what leaves for a toolbox, and its record   // a circle's toolboxes (L1035): the key from the operator's config
 import { toolsManifest } from '../src/v2/toolsManifest.js';
@@ -1325,6 +1326,9 @@ if (tgToken || inboxDoor.bridge) {
     toolboxOn: async (name) => ((await toolboxes?.listTools?.({}))?.toolboxes ?? []).some((b) => b.name === name),
     // its placed page (the address and the ops its operator named, L1113): the link `/scherm <toolbox>` sends, and the grant
     toolboxPage: async (name) => (await toolboxes?.pageOf?.(name)) ?? null,
+    // a page this box serves itself: the entry its link carries, and a leaver's entries and cookies (made further down)
+    pageEntry: async (person, name) => (await toolboxPages?.entryFor?.(person, name)) ?? null,
+    dropPageEntries: async (person) => toolboxPages?.dropPerson?.(person),
     grant: async (g) => {
       const r = await agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce, ...(g.toolbox ? { toolbox: g.toolbox } : {}) });
       // whether the grant reached the screen, or is held until it next speaks (the screen's address, its first characters)
@@ -1486,6 +1490,25 @@ if (tgToken || inboxDoor.bridge) {
   });
   await toolboxes.load();
   toolboxesRef = toolboxes;
+  // A TOOLBOX'S PAGE served from this box: its files placed in <data-dir>/toolboxes/<name>/page/, served on localhost
+  // only (the https server in front is the operator's), while that toolbox is on, to a browser that came in with the
+  // entry of the link `/scherm <toolbox>` sends, or holds the cookie it was spent into. Entries and cookies live in a
+  // sealed store of this box. ONDERLING_TOOLBOX_PAGE_PORT moves the port (0: any free one, said below).
+  const pagePortEnv = Number.parseInt(process.env.ONDERLING_TOOLBOX_PAGE_PORT ?? '', 10);
+  const toolboxPages = createToolboxPages({
+    entries: createPageEntries({ store: new VaultNodeFs(path.join(dataDir, 'toolbox-pages.json'), vaultPassphrase()) }),
+    pagesDir: toolboxDir,
+    onToolboxes: async () => (screens ? ((await toolboxes.listTools({}))?.toolboxes ?? []).map((b) => b.name) : []),
+    pageOf: (name) => toolboxes.pageOf(name),
+    mayEnter: async (person, name) => Boolean(await screens?.mayUseToolbox?.(person, name)),
+    t, port: Number.isInteger(pagePortEnv) && pagePortEnv >= 0 ? pagePortEnv : TOOLBOX_PAGE_PORT,
+    log: (e) => {
+      walkLog({ kind: 'toolbox-page', ...e });
+      if (e.what === 'listening') console.log(`device-runner: toolbox pages on 127.0.0.1:${e.port}`);
+      if (e.what === 'not-listening') console.warn(`device-runner: toolbox pages not served (${e.reason})`);
+    },
+  });
+  await toolboxPages.sync();
   // the last list of things shown per thread, so a button carries only its number (L1035)
   const toolChoices = makeChoiceKeeper();
   // through the box's own gated call, as the person who tapped (`ctx`); the shopping list is the template's role
@@ -1513,7 +1536,9 @@ if (tgToken || inboxDoor.bridge) {
       const r = await toolboxes.listTools(args);
       return { ...r, message: toolboxListLine(r?.toolboxes ?? [], (k, p) => t(k, p, ctx?.lang ?? undefined), { all: Boolean(args?.all) }) };
     },
-    addToolbox: (args) => toolboxes.addToolbox(args), removeToolbox: (args) => toolboxes.removeToolbox(args),
+    // switching a toolbox on or off opens or closes its page's door on this box
+    addToolbox: async (args) => { const r = await toolboxes.addToolbox(args); await toolboxPages.sync(); return r; },
+    removeToolbox: async (args) => { const r = await toolboxes.removeToolbox(args); await toolboxPages.sync(); return r; },
   }, toolsManifest);
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,

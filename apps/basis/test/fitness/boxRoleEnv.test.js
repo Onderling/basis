@@ -21,6 +21,7 @@ const NOT_PASSED = {
   ONDERLING_WALK_SHAPES: 'testing only: the unrouted frames\' key names in the walk log — never set by a release role (walkShapesTestingOnly)',
   PRIVATEMODE_MODEL: 'optional override of the default model; the default is what a box runs',
   ONDERLING_TELEGRAM_API_ROOT: 'a Bot API server of its own (self-hosted, or a test fake); a box talks to Telegram itself',
+  ONDERLING_TOOLBOX_PAGE_PORT: 'moves the localhost port of the toolbox page server (a test sets 0); a box runs the default port (tools.pagePort)',
 };
 // Passed by the role, read elsewhere than the runner.
 const READ_ELSEWHERE = {

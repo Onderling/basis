@@ -86,7 +86,10 @@ kernel's roster fold; every shell composes the same binding).
   log). A head served at catch-up carries `served` in its signed body and is taken only when this device asked
   (`frontierReplay.js` hands the rail `{asked: true}`). The settings lane is handed its rail at boot in every shell
   (`scripts/shell-seams.mjs`). The chat lane binds by the conversation kinds, a filter every reader asks
-  (`conversationKinds.js`).
+  (`conversationKinds.js`). A write into ANOTHER circle than the one the door asked (an appointment's copy into a
+  pair circle) asks that circle as its receivers will (`writeIntoRefusal` in `circleActGate.js`, with this device's
+  kept settings changes) and is refused in words where they would refuse; where this device does not know the kept
+  changes yet, it is not refused and the receivers decide.
 - **The roster and the caretaker:** `packages/core/src/security/rosterFold.js` (`foldRoster`, `caretakerOrder`),
   folded by pinboard's `deriveRoster`.
 - **Screens:** web `apps/basis/web/v2/circleGovernancePanel.js`; phone `CircleGovernanceScreen.js`; the doors' callers
@@ -121,7 +124,10 @@ pinboard: removeMember setMemberRole editGroupRules recordGroupRulesUpdate getGr
   back on the sender's; a backdated one is refused everywhere; all three end equal; the joiner gets the existing rows,
   served in answer to its ask, with adding off), `v2/itemsLaneSwitchesBind.test.js`, `v2/contentJudge.test.js`,
   `v2/contentLine.test.js`, `v2/contentJudgments.test.js` (the kind's four conditions), `v2/itemsServedHeads.test.js`,
-  `v2/itemsLaneQuietStart.test.js`.
+  `v2/itemsLaneQuietStart.test.js`. The chat lane: `chatKindsSwitchThreeDevice.test.js` (three real agents; a changed
+  app sends a chat line where the circle allows asks only: kept on the log, not shown, counted or notified on any
+  device, the sender's own included; back on, it shows), `v2/conversationKindsBind.test.js`. A write into another
+  circle: `shareIntoSwitchedOffPair.relay.test.js`, `v2/writeIntoRefusal.test.js`.
 - The door on both shells' menus: `alphaSurface.test.js` and the phone's `circleDetailActionsProjection.test.js`.
 - The caretaker over a real relay: `test/v2/caretakerHandover.relay.test.js`; a removed member refused on every
   member's device: `removedMemberRefusedEverywhere.relay.test.js`; the classes and tallies:

@@ -25,6 +25,7 @@ import { isAppSurfaceEnabled } from './appFeature.js';
 import { isFeatureEnabled } from './circlePolicy.js';
 import { processRefusalLog } from './refusalLog.js';
 import { isOwnPlaceId } from './grantsManifest.js';
+import { contentLineChanges } from './contentLine.js';
 
 /** Scopes whose writes are not a circle's (a person's own, this device's): no circle's switch governs them. */
 const NOT_A_CIRCLES = new Set(['person', 'device', 'own']);
@@ -141,4 +142,38 @@ export function itemStatementVerdict({ manifests = [], policy = {}, type, act })
     refused = refused ?? v;
   }
   return refused;
+}
+
+/**
+ * A WRITE INTO ANOTHER CIRCLE asks that circle too. An op's door asks the switches of the circle the op names; a few ops
+ * also write a row into a DIFFERENT circle (an appointment's copy into a paired circle, a share into a target circle, a
+ * sealed copy back into the source). That circle's switches were never asked on the sender, so the row showed there and
+ * was refused on every other member's device. Before such a write, this asks the target circle the question its
+ * receivers will ask (`itemStatementVerdict`), with its settings read as the sender's gate reads them (`inputs`):
+ * null when the write may go, else the door's own refusal (its code, told in the door's words: `gateRefusalKey`).
+ *
+ * THE SAME ANSWER AS THE RECEIVERS. A receiver judges by the settings changes its settings lane KEPT (`contentJudge.js`):
+ * a circle with none applies every row, whatever its first settings say (a pair circle never changes its settings, and
+ * its first ones have the calendar off). So the sender refuses only where a receiver would: the circle has a kept
+ * change on the content line; then the settings as they stand (the reader's) decide. Kept changes not known on this
+ * device yet: not refused here (the receivers park and judge; the sender cannot know more than they will).
+ * @param {object} a
+ * @param {string} a.circleId  the circle the row is written INTO
+ * @param {string} a.type      the row's item type
+ * @param {'add'|'change'|'remove'} [a.act]
+ * @param {object[]} a.manifests
+ * @param {(circleId: string) => Promise<{policy?: object}|null>} a.inputs  the sender's gate's own reader
+ * @param {object[]|undefined} a.kept  this device's kept settings changes for the circle (`keptPolicyChangesOf`)
+ */
+export async function writeIntoRefusal({ circleId, type, act = 'add', manifests = [], inputs = null, kept } = {}) {
+  if (typeof inputs !== 'function' || typeof circleId !== 'string' || !circleId || isOwnPlaceId(circleId)) return null;
+  if (!Array.isArray(kept) || contentLineChanges(kept).length === 0) return null;
+  let given = null;
+  try { given = await inputs(circleId); } catch {
+    processRefusalLog().note({ tag: 'gate', lane: 'availability', check: 'circle-inputs', reason: 'reader-threw' });
+    given = null;
+  }
+  if (!given) return null;
+  const v = itemStatementVerdict({ manifests, policy: given.policy ?? {}, type, act });
+  return v.allow ? null : refuse('availability', v.code);
 }

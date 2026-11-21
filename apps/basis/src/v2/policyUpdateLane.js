@@ -299,6 +299,9 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
       try {
         statement = await emit({ groupId: circleId, policy, version, ...(proposalId ? { proposalId } : {}) });
         if (statement?.body?.hash) await headStore.write(circleId, { version, key: statement.body.hash, statement });
+        // the admin's own device judges content by its own change too: the fan never comes back here, so the lane notes
+        // the kept changes again now that the statement is on this device's log (the head is already this one)
+        if (statement?.body?.hash && knownRail) await apply(circleId, knownRail).catch(() => {});
       } finally {
         // The admin's save stays the local truth whether or not the lane took it: applying the lane above may have
         // written an older policy here, and a failed emit must not leave that older one in the store the screen shows.

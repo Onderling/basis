@@ -23,6 +23,7 @@ import { rosterBindingVerifier } from './membershipRail.js';
 import { judgeItemStatement } from './contentJudge.js';
 import { linksIndex } from './contentLine.js';
 import { keptPolicyChangesOf, onKeptPolicyChanges, requestKeptPolicyChanges } from './keptPolicyChanges.js';
+import { contentJudgmentsOn } from './contentJudgments.js';
 import { processRefusalLog } from './refusalLog.js';
 import { NOT_TAKEN } from '../core/handlers/peerRouter.js';   // a verdict the receive record reads: not taken, so a repeat is handed on again
 
@@ -132,7 +133,8 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
   const manifestsOf = () => { try { return (typeof judge?.manifests === 'function' ? judge.manifests() : judge?.manifests) ?? []; } catch { return []; } };
   const parked = new Map();       // circleId → Map<hash, body>
   const parkedIn = (cid) => parked.get(cid) ?? parked.set(cid, new Map()).get(cid);
-  const previousOf = new Map();   // statement hash → the row as it was before that statement changed it (this run)
+  // what this device proved, and the row as it was where a take-back needs it: on the device log (`contentJudgments.js`)
+  const judgmentsOf = (cid) => contentJudgmentsOn(base.deviceLog, cid);
   const switchRefused = new Set();
   let noLaneSaid = false;
   function saySwitchRefusal(circleId, ref, code) {
@@ -141,18 +143,35 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     switchRefused.add(key);
     processRefusalLog().note({ tag: 'gate', lane: 'items', check: 'circle-switch', reason: code ?? 'capability-denied' });
   }
+  /** A head SERVED in answer to a catch-up (signed by whoever served it, marked so inside the signed body): not an act. */
+  const isServedHead = (circleId, b) => !isOwn(circleId) && b?.kind === 'snapshot' && b?.payload?.served === true;
+  function refuseServed() {
+    processRefusalLog().note({ tag: 'gate', lane: 'items', check: 'served-head', reason: 'a served head this device did not ask for' });
+  }
   const rowIdOf = (circleId, b) => (b?.kind === 'snapshot' ? (itemOf(circleId, b)?.id ?? b.subject) : (b?.payload?.id ?? b?.subject));
-  /** `held`: the row as this device holds it before the statement (`undefined`: read it from the store). */
-  async function verdictFor(circleId, body, { held = undefined, linksOf = null } = {}) {
+  /**
+   * WHICH ACT a snapshot was is a fact of its ARRIVAL here: a row this device did not hold is an add, a held one a
+   * change. Read from the store when it first lands (`fresh`), and kept (`contentJudgments.js`), because a later
+   * judging cannot tell it from the log: the row's making may have aged out, and a sender chooses its own links.
+   * `held`: the row as the statements before this one left it (a re-judge); `undefined`: read it from the store.
+   * `unknownAct`: no kept act and no earlier statement of the row here: judged as both, and the same answer or none.
+   */
+  async function verdictFor(circleId, body, { held = undefined, linksOf = null, fresh = false, unknownAct = false } = {}) {
     if (!judging || isOwn(circleId) || (body?.kind !== 'snapshot' && body?.kind !== 'remove')) return { verdict: 'apply' };
+    const judgments = judgmentsOf(circleId);
     let row = held;
     if (row === undefined) {
       const id = rowIdOf(circleId, body);
       try { row = (typeof id === 'string' && id) ? ((await storeFor(circleId)?.get?.(id)) ?? null) : null; } catch { row = null; }
     }
-    let act; let type;
-    if (body.kind === 'snapshot') { act = row ? 'change' : 'add'; type = itemOf(circleId, body)?.type ?? null; }
-    else { if (!row) return { verdict: 'apply' }; act = 'remove'; type = row.type ?? null; }
+    let acts; let type;
+    if (body.kind === 'snapshot') {
+      type = itemOf(circleId, body)?.type ?? null;
+      const known = judgments.act(body.hash);
+      if (known) acts = [known];
+      else if (fresh) { acts = [row ? 'change' : 'add']; judgments.noteAct(body.hash, acts[0]); }
+      else acts = unknownAct ? ['add', 'change'] : [row ? 'change' : 'add'];
+    } else { if (!row) return { verdict: 'apply' }; acts = ['remove']; type = row.type ?? null; }
     let kept = keptPolicyChangesOf(base.deviceLog, circleId);
     // not known: asked of this device's settings lane. A composition with NO settings lane cannot judge at all: it
     // applies as before and says so once (every shell hands its lane the rail at boot: the shell seams hold that)
@@ -161,7 +180,10 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
       kept = [];
     }
     const links = linksOf ?? linksIndex(base.storedStatements(circleId).map((st) => st.body));
-    return judgeItemStatement({ body, act, type, linksOf: links, kept, manifests: manifestsOf() });
+    // a head served in answer to this device's own catch-up ask (only such a one is on the log: see `ingest`)
+    const served = isServedHead(circleId, body);
+    const verdicts = acts.map((act) => judgeItemStatement({ body, act, type, linksOf: links, kept, manifests: manifestsOf(), served, proofs: judgments }));
+    return verdicts.every((v) => v.verdict === verdicts[0].verdict) ? verdicts[0] : { verdict: 'park' };
   }
 
   /**
@@ -186,11 +208,18 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     }
     const waiting = parkedIn(circleId);
     for (const [rowId, list] of byRow) {
-      // in log order: whether the row is held at a statement follows from the ones taken before it
+      // in log order: whether the row is held at a statement follows from the ones taken before it, and the first one
+      // here is the act it was when it arrived (kept; a change: the row was held before it)
+      const first = list[0];
+      const firstAct = first?.kind === 'snapshot' ? judgmentsOf(circleId).act(first.hash) : null;
       let held = null;
+      if (firstAct === 'change' || first?.kind === 'remove') {
+        held = judgmentsOf(circleId).previous(first.hash);
+        if (!held) { try { held = (await store.get?.(rowId)) ?? null; } catch { held = null; } }
+      }
       const judged = [];
       for (const b of list) {
-        const v = await verdictFor(circleId, b, { held, linksOf });
+        const v = await verdictFor(circleId, b, { held, linksOf, unknownAct: b === first && first.kind === 'snapshot' && !firstAct });
         judged.push({ b, v });
         if (v.verdict === 'apply') held = b.kind === 'snapshot' ? (itemOf(circleId, b) ?? held) : null;
       }
@@ -219,11 +248,11 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
       }
     }
     if (allowed.length === 0) {
-      // the row's first statement on the log is an add that is now refused: the row goes. A row older than the log:
-      // the copy kept before its first refused change, or, when none was kept on this device, as it stood (never lost)
+      // the row's first statement here arrived as an add and is not allowed: the row goes. It changed a row held before:
+      // the copy kept beside it, or, when none was kept, the row as it stands (never lost on a guess)
       const firstTaken = judged.find(({ b }) => b.kind === 'snapshot');
-      const kept = firstTaken ? previousOf.get(firstTaken.b.hash) : null;
-      const wasAdd = Boolean(firstTaken) && !kept && !olderThanLog(firstTaken.b, judged);
+      const kept = firstTaken ? judgmentsOf(circleId).previous(firstTaken.b.hash) : null;
+      const wasAdd = Boolean(firstTaken) && !kept && judgmentsOf(circleId).act(firstTaken.b.hash) === 'add';
       const restore = kept ?? (wasAdd ? null : before);
       if (restore) { try { await store.put(restore, { sync: false, origin: true }); } catch { /* best effort */ } }
     }
@@ -231,18 +260,21 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     try { after = (await store.get?.(rowId)) ?? null; } catch { after = null; }
     if (!after && before && typeof onItemRemoved === 'function') { try { await onItemRemoved(circleId, rowId); } catch { /* never fails */ } }
   }
-  // a row's first held snapshot that has a parent on its author's chain not held here may be a change of a row the
-  // log no longer shows the making of: not provably an add
-  function olderThanLog(b, judged) {
-    return judged.length > 0 && judged[0].b === b && Boolean(b.parentHash) && !judged.some(({ b: x }) => x.hash === b.parentHash);
-  }
+
   if (judging) onKeptPolicyChanges(base.deviceLog, (cid) => { rejudge(cid).catch(() => {}); });
 
-  async function applyToHead(circleId, body) {
+  /** Does the log hold another statement of this row? Then the log rebuilds it, and no copy is kept beside this one. */
+  function otherStatementOf(circleId, rowId, hash) {
+    try {
+      return base.storedStatements(circleId).some((st) => st?.body?.hash !== hash && rowIdOf(circleId, st?.body) === rowId);
+    } catch { return true; }
+  }
+
+  async function applyToHead(circleId, body, { fresh = false } = {}) {
     const store = storeFor(circleId);
     if (!store) return;
     if (judging && !isOwn(circleId)) {
-      const v = await verdictFor(circleId, body);
+      const v = await verdictFor(circleId, body, { fresh });
       if (v.verdict === 'park') { if (body?.hash) parkedIn(circleId).set(body.hash, body); return; }
       if (body?.hash) parkedIn(circleId).delete(body.hash);
       if (v.verdict === 'refuse') { saySwitchRefusal(circleId, body.payload?.authorRef, v.code); return; }
@@ -271,7 +303,11 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
       let previous = null;
       try { previous = (await store.get?.(item.id)) ?? null; } catch { previous = null; }
       const existed = !!previous;
-      if (previous && body?.hash) previousOf.set(body.hash, previous);   // the row as it was, for a take-back
+      // the row as it was, kept only where a take-back would need it: a fresh change of a row whose making is not on the
+      // log (it is older than the log, or arrived by catch-up), so no allowed statement could rebuild it
+      if (fresh && judging && !isOwn(circleId) && previous && body?.hash && !otherStatementOf(circleId, item.id, body.hash)) {
+        judgmentsOf(circleId).keepPrevious(body.hash, previous);
+      }
       try { await store.put(item, { sync: false, origin: true }); }
       catch (err) {
         // a type this node does not hold (an extension it does not run): the row is not held, the statement stays on
@@ -331,9 +367,11 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
       // the own scope serves what it sends: sealed to the person, or not at all
       const carried = isOwn(circleId) ? ownSnapshotPayload(circleId, item) : { item };
       if (!carried) return stored;
+      // `served`: a head this device SERVES, not an act of its writer: marked inside the signed body, so the asker can
+      // tell it from an author's statement (the person's own scope has no circle switches and is not marked)
       const statement = signSpine(resolved, {
         kind: 'snapshot', circleId, subject: item.id,
-        payload: { ...carried, authorRef: ref }, parent, deps,
+        payload: { ...carried, authorRef: ref, ...(isOwn(circleId) ? {} : { served: true }) }, parent, deps,
       });
       bodies.push(statement.body);   // chain the next synthesized statement after this one
       synthesized.push(statement);
@@ -373,7 +411,15 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     ...base,
     /** The one write path; on the own scope the item is sealed to the person (or nothing is written to the lane). */
     async append(circleId, opts = {}) {
-      if (!isOwn(circleId)) return base.append(circleId, opts);
+      if (!isOwn(circleId)) {
+        const res = await base.append(circleId, opts);
+        // this device's own write: the act it was is what the store stamped (a new row is made and changed at one moment)
+        const item = opts.kind === 'snapshot' ? opts.payload?.item : null;
+        if (judging && res?.statement?.body?.hash && typeof item?.createdAt === 'string' && typeof item?.updatedAt === 'string') {
+          judgmentsOf(circleId).noteAct(res.statement.body.hash, item.createdAt === item.updatedAt ? 'add' : 'change');
+        }
+        return res;
+      }
       if (opts.kind === 'snapshot') {
         const payload = ownSnapshotPayload(circleId, opts.payload?.item);
         if (!payload) return null;
@@ -386,13 +432,25 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     rebuildHead,
     /** Judge the circle's held statements again (the settings lane calls it through the kept-changes note). */
     rejudge,
-    /** The full gate (signature + declared kind + key↔ref binding), then the head apply. */
-    async ingest(circleId, statement) {
+    /**
+     * VERIFY without landing (a device that does not hold the lane, carrying on): a served head is never carried on,
+     * whoever asked for it asked for itself.
+     */
+    async verify(circleId, statement) {
+      if (isServedHead(circleId, statement?.body)) { refuseServed(); return { ok: false, reason: 'served head not asked for' }; }
+      return base.verify(circleId, statement);
+    },
+    /**
+     * The full gate (signature + declared kind + key↔ref binding), then the head apply. `ctx.asked`: the statement came in
+     * a catch-up batch this device asked for (`frontierReplay.js`); only then is a SERVED head taken.
+     */
+    async ingest(circleId, statement, ctx = {}) {
+      if (isServedHead(circleId, statement?.body) && ctx?.asked !== true) { refuseServed(); return { ok: false, reason: 'served head not asked for' }; }
       const res = await base.ingest(circleId, statement);
       // a statement this log already holds was applied when it first landed: applying it again would put back what a
       // later statement removed (a sibling re-carrying an old snapshot after the delete)
       if (res?.ok && !res.existed) {
-        try { await applyToHead(circleId, statement.body); }
+        try { await applyToHead(circleId, statement.body, { fresh: true }); }
         catch { /* the entry landed; the head converges on the next snapshot/catch-up */ }
         // a statement that arrived may be the link a parked one waited for
         if (judging && (parked.get(circleId)?.size ?? 0) > 0) { try { await rejudge(circleId); } catch { /* next arrival */ } }

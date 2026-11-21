@@ -134,6 +134,11 @@ export const ENTRY_KINDS = Object.freeze({
   // author), never its words. The store keeps no landing time, so this is what makes a late arrival news. Written by
   // this device about itself, never carried; the item's own row is the durable head.
   'item-landed':     K(LANE.SYSTEM, false, RETAIN.CHAT, false, LOCAL_BINDING, true),
+  // What this device PROVED about an items statement's place on a settings line ("behind change k" / "not behind"),
+  // and, only where a take-back needs it, the row as it was. A cache of fixed answers, each device its own (its links
+  // differ): never carried, never accepted from a peer, not mirrored, never news, never a wake. Ages out with the items
+  // statements it judges (the same class); a lost entry is judged again.
+  'content-judged':  K(LANE.SYSTEM, false, RETAIN.CHAT, false, LOCAL_BINDING, false),
   // A planned occurrence that RAN (pending work): written once per occurrence id by the host that ran it — first
   // write wins, so a second host or a repeat never records a second run. Short: the row's own `lastRunAt` is the
   // durable head; the mark only has to outlive the occurrence's window.

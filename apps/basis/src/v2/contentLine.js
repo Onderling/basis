@@ -112,6 +112,8 @@ export function contentLineChanges(bodies) {
     const atV = byVersion.get(v).sort((a, b) => (a.hash < b.hash ? 1 : a.hash > b.hash ? -1 : 0));
     return {
       version: v,
+      // which statement drew each line: the key a proven answer is kept under (`contentJudgments.js`)
+      ids: atV.map((b) => (typeof b.hash === 'string' && b.hash ? b.hash : null)),
       lines: atV.map((b) => (b.payload.contentUpTo && typeof b.payload.contentUpTo === 'object' ? b.payload.contentUpTo : null)),
       after: denyWinsMerge(atV.map((b) => b.payload.policy)),
     };
@@ -125,18 +127,28 @@ export function contentLineChanges(bodies) {
  * @param {'items'|'chat'} a.lane
  * @param {(h: string) => ({parent?: string|null, deps?: string[]}|null)} a.linksOf  the lane's links on this device
  * @param {ReturnType<typeof contentLineChanges>} a.changes
+ * @param {{relation: Function, prove: Function}} [a.proofs]  the answers this device proved before
+ *   (`contentJudgments.js`): read before a walk, and a new proof kept. A proven answer never changes (ancestry is fixed),
+ *   so it outlives the links that proved it; an unknown place is never kept.
  * @returns {{settings: object[], beforeUnknown?: true}}  one setting: proven. More: the candidates, judged under each.
  *   `beforeUnknown`: the statement may be behind every change this device holds, and the oldest held is not the
  *   circle's first, so the settings before it are not known here.
  */
-export function settingsForContent({ hash, lane, linksOf, changes }) {
+export function settingsForContent({ hash, lane, linksOf, changes, proofs = null }) {
   const list = Array.isArray(changes) ? changes : [];
   const settings = [];
   const add = (p) => { if (!settings.includes(p)) settings.push(p); };
+  const relationTo = (line, id) => {
+    const known = id ? proofs?.relation?.(hash, id) : undefined;
+    if (known) return known;
+    const rel = lineRelation(hash, line ? line[lane] : undefined, linksOf);
+    if (id && rel !== 'unknown') { try { proofs?.prove?.(hash, id, rel); } catch { /* judged again next time */ } }
+    return rel;
+  };
   for (let i = list.length - 1; i >= 0; i -= 1) {
     const c = list[i];
     // two admins at one version: behind it only when behind every line; not behind as soon as one line proves it
-    const rels = c.lines.map((line) => lineRelation(hash, line ? line[lane] : undefined, linksOf));
+    const rels = c.lines.map((line, j) => relationTo(line, c.ids?.[j] ?? null));
     if (rels.some((r) => r === 'not-behind')) { add(c.after); return { settings }; }
     if (rels.length && rels.every((r) => r === 'behind')) continue;
     add(c.after);   // unknown: after this change is one reading; the older changes give the others

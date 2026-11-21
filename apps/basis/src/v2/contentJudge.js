@@ -25,15 +25,16 @@ import { isFeatureEnabled } from './circlePolicy.js';
  * @param {object[]|undefined} a.kept   the kept settings changes; undefined = not known yet
  * @param {object[]} a.manifests
  * @param {boolean} [a.served]      a head served in answer to this device's own catch-up ask: judged only by its app
+ * @param {object} [a.proofs]       this device's kept answers (`contentJudgments.js`): read before a walk, new ones kept
  * @returns {{verdict: 'apply'|'refuse'|'park', code?: string}}
  */
-export function judgeItemStatement({ body, act, type = null, linksOf, kept, manifests = [], served = false }) {
+export function judgeItemStatement({ body, act, type = null, linksOf, kept, manifests = [], served = false, proofs = null }) {
   if (kept === undefined) return { verdict: 'park' };
   const rowType = type ?? body?.payload?.item?.type ?? null;
   if (!Array.isArray(kept) || kept.length === 0 || typeof rowType !== 'string') return { verdict: 'apply' };
   const changes = contentLineChanges(kept);
   if (!changes.length) return { verdict: 'apply' };
-  const { settings, beforeUnknown } = settingsForContent({ hash: body?.hash, lane: 'items', linksOf, changes });
+  const { settings, beforeUnknown } = settingsForContent({ hash: body?.hash, lane: 'items', linksOf, changes, proofs });
   if (beforeUnknown || !settings.length) return { verdict: 'park' };
   const cap = served ? itemTypeCapability(manifests, rowType) : null;
   const verdicts = settings.map((policy) => (served

@@ -290,6 +290,7 @@ describe('the items lane — snapshots on the device log, heads causally merged'
     const pull = makeFrontierReplay({
       rail: cato.rail, sendToPeer: () => {}, subtypes: ITEMS_CATCHUP_SUBTYPES,
     });
+    await pull.requestFrom('peer:ada', CIRCLE);                         // cato asks: what ada SERVES is taken only then
     await serve.onRequest('peer:cato', {
       subtype: ITEMS_CATCHUP_SUBTYPES.request, circleId: CIRCLE,
       frontier: pull.localFrontier(CIRCLE),                             // cato's (empty) head set

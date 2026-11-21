@@ -3296,7 +3296,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const mine = rows.find((m) => m?.webid === circleSelfRef(act.circleId));
       const listed = new Set([mine?.circleAddress, ...(mine?.circleAddresses ?? []), ...((mine?.retiredAddresses ?? []).map((x) => x?.address))].filter(Boolean));
       const ok = exclude.filter((a) => a !== circleAddressFor(act.circleId) && listed.has(a));
-      if (!ok.length) return;
+      if (!ok.length) { console.warn(`[keys] ${String(act.circleId).slice(0, 12)}: a rotation past ${exclude.length} address(es) not on this person's row here was not done`); return; }
       await rotatePastOwnOld(act.circleId, ok);
       return;
     }
@@ -3305,7 +3305,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (typeof act.address !== 'string' || act.address === circleAddressFor(act.circleId)) return;
       const mine = rows.find((m) => m?.webid === circleSelfRef(act.circleId));
       const listed = new Set([mine?.circleAddress, ...(mine?.circleAddresses ?? []), ...((mine?.retiredAddresses ?? []).map((x) => x?.address))].filter(Boolean));
-      if (!listed.has(act.address)) return;
+      if (!listed.has(act.address)) { console.warn(`[keys] ${String(act.circleId).slice(0, 12)}: a ban of an address not on this person's row here was not done`); return; }
+      // the ban rotates the key: the address this point presents is a recipient first, so the rotation never leaves it out.
+      // A grant that fails stops the ban here (unacked, so the forwarder re-sends it): a rotation without the point is worse.
+      try {
+        await ctl.grantRecipient?.({ groupId: act.circleId, publicKey: sealingPublicKeyFromNetworkKey(circleAddressFor(act.circleId)), ownDevice: true });
+      } catch (e) {
+        console.warn(`[keys] ${String(act.circleId).slice(0, 12)}: the grant of this point's own address failed; the ban waits (${e?.message ?? e})`);
+        throw new Error('ban-waits-for-the-own-grant');
+      }
       await ctl.revokeRecipient?.({ groupId: act.circleId, publicKey: sealingPublicKeyFromNetworkKey(act.address), policy: 'ban' });
     }
   };
@@ -3330,7 +3338,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     // been signed and then superseded, and signing it again now would quietly undo the later change. One that is on this
     // device's rail as signed is dropped; the rest can now never be signed by anyone (this device is the point), so they
     // leave the outbox at once and the person is told they may not have come through.
-    for (const [actId, e] of [...spineOutbox]) {
+    // membership acts first (stable otherwise): a key act checks this person's row, and the membership acts that waited
+    // (a re-key's retirement of the old address) are what that row holds — signed after it, the rotation past the old
+    // address found it on no row and was not done
+    for (const [actId, e] of [...spineOutbox].sort(([, x], [, y]) => (x.lane === 'membership' ? 0 : 1) - (y.lane === 'membership' ? 0 : 1))) {
       if (e.ackedHash || e.act?.circleId !== circleId) continue;
       if (!e.local) {
         spineOutbox.delete(actId);

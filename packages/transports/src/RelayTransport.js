@@ -69,6 +69,15 @@ const OVER_RATE_RESEND_DELAY_MS = param({ key: 'transports.overRateResendDelayMs
 const OVER_RATE_RESEND_PER_SEC = param({ key: 'transports.overRateResendPerSec', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 });
 // How often one frame is sent in all before it is given up (the first send included).
 const OVER_RATE_MAX_ATTEMPTS = param({ key: 'transports.overRateMaxAttempts', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 });
+// How old a refused frame may be and still be sent again (from its signed `_ts`, else its first write). A receiver drops
+// a frame older than its replay window (`security.replayWindowMs`, ten minutes): well under that, so a re-sent frame can
+// still be taken; past it the frame is given up and said, also while the socket is down (a test pins the agreement).
+export const OVER_RATE_MAX_AGE_MS = param({ key: 'transports.overRateMaxAgeMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 * 60 * 1_000 });
+// How many refused frames may wait for a re-send at once; one more is given up and said, not held.
+const OVER_RATE_QUEUE_MAX = param({ key: 'transports.overRateQueueMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1_000 });
+// A frame written this shortly before its socket closed may have lost its refusal with the socket: it is sent once more
+// on the next socket (a receiver drops a copy it already holds by its id). Older ones would have had their answer.
+const UNANSWERED_AT_CLOSE_MS = param({ key: 'transports.unansweredAtCloseMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2_000 });
 // THIS TRANSPORT PACES ITS OWN SENDS UNDER THE RELAY'S LIMIT (the start burst, 2026-11-20): the relay counts `send` frames per socket in
 // a token bucket (30 a second, a burst of 60, `relay.msgRatePerSec` / `relay.msgRateBurst`) and refuses what is over it.
 // This keeps its own bucket WELL below that, so a start's burst is held here and sent as it allows. Well below, because the
@@ -183,6 +192,9 @@ export class RelayTransport extends Transport {
       delayMs: pos(o.delayMs, OVER_RATE_RESEND_DELAY_MS),
       perSec: pos(o.perSec, OVER_RATE_RESEND_PER_SEC),
       maxAttempts: Math.max(1, Math.floor(pos(o.maxAttempts, OVER_RATE_MAX_ATTEMPTS))),
+      maxAgeMs: pos(o.maxAgeMs, OVER_RATE_MAX_AGE_MS),
+      maxQueued: Math.max(1, Math.floor(pos(o.maxQueued, OVER_RATE_QUEUE_MAX))),
+      unansweredAtCloseMs: pos(opts.unansweredAtCloseMs, UNANSWERED_AT_CLOSE_MS),
     };
     const pc = opts.sendPace ?? {};
     this.#pace.perSec = pos(pc.perSec, RELAY_SEND_PER_SEC);
@@ -461,7 +473,7 @@ export class RelayTransport extends Transport {
   }
 
   /** Write one `send` frame, and keep it a while by its envelope id: the relay may refuse it as over-rate. */
-  #writeSend(to, envelope, attempts) {
+  #writeSend(to, envelope, attempts, { firstAt = null, closeResent = false } = {}) {
     const frame = { type: 'send', to, envelope };
     if (envelope._topic) frame.topic = envelope._topic;
     this.#ws.send(JSON.stringify(frame));
@@ -469,7 +481,7 @@ export class RelayTransport extends Transport {
     if (typeof id !== 'string' || !id) return;
     const now = Date.now();
     this.#sentFrames.delete(id);
-    this.#sentFrames.set(id, { to, envelope, at: now, attempts });
+    this.#sentFrames.set(id, { to, envelope, at: now, attempts, firstAt: firstAt ?? now, closeResent });
     // the oldest first: past the keep window, or over the count
     for (const [k, v] of this.#sentFrames) {
       if (now - v.at <= Number(OVER_RATE_KEEP_MS) && this.#sentFrames.size <= Number(OVER_RATE_KEEP_MAX)) break;
@@ -486,14 +498,54 @@ export class RelayTransport extends Transport {
     this.#sentFrames.delete(id);
     if (!kept || kept.attempts >= this.#overRate.maxAttempts) { this.#reportUndelivered(id, 'over-rate', kept?.to ?? null); return; }
     if (this.#overRateQueue.some((h) => h.id === id)) return;
-    this.#overRateQueue.push({ id, ...kept });
+    this.#hold({ id, ...kept });
+  }
+
+  /** Queue a frame for its paced re-send: given up and said when it is already too old or the queue is full. */
+  #hold(held) {
+    if (this.#tooOld(held)) { this.#reportUndelivered(held.id, 'over-rate-too-old', held.to); return; }
+    if (this.#overRateQueue.length >= this.#overRate.maxQueued) { this.#reportUndelivered(held.id, 'over-rate-queue-full', held.to); return; }
+    this.#overRateQueue.push(held);
     if (!this.#overRateTimer && !this.#overRateBusy) this.#overRateTimer = setTimeout(() => this.#resendOne(), this.#overRate.delayMs);
+  }
+
+  /** Too old to be taken: its signed `_ts` (else its first write) is past the age limit, under the replay window. */
+  #tooOld(held) {
+    const ts = Number(held?.envelope?._ts);
+    const made = Number.isFinite(ts) && ts > 0 ? ts : Number(held?.firstAt ?? Date.now());
+    return Date.now() - made > this.#overRate.maxAgeMs;
+  }
+
+  /** Give up, and say, every waiting frame that is too old to be taken (also while the socket is down). */
+  #dropTooOld() {
+    const keep = [];
+    for (const held of this.#overRateQueue.splice(0)) {
+      if (this.#tooOld(held)) this.#reportUndelivered(held.id, 'over-rate-too-old', held.to);
+      else keep.push(held);
+    }
+    this.#overRateQueue.push(...keep);
+  }
+
+  /**
+   * The socket closed: a frame written on it just before, with no answer yet, may have lost its refusal with it. Each
+   * is sent once more on the next socket (a receiver drops a copy it already holds by its id); a frame already sent
+   * again for a close is not, so a flapping socket cannot repeat it. What was kept for the old socket is let go.
+   */
+  #holdUnansweredAtClose() {
+    const now = Date.now();
+    for (const [id, kept] of this.#sentFrames) {
+      if (now - kept.at > this.#overRate.unansweredAtCloseMs || kept.closeResent) continue;
+      if (this.#overRateQueue.some((h) => h.id === id)) continue;
+      this.#hold({ id, ...kept, closeResent: true });
+    }
+    this.#sentFrames.clear();
   }
 
   /** Send the oldest refused frame again; the next one follows after the pace's interval. Never faster, never more. */
   async #resendOne() {
     this.#overRateTimer = null;
     if (this.#stopped) return;
+    this.#dropTooOld();
     const held = this.#overRateQueue[0];
     if (!held) return;
     if (!this.connected) {   // no socket: nothing is sent; look again after the first wait
@@ -504,7 +556,7 @@ export class RelayTransport extends Transport {
     this.#overRateBusy = true;
     try {
       await this.#awaitSenderBound(held.envelope);
-      this.#writeSend(held.to, held.envelope, held.attempts + 1);
+      this.#writeSend(held.to, held.envelope, held.attempts + 1, { firstAt: held.firstAt, closeResent: held.closeResent });
     } catch {
       this.#reportUndelivered(held.id, 'over-rate', held.to);
     } finally {
@@ -846,6 +898,7 @@ export class RelayTransport extends Transport {
       // hold or retry decides — never written later on another socket behind the caller's back
       this.#refusePaced();
       if (this.#stopped) return;
+      this.#holdUnansweredAtClose();
       // Immediately reset the connect promise so any concurrent _put calls will
       // wait for the new connection rather than using the stale resolved promise.
       this.#resetConnectPromise();

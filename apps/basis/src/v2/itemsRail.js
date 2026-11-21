@@ -171,9 +171,11 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
   // ── WHOSE ITEM IT IS BINDS HERE ─────────────────────────────────────────────────────────────────────────────────────
   // Each item type declares who may change and remove a row (`changedByOf(type)`): 'author' (the member who added it,
   // and any admin) or 'circle' (any member); nothing declared = 'author'. The receiver knows whose a row is from the
-  // statement that added it (its verified author), never from a field a later snapshot carries: a new row must name its
-  // own author as `createdBy`, a change must keep the held row's `createdBy`. A head SERVED in answer to a catch-up is
-  // not an act: it carries the original maker as the server holds it, and changes nothing about whose it is.
+  // statement that added it: its VERIFIED author, kept on the row as `madeBy` (the circle-scoped ref the rail checked,
+  // never `createdBy`, which is the writer's own id and travels unchecked). A new row gets its author as `madeBy`
+  // whatever it carries; a change keeps the held `madeBy` (one that names another is refused). A head SERVED in answer
+  // to a catch-up is not an act: it keeps the `madeBy` the server holds. A row whose maker is not known here (made
+  // before this, or served without one) takes any member's change: said in enforceability.md.
   const whoseRefusedOnce = new Set();
   function sayWhoseRefusal(circleId, ref, code) {
     const key = `${circleId}\u0000${ref ?? ''}\u0000${code}`;
@@ -186,33 +188,35 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     try { return changedByOf(type) === 'circle' ? 'circle' : 'author'; } catch { return 'author'; }
   };
   /**
-   * Why this statement may not change the row (a code), or null. `previous` is the row as held here (null: not held).
-   * For a new row, the maker is fixed as the author (`fixMaker`).
+   * The maker of a held row: its `madeBy`, else the verified author of the first statement of that row this device's log
+   * holds, in arrival order (the row was written here, or arrived before makers were kept): the statement that added it.
    */
+  function makerOf(circleId, previous) {
+    if (previous?.madeBy != null) return previous.madeBy;
+    let bodies = [];
+    try { bodies = base.storedStatements(circleId).map((st) => st?.body).filter((b) => b?.kind === 'snapshot' && rowIdOf(circleId, b) === previous?.id && !isServedHead(circleId, b)); } catch { bodies = []; }
+    return inArrivalOrder(bodies)[0]?.payload?.authorRef ?? null;
+  }
+  /** Why this statement may not change the row (a code), or null. `previous` is the row as held here (null: not held). */
   async function whoseRefusal(circleId, item, body, previous, { remove = false } = {}) {
-    if (isOwn(circleId)) return null;
-    const type = previous?.type ?? item?.type;
-    const rule = ruleOf(type);
+    if (isOwn(circleId) || !previous) return null;   // a new row: its maker is its author (`fixMaker`)
+    const rule = ruleOf(previous.type ?? item?.type);
     if (!rule) return null;
     const author = body?.payload?.authorRef ?? null;
-    const served = isServedHead(circleId, body);
-    if (!remove && item) {
-      if (!previous) {
-        if (!served && item.createdBy != null && item.createdBy !== author) return 'forged-maker';
-      } else if ((previous.createdBy ?? null) !== (item.createdBy ?? previous.createdBy ?? null)) {
-        return 'changed-maker';
-      }
-    }
-    if (!previous || served || rule === 'circle') return null;
-    if (previous.createdBy != null && previous.createdBy === author) return null;
+    if (isServedHead(circleId, body)) return null;
+    const maker = makerOf(circleId, previous);
+    if (!remove && item && item.madeBy != null && maker != null && item.madeBy !== maker) return 'changed-maker';
+    if (rule === 'circle' || maker == null || maker === author) return null;
     if (await authorIsAdmin(circleId, author)) return null;
     return 'not-yours';
   }
-  /** A new row's maker is the statement's verified author when the item names none (a served head keeps its own). */
+  /** The row as it is put here: a new row's maker is the statement's verified author; a change keeps the held one. */
   const fixMaker = (circleId, item, body, previous) => {
-    if (isOwn(circleId) || !item || item.createdBy != null) return item;
-    if (previous) return previous.createdBy != null ? { ...item, createdBy: previous.createdBy } : item;   // a change keeps it
-    return !isServedHead(circleId, body) && body?.payload?.authorRef ? { ...item, createdBy: body.payload.authorRef } : item;
+    if (isOwn(circleId) || !item || typeof changedByOf !== 'function') return item;
+    if (previous) { const maker = makerOf(circleId, previous); return maker != null ? { ...item, madeBy: maker } : item; }
+    if (isServedHead(circleId, body)) return item;
+    const author = body?.payload?.authorRef;
+    return author ? { ...item, madeBy: author } : item;
   };
   const rowIdOf = (circleId, b) => (b?.kind === 'snapshot' ? (itemOf(circleId, b)?.id ?? b.subject) : (b?.payload?.id ?? b?.subject));
   /**

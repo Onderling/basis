@@ -74,7 +74,7 @@ describe('whose item it is, judged by each receiving device', () => {
     const { wire, ada, xavi, yara } = await three();
     const note = await xavi.store.put({ type: 'note', text: 'mine', body: 'mine' }, { by: 'webid:xavi' });
     await settle(); await flush(wire, ada, yara);
-    expect((await yara.store.get(note.id))?.createdBy).toBe('webid:xavi');
+    expect((await yara.store.get(note.id))?.madeBy).toBe('webid:xavi');
     await ada.store.put({ ...(await ada.store.get(note.id)), text: 'ada was here' }, { by: 'webid:ada' });
     await settle(); await flush(wire, xavi, yara);
     expect((await xavi.store.get(note.id)).text).toBe('mine');
@@ -92,7 +92,7 @@ describe('whose item it is, judged by each receiving device', () => {
     await ada.store.put({ ...(await ada.store.get(task.id)), text: 'boodschappen gedaan' }, { by: 'webid:ada' });
     await settle(); await flush(wire, xavi, yara);
     expect((await xavi.store.get(task.id)).text).toBe('boodschappen gedaan');
-    expect((await yara.store.get(task.id)).createdBy, 'the maker stays').toBe('webid:xavi');
+    expect((await yara.store.get(task.id)).madeBy, 'the maker stays').toBe('webid:xavi');
   });
 
   it('an admin\'s change and removal of a member\'s note: taken', async () => {
@@ -105,16 +105,17 @@ describe('whose item it is, judged by each receiving device', () => {
     expect(await ada.store.get(note.id)).toBeNull();
   });
 
-  it('a new row naming another maker is refused; a change that renames the maker is refused', async () => {
+  it('a new row naming another maker is kept under its real author; a change that renames the maker is refused', async () => {
     const { wire, ada, xavi, yara } = await three();
-    await ada.store.put({ id: 'n-forged', type: 'note', text: 'xavi said so', body: 'x', createdBy: 'webid:xavi' }, { by: 'webid:ada' });
+    await ada.store.put({ id: 'n-forged', type: 'note', text: 'xavi said so', body: 'x', madeBy: 'webid:xavi' }, { by: 'webid:ada' });
     await settle(); await flush(wire, xavi, yara);
-    expect(await yara.store.get('n-forged')).toBeNull();
+    expect((await yara.store.get('n-forged'))?.madeBy, 'the verified author, not the claimed one').toBe('webid:ada');
     const task = await xavi.store.put({ type: 'task', text: 'mine' }, { by: 'webid:xavi' });
     await settle(); await flush(wire, ada, yara);
-    await ada.store.put({ ...(await ada.store.get(task.id)), createdBy: 'webid:ada', text: 'now mine' }, { by: 'webid:ada' });
+    expect((await ada.store.get(task.id)).madeBy).toBe('webid:xavi');
+    await ada.store.put({ ...(await ada.store.get(task.id)), madeBy: 'webid:ada', text: 'now mine' }, { by: 'webid:ada' });
     await settle(); await flush(wire, xavi, yara);
-    expect((await yara.store.get(task.id)).createdBy).toBe('webid:xavi');
+    expect((await yara.store.get(task.id)).madeBy).toBe('webid:xavi');
     expect((await yara.store.get(task.id)).text).toBe('mine');
   });
 });

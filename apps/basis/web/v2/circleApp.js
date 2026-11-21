@@ -453,7 +453,7 @@ import { createContactDmStore } from '../../src/v2/contactDmStore.js';
 import { createAttachmentBlobStore } from '../../src/v2/attachmentBlobStore.js';
 import {
   outOfCircleShareOffered,
-  shareItemAcrossCircles, shareItemToPublishedKey, listSharedResolved, revokeItemShare, adminOutboundShares, stopShareWords, memberRevokeWords, revokeAllForMember,
+  shareItemAcrossCircles, shareItemToPublishedKey, shareFailureKey, listSharedResolved, revokeItemShare, adminOutboundShares, stopShareWords, memberRevokeWords, revokeAllForMember,
   shareErrorStatusKey,
 } from '../../src/v2/circleShare.js';
 // objective L · Phase 2 — the out-of-circle recipient picker (thin DOM over the SHARED `pickableRecipients`).
@@ -641,6 +641,8 @@ async function shareItemIntoCircle({ itemId, fromCircleId, toCircleId, by, recip
     policyOf: _circlePolicy,
     // recipient re-seal: the resolved keys + the injected copy-mode re-sealer (pod-client crypto).
     recipientKeys, sealCopy: sealCopyToRecipients,
+    // the share's own copy into the source circle asks that circle first, as its receivers will (the agent's gate)
+    mayWriteInto: async (c, a) => (await circleHouseholdAgent?.mayWriteInto?.(c, a)) ?? null,
     itemId, fromCircleId, toCircleId, by: by ?? rowAuthorWeb(fromCircleId) ?? undefined,
     recipient, recipients: who,
   });
@@ -678,6 +680,7 @@ async function shareItemToContact({ itemId, fromCircleId, toCircleId, by, recipi
     policyOf: _circlePolicy,
     sealCopy: sealCopyToRecipients,
     sealingKeyFromNetworkKey: podSealingPublicKeyFromNetworkKey,
+    mayWriteInto: async (c, a) => (await circleHouseholdAgent?.mayWriteInto?.(c, a)) ?? null,
     // NOTICE emitters (routed by the circle's `notifyOutOfCircle` setting): `admins` pings the circle admins,
     // `post` lands a category-tagged noticeboard post. Both best-effort — a notice never fails the share.
     // `notify` (admins) → @onderling/notify-envelope wiring is a follow-up; today it records the event.
@@ -8532,7 +8535,7 @@ function showCircle(id, circle, policy) {
           const r = await shareItemIntoCircle({ itemId, fromCircleId: id, toCircleId });
           circleNote(r?.ok
             ? t('circle.share.done', { item: itemId, circle: toCircleId })
-            : t(shareErrorStatusKey(r?.error), { error: r?.error ?? 'unknown' }));
+            : t(shareFailureKey(r), { error: r?.error ?? 'unknown' }));
           return;
         }
         // objective L · Phase 2 — share an item OUT to an out-of-circle PERSON (a contact), ALONGSIDE the
@@ -8553,7 +8556,7 @@ function showCircle(id, circle, policy) {
             itemId, fromCircleId: id, toCircleId,
             onResult: (r, recip) => circleNote(
               !r?.ok
-                ? t('circle.share.to_person_failed', { error: r?.error ?? 'unknown' })
+                ? t(shareFailureKey(r, { toPerson: true }), { error: r?.error ?? 'unknown' })
                 // via:'copy' — the D2 seal gate re-sealed a COPY (group-key content can't grant in place
                 // out-of-circle); tell the user outside-circle sharing differs (a copy, not revocable).
                 : t(r?.via === 'copy' ? 'circle.share.to_person_done_copy' : 'circle.share.to_person_done',

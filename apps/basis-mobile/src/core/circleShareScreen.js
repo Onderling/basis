@@ -20,7 +20,7 @@ import {
 // objective L · Phase 2 — the SHARED (web≡mobile) out-of-circle recipient selector. Mobile uses the SAME
 // selector web's `renderRecipientPicker` does — no mobile fork (invariants #1/#2).
 import { pickableRecipients, outOfCircleLinkWarning } from '../../../basis/src/v2/shareRecipients.js';
-import { shareErrorStatusKey } from '../../../basis/src/v2/circleShare.js';
+import { shareErrorStatusKey, shareFailureKey } from '../../../basis/src/v2/circleShare.js';
 
 /** The default wrapper set — the live composition root. Tests inject a fake `deps` in its place. */
 export const defaultShareDeps = {
@@ -118,7 +118,7 @@ export async function shareOut({
   if (r?.ok) return status(true, 'circle.share.done', { item: itemId, circle: target });
   // The KEY carries the explanation for a known code ("your pod is not connected…"), so a refusal reads as
   // something the person can act on rather than as a raw machine code. Unknown codes keep the old template.
-  return status(false, shareErrorStatusKey(r?.error), { error: r?.error ?? 'unknown' });
+  return status(false, shareFailureKey(r), { error: r?.error ?? 'unknown' });
 }
 
 /**
@@ -147,7 +147,7 @@ export async function shareToRecipient({
   // via:'copy' — the D2 seal gate re-sealed a COPY (group-key content can't grant in place out-of-circle);
   // tell the user outside-circle sharing differs (a copy, not revocable). Web parity (circleApp.js).
   if (r?.ok) return status(true, r?.via === 'copy' ? 'circle.share.to_person_done_copy' : 'circle.share.to_person_done', { item: itemId, name: name ?? recipient });
-  return status(false, 'circle.share.to_person_failed', { error: r?.error ?? 'unknown' });
+  return status(false, shareFailureKey(r, { toPerson: true }), { error: r?.error ?? 'unknown' });
 }
 
 /**

@@ -929,6 +929,9 @@ export async function bootAgentBundle(opts = {}) {
   // fires on a membership change, e.g. a REMOVE → rotation, so wiring here at boot is always in time).
   // Injected as an opts hook so this module keeps zero RN/screen imports; App.js passes circlePods'
   // setCircleKeyEventWiring. Absent (tests / stub boots) ⇒ single-device behaviour, unchanged.
+  // a share's own copy into its source circle asks that circle first, as its receivers will (the agent decides;
+  // App.js passes circlePods' setCircleWriteGate, which the share wrappers read)
+  opts.setWriteGate?.((circleId, act) => agent.mayWriteInto?.(circleId, act) ?? null);
   opts.setKeyEventWiring?.({
     sendPeer: (addr, payload, sendOpts) => (typeof agent.sendPeerMessage === 'function'
       ? agent.sendPeerMessage(addr, payload, sendOpts)

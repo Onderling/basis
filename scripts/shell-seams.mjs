@@ -350,6 +350,9 @@ export const SEAMS = Object.freeze([
   // A PERSON'S WRITE IN A CIRCLE ASKS THAT CIRCLE (L1042): the agent decides at the outer waist; a shell hands in only
   // the stores it alone has. The box hands none until the box row (L1050): one circle's rule at every door is Frits's call.
   { id: 'circle-capability-inputs', pattern: /circleCapabilityInputs:/, shells: ['web', 'mobile'], why: 'a write a circle switched off must be refused when tapped, as when typed: the waist reads the circle\'s policy through this reader' },
+  // A SHARE'S OWN COPY INTO ITS SOURCE CIRCLE asks that circle first (`agent.mayWriteInto`): the shells call the share
+  // functions directly, so each hands the agent's gate in. The box shares nothing.
+  { id: 'share-asks-source', pattern: /\.mayWriteInto\b/, shells: ['web', 'mobile'], why: 'a share whose copy the source circle refuses is refused on the sender in words, not shown there and refused on every other device' },
   { id: 'plus-own-lists', pattern: /createPlusDoor\(\{[^}]*ownListsOf:/, shells: ['web', 'mobile'], why: 'the "+" reads the ticked self\'s own lists first, read as that self' },
   // THE PERSON'S OWN RECORD (ownActions.js, ledger L203): what no op shows (a proposal declined, a line placed nowhere)
   // is noted by the "+" door through the agent's `noteOwnAct`; a shell that does not hand it records only what ran

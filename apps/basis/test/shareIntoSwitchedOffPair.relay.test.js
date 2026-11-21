@@ -54,6 +54,8 @@ describe('a share into a pair circle asks that circle\'s switches', () => {
     expect(await pairEvents(), 'a copy was written into the pair circle').toEqual([]);
     const own = ((await phone.agent.callSkill('calendar', 'listEvents', { days: 3650 }))?.items ?? []).find((e) => e.id === made.itemId);
     expect(own?.shared ?? [], 'the own appointment is marked shared').toEqual([]);
+    // the same gate the agent hands both shells for a share's copy into its source circle
+    expect(await phone.agent.mayWriteInto(pair, { type: 'calendar-event', act: 'add' }), 'the agent\'s gate does not refuse it').toBeTruthy();
   }, 60_000);
 
   it('never changed (its first settings have the calendar off): the share goes, as every receiver applies it', async () => {

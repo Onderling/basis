@@ -69,6 +69,10 @@ It is also a useful design tool. Asking the question tells you *where the gate a
     kind the circle has off (a ping, nothing shows). A circle whose settings a device does not know yet filters
     nothing until they arrive. The record of each circle's conversation kinds is held per process (a box running
     several agents shares it).
+  - **A share's pointer is judged nowhere**: no manifest declares the `shared-ref` type, so a receiver applies one in
+    any circle whatever its switches. What a share writes beside it IS judged: its copy into the source circle (an add
+    of the item's own type) and an in-place re-seal (a change); the sender asks the source first (`mayWriteInto`) and
+    refuses the whole share in words where the receivers would refuse.
 - **Whose item it is binds on the receiving device** (`madeBy`, `changedBy`): a member's device that skips its own
   check cannot change or remove another member's note, post or ask on anyone else's device. What is left: a row whose
   maker is not known there (made before makers were kept, or served by catch-up without one) takes any member's change

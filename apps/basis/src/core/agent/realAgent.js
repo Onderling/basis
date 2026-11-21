@@ -3303,8 +3303,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       const mine = rows.find((m) => m?.webid === circleSelfRef(act.circleId));
       const listed = new Set([mine?.circleAddress, ...(mine?.circleAddresses ?? []), ...((mine?.retiredAddresses ?? []).map((x) => x?.address))].filter(Boolean));
       if (!listed.has(act.address)) { console.warn(`[keys] ${String(act.circleId).slice(0, 12)}: a ban of an address not on this person's row here was not done`); return; }
-      // the ban rotates the key: the address this point presents is a recipient first, so the rotation never leaves it out
-      await ctl.grantRecipient?.({ groupId: act.circleId, publicKey: sealingPublicKeyFromNetworkKey(circleAddressFor(act.circleId)), ownDevice: true }).catch(() => null);
+      // the ban rotates the key: the address this point presents is a recipient first, so the rotation never leaves it out.
+      // A grant that fails stops the ban here (unacked, so the forwarder re-sends it): a rotation without the point is worse.
+      try {
+        await ctl.grantRecipient?.({ groupId: act.circleId, publicKey: sealingPublicKeyFromNetworkKey(circleAddressFor(act.circleId)), ownDevice: true });
+      } catch (e) {
+        console.warn(`[keys] ${String(act.circleId).slice(0, 12)}: the grant of this point's own address failed; the ban waits (${e?.message ?? e})`);
+        throw new Error('ban-waits-for-the-own-grant');
+      }
       await ctl.revokeRecipient?.({ groupId: act.circleId, publicKey: sealingPublicKeyFromNetworkKey(act.address), policy: 'ban' });
     }
   };

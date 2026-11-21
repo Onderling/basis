@@ -7,9 +7,15 @@
  * as an older or changed app would hold it): its add passes its own gate, lands in its store and rides the items lane.
  * A and B must not show it; the task made before the switch-off stays on all three.
  *
+ * C's patched policy is C's OWN copy (`window.onderlingCirclePolicy.update`, no statement made): no seam reaches a
+ * peer's store past its sender gate, and an app that holds an older or changed policy is exactly the case the judge on
+ * arrival is for. The adds go through the outer waist as a tap (`{door: 'tap'}`): only a person's act is asked by the
+ * sender's gate, so a door-less call would pass B's gate too and prove nothing.
+ *
  * The probe names its branch: a row missing on A or B is checked against what that device's console said (the items
  * lane's "refused ... circle-switch" line: it arrived and the switch refused it), so "never arrived" is not read as a
- * pass.
+ * pass. With the judge off (`judging` forced false in `itemsRail.js`) the walk goes red at "A does not show the task
+ * put past the gate": the row arrives and is shown.
  *
  *   PEER_TEST_PORT=5273 PEER_TEST_RELAY=ws://127.0.0.1:8798 npx playwright test --project=relay test-browser/walk-items-switch-binds.spec.js
  */
@@ -24,11 +30,14 @@ const BEFORE = 'gemaakt toen toevoegen aan stond';
 const PAST = 'langs de schakelaar gezet';
 const ADD = 'tasks add task';
 
+// a read as background; an add as the person's tap (only a call naming a person door is asked by the sender's gate)
 const call = (page, app, op, args = {}) => page.evaluate(([a, o, x]) => window.onderlingCall(a, o, x), [app, op, args]);
+const tap = (page, app, op, args = {}) => page.evaluate(([a, o, x]) => window.onderlingCall(a, o, x, { door: 'tap' }), [app, op, args]);
 const openText = async (page, circleId) => JSON.stringify((await call(page, 'tasks', 'listOpen', { circleId })) ?? null);
 const policyOf = (page, circleId) => page.evaluate((cid) => window.onderlingCirclePolicy.get(cid), circleId);
 const addingOn = async (page, circleId) => (await policyOf(page, circleId))?.capabilities?.[ADD]?.enabled !== false;
-const tasksOn = async (page, circleId) => ((await policyOf(page, circleId))?.features ?? []).includes?.('tasks') ?? false;
+// `features` is a map of feature → boolean (`circlePolicy.js` isFeatureEnabled)
+const tasksOn = async (page, circleId) => (await policyOf(page, circleId))?.features?.tasks === true;
 
 async function poll(fn, { tries = 30, every = 2000 } = {}) {
   for (let i = 0; i < tries; i += 1) { const v = await fn(); if (v) return v; await new Promise((r) => setTimeout(r, every)); }
@@ -57,7 +66,7 @@ test('adding tasks switched off: a task put past the sender\'s gate is not shown
     for (const n of [B, C]) expect(await poll(() => tasksOn(n.page, circle)), `${n.label} holds tasks on`).toBeTruthy();
 
     // B adds a task while adding is on: it reaches A and C
-    const made = await call(B.page, 'tasks', 'addTask', { text: BEFORE, circleId: circle });
+    const made = await tap(B.page, 'tasks', 'addTask', { text: BEFORE, circleId: circle });
     expect(made?.ok !== false && !made?.error, `B's add: ${JSON.stringify(made)}`).toBe(true);
     for (const n of [A, C]) expect(await poll(async () => (await openText(n.page, circle)).includes(BEFORE)), `${n.label} shows the task made before`).toBeTruthy();
 
@@ -68,13 +77,13 @@ test('adding tasks switched off: a task put past the sender\'s gate is not shown
     for (const n of [B, C]) expect(await poll(async () => !(await addingOn(n.page, circle))), `${n.label} holds adding off`).toBeTruthy();
 
     // B's own app refuses an add now (the sender's gate)
-    const refused = await call(B.page, 'tasks', 'addTask', { text: 'B probeert nog toe te voegen', circleId: circle });
+    const refused = await tap(B.page, 'tasks', 'addTask', { text: 'B probeert nog toe te voegen', circleId: circle });
     expect(refused?.ok, `B's own gate refuses: ${JSON.stringify(refused)}`).toBe(false);
 
     // C's app holds adding on (its copy of the policy patched back) and adds: past its gate, into its store, onto the lane
     const cPol = (await policyOf(C.page, circle)) ?? {};
     await C.page.evaluate(([cid, caps]) => window.onderlingCirclePolicy.update(cid, { capabilities: caps }), [circle, { ...(cPol.capabilities ?? {}), [ADD]: { enabled: true } }]);
-    const past = await call(C.page, 'tasks', 'addTask', { text: PAST, circleId: circle });
+    const past = await tap(C.page, 'tasks', 'addTask', { text: PAST, circleId: circle });
     expect(past?.ok !== false && !past?.error, `C's add passed its own gate: ${JSON.stringify(past)}`).toBe(true);
 
     // A and B: the statement arrives and is refused; never shown

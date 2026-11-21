@@ -5,6 +5,8 @@
 // substrate as pinboard-mobile + folio-mobile + tasks-mobile (see
 // the retired pinboard-mobile app's entry, now in the archive tag).
 import '@onderling/react-native/platform/polyfills';
+// DEBUG BUILD (L1103 part 2): count every storage write of the first 30 s of a start
+import './src/core/startWriteCounter';
 
 // @expo/metro-runtime adds the fast-refresh + web-only runtime hooks
 // required by metro-web (Phase A). Native bundles ignore it.

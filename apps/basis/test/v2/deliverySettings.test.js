@@ -270,7 +270,7 @@ describe('the outbox as a PROJECTION — receipts on the log, the ladder rebuilt
   const CHAT = 'chat-message';
   const logOf = (entries) => ({
     entries,
-    query: () => entries,
+    query: () => entries.slice().reverse(),   // newest-first, as the device log reads
     appendSilentEntry: (e) => { entries.push({ type: e.kind, silent: true, ...e }); return e; },
   });
 

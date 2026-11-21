@@ -6589,6 +6589,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       // the circle's switches bind on arrival: each statement judged by the settings at its place (`contentJudge.js`),
       // against the same manifests the sender's gate reads
       judge: { manifests: () => allManifests() },
+      // whose item it is binds on arrival too: each type's declared `changedBy` ('author' | 'circle'; none = 'author'),
+      // read from the same registry the circle stores validate against
+      changedByOf: (type) => storeRegistry.schema?.(type)?.changedBy,
       // the person's own scope: between their own devices only (see the own store above)
       // …one lane per self this device holds: each signed, carried and verified as that self's devices
       own: {

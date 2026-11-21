@@ -92,7 +92,7 @@ export const OWN_ITEMS_CATCHUP_SUBTYPES = Object.freeze({
  *   carried so a sibling verifies the chain without the registry. `belongs(scope, item)` says which lane an item of the
  *   one shared own store rides: a lane serves and applies only its own items (none of another self's).
  */
-export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, storeFor, verifyBinding = null, onItemApplied = null, onItemRemoved = null, own = null, judge = null }) {
+export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, storeFor, verifyBinding = null, onItemApplied = null, onItemRemoved = null, own = null, judge = null, changedByOf = null }) {
   const refIn = selfRefIn(myRef);   // in each circle, the self this device is there
   if (typeof circleIdentityFor !== 'function' || typeof storeFor !== 'function') return null;
   const isOwn = (circleId) => (typeof own?.isOwn === 'function' ? own.isOwn(circleId) === true : (Boolean(own?.scope) && circleId === own.scope));
@@ -167,6 +167,53 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
   function refuseServed() {
     processRefusalLog().note({ tag: 'gate', lane: 'items', check: 'served-head', reason: 'a served head this device did not ask for' });
   }
+
+  // ── WHOSE ITEM IT IS BINDS HERE ─────────────────────────────────────────────────────────────────────────────────────
+  // Each item type declares who may change and remove a row (`changedByOf(type)`): 'author' (the member who added it,
+  // and any admin) or 'circle' (any member); nothing declared = 'author'. The receiver knows whose a row is from the
+  // statement that added it (its verified author), never from a field a later snapshot carries: a new row must name its
+  // own author as `createdBy`, a change must keep the held row's `createdBy`. A head SERVED in answer to a catch-up is
+  // not an act: it carries the original maker as the server holds it, and changes nothing about whose it is.
+  const whoseRefusedOnce = new Set();
+  function sayWhoseRefusal(circleId, ref, code) {
+    const key = `${circleId}\u0000${ref ?? ''}\u0000${code}`;
+    if (whoseRefusedOnce.has(key)) return;
+    whoseRefusedOnce.add(key);
+    processRefusalLog().note({ tag: 'gate', lane: 'items', check: 'whose-item', reason: code });
+  }
+  const ruleOf = (type) => {
+    if (typeof changedByOf !== 'function') return null;   // not composed with the declarations: no whose-check here
+    try { return changedByOf(type) === 'circle' ? 'circle' : 'author'; } catch { return 'author'; }
+  };
+  /**
+   * Why this statement may not change the row (a code), or null. `previous` is the row as held here (null: not held).
+   * For a new row, the maker is fixed as the author (`fixMaker`).
+   */
+  async function whoseRefusal(circleId, item, body, previous, { remove = false } = {}) {
+    if (isOwn(circleId)) return null;
+    const type = previous?.type ?? item?.type;
+    const rule = ruleOf(type);
+    if (!rule) return null;
+    const author = body?.payload?.authorRef ?? null;
+    const served = isServedHead(circleId, body);
+    if (!remove && item) {
+      if (!previous) {
+        if (!served && item.createdBy != null && item.createdBy !== author) return 'forged-maker';
+      } else if ((previous.createdBy ?? null) !== (item.createdBy ?? previous.createdBy ?? null)) {
+        return 'changed-maker';
+      }
+    }
+    if (!previous || served || rule === 'circle') return null;
+    if (previous.createdBy != null && previous.createdBy === author) return null;
+    if (await authorIsAdmin(circleId, author)) return null;
+    return 'not-yours';
+  }
+  /** A new row's maker is the statement's verified author when the item names none (a served head keeps its own). */
+  const fixMaker = (circleId, item, body, previous) => {
+    if (isOwn(circleId) || !item || item.createdBy != null) return item;
+    if (previous) return previous.createdBy != null ? { ...item, createdBy: previous.createdBy } : item;   // a change keeps it
+    return !isServedHead(circleId, body) && body?.payload?.authorRef ? { ...item, createdBy: body.payload.authorRef } : item;
+  };
   const rowIdOf = (circleId, b) => (b?.kind === 'snapshot' ? (itemOf(circleId, b)?.id ?? b.subject) : (b?.payload?.id ?? b?.subject));
   /**
    * WHICH ACT a snapshot was is a fact of its ARRIVAL here: a row this device did not hold is an add, a held one a
@@ -278,8 +325,10 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
       if (b.kind === 'snapshot') {
         const item = itemOf(circleId, b);
         // the same refusals as a landing (a lane-carried row, an announcement by a non-admin): a rebuild is no back door
-        if (item && !(await refusedOnHead(circleId, item, b))) { try { await store.put(item, { sync: false, origin: true }); } catch { /* a type not held here */ } }
-      } else {
+        let held = null;
+        try { held = (await store.get?.(rowId)) ?? null; } catch { held = null; }
+        if (item && !(await refusedOnHead(circleId, item, b, held))) { try { await store.put(fixMaker(circleId, item, b, held), { sync: false, origin: true }); } catch { /* a type not held here */ } }
+      } else if (!(await removeRefused(circleId, store, rowId, b))) {
         try { await store.delete(rowId, { sync: false }); } catch { /* already gone */ }
       }
     }
@@ -320,7 +369,7 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
   }
 
   /** Whether a snapshot's row may not land here whatever the switches say (true: refused, and said where it is news). */
-  async function refusedOnHead(circleId, item, body) {
+  async function refusedOnHead(circleId, item, body, previous = undefined) {
     // on an own lane, only that lane's self's items (one lane never writes another self's into the shared own store)
     if (isOwn(circleId) && !ownBelongs(circleId, item)) return true;
     // A roster row never lands through this lane: its addresses are proven facts patched in place,
@@ -333,6 +382,20 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
       refusedOnce(circleId, body.payload?.authorRef);
       return true;
     }
+    let held = previous;
+    if (held === undefined) { try { held = (await storeFor(circleId)?.get?.(item.id)) ?? null; } catch { held = null; } }
+    const whose = await whoseRefusal(circleId, item, body, held);
+    if (whose) { sayWhoseRefusal(circleId, body.payload?.authorRef, whose); return true; }
+    return false;
+  }
+
+  /** Whether a remove may not take the row away here: whose it is (its maker, or an admin, for an 'author' type). */
+  async function removeRefused(circleId, store, id, body) {
+    let held = null;
+    try { held = (await store.get?.(id)) ?? null; } catch { held = null; }
+    if (!held) return false;
+    const whose = await whoseRefusal(circleId, null, body, held, { remove: true });
+    if (whose) { sayWhoseRefusal(circleId, body.payload?.authorRef, whose); return true; }
     return false;
   }
 
@@ -341,7 +404,9 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     if (body.kind === 'snapshot') {
       const item = itemOf(circleId, body);
       if (!item || typeof item.id !== 'string' || !item.id) return;
-      if (await refusedOnHead(circleId, item, body)) return;
+      let held = null;
+      try { held = (await store.get?.(item.id)) ?? null; } catch { held = null; }
+      if (await refusedOnHead(circleId, item, body, held)) return;
       // sync:false — an ingest never re-publishes (the echo loop); origin:true — the causal merge keeps
       // the writer's clock and runs the claim fold, exactly like the legacy mirror's inbound path.
       // whether this device held the row before: a snapshot that is an UPDATE (a claim, an edit) is not a new arrival.
@@ -356,7 +421,7 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
       if (fresh && judging && !isOwn(circleId) && previous && body?.hash && !otherStatementOf(circleId, item.id, body.hash)) {
         judgmentsOf(circleId).keepPrevious(body.hash, previous);
       }
-      try { await store.put(item, { sync: false, origin: true }); }
+      try { await store.put(fixMaker(circleId, item, body, previous), { sync: false, origin: true }); }
       catch (err) {
         // a type this node does not hold (an extension it does not run): the row is not held, the statement stays on
         // the log — the head picks it up the day the type is installed here (a rebuild re-applies what the log holds).
@@ -373,6 +438,7 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     } else if (body.kind === 'remove') {
       const id = body.payload?.id ?? body.subject;
       if (typeof id === 'string' && id) {
+        if (await removeRefused(circleId, store, id, body)) return;
         await store.delete(id, { sync: false });
         if (typeof onItemRemoved === 'function') { try { await onItemRemoved(circleId, id); } catch { /* never fails the merge */ } }
       }

@@ -26,7 +26,7 @@
  * The governance fold ignores this kind (it branches on propose/vote/resolve): a policy-update is a carried fact.
  */
 import { judgePolicyChain, judgeWithProposals, proposalsOn } from './governanceReceiverGate.js';
-import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES } from './circlePolicy.js';
+import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, mergeCirclePolicy } from './circlePolicy.js';
 import { processRefusalLog } from './refusalLog.js';
 import { sealedKeyValue } from './localStoreSeal.js';
 import { noteKeptPolicyChanges, provideKeptPolicyChanges } from './keptPolicyChanges.js';
@@ -288,10 +288,13 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
      * admin saw "saved" (L144). It states one past the lane's head, makes its own statement the head, and puts the
      * saved policy back locally — applying the lane may have written the older one there, and the save is now newest.
      */
-    async state(circleId, { proposalId = null } = {}) {
+    async state(circleId, { proposalId = null, policy: given = null } = {}) {
       const emit = typeof emitter === 'function' ? emitter() : null;
       if (typeof emit !== 'function' || typeof circleId !== 'string' || !circleId) return null;
-      const policy = await readPolicy(circleId).catch(() => null);
+      // `given`: an admin's SAVE hands the settings it wants stated; they are written here only once the statement went
+      // out (`saveCircleSettings`). Without it the policy already written here is stated (the founder's first write,
+      // a decided proposal's enactor, which writes first).
+      const policy = (given && typeof given === 'object') ? given : await readPolicy(circleId).catch(() => null);
       if (!policy || typeof policy !== 'object') return null;
       if (knownRail) await apply(circleId, knownRail).catch(() => {});
       const version = await nextPolicyVersion(headStore, circleId);
@@ -302,12 +305,12 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
         // the admin's own device judges content by its own change too: the fan never comes back here, so the lane notes
         // the kept changes again now that the statement is on this device's log (the head is already this one)
         if (statement?.body?.hash && knownRail) await apply(circleId, knownRail).catch(() => {});
-      } finally {
-        // The admin's save stays the local truth whether or not the lane took it: applying the lane above may have
-        // written an older policy here, and a failed emit must not leave that older one in the store the screen shows.
-        await writePolicy(circleId, policy).catch(() => {});
+      } catch { statement = null; } finally {
+        // The stated policy is the local truth: applying the lane above may have written an older one here. A GIVEN
+        // policy that was not stated is not written: this device keeps what the circle holds, and the save says it failed.
+        if (statement?.body?.hash || !given) await writePolicy(circleId, policy).catch(() => {});
       }
-      return statement;
+      return statement?.body?.hash ? statement : null;
     },
     apply,
     /** The policy in force on this device: what the rules apply's receiver gate judges an unstamped rules change by. */
@@ -317,6 +320,43 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
     /** The shell hands over its receive rail when it builds it. */
     useRail(rail) { know(rail); },
     preserved: (circleId) => preservedPolicyStatementsFor({ headStore, circleId }),
+  };
+}
+
+/**
+ * AN ADMIN'S SETTINGS SAVE, the one both shells call: the settings are STATED to the circle, and written on this device
+ * only when the statement went out. A save that could not be stated is not a save: this device keeps what the circle
+ * holds and the screen says so (otherwise the admin's device alone would hold a change no other member ever gets).
+ * `policy` is merged over the settings this device holds, as a store update merges (a recipe hands a patch; the
+ * settings screen its whole working copy), and the merged settings are what is stated.
+ * @param {{lane: ReturnType<typeof makeCirclePolicyLane>|null, circleId: string, policy: object}} a
+ * @returns {Promise<{ok: true, policy: object}|{ok: false, error: 'not-stated'}>}
+ */
+export async function saveCircleSettings({ lane, circleId, policy } = {}) {
+  if (!lane || typeof lane.state !== 'function' || !policy || typeof policy !== 'object') return { ok: false, error: 'not-stated' };
+  // the held settings: none held yet is `{}`; a read that FAILED is not "none" (a patch merged over nothing would be
+  // stated as the circle's whole settings), so it is not a save
+  let current = {};
+  try { current = (typeof lane.readPolicy === 'function' ? await lane.readPolicy(circleId) : null) ?? {}; } catch { return { ok: false, error: 'not-stated' }; }
+  const { policyPending: _pending, ...held } = current;
+  const merged = mergeCirclePolicy(held, policy);
+  let statement = null;
+  try { statement = await lane.state(circleId, { policy: merged }); } catch { statement = null; }
+  return statement ? { ok: true, policy: merged } : { ok: false, error: 'not-stated' };
+}
+
+/**
+ * A policy store whose `update` is an admin's save (`saveCircleSettings`): what a settings screen and a recipe apply are
+ * handed on every shell, so neither can write settings here that the circle never got. `update` answers the saved
+ * policy, as the store does, or `{ok: false, error: 'not-stated'}`.
+ */
+export function statingPolicyStore(store, lane) {
+  return {
+    ...store,
+    update: async (circleId, patch) => {
+      const r = await saveCircleSettings({ lane, circleId, policy: patch });
+      return r.ok ? r.policy : r;
+    },
   };
 }
 

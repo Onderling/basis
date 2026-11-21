@@ -1,6 +1,6 @@
 # Architecture
 
-> **Last updated: 2026-11-20** — checked against the code on `development` that day. Every change to this file
+> **Last updated: 2026-11-21** — checked against the code on `development` that day. Every change to this file
 > moves this date (`scripts/lint-architecture-date.mjs` is red otherwise), so the date says how fresh the whole
 > file is, not one paragraph.
 
@@ -1455,7 +1455,12 @@ unchanged store writes nothing; a row it cannot open (sealed under another key) 
 byte, never handed on as content, until the caller writes that key itself. A small key-value store goes through
 `sealedKeyValue` (values sealed, keys legible, a write before the key refused rather than stored in the clear) or,
 for one JSON value per key, `sealedJsonIo`, which also answers a read before the key as "nothing kept" without
-overwriting anything and reseals an old plain value at its first read. A store of a person's content uses the strict
+overwriting anything and reseals an old plain value at its first read. The seal is bound to its key and to the
+device's history: the storage key is sealed inside every value, so a value copied under another key does not open
+there; and a content key minted from now on is stored with a form mark (`kv1:`), on which device a plain or unbound
+value was planted and is refused ("not readable", kept). A bare key is an older one, whose plain and unbound values are
+the upgrade's, read once and rewritten sealed and bound (`localStoreSeal.js`, `openStoredValue` for a tool that reads
+raw storage). A store of a person's content uses the strict
 mode: a read before the key, or of a value that will not open with this key, answers "not readable yet" and writes
 nothing over it; where an empty answer would be read as "nothing there" (the page book, a contact's name, the
 person's availability, the pins, the contact seen-marks) the read waits for the key instead.

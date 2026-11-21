@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { groupKeyStrategy } from '@onderling/pod-client';
-import { setShellContentSeal } from '../../basis/src/v2/localStoreSeal.js';
+import { setShellContentSeal, openStoredValue } from '../../basis/src/v2/localStoreSeal.js';
 // the cache seals at rest (ledger L1083): a content key is published, as after a boot
 const SEAL = groupKeyStrategy({ groupKey: Buffer.from(new Uint8Array(32).fill(7)).toString('base64url') });
 setShellContentSeal(SEAL);
@@ -33,7 +33,7 @@ describe('γ-next.recipe — circleRecipePendingStorageRN', () => {
   it('round-trips a recipe through save / load', async () => {
     const io = asyncStorageCircleRecipePendingIo(storage);
     await io.save('g1', { id: 'r1', name: 'Circle', blocks: [] });
-    expect(SEAL.open(storage.map.get('cc.circleRecipePending.g1'))).toBe(JSON.stringify({ id: 'r1', name: 'Circle', blocks: [] }),
+    expect(openStoredValue(SEAL, 'cc.circleRecipePending.g1', storage.map.get('cc.circleRecipePending.g1'))).toBe(JSON.stringify({ id: 'r1', name: 'Circle', blocks: [] }),
     );
     expect(await io.load('g1')).toEqual({ id: 'r1', name: 'Circle', blocks: [] });
   });

@@ -124,6 +124,14 @@ function openStored(s, key, stored) {
 }
 
 /**
+ * What a stored value holds, opened with `strategy` under `key`, by the same rule every read uses; `null` when this
+ * device would not hand it on. For a tool or a test that reads raw storage: never open a stored value by hand.
+ */
+export function openStoredValue(strategy, key, stored) {
+  try { const v = judgeStored(strategy, openStored(strategy, key, stored)); return v.ok ? v.value : null; } catch { return null; }
+}
+
+/**
  * The one rule for what a read may hand on: a value bound to this key, always; a plain or unbound one only on a
  * device whose content key is older than this rule (`plainRefused` false: the upgrade's values, rewritten bound at
  * that read); never one bound to another key. Answers `{ ok, value, rewrite }`.

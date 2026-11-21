@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { groupKeyStrategy } from '@onderling/pod-client';
-import { setShellContentSeal } from '../../src/v2/localStoreSeal.js';
+import { setShellContentSeal, openStoredValue } from '../../src/v2/localStoreSeal.js';
 import {
   localStorageScreenBlocksCacheIo,
   createScreenBlocksCacheLocal,
@@ -34,7 +34,7 @@ describe('localStorageScreenBlocksCacheIo · δ.1', () => {
     const io = localStorageScreenBlocksCacheIo(s);
     const blocks = [{ blockId: 'b1', type: 'noticeboard', status: 'ok' }];
     await io.save('s1', blocks);
-    expect(seal.open(s._backing.get('cc.screenBlocksCache.s1'))).toBe(JSON.stringify(blocks));
+    expect(openStoredValue(seal, 'cc.screenBlocksCache.s1', s._backing.get('cc.screenBlocksCache.s1'))).toBe(JSON.stringify(blocks));
   });
 
   it('reads back the same shape', async () => {

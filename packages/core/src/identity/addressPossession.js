@@ -23,19 +23,20 @@
 //
 // ── WHAT THE SIGNER IS ASKED TO SIGN ────────────────────────────────────────────────────────────
 // The relay supplies a NONCE, never a message. The client builds the message itself out of the
-// nonce and the address it is registering, so a hostile relay cannot use registration as a signing
+// nonce, the address it is registering and the relay it dialled, so a hostile relay cannot use registration as a signing
 // oracle for content of its choosing. The prefix is domain-separated so a signature made here can
 // never be mistaken for one made anywhere else in the system.
 //
-// ── WHAT THIS DOES NOT COVER, STATED RATHER THAN IMPLIED ────────────────────────────────────────
+// ── WHICH RELAY: THE PROOF NAMES THE ONE THE DEVICE DIALLED ─────────────────────────────────────
 // The nonce defeats CAPTURE-AND-REPLAY: a proof is useless at another relay (which issued a
-// different nonce) and at another time (single-use, short-lived). It does NOT defeat a LIVE PROXY:
-// a hostile relay a client is connected to can fetch a challenge from a third relay, hand it to the
-// client as its own, and forward the answer — registering the client's address there. Closing that
-// needs the signed message to name WHICH relay it is for, which needs a relay to have a verifiable
-// identity of its own (a key, or a url it can prove). We do not have one yet; when we do, add an
-// audience field here. Recorded in `plans/DECISIONS-FOR-REVIEW.md` (2026-07-31) rather than left
-// for someone to discover.
+// different nonce) and at another time (single-use, short-lived). Until 2026-11-21 it did NOT defeat
+// a LIVE PROXY: a hostile relay a client is connected to could fetch a challenge from a third relay,
+// hand it to the client as its own, and forward the answer — registering the client's address there.
+// The message now names the relay the device DIALLED (the host of its ws(s) address: TLS proves that
+// name to the device, so no relay key is needed), and a relay accepts a proof only when that name is
+// one of its own — the Host the connection came in on, or a name its operator configured for a proxy
+// that rewrites Host. A passed-on challenge gets an answer naming the hostile relay; the honest relay
+// refuses it. (`relay/test/proofNamesItsRelay.test.js`.)
 import nacl from 'tweetnacl';
 import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
 import { AgentIdentity } from './AgentIdentity.js';

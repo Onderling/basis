@@ -38,9 +38,10 @@ function openClient(port, address) {
       const msg = JSON.parse(raw);
       // Step 2 of registration: prove we hold the key behind the address we asked for.
       if (msg.type === 'challenge') {
-        const proof = proveAddress(msg.address, msg.nonce);
+        const relay = `localhost:${port}`;   // the relay this client dialled: what its proof names
+        const proof = proveAddress(msg.address, msg.nonce, relay);
         if (proof) {
-          ws.send(JSON.stringify({ type: 'register-proof', address: msg.address, nonce: msg.nonce, proof }));
+          ws.send(JSON.stringify({ type: 'register-proof', address: msg.address, nonce: msg.nonce, proof, relay }));
         }
         return;
       }

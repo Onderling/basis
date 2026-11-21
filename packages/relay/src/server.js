@@ -324,7 +324,9 @@ const STOP_GRACE_MS = 1_000;
 export async function startRelay(opts = {}) {
   const {
     port            = DEFAULT_PORT,
-    relayNames      = (process.env.RELAY_NAMES ?? '').split(',').map((x) => x.trim()).filter(Boolean),
+    // the host names this relay answers to besides the Host a connection came in on (a proxy that rewrites Host);
+    // bin/relay.js reads them from RELAY_NAMES
+    relayNames      = [],
     host            = '0.0.0.0',
     tlsCert,
     tlsKey,
@@ -360,7 +362,7 @@ export async function startRelay(opts = {}) {
     // A person's agenda link, forwarded to the node that holds it (off by default — the boot doors turn it on).
     feeds                     = false,
   } = opts;
-  const ownRelayNames = new Set(Array.isArray(relayNames) ? relayNames.filter((x) => typeof x === 'string' && x) : []);
+  const ownRelayNames = new Set(Array.isArray(relayNames) ? relayNames.filter((x) => typeof x === 'string' && x).map((x) => x.toLowerCase()) : []);
 
   const effectiveQueueCapTotal = queueCapTotal ?? (queueCap * DEFAULT_QUEUE_CAP_RATIO);
 
@@ -722,8 +724,9 @@ export async function startRelay(opts = {}) {
   wss.on('connection', (socket, req) => {
     // THE NAME THIS CONNECTION DIALLED (its Host), and the operator's own names (`relayNames`, RELAY_NAMES behind a proxy
     // that rewrites Host): a proof of an address must name one of them, or it was answered for another relay
-    const dialled = typeof req?.headers?.host === 'string' && req.headers.host ? req.headers.host : 'localhost';
-    const isOwnRelayName = (name) => name === dialled || ownRelayNames.has(name);
+    // (a host name is case-insensitive: both sides are compared lower-cased)
+    const dialled = typeof req?.headers?.host === 'string' && req.headers.host ? req.headers.host.toLowerCase() : 'localhost';
+    const isOwnRelayName = (name) => typeof name === 'string' && (name.toLowerCase() === dialled || ownRelayNames.has(name.toLowerCase()));
     // G13 — ONE socket may own SEVERAL addresses: a device presents a different address per circle, and
     // (decisions.md 2026-07-27) since the relay can correlate them anyway via the shared push token, one
     // connection carrying N addresses is both the cheap and the correct shape. `registeredAddress` stays as

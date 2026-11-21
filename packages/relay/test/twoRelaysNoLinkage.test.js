@@ -24,7 +24,7 @@ import { VaultMemory } from '@onderling/vault';
 import { randomBytes } from 'node:crypto';
 // The co-tenant observer has to register a real address of its own now — and Anna's circle
 // addresses are keys she proves, not labels (Decision 3, 2026-07-31).
-import { addr, proveAddress } from './helpers/provenClient.js';
+import { addr, proveAddress, relayNameOf } from './helpers/provenClient.js';
 
 /** Anna's profile seed → her real per-circle addresses, and the signer for each. */
 const ANNA_SEED = new Uint8Array(randomBytes(32));
@@ -55,8 +55,9 @@ async function observer(url, ownAddress) {
       ws.frames.push(msg);
       // The relay challenges before it registers anyone, including the watcher.
       if (msg?.type === 'challenge') {
-        const proof = proveAddress(msg.address, msg.nonce);
-        if (proof) ws.send(JSON.stringify({ type: 'register-proof', address: msg.address, nonce: msg.nonce, proof }));
+        const relay = relayNameOf(url);   // the relay this client dialled: what its proof names
+        const proof = proveAddress(msg.address, msg.nonce, relay);
+        if (proof) ws.send(JSON.stringify({ type: 'register-proof', address: msg.address, nonce: msg.nonce, proof, relay }));
       }
       if (msg?.type === 'peer-list') for (const p of msg.peers ?? []) ws.seen.add(p);
     } catch { /* not for us */ }

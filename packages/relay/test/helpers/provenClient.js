@@ -20,7 +20,7 @@
  */
 import { WebSocket } from 'ws';
 import nacl from 'tweetnacl';
-import { AgentIdentity, addressPossessionMessage, b64encode } from '@onderling/core';
+import { AgentIdentity, addressPossessionMessage, b64encode, relayNameOf } from '@onderling/core';
 
 /** label → { seed, pubKey } — deterministic within a run, distinct across labels. */
 const identities = new Map();
@@ -53,11 +53,17 @@ export function useIdentity(identity) {
   return identity.pubKey;
 }
 
-/** Sign a challenge for any address this helper holds a key for; null when it holds none. */
-export function proveAddress(address, nonce) {
+/**
+ * Sign a challenge for any address this helper holds a key for; null when it holds none. `relay` is the relay's name as
+ * the client dialled it (`relayNameOf(url)`): the proof names it, and a relay refuses a proof naming another relay.
+ */
+export function proveAddress(address, nonce, relay) {
   const sign = signers.get(address);
-  return sign ? sign(addressPossessionMessage(address, nonce)) : null;
+  return sign ? sign(addressPossessionMessage(address, nonce, relay)) : null;
 }
+
+/** The relay name a client that dialled `url` puts in its proof (re-exported so a suite need not import core for it). */
+export { relayNameOf };
 
 /** The ADDRESS for a label — a real Ed25519 public key this helper can sign for. */
 export function addr(label) { return identityFor(label).pubKey; }
@@ -66,9 +72,9 @@ export function addr(label) { return identityFor(label).pubKey; }
  * Sign a challenge for `address` with `label`'s key. When the two do not match this is a FORGED
  * proof — which is what the adversary tests need, and what the relay must refuse.
  */
-export function proofFor(label, address, nonce) {
+export function proofFor(label, address, nonce, relay) {
   const rec = identityFor(label);
-  return signers.get(rec.pubKey)(addressPossessionMessage(address, nonce));
+  return signers.get(rec.pubKey)(addressPossessionMessage(address, nonce, relay));
 }
 
 /**
@@ -84,15 +90,16 @@ export function openClient(url, opts = {}) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url, wsOpts);
     ws.messages = [];
+    ws.relayName = relayNameOf(url);       // the relay this client dialled: what its proofs name
     ws.on('message', (raw) => {
       let msg;
       try { msg = JSON.parse(raw); } catch { return; }
       ws.messages.push(msg);
       if (!autoProve || msg.type !== 'challenge') return;
-      const proof = proveAddress(msg.address, msg.nonce);
+      const proof = proveAddress(msg.address, msg.nonce, ws.relayName);
       if (!proof) return;                  // not ours to prove — say nothing, as a real client would
       ws.send(JSON.stringify({
-        type: 'register-proof', address: msg.address, nonce: msg.nonce, proof,
+        type: 'register-proof', address: msg.address, nonce: msg.nonce, proof, relay: ws.relayName,
       }));
     });
     ws.once('open', () => resolve(ws));

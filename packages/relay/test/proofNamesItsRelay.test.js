@@ -8,9 +8,10 @@
  * name): the hostile relay's answer names the hostile relay and is refused.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import WebSocket from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 import { randomBytes } from 'node:crypto';
 import { AgentIdentity, signAddressPossession } from '@onderling/core';
+import { RelayTransport } from '@onderling/transports';
 import { startRelay } from '../src/server.js';
 
 const throwawayVault = () => { const m = new Map(); return { get: async (k) => m.get(k) ?? null, set: async (k, v) => { m.set(k, v); } }; };
@@ -59,4 +60,41 @@ describe('the proof of an address names the relay it was answered for', () => {
     const id = await AgentIdentity.fromSeed(new Uint8Array(randomBytes(32)), throwawayVault());
     expect(await registerNaming(id, 'relay.example.org')).toBe('registered');
   });
+
+  it('a host name is case-insensitive on both sides', async () => {
+    relay = await startRelay({ port: 0, relayNames: ['Relay.Example.org'] });
+    const id = await AgentIdentity.fromSeed(new Uint8Array(randomBytes(32)), throwawayVault());
+    expect(await registerNaming(id, 'relay.EXAMPLE.org')).toBe('registered');
+  });
+});
+
+describe('the attack end to end: a hostile relay passes an honest relay\'s challenge to a real device', () => {
+  let hostile;
+  afterEach(async () => { if (hostile) { for (const c of hostile.clients) c.terminate(); await new Promise((r) => hostile.close(() => r())); hostile = null; } });
+
+  it('the device answers for the relay it dialled, so the honest relay refuses to give the hostile one its address', async () => {
+    relay = await startRelay({ port: 0, host: '127.0.0.1' });
+    // the hostile relay: every frame both ways is passed on to the honest relay, which it dials as itself
+    hostile = new WebSocketServer({ port: 0, host: '127.0.0.1' });
+    await new Promise((r) => hostile.once('listening', r));
+    const upstreamSaid = [];
+    hostile.on('connection', (down) => {
+      const up = new WebSocket(`ws://127.0.0.1:${relay.port}`);
+      const pending = [];
+      up.on('open', () => { while (pending.length) up.send(pending.shift()); });
+      down.on('message', (d) => { const t = String(d); if (up.readyState === 1) up.send(t); else pending.push(t); });
+      up.on('message', (d) => { upstreamSaid.push(JSON.parse(String(d))); if (down.readyState === 1) down.send(String(d)); });
+      down.on('close', () => up.close()); up.on('close', () => down.close());
+    });
+    const identity = await AgentIdentity.fromSeed(new Uint8Array(randomBytes(32)), throwawayVault());
+    const tx = new RelayTransport({ relayUrl: `ws://127.0.0.1:${hostile.address().port}`, identity });
+    tx.on('error', () => { /* the refusal surfaces here too */ });
+    await tx.connect().catch(() => {});
+    const t0 = Date.now();
+    while (!upstreamSaid.some((m) => m.type === 'error' || m.type === 'registered') && Date.now() - t0 < 4_000) await new Promise((r) => setTimeout(r, 20));
+    // before the proof named its relay, this was `registered`: the honest relay handed the address to the hostile one
+    expect(upstreamSaid.find((m) => m.type === 'registered')).toBeUndefined();
+    expect(upstreamSaid.find((m) => m.type === 'error')).toMatchObject({ message: 'PROOF_INVALID', address: identity.pubKey });
+    await tx.disconnect?.().catch?.(() => {});
+  }, 15_000);
 });

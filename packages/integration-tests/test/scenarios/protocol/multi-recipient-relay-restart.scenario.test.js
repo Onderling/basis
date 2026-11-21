@@ -37,7 +37,7 @@ import nacl                     from 'tweetnacl';
 // Registration is challenge-first since 2026-07-31 (DESIGN-boundary-authentication §7): an address
 // is a public key the relay makes you prove. The five targets below are therefore real keys, and the
 // client answers the challenge — everything else about this scenario is unchanged.
-import { AgentIdentity, addressPossessionMessage, b64encode } from '@onderling/core';
+import { AgentIdentity, addressPossessionMessage, b64encode, relayNameOf } from '@onderling/core';
 
 // The relay package does not currently re-export its queue stores at the
 // top level (its `exports` map only exposes `.`).  Resolve their files via
@@ -67,12 +67,12 @@ function keyFor(label) {
   return keys.get(label);
 }
 const addr = (label) => keyFor(label).address;
-function proofFor(address, nonce) {
+function proofFor(address, nonce, relay) {
   const rec = [...keys.values()].find((k) => k.address === address);
   if (!rec) return null;
   const kp = nacl.sign.keyPair.fromSeed(rec.seed);
   return b64encode(nacl.sign.detached(
-    new TextEncoder().encode(addressPossessionMessage(address, nonce)), kp.secretKey,
+    new TextEncoder().encode(addressPossessionMessage(address, nonce, relay)), kp.secretKey,
   ));
 }
 
@@ -84,8 +84,9 @@ function openClient(url) {
       let msg; try { msg = JSON.parse(raw); } catch { return; }
       ws.messages.push(msg);
       if (msg.type !== 'challenge') return;
-      const proof = proofFor(msg.address, msg.nonce);
-      if (proof) ws.send(JSON.stringify({ type: 'register-proof', address: msg.address, nonce: msg.nonce, proof }));
+      const relay = relayNameOf(url);   // the relay this client dialled: what its proof names
+      const proof = proofFor(msg.address, msg.nonce, relay);
+      if (proof) ws.send(JSON.stringify({ type: 'register-proof', address: msg.address, nonce: msg.nonce, proof, relay }));
     });
     ws.once('open',  () => resolve(ws));
     ws.once('error', reject);

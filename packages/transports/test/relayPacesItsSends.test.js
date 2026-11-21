@@ -25,7 +25,7 @@ async function waitFor(pred, ms = 20_000) {
 function ratedRelay({ perSec = 30, burst = 60 } = {}) {
   const wss = new WebSocketServer({ port: 0 });
   const state = { sends: [], refused: 0, sockets: [] };
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
     state.sockets.push(ws);
     const open = new Map();
     let tokens = burst; let at = Date.now();
@@ -39,7 +39,7 @@ function ratedRelay({ perSec = 30, burst = 60 } = {}) {
       }
       if (msg.type === 'register-proof') {
         const address = open.get(msg.nonce); open.delete(msg.nonce);
-        if (address !== msg.address || !verifyAddressPossession(msg)) return;
+        if (address !== msg.address || !verifyAddressPossession({ ...msg, isOwnRelayName: (n) => n === req?.headers?.host })) return;
         ws.send(JSON.stringify({ type: 'registered', address }));
         return;
       }

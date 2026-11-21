@@ -22,6 +22,10 @@
  *   PEER_DISCOVERY   '1' broadcasts the connected-address list to every registered client (and
  *                    answers peer-list requests). OFF by default: it is a presence and linkage
  *                    oracle (see server.js). An operator who turns it on must disclose it.
+ *   RELAY_NAMES      comma-separated host names (with a port when not the default) this relay answers to, for a proxy
+ *                    in front of it that REWRITES the Host header. A device's proof of its address names the relay it
+ *                    dialled; the relay accepts the Host a connection came in on, plus these. Unset is right behind a
+ *                    proxy that passes Host on (Caddy's reverse_proxy does).
  *
  * Usage:
  *   npx @onderling/relay
@@ -88,6 +92,7 @@ const { tls, feeds: feedInfo } = await startRelay({
   ...(pushTokenRegistry ? { pushTokenRegistry } : {}),
   forwardStore,
   peerDiscovery: process.env.PEER_DISCOVERY === '1',
+  relayNames: (process.env.RELAY_NAMES ?? '').split(',').map((x) => x.trim()).filter(Boolean),
   // a person's agenda link, GET /feed/<node>/<id>.<k>.ics, forwarded to the node that holds it; nothing held here
   feeds: true,
   log: true,

@@ -32,7 +32,7 @@ import { WebSocket } from 'ws';
 import { randomBytes } from 'node:crypto';
 import {
   AgentIdentity, SecurityLayer, mkEnvelope, P, circleIdentity, deriveCircleAddress,
-  addressPossessionMessage, b64encode,
+  addressPossessionMessage, b64encode, relayNameOf,
 } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { startRelay } from '../../src/server.js';
@@ -118,8 +118,8 @@ function openClient(url) {
       const identity = keyring.get(msg.address);
       if (!identity) return;                     // not ours to prove, and we do not pretend otherwise
       ws.send(JSON.stringify({
-        type: 'register-proof', address: msg.address, nonce: msg.nonce,
-        proof: b64encode(identity.sign(addressPossessionMessage(msg.address, msg.nonce))),
+        type: 'register-proof', address: msg.address, nonce: msg.nonce, relay: relayNameOf(url),
+        proof: b64encode(identity.sign(addressPossessionMessage(msg.address, msg.nonce, relayNameOf(url)))),
       }));
     });
     ws.once('open', () => resolve(ws));
@@ -481,9 +481,10 @@ describe('the relay\'s own plaintext canary', () => {
     expect(KNOWN_HOLES.find(h => h.id === 'group-publish-names-a-circle-on-the-wire')).toBeUndefined();
     // …and the biggest of the three: `unproven-registration` — "anyone may register any address" —
     // closed by proof of possession on 2026-07-31 (Decision 3). What is left in its place is the
-    // narrower `live-proxy-of-a-registration-challenge`, which is still open and still written down.
+    // narrower `live-proxy-of-a-registration-challenge`, closed in turn on 2026-11-21: the proof names the relay it
+    // was dialled at, so a challenge passed on from another relay is answered for the wrong one.
     expect(KNOWN_HOLES.find(h => h.id === 'unproven-registration')).toBeUndefined();
-    expect(KNOWN_HOLES.find(h => h.id === 'live-proxy-of-a-registration-challenge')).toBeTruthy();
+    expect(KNOWN_HOLES.find(h => h.id === 'live-proxy-of-a-registration-challenge')).toBeUndefined();
   });
 });
 

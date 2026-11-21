@@ -31,6 +31,9 @@
  *                            (DEFAULT empty = NOBODY; a real deploy sets this)
  *
  *   -- push wake (enable by setting PUSH_PROVIDER=expo) --
+ *   RELAY_NAMES              comma-separated host names this relay answers to, for a proxy that REWRITES Host:
+ *                            a device's address proof names the relay it dialled; the Host a connection came in
+ *                            on is accepted, plus these. Unset is right behind a proxy that passes Host on.
  *   PEER_DISCOVERY           '1' broadcasts the connected-address list to every client (OFF by default; disclose when on)
  *   PUSH_PROVIDER            'expo' to enable Expo push wake (else no push)
  *   EXPO_ACCESS_TOKEN        optional Expo enhanced-security access token
@@ -133,6 +136,7 @@ if (process.env.QUEUE_DB) {
 }
 
 const { port: boundPort, tls, feeds: feedInfo } = await startRelay({
+  relayNames: (process.env.RELAY_NAMES ?? '').split(',').map((x) => x.trim()).filter(Boolean),
   peerDiscovery: process.env.PEER_DISCOVERY === '1',   // OFF by default — a presence + linkage oracle; disclose when on
   port,
   host,

@@ -153,8 +153,8 @@ export class WsServerTransport extends Transport {
           return;
         }
         // the proof must name the relay this connection dialled (its Host): one answered for another relay is refused
-        const dialled = typeof req?.headers?.host === 'string' && req.headers.host ? req.headers.host : 'localhost';
-        if (!verifyAddressPossession({ address, nonce, proof, relay: msg.relay, isOwnRelayName: (n) => n === dialled })) {
+        const dialled = typeof req?.headers?.host === 'string' && req.headers.host ? req.headers.host.toLowerCase() : 'localhost';
+        if (!verifyAddressPossession({ address, nonce, proof, relay: msg.relay, isOwnRelayName: (n) => typeof n === 'string' && n.toLowerCase() === dialled })) {
           ws.send(JSON.stringify({ type: 'error', message: 'PROOF_INVALID', address }));
           return;
         }

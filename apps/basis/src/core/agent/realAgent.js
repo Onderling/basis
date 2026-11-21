@@ -120,7 +120,7 @@ import { backfillContactPersonas } from '../../v2/contactPersona.js';   // conta
 import { bookRowsOf } from '../../v2/contactsSource.js';   // a listContacts reply's rows, whole
 import { KEEP_DAYS_KEY, roomRetentionMs, makeRoomKeeper, earlierInTheRoom } from '../../v2/nearbyKept.js';
 import { recordOwnAction, ownRetentionMs, OWN_RECORD_KEY, OWN_KEEP_WEEKS_KEY, ownActionRows, ownActionsExport, OWN_ACTION_KIND, noteOwnOutcome } from '../../ownActions.js';   // the person's own acts, at the outer waist
-import { circleActRefusal } from '../../v2/circleActGate.js';   // a person's write in a circle asks that circle's capability set, at the outer waist
+import { circleActRefusal, writeIntoRefusal, gateRefusalKey } from '../../v2/circleActGate.js';   // a person's write in a circle asks that circle's capability set, at the outer waist
 import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
 import { makeSyncSelection } from '../../v2/syncSelection.js';
 import { leaveCircleLocally } from '../../v2/circleMembershipHygiene.js';
@@ -8658,6 +8658,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       await ensureCircleSync(pairCircleId);
       const store = householdService.stores.getStore(pairCircleId);
       const existing = await store.get(copyId).catch(() => null);
+      // the pair circle's own switches, asked here as its members' devices will ask them (the door asked only the op's)
+      const refusal = await writeIntoRefusal({ circleId: pairCircleId, type: 'calendar-event', act: existing ? 'change' : 'add', manifests: allManifests(), inputs: opts.circleCapabilityInputs ?? null });
+      if (refusal) return { ok: false, code: refusal.code, error: tr(gateRefusalKey(refusal.code)), refusal };
       const fields = sharedFieldsOf(ev);
       if (existing) {
         await store.put({ ...existing, ...fields, ...(fields.state ? {} : { state: existing.state === 'cancelled' ? 'scheduled' : existing.state }) }, { by: self });

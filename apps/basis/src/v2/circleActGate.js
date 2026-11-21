@@ -142,3 +142,29 @@ export function itemStatementVerdict({ manifests = [], policy = {}, type, act })
   }
   return refused;
 }
+
+/**
+ * A WRITE INTO ANOTHER CIRCLE asks that circle too. An op's door asks the switches of the circle the op names; a few ops
+ * also write a row into a DIFFERENT circle (an appointment's copy into a paired circle, a share into a target circle, a
+ * sealed copy back into the source). That circle's switches were never asked on the sender, so the row showed there and
+ * was refused on every other member's device. Before such a write, this asks the target circle the question its
+ * receivers will ask (`itemStatementVerdict`), with its settings read as the sender's gate reads them (`inputs`):
+ * null when the write may go, else the door's own refusal (its code, told in the door's words: `gateRefusalKey`).
+ * @param {object} a
+ * @param {string} a.circleId  the circle the row is written INTO
+ * @param {string} a.type      the row's item type
+ * @param {'add'|'change'|'remove'} [a.act]
+ * @param {object[]} a.manifests
+ * @param {(circleId: string) => Promise<{policy?: object}|null>} a.inputs  the sender's gate's own reader
+ */
+export async function writeIntoRefusal({ circleId, type, act = 'add', manifests = [], inputs = null } = {}) {
+  if (typeof inputs !== 'function' || typeof circleId !== 'string' || !circleId || isOwnPlaceId(circleId)) return null;
+  let given = null;
+  try { given = await inputs(circleId); } catch {
+    processRefusalLog().note({ tag: 'gate', lane: 'availability', check: 'circle-inputs', reason: 'reader-threw' });
+    given = null;
+  }
+  if (!given) return null;
+  const v = itemStatementVerdict({ manifests, policy: given.policy ?? {}, type, act });
+  return v.allow ? null : refuse('availability', v.code);
+}

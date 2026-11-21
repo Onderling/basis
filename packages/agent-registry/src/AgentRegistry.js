@@ -77,6 +77,13 @@ function _serialised(pseudoPod, uri, run) {
  *                                          every write snapshots the resource (best-effort).
  * @param {() => string} [opts.now]
  */
+/** Two stored cards hold the same thing, field by field (key order aside); the timestamp is the caller's to set equal. */
+function sameStoredCard(a, b) {
+  const canon = (v) => (Array.isArray(v) ? v.map(canon)
+    : (v && typeof v === 'object') ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v);
+  return JSON.stringify(canon(a)) === JSON.stringify(canon(b));
+}
+
 export function createAgentRegistry({
   pseudoPod,
   anchorPodUri,
@@ -140,6 +147,29 @@ export function createAgentRegistry({
    * Register a new agent OR update an existing entry (matched by
    * agentId). Etag-CAS retry on conflict.
    */
+  /** The record `register` stores for `entry` (one builder, so the no-change check compares like with like). */
+  function cardFor(entry, prevKind, signedAt) {
+    return {
+      agentId:      entry.agentId,
+      pubKey:       entry.pubKey,
+      webid:        entry.webid ?? null,
+      agentUri:     entry.agentUri,
+      role:         entry.role ?? 'device',
+      name:         entry.name ?? null,
+      deviceId:     entry.deviceId ?? null,
+      capabilities: Array.isArray(entry.capabilities) ? [...entry.capabilities] : [],
+      grants:       Array.isArray(entry.grants) ? [...entry.grants] : [],
+      signedAt,
+      revokedAt:    entry.revokedAt ?? null,
+      // identity step 2 — persist the profile fields (normalised on read via _normaliseAgent)
+      properties:       entry.properties ?? {},
+      ownerFingerprint: entry.ownerFingerprint ?? null,
+      // property layer (personas) — persisted per-context disclosure policy
+      disclosure:       entry.disclosure ?? { perContext: {} },
+      ...(PROFILE_KINDS.includes(prevKind) ? { kind: prevKind } : {}),
+    };
+  }
+
   async function register(entry = {}) {
     if (typeof entry.agentId !== 'string' || entry.agentId.length === 0) {
       throw Object.assign(
@@ -159,6 +189,16 @@ export function createAgentRegistry({
         { code: 'INVALID_ARGUMENT' },
       );
     }
+    // THE SAME CARD AGAIN WRITES NOTHING: a start registers this device's own card, and with nothing changed only the
+    // timestamps would differ (the upgrade walk, 2026-11-20: every start rewrote the registry). Compared on what this
+    // write would store, so a register that would change anything (a field, a property wiped) still writes.
+    {
+      const { body } = await _readCurrent();
+      const prev = body.agents.find(a => a.agentId === entry.agentId);
+      // both sides through the same read-time normaliser: what a read would answer, before and after this write
+      const candidate = normaliseResource({ agents: [cardFor(entry, prev?.kind, prev?.signedAt)] }).agents[0];
+      if (prev && sameStoredCard(prev, candidate)) return body;
+    }
     const signedAt = entry.signedAt ?? now();
     return withCAS({
       readCurrent: _readCurrent,
@@ -171,25 +211,7 @@ export function createAgentRegistry({
         const prevKind = body.agents.find(a => a.agentId === entry.agentId)?.kind;
         const next = {
           v:         RESOURCE_VERSION,
-          agents:    [...without, {
-            agentId:      entry.agentId,
-            pubKey:       entry.pubKey,
-            webid:        entry.webid ?? null,
-            agentUri:     entry.agentUri,
-            role:         entry.role ?? 'device',
-            name:         entry.name ?? null,
-            deviceId:     entry.deviceId ?? null,
-            capabilities: Array.isArray(entry.capabilities) ? [...entry.capabilities] : [],
-            grants:       Array.isArray(entry.grants) ? [...entry.grants] : [],
-            signedAt,
-            revokedAt:    entry.revokedAt ?? null,
-            // identity step 2 — persist the profile fields (normalised on read via _normaliseAgent)
-            properties:       entry.properties ?? {},
-            ownerFingerprint: entry.ownerFingerprint ?? null,
-            // property layer (personas) — persisted per-context disclosure policy
-            disclosure:       entry.disclosure ?? { perContext: {} },
-            ...(PROFILE_KINDS.includes(prevKind) ? { kind: prevKind } : {}),
-          }],
+          agents:    [...without, cardFor(entry, prevKind, signedAt)],
           updatedAt: now(),
         };
         return next;

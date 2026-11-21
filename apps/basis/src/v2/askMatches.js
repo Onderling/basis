@@ -81,7 +81,7 @@ const STORAGE_KEY = 'cc.askMatchSkips';
  * the agent's boot); before the key a read is "nothing kept" and a write is refused.
  */
 export function sealedAskMatchSkipsIo(storage) {
-  const kv = sealedKeyValue(storage, { name: 'the ask-match skips', strict: true });
+  const kv = sealedKeyValue(storage, { name: 'the ask-match skips', strict: true, resealAtStart: [STORAGE_KEY] });
   return {
     load: async () => { try { const s = await kv.getItem(STORAGE_KEY); return s ? JSON.parse(s) : null; } catch { return null; } },
     save: async (v) => { try { await kv.setItem(STORAGE_KEY, JSON.stringify(v)); } catch { /* private window / no content key yet */ } },

@@ -80,6 +80,6 @@ export function makeContactSeenStore(io) {
  * it never writes a fresh map over their marks.
  */
 export function sealedContactSeenStore(storage) {
-  const store = makeContactSeenStore(sealedKeyValue(storage, { name: 'contact seen-marks', strict: true, waitForKey: true }));
+  const store = makeContactSeenStore(sealedKeyValue(storage, { name: 'contact seen-marks', strict: true, waitForKey: true, resealAtStart: [CONTACT_SEEN_KEY] }));
   return { read: async () => (shellContentSeal() ? store.read() : null), mark: store.mark };
 }

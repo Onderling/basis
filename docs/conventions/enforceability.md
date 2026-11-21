@@ -61,7 +61,7 @@ It is also a useful design tool. Asking the question tells you *where the gate a
     writer's original statement beside every row and serving that (roughly double the storage per row).
   - **Which change it was** is not told apart: with "add" on and "complete" off, a changed app can complete a task and
     the receiver sees "a change". Each type declaring its fields per act closes it.
-  - **Whose item it is**: any member can change or remove another member's item where the switches allow the act.
+  - **Whose item it is** binds since 2026-11-21 (`madeBy`, `changedBy`): its own limits are in the next bullet.
   - **A removed row can come back as new**: the store keeps no tombstone, so a re-sent snapshot is judged as an add.
   - **An admin can draw the line early** (name fewer tips than they held) and so take back up to the items window of
     what the switch covers: signed, shown, and itself a governed settings change.

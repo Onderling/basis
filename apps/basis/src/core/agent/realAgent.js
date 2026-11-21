@@ -5806,8 +5806,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         console.warn(`[remove-persona] the re-key failed — the next start asks for the recovery phrase: ${err?.message ?? err}`);
         return [DataPart({ ok: false, error: 'storage', rekeyFailed: true })];
       }
+      await rt?.forgetPeerKeys?.();   // the removed self's remembered peer keys, zeroed before the reload
       return [DataPart({ ok: true, personaId: pid, deviceId: wire, retiredIn, reloadRequired: true, rekeyedTo: next })];
     }
+    await rt?.forgetPeerKeys?.();   // the removed self's remembered peer keys, zeroed before the reload
     return [DataPart({ ok: true, personaId: pid, deviceId: wire, retiredIn, reloadRequired: true })];
   }, { visibility: 'private' });
   // WHAT THE NEARBY ROOM SEES OF A SELF — its level, on THAT self's disclosure under the reserved context `nearby`: the

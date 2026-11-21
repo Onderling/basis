@@ -1039,7 +1039,7 @@ carries `stableId` (rotation-surviving user id) and `deviceId` (per-install id),
 persisted in the vault. Construct via the static factories (`generate`, `restore`,
 `fromMnemonic`, `fromSeed`, …) so seed persistence and id init happen.
 
-**Methods:** `getMnemonic()` · `sign()` · `box()` · `unbox()` · `deriveSessionKey()` · `sharedCopyOpener()`
+**Methods:** `forgetPeerKeys()` · `getMnemonic()` · `sign()` · `box()` · `unbox()` · `deriveSessionKey()` · `sharedCopyOpener()`
 
 ## `src/identity/Bootstrap.js`
 

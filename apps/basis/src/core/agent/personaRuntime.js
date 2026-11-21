@@ -276,5 +276,11 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
     chatId,
     personKey: initialPersonKey,
     personIdentity: null,
+    /** Zero every shared key this persona's identities remember with peers (its circle selves, its chat and person
+     *  identity): when it is removed from this device, before the reload. */
+    async forgetPeerKeys() {
+      for (const p of circleIdentities.values()) { try { (await p)?.forgetPeerKeys?.(); } catch { /* best effort */ } }
+      for (const id of [this.chatId, this.personIdentity]) { try { id?.forgetPeerKeys?.(); } catch { /* best effort */ } }
+    },
   };
 }

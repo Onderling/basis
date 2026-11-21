@@ -21,6 +21,9 @@ const TWEETNACL = Object.freeze({
 });
 let impl = TWEETNACL;
 
+/** The authenticator's bytes at the front of every box (`secretbox.overheadLength`). */
+const BOX_OVERHEAD = 16;
+
 /** An installed implementation that throws or disagrees AFTER its vetting: that call answers by tweetnacl (the same
  *  bytes, by the vetting), and the log says so once per implementation, so a broken native module never breaks a read. */
 let saidFailure = null;
@@ -58,6 +61,9 @@ export function secretboxSeal(msg, nonce, key) {
  * @returns {Uint8Array|null}
  */
 export function secretboxOpen(box, nonce, key) {
+  // a box shorter than its authenticator, or not bytes, opens to nothing, before any implementation sees it: a native
+  // one sized a buffer from `length - 16` (an unsigned underflow), and its throw would depend on the runtime
+  if (!(box instanceof Uint8Array) || box.length < BOX_OVERHEAD) return null;
   if (impl === TWEETNACL) return TWEETNACL.open(box, nonce, key);
   let out = null;
   try { out = impl.open(box, nonce, key); } catch { out = null; }
@@ -166,6 +172,10 @@ export function useSecretbox(eq) {
       }
     }
     if (!largeAgrees(eq, nonce, key)) return { ok: false, name: impl.name, reason: 'large-message-disagrees' };
+    // malformed input is refused, not answered with bytes: a box shorter than its authenticator, an empty one
+    for (const short of [new Uint8Array(0), new Uint8Array(15)]) {
+      if (!refuses(eq, short, nonce, key)) return { ok: false, name: impl.name, reason: 'opens-a-short-box' };
+    }
   } catch (e) {
     return { ok: false, name: impl.name, reason: `failed: ${String(e?.message ?? e)}` };
   }

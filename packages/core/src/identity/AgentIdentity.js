@@ -308,12 +308,25 @@ export class AgentIdentity {
     const curve = curvePublicKeyOf(peerPubKeyB64);
     if (!curve) throw new Error(`Invalid ${role} Ed25519 public key`);
     const key = nacl.box.before(curve, this.#box().secretKey);
-    if (this.#sharedKeys.size >= Number(SHARED_KEY_MEMO_MAX)) this.#sharedKeys.delete(this.#sharedKeys.keys().next().value);
+    if (this.#sharedKeys.size >= Number(SHARED_KEY_MEMO_MAX)) {
+      const oldest = this.#sharedKeys.keys().next().value;
+      this.#sharedKeys.get(oldest)?.fill(0);   // a shared key let go is zeroed, never left to the collector
+      this.#sharedKeys.delete(oldest);
+    }
     this.#sharedKeys.set(peerPubKeyB64, key);
     return key;
   }
 
   /** Return the BIP39 mnemonic for the current seed (reads from vault). */
+  /**
+   * Zero and drop every shared key remembered with a peer (`#sharedKeyWith`): for when this identity leaves the device
+   * (a persona removed here, a start-over) before the process ends. The next box or unbox derives them again.
+   */
+  forgetPeerKeys() {
+    for (const key of this.#sharedKeys.values()) key.fill(0);
+    this.#sharedKeys.clear();
+  }
+
   async getMnemonic() {
     if (!this.#vault) return null;
     const raw = await this.#vault.get('agent-privkey');

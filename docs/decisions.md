@@ -2260,3 +2260,32 @@ proposal that decided it, and the lanes' tips. They are rare and small.
 **Alternatives:** *keep the head only* (as before) cannot place a line. *Make the whole governance lane record* keeps
 every vote forever for no reader. **Not migrated:** circles whose older changes already compacted keep what they hold
 (fresh circles before the alpha); a device holding only a head treats everything older as unknown.
+
+## 2026-11-21 — The items lane judges what it applies; each device keeps its own proofs; a served head is taken only when asked (Fable ruled)
+
+**Status:** settled and built (`contentJudge.js`, `contentJudgments.js`, `keptPolicyChanges.js`, `itemsRail.js`,
+`frontierReplay.js` in `apps/basis/src/v2/`).
+
+**Decision:** every items statement is judged before it reaches the store, by the settings at its place on the content
+line, on every path that applies from the log (the live fan, a catch-up, the re-apply when a store opens). Refused: kept
+on the log, not applied. A later settings change that refuses an applied one takes it back locally, never by a
+corrective publish: the row is rebuilt from its statements still allowed, in the store's own merge order, so a later
+allowed change survives; only where no allowed statement of the row is left does a kept copy of the row as it was come
+back. The author's own device takes back too. What a device proved ("behind change k" / "not behind"), which act a
+statement was when it arrived (an add of a row not held, a change of a held one), and that kept copy are a SILENT entry
+kind on the device's own log (`content-judged`), not a store: never carried (not even to the person's other devices),
+accepted from no peer, not mirrored or exported, never counted or a wake; it ages out with the items statements, and a
+lost entry only means judging again. The kept settings changes are noted per device, and at a start the rail asks the
+settings lane for them. A head a member SERVES at catch-up carries `served: true` inside its signed body; the catch-up
+remembers which circles this device asked of which peer (until the last batch, or a window) and hands the rail
+`{asked: true}` only then; a served head is taken only when asked, judged only by "the type's app is on", and goes
+through the store's causal merge; in a live fan or an unasked batch it is refused.
+
+**Why:** the sender's gate binds only the sender's app. A served head is signed by the server, not the writer: judged
+as an add behind no line it was refused wherever adding was off, so a joiner missed the existing rows old members keep.
+The act is kept because a later judging cannot read it from the log (the row's making ages out, and a sender picks its
+own links).
+
+**Alternatives:** *a sealed store per circle* for the proofs (proposed first): a second place beside the log, named in
+every forget list. *Restore the kept copy always*: a take-back of one change would wipe a later allowed one. *Judge a
+served head as an act*: the joiner case above. **Residuals** are in `docs/conventions/enforceability.md`.

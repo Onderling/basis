@@ -17,6 +17,7 @@ import path from 'node:path';
 import { buildHouseholdDataSource } from '../household/persist.js';
 import { backendSnapshotIo, fileKeyValueStorage } from './eventLogPersistence.js';
 import { sealedLocalBackend, sealedKeyValue, shellContentSeal } from './localStoreSeal.js';
+import { sealedPolicyHeadStore } from './policyUpdateLane.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /**
@@ -111,6 +112,8 @@ export function boxStores(dataDir) {
     // Handed to the agent, which hydrates it once the content key exists — never hydrated here.
     deviceLogIo:    boxDeviceLogIo(paths.deviceLog, { legacyFile: path.join(dataDir, 'device-log.json') }),
     circlePolicyKv: sealedFileKeyValue(paths.circlePolicy),
+    // the policy heads in the same file, through the shells' own store: strict, resealed at the start (web ≡ phone)
+    policyHeadStore: sealedPolicyHeadStore(fileKeyValueStorage(paths.circlePolicy)),
     // Built after the agent booted (the key exists), like every other content store.
     contactDmSource: () => buildHouseholdDataSource({ path: paths.contactDm }, { strategy: shellContentSeal() }),
     // The door's thread rows (memory mode, language, a pending ask) — the turns themselves are on the device log.

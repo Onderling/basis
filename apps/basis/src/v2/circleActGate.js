@@ -101,3 +101,44 @@ export function circleCapabilityVerdict({ app, op = null, atom = null, noun = nu
 export function gateRefusalKey(code) {
   return code === 'app-disabled' ? 'circle.gate.appDisabled' : 'circle.gate.capabilityDenied';
 }
+
+/**
+ * Which app declares an item type, and the noun it is: from the manifests' `itemTypes` (one source, no second table).
+ * `null`: no manifest declares it (a lane-carried row, an extension this node does not run).
+ * @param {object[]} manifests @param {string} type
+ * @returns {{app: string, noun: string}|null}
+ */
+export function itemTypeCapability(manifests, type) {
+  if (typeof type !== 'string' || !type) return null;
+  const m = (Array.isArray(manifests) ? manifests : []).find((x) => Array.isArray(x?.itemTypes) && x.itemTypes.includes(type));
+  return m ? { app: m.app, noun: type } : null;
+}
+
+/** The atoms that are not a change: making a row, reading, removing. Every other declared atom changes a held row. */
+const NOT_A_CHANGE = new Set(['add', 'list', 'remove']);
+
+/**
+ * An item statement that arrived, judged by the circle's switches (the rails' side of `circleCapabilityVerdict`): a row
+ * this device does not hold is an `add`, a row it holds a `change` (taken when ANY change atom of the type is on: which
+ * change it was is not told apart until each type declares its fields per atom), a remove a `remove`.
+ * @param {object} a
+ * @param {object[]} a.manifests @param {object} a.policy  the settings the content line picked
+ * @param {string} a.type @param {'add'|'change'|'remove'} a.act
+ * @returns {{allow: true, reason?: string}|{allow: false, code: string}}
+ */
+export function itemStatementVerdict({ manifests = [], policy = {}, type, act }) {
+  const cap = itemTypeCapability(manifests, type);
+  if (!cap) return { allow: true, reason: 'no-type' };
+  if (act !== 'change') return circleCapabilityVerdict({ app: cap.app, atom: act, noun: cap.noun, manifests, policy });
+  const m = manifests.find((x) => x?.app === cap.app);
+  const atoms = (m?.nouns?.[cap.noun]?.atoms ?? []).filter((a) => !NOT_A_CHANGE.has(a));
+  // no change atom declared: the type has no row a circle could turn for a change (the verdict's own no-row rule)
+  if (!atoms.length) return circleCapabilityVerdict({ app: cap.app, atom: 'update', noun: cap.noun, manifests, policy });
+  let refused = null;
+  for (const atom of atoms) {
+    const v = circleCapabilityVerdict({ app: cap.app, atom, noun: cap.noun, manifests, policy });
+    if (v.allow) return { allow: true };
+    refused = refused ?? v;
+  }
+  return refused;
+}

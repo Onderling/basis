@@ -156,7 +156,7 @@ import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGr
 import { createPairRoster } from '../src/v2/pairRoster.js';
 import { makeCircleReachable } from '../src/v2/householdRosterPairing.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../src/v2/rulesUpdateLane.js';
-import { makeCirclePolicyLane, makePolicyHeadStore, membersOfViaSkill } from '../src/v2/policyUpdateLane.js';
+import { makeCirclePolicyLane, membersOfViaSkill } from '../src/v2/policyUpdateLane.js';
 import { createCirclePolicyStore, localStoragePolicyIo } from '../src/v2/circlePolicyStore.js';
 import { makeGovernanceRail } from '../src/v2/governanceAppWiring.js';
 import { runPendingForget } from '../src/v2/enrolForgets.js';
@@ -678,11 +678,14 @@ if (relayUrl) {
   const circlePolicyStore = createCirclePolicyStore(localStoragePolicyIo(circlePolicyKv));
   const circlePolicyLane = makeCirclePolicyLane({
     emitter: () => agent.emitPolicyUpdate ?? null,
-    headStore: makePolicyHeadStore(circlePolicyKv),
+    headStore: stores.policyHeadStore,
     readPolicy: (cid) => circlePolicyStore.get(cid),
     writePolicy: (cid, policy) => circlePolicyStore.update(cid, policy),
     membersOf: membersOfViaSkill(callSkill),   // the roster the receiver gate counts
   });
+  // the lane is handed its rail at boot (web and phone alike): a content rail that finds a circle's kept settings changes
+  // not known asks the lane, and a quiet start brings no settings statement that would make it apply by itself
+  if (govRail) circlePolicyLane.useRail(govRail);
   // A landed governance statement may be a rules-update or a policy-update: fold it into this device's heads — the
   // same reaction for a catch-up batch and a live statement.
   const govChanged = (cid) => {

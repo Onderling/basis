@@ -140,3 +140,39 @@ describe('the one decision, asked by a rail', () => {
     expect(circleCapabilityVerdict({ app: 'tasks', atom: 'add', noun: 'task', manifests, policy: { features: { tasks: false } } })).toEqual({ allow: false, code: 'app-disabled' });
   });
 });
+
+describe('an item statement, judged by its type', () => {
+  it('a new row is an add, a held row a change, a remove a remove; the app and noun come from the manifests', async () => {
+    const { itemStatementVerdict, itemTypeCapability } = await import('../../src/v2/circleActGate.js');
+    const { allManifests } = await import('../../src/v2/manifestSources.js');
+    const manifests = allManifests();
+    expect(itemTypeCapability(manifests, 'list-item')).toEqual({ app: 'lists', noun: 'list-item' });
+    expect(itemTypeCapability(manifests, 'no-such-type')).toBe(null);
+    const addOff = { capabilities: { 'lists add list-item': { enabled: false } } };
+    expect(itemStatementVerdict({ manifests, policy: addOff, type: 'list-item', act: 'add' })).toEqual({ allow: false, code: 'capability-denied' });
+    expect(itemStatementVerdict({ manifests, policy: addOff, type: 'list-item', act: 'remove' })).toEqual({ allow: true });
+    expect(itemStatementVerdict({ manifests, policy: {}, type: 'list-item', act: 'add' })).toEqual({ allow: true });
+  });
+
+  it('a change is taken when ANY change atom of the type is on, refused when all are off', async () => {
+    const { itemStatementVerdict } = await import('../../src/v2/circleActGate.js');
+    const { allManifests } = await import('../../src/v2/manifestSources.js');
+    const manifests = allManifests();
+    const tasks = manifests.find((m) => m.app === 'tasks');
+    const changeAtoms = tasks.nouns.task.atoms.filter((a) => !['add', 'list', 'remove'].includes(a));
+    const allOff = { capabilities: Object.fromEntries(changeAtoms.map((a) => [`tasks ${a} task`, { enabled: false }])) };
+    const oneOn = { capabilities: Object.fromEntries(changeAtoms.slice(1).map((a) => [`tasks ${a} task`, { enabled: false }])) };
+    expect(itemStatementVerdict({ manifests, policy: allOff, type: 'task', act: 'change' }).allow).toBe(false);
+    expect(itemStatementVerdict({ manifests, policy: oneOn, type: 'task', act: 'change' })).toEqual({ allow: true });
+  });
+
+  it('a switched-off app refuses every row of its types, whatever the act; a type no app declares passes', async () => {
+    const { itemStatementVerdict } = await import('../../src/v2/circleActGate.js');
+    const { allManifests } = await import('../../src/v2/manifestSources.js');
+    const manifests = allManifests();
+    for (const act of ['add', 'change', 'remove']) {
+      expect(itemStatementVerdict({ manifests, policy: { features: { tasks: false } }, type: 'task', act })).toEqual({ allow: false, code: 'app-disabled' });
+    }
+    expect(itemStatementVerdict({ manifests, policy: { features: { tasks: false } }, type: 'no-such-type', act: 'add' })).toEqual({ allow: true, reason: 'no-type' });
+  });
+});

@@ -1133,8 +1133,13 @@ connection: a token bucket per socket (`relay.msgRatePerSec` 30, `relay.msgRateB
 refused at once with `OVER_RATE`, written only to the socket it came in on and naming only that frame's envelope id,
 so it says nothing about the receiver. `RelayTransport` keeps each frame it wrote for a short while
 (`transports.overRateKeepMs`, 10 s) and re-sends a refused one after a second, one at a time at 10 a second, at most
-five sends in all; after that, or when the frame was no longer kept, or the socket closed with it queued, it tells
-the give-up path (`onUndelivered`, reason `over-rate`), and the bubble says failed. Order is kept among re-sent
+five sends in all; after that, or when the frame was no longer kept, or the transport is stopped with it queued, it
+tells the give-up path (`onUndelivered`, reason `over-rate`), and the bubble says failed. A waiting frame is also given
+up and said when it is too old to be taken (`transports.overRateMaxAgeMs`, 5 min from its signed `_ts`, under the
+receivers' 10 min replay window; checked while the socket is down too: reason `over-rate-too-old`) or when the queue
+is full (`transports.overRateQueueMax`, 1000: `over-rate-queue-full`). A frame written in the last two seconds before
+its socket closed (`transports.unansweredAtCloseMs`) may have lost its refusal with the socket: it is sent once more on
+the next socket, never twice for a close; a receiver drops a copy it already holds by its id. Order is kept among re-sent
 frames, not between a re-sent frame and a newer one. A relay that names no frame in `OVER_RATE` gets no re-send. The
 second limit is the hold for a receiver that is not connected: the relay keeps the frame for up to 24 h
 (`relay.queueTtlMs`, capped in count per address) and, when it gives up, sends the sender an `undelivered` frame with
@@ -1217,6 +1222,23 @@ a member vote, then the admins together, then any one admin). A joiner and a fol
 up exactly as they catch up the roster, and a device keeps the winning statement so it can serve it after the lane's
 audit window — so a policy is the same on every member's device, not a per-device setting that only a settings save
 ever broadcast.
+
+**A circle's switches bind on every member's device, not only in the sender's app** (2026-11-21). The settings say
+which apps, features and acts are on; the sender's gate asks them, and so does every receiving device. Each settings
+change names the content lanes' tips as the admin's device held them (`contentUpTo`); a content statement is judged by
+the settings after the newest change it is not behind, and one behind every change by the creation settings. Only an
+admin's signed line puts a statement "before" a change, so nothing a sender writes can backdate it, and the verdict is
+the same on every device in any arrival order (`contentLine.js`). On the items lane the rail judges every statement
+before it reaches the store, whatever brought it (the live fan, a catch-up, the re-apply when a store opens):
+refused, it stays on the log and is not applied; where its place is unknown and the readings differ, it waits; a later
+settings change that refuses one already applied takes it back by rebuilding the row from its statements still
+allowed, on the author's device too (`itemsRail.js`, `contentJudge.js`). What a device proved about a statement's
+place, which act the statement was when it arrived, and, only where a take-back needs it, the row as it was, it keeps
+on its own log as a silent kind (`content-judged`) that no door accepts and nothing carries. A head SERVED at catch-up
+(a row whose statements aged out) is not an act: it carries `served` inside its signed body, is taken only in answer to
+this device's own ask, is judged only by its app being on, and goes through the store's causal merge. Chat binds by
+the circle's conversation kinds, a view filter every reader asks. What this does not bind is named in
+[enforceability.md](conventions/enforceability.md).
 
 Anything that must be *agreed* is computed identically everywhere (the tally, the caretaker), never decided
 locally — the same discipline the hash-chain enforces. Full record: [decisions.md](decisions.md) (2026-07-25).
@@ -1455,12 +1477,15 @@ unchanged store writes nothing; a row it cannot open (sealed under another key) 
 byte, never handed on as content, until the caller writes that key itself. A small key-value store goes through
 `sealedKeyValue` (values sealed, keys legible, a write before the key refused rather than stored in the clear) or,
 for one JSON value per key, `sealedJsonIo`, which also answers a read before the key as "nothing kept" without
-overwriting anything and reseals an old plain value at its first read. The seal is bound to its key and to the
-device's history: the storage key is sealed inside every value, so a value copied under another key does not open
-there; and a content key minted from now on is stored with a form mark (`kv1:`), on which device a plain or unbound
-value was planted and is refused ("not readable", kept). A bare key is an older one, whose plain and unbound values are
-the upgrade's, read once and rewritten sealed and bound (`localStoreSeal.js`, `openStoredValue` for a tool that reads
-raw storage). A store of a person's content uses the strict
+overwriting anything and reseals an old plain value at its first read. A value nothing reads in a start would stay
+plain, so a strict store can name the keys it owns (`resealAtStart`): once the content key is there they are listed and
+read once, which reseals a plain one and writes nothing for a sealed one (the policy heads, on web, phone and box, and
+the availability do; the other strict stores are a follow-up). The seal is bound to its key and to the device's
+history: the storage key is sealed inside every value, so a value copied under another key does not open there; and a
+content key minted from now on is stored with a form mark (`kv1:`), on which device a plain or unbound value was
+planted and is refused ("not readable", kept). A bare key is an older one, whose plain and unbound values are the
+upgrade's, read once and rewritten sealed and bound (`localStoreSeal.js`, `openStoredValue` for a tool that reads raw
+storage). A store of a person's content uses the strict
 mode: a read before the key, or of a value that will not open with this key, answers "not readable yet" and writes
 nothing over it; where an empty answer would be read as "nothing there" (the page book, a contact's name, the
 person's availability, the pins, the contact seen-marks) the read waits for the key instead.

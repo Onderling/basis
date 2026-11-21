@@ -51,6 +51,25 @@ It is also a useful design tool. Asking the question tells you *where the gate a
   (its LAN address) can pass that relay's challenge on under the same private Host. Set `RELAY_NAMES` on any relay
   reachable from the internet. Both cases need the device to dial a private name it was handed; accepted (`packages/core/src/identity/addressPossession.js`, `relayOwnNames`).
 
+- **A circle's switches bind on arrival, with named limits** (2026-11-21). An app, feature or act the circle switched
+  off is refused on every member's device, judged by the settings in force where the statement stands on the content
+  line (docs/architecture.md, "Consistency & governance"). What a changed client can still do:
+  - **Whoever answers this device's catch-up can hand it a row**, or an older state of a row it does not hold newer, of
+    any type whose app is on, also where adding is off: a head served for a row whose statements aged out is signed by
+    the server, not the writer, and is judged only by its app being on. It is taken only in answer to this device's own
+    ask, never from the live fan, and it cannot replace a newer row this device holds. Closing it means keeping the
+    writer's original statement beside every row and serving that (roughly double the storage per row).
+  - **Which change it was** is not told apart: with "add" on and "complete" off, a changed app can complete a task and
+    the receiver sees "a change". Each type declaring its fields per act closes it.
+  - **Whose item it is**: any member can change or remove another member's item where the switches allow the act.
+  - **A removed row can come back as new**: the store keeps no tombstone, so a re-sent snapshot is judged as an add.
+  - **An admin can draw the line early** (name fewer tips than they held) and so take back up to the items window of
+    what the switch covers: signed, shown, and itself a governed settings change.
+  - **The wake is decided on the sender**, by the entry kind: a changed sender can wake members' devices for a chat
+    kind the circle has off (a ping, nothing shows). A circle whose settings a device does not know yet filters
+    nothing until they arrive. The record of each circle's conversation kinds is held per process (a box running
+    several agents shares it).
+
 ## The inverse failure
 
 Do not over-correct into refusing to build client-side controls. A filter that is *called* a filter is

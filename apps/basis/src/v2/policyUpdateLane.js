@@ -29,6 +29,7 @@ import { judgePolicyChain, judgeWithProposals, proposalsOn } from './governanceR
 import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, mergeCirclePolicy } from './circlePolicy.js';
 import { processRefusalLog } from './refusalLog.js';
 import { sealedKeyValue } from './localStoreSeal.js';
+import { noteKeptPolicyChanges, provideKeptPolicyChanges } from './keptPolicyChanges.js';
 
 export const POLICY_UPDATE_KIND = 'policy-update';
 
@@ -206,7 +207,8 @@ export async function applyPolicyUpdates({ rail, circleId, membersOf = null, adm
   }
   let present = false;
   try { present = rail.storedStatements(circleId).some((s) => s?.body?.kind === POLICY_UPDATE_KIND); } catch { present = false; }
-  if (!present) return { applied: false };
+  // no settings change held for the circle: known, and empty (the content judge has nothing to judge by)
+  if (!present) { noteKeptPolicyChanges(rail.deviceLog, circleId, []); return { applied: false }; }
   let bodies = [];
   try { bodies = (await rail.readVerifiedBodies(circleId))?.bodies ?? []; } catch { return { applied: false }; }
   let members = [];
@@ -226,6 +228,8 @@ export async function applyPolicyUpdates({ rail, circleId, membersOf = null, adm
     (proposals, need) => judgePolicyChain({ bodies: changes, members, proposals, merge: denyWinsMerge, need }),
     () => proposalsOn({ rail, circleId, policy, members }),
   );
+  // the kept changes are what every content statement of this circle is judged by on this device (`contentJudge.js`)
+  noteKeptPolicyChanges(rail.deviceLog, circleId, kept);
   const won = foldPolicyUpdates(kept, { admins });
   // every refusal says why (L857): a settings change the circle's rule did not allow
   for (let i = 0; i < skipped.length; i += 1) processRefusalLog().note({ tag: 'gate', lane: 'governance', check: 'settings', reason: 'not allowed by the circle rule' });
@@ -263,8 +267,15 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
   // The receive rail this device folds the lane with — handed over by the shell when it builds it, and remembered from
   // every apply, so a SAVE can bring the head up to date before it counts one past it.
   let knownRail = null;
+  // handed a rail, the lane is this device's provider of kept settings changes: a content rail that finds a circle's not
+  // known asks it to apply (a quiet start brings no settings statement that would make it apply by itself)
+  const know = (rail) => {
+    if (!rail || rail === knownRail) return;
+    knownRail = rail;
+    provideKeptPolicyChanges(rail.deviceLog, (circleId) => apply(circleId));
+  };
   const apply = (circleId, rail) => {
-    if (rail) knownRail = rail;
+    know(rail);
     return applyPolicyUpdates({ rail: rail ?? knownRail, circleId, membersOf, adminsOf, readPolicy, headStore, writePolicy });
   };
   return {
@@ -291,6 +302,9 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
       try {
         statement = await emit({ groupId: circleId, policy, version, ...(proposalId ? { proposalId } : {}) });
         if (statement?.body?.hash) await headStore.write(circleId, { version, key: statement.body.hash, statement });
+        // the admin's own device judges content by its own change too: the fan never comes back here, so the lane notes
+        // the kept changes again now that the statement is on this device's log (the head is already this one)
+        if (statement?.body?.hash && knownRail) await apply(circleId, knownRail).catch(() => {});
       } catch { statement = null; } finally {
         // The stated policy is the local truth: applying the lane above may have written an older one here. A GIVEN
         // policy that was not stated is not written: this device keeps what the circle holds, and the save says it failed.
@@ -304,7 +318,7 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
     headVersion: async (circleId) => (await headStore.read(circleId).catch(() => null))?.version ?? 0,
     readPolicy: (circleId) => readPolicy(circleId),
     /** The shell hands over its receive rail when it builds it. */
-    useRail(rail) { if (rail) knownRail = rail; },
+    useRail(rail) { know(rail); },
     preserved: (circleId) => preservedPolicyStatementsFor({ headStore, circleId }),
   };
 }
@@ -377,5 +391,5 @@ export function adminsOfViaSkill(callSkill) {
 /** The policy-head store, SEALED at rest (ledger L1083: it keeps the circle policy's original statement), over
  *  localStorage (web) or AsyncStorage (phone). */
 export function sealedPolicyHeadStore(storage) {
-  return makePolicyHeadStore(sealedKeyValue(storage, { name: 'the policy head', strict: true }));
+  return makePolicyHeadStore(sealedKeyValue(storage, { name: 'the policy head', strict: true, resealAtStart: [POLICY_HEAD_KEY('')] }));
 }

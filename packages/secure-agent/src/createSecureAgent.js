@@ -879,12 +879,29 @@ export async function createSecureAgent(opts = {}) {
   let   outboxRestored = Promise.resolve(0);
 
   /** Serialise the queue. `opts` is JSON round-tripped, so anything unserialisable (a callback) is
-   *  dropped rather than throwing — a resend must not depend on a closure the restart cannot restore. */
+   *  dropped rather than throwing — a resend must not depend on a closure the restart cannot restore.
+   *
+   *  ONE WRITE PER BURST (ledger L619): the queue is serialised when its write RUNS, not when it is asked for, and a
+   *  write that is still waiting serves every call made meanwhile. Before, each hold serialised the whole outbox (on a
+   *  seeded phone ~200 kB, hundreds of holds in a start's first seconds) and queued a write of it. The promise is the
+   *  same: once the returned promise (or `outboxFlushed()`) resolves, the durable copy holds this call's change. */
+  let holdPersistWaiting = false;
   function persistHolds() {
     if (!holdStore) return holdPersist;
-    let snapshot;
+    if (holdPersistWaiting) return holdPersist;   // the waiting write reads the queue when it runs: this change included
+    holdPersistWaiting = true;
+    holdPersist = holdPersist.then(async () => {
+      holdPersistWaiting = false;                 // from here on a change needs a write of its own
+      const snapshot = serialiseHolds();
+      if (snapshot == null) return;               // a queue we cannot serialise stays in memory
+      try { await holdStore.write(holdStoreUri, snapshot); }
+      catch (err) { if (typeof console !== 'undefined') console.warn('[secure-agent] outbox persist failed', err?.message ?? err); }
+    });
+    return holdPersist;
+  }
+  function serialiseHolds() {
     try {
-      snapshot = JSON.stringify({
+      return JSON.stringify({
         v: 1,
         peers: [...pendingHold].map(([addr, q]) => [addr, [...q].map(([k, e]) => [k, {
           payload: e.payload, opts: e.opts ?? null, ts: e.ts ?? Date.now(),
@@ -895,12 +912,7 @@ export async function createSecureAgent(opts = {}) {
         dead: [...deliveryFailures].map(([addr, f]) => [addr, { n: f.n, at: f.at }]),
         alive: [...seenAlive],
       });
-    } catch { return holdPersist; }          // a queue we cannot serialise stays in memory
-    holdPersist = holdPersist.then(async () => {
-      try { await holdStore.write(holdStoreUri, snapshot); }
-      catch (err) { if (typeof console !== 'undefined') console.warn('[secure-agent] outbox persist failed', err?.message ?? err); }
-    });
-    return holdPersist;
+    } catch { return null; }
   }
 
   /** Load the queue written by a previous run. Entries past the TTL are dropped on the way in and

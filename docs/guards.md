@@ -97,7 +97,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `untrusted-json` | — | JSON that someone else wrote is parsed with `parseUntrustedJson` (@onderling/core) |
 | `web-buttons` | — | no bare <button> in the web shell |
 
-## Named design guards (`G-*`, in fitness tests) · 28
+## Named design guards (`G-*`, in fitness tests) · 30
 
 *From an explicit `@guard [<id>] — <claim>` tag in a fitness test (preferred), or a `G-*` id in a
 `describe(...)` block (fallback). Tag a fitness test with `@guard` to add it here — an id is optional.*
@@ -126,6 +126,8 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | — | a toolbox word's slot phrase is taken off the line only as whole words at its start or end (longest first, any case),… | `apps/basis/test/v2/toolboxSlots.test.js` |
 | — | a toolbox's key never appears in a reply, a refusal, a log line or the list of tools, and a toolbox with no key on th… | `apps/basis/test/v2/toolboxes.test.js` |
 | — | a placed toolbox is off until the admin's yes; one that is off is refused before any call leaves, and its words reach… | `apps/basis/test/v2/toolboxes.test.js` |
+| — | framed by another page, the web app's main shell refuses to start and a screen address starts (its entry asks before … | `apps/basis/test/web/ownWindow.test.js` |
+| — | web app's page loads no script, stylesheet or frame from another origin, and the NKN library it runs is the installed… | `apps/basis/test/webOwnOrigin.test.js` |
 | — | subtask-spawn gate bites — only an authorized actor can spawn under a parent | `packages/item-store/test/spawnSubtask.test.js` |
 | — | a param declares scope (sync) + kind (security); kind:internal is immutable by construction, and set-param gates on kind | `packages/params/test/params.test.js` |
 | G-C1 | a circle owns ONE store: the local write and its publisher are the same object | `apps/basis/test/appTaskFanTwoDevice.test.js` |

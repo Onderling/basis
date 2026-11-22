@@ -11,6 +11,8 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { readFileSync, existsSync } from 'node:fs';
+import path from 'node:path';
 
 const empty       = fileURLToPath(new URL('./src/web/shims/empty.js',       import.meta.url));
 const oidcSession = fileURLToPath(new URL('./src/web/shims/oidcSession.js', import.meta.url));
@@ -52,8 +54,34 @@ const onderlingCore = fileURLToPath(new URL('../../packages/core',          impo
 // the browser bundle needs and would silently give a different module than the alias promises.
 const eventsShim  = createRequire(import.meta.url).resolve('events/events.js');
 
+// NOTHING the web app runs comes from another origin (ledger L1041): a script on this origin can use the keys this
+// origin holds. The NKN library is the installed one (`@onderling/transports`' own `nkn-sdk`, the version its code is
+// tested against), served beside the app at `vendor/nkn.min.js` in dev and emitted into the build: never a CDN.
+const transportsRequire = createRequire(fileURLToPath(new URL('../../packages/transports/package.json', import.meta.url)));
+// the package's own folder, as Node would find it from the transport (its exports do not publish the dist file)
+const nknDir = (transportsRequire.resolve.paths('nkn-sdk') ?? []).map((d) => path.join(d, 'nkn-sdk')).find((d) => existsSync(path.join(d, 'package.json')));
+if (!nknDir) throw new Error('vite.config: nkn-sdk is not installed for @onderling/transports');
+export const NKN_FILE = path.join(nknDir, 'dist', 'nkn.min.js');
+export const SAME_ORIGIN_NKN = 'vendor/nkn.min.js';
+function sameOriginNkn() {
+  return {
+    name: 'onderling-same-origin-nkn',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!String(req.url ?? '').split('?')[0].endsWith(`/${SAME_ORIGIN_NKN}`)) return next();
+        res.setHeader('Content-Type', 'text/javascript');
+        res.end(readFileSync(NKN_FILE));
+      });
+    },
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: SAME_ORIGIN_NKN, source: readFileSync(NKN_FILE) });
+    },
+  };
+}
+
 export default defineConfig({
   root: 'web',
+  plugins: [sameOriginNkn()],
   // Allow imports from outside `web/`.  '../..' reaches the monorepo
   // root so `packages/*` and other apps' node_modules trees (pnpm
   // hoists per-app copies under `apps/<x>/node_modules/.pnpm/...`)

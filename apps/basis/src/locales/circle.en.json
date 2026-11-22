@@ -11595,6 +11595,10 @@
       "doc": "The first open: three doors the first time the app opens on a device (src/v2/firstOpen.js)."
     }
   },
+  "framed_refused": {
+    "text": "Basis opens only in a window of its own, not inside another page. Open it directly at its own address.",
+    "doc": "Shown instead of the app when another page has put it in a frame: the app refuses to run there (a framing page could drive it or steer clicks). Ledger L1041."
+  },
   "persona_button": {
     "settings": {
       "text": "Settings",

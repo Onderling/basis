@@ -43,6 +43,7 @@ if (import.meta.env?.DEV) configureLog({ sink: consoleSink });
 import { createPeek } from '../../src/v2/circlePeek.js';
 import { myCircleIds } from '../../src/v2/myCircleIds.js';
 import { readTestModel, testModelProviders } from '../../src/v2/testModel.js';
+import { startsWhenFramed } from '../../src/web/ownWindow.js';
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
   scopePinboardCallSkill, scopedWriteFailureKey, createPodReadBack, createCirclePodProducer, createCircleControlAgentRouter, notePodAgentFor, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster, createProducerKeyWait, isSealedPosture, sealedAnswer, memberStatusReader, runKeyAudienceCheck,
@@ -10569,4 +10570,14 @@ async function boot() {
 
 // A `/scherm` link (or the bot's "Open het scherm" button inside Telegram) opens the web app as a SCREEN for a household
 // bot (no account, no person's agent): the screen shell instead of the app.
-if (isScreenAddress(window.location.hash, window.location.search)) startScreenShell(window); else boot();
+// Only in a window of its own (ledger L1041): framed by another page, the main app does not start and the page says
+// why; a screen address starts (Telegram shows the screen's Web App in a frame; `startsWhenFramed`).
+async function refuseFramed() {
+  try { await initLocalisation({ lng: detectDeviceLang() }); } catch { /* the key's own text stays */ }
+  const p = document.createElement('p');
+  p.setAttribute('data-framed', 'refused');
+  p.textContent = t('circle.framed_refused');
+  document.body.replaceChildren(p);
+}
+const atScreenAddress = isScreenAddress(window.location.hash, window.location.search);
+if (!startsWhenFramed(window, { screen: atScreenAddress })) refuseFramed(); else if (atScreenAddress) startScreenShell(window); else boot();

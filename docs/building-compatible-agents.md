@@ -78,3 +78,5 @@ the manifest it must satisfy is in [`conventions/manifest-standard.md`](./conven
 - **Call** ops as `{opId, args}`; **query** declared properties (you get your tier's rung).
 - **Authenticate** to raise your tier; request the minimum.
 - **To provide**, satisfy the port + its conformance harness.
+- **A page of your own** (a view a person opens) is served from your own origin. Basis never hosts it beside the web
+  app, under any path: everything on the web app's origin can use the keys a person's Basis keeps there.

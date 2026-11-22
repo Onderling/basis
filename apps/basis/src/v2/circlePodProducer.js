@@ -85,6 +85,16 @@ function memorySharing() {
   return { grant: async () => {}, revoke: async () => {} };
 }
 
+/** A vault value that is there but is not JSON: kept, never read as absent (a save would write over it). */
+const UNREADABLE = Symbol('unreadable');
+/** A JSON copy from the vault: null when absent, UNREADABLE when there but not parseable; a failed read throws through. */
+async function readJsonCopy(vault, key) {
+  const raw = await vault.get(key);
+  if (raw == null || raw === '') return null;
+  if (typeof raw !== 'string') return raw;
+  try { return JSON.parse(raw); } catch { return UNREADABLE; }
+}
+
 /**
  * @param {object} deps
  * @param {string} deps.circleId
@@ -200,20 +210,25 @@ export async function createCirclePodProducer({
   // the key there and leaves no note); the first note for a key stands; this device's revoke removes it. Beside the
   // pod-agents note: this device only, never on the pod, the roster or the lane.
   const holderNotesVaultKey = `${groupKeyPrefix}:key-holders:${circleId}`;
-  let holderNotes = {};
-  try { const raw = await vault.get(holderNotesVaultKey); if (raw) holderNotes = JSON.parse(raw) ?? {}; } catch { holderNotes = {}; }
-  const saveHolderNotes = async () => { try { await vault.set(holderNotesVaultKey, JSON.stringify(holderNotes)); } catch { /* best-effort */ } };
+  // A note that is THERE but does not parse is kept as it is and never saved over (read as empty, the next save wrote
+  // an empty or one-entry map over it): the notes are read-only until it is mended, a note asked for is refused.
+  const holderRead = await readJsonCopy(vault, holderNotesVaultKey);
+  const holdersUnreadable = holderRead === UNREADABLE;
+  let holderNotes = holdersUnreadable || !holderRead || typeof holderRead !== 'object' ? {} : holderRead;
+  const saveHolderNotes = async () => { if (holdersUnreadable) return; try { await vault.set(holderNotesVaultKey, JSON.stringify(holderNotes)); } catch { /* best-effort */ } };
   const keyHolders = {
     of: (key) => (typeof holderNotes[key] === 'string' ? holderNotes[key] : null),
     async note(key, person) {
+      if (holdersUnreadable) return false;
       if (typeof key !== 'string' || !key || typeof person !== 'string' || !person || holderNotes[key]) return false;
       holderNotes[key] = person; await saveHolderNotes(); return true;
     },
-    async forget(key) { if (!(key in holderNotes)) return false; delete holderNotes[key]; await saveHolderNotes(); return true; },
-    forgetPerson: async (person) => { let n = 0; for (const [k, p] of Object.entries(holderNotes)) if (p === person) { delete holderNotes[k]; n += 1; } if (n) await saveHolderNotes(); return n; },
+    async forget(key) { if (holdersUnreadable || !(key in holderNotes)) return false; delete holderNotes[key]; await saveHolderNotes(); return true; },
+    forgetPerson: async (person) => { if (holdersUnreadable) return 0; let n = 0; for (const [k, p] of Object.entries(holderNotes)) if (p === person) { delete holderNotes[k]; n += 1; } if (n) await saveHolderNotes(); return n; },
   };
-  let savedPodAgents = {};
-  try { const raw = await vault.get(podAgentsVaultKey); if (raw) savedPodAgents = JSON.parse(raw) ?? {}; } catch { savedPodAgents = {}; }
+  const podAgentsRead = await readJsonCopy(vault, podAgentsVaultKey);
+  const podAgentsUnreadable = podAgentsRead === UNREADABLE;   // kept as it is: never written back from an empty start
+  const savedPodAgents = podAgentsUnreadable || !podAgentsRead || typeof podAgentsRead !== 'object' ? {} : podAgentsRead;
 
   // Include THIS device's own per-circle sealing identity in the bootstrap roster, so the
   // local member is a recipient of the group key and can seal/open the circle's content
@@ -253,15 +268,23 @@ export async function createCirclePodProducer({
       const body = typeof r === 'string' ? r : r?.content;
       if (body != null) await vault.set(groupKeyVaultKey, typeof body === 'object' ? JSON.stringify(body) : String(body));
     } catch { /* best-effort */ }
-    try { if (controlAgent?.podAgents) await vault.set(podAgentsVaultKey, JSON.stringify(controlAgent.podAgents())); } catch { /* best-effort */ }
+    try { if (controlAgent?.podAgents && !podAgentsUnreadable) await vault.set(podAgentsVaultKey, JSON.stringify(controlAgent.podAgents())); } catch { /* best-effort */ }
   }
 
   // The vault copy goes back ONLY where the pod holds nothing (the in-memory pod after a reload); on a pod that holds the
   // file, the pod wins and the copy is refreshed from it below (persistGroupKey). Through the one key-resource write.
   if (ownsRoot && controlAgent) {
-    let saved = null;
-    try { const raw = await vault.get(groupKeyVaultKey); saved = raw ? JSON.parse(raw) : null; } catch { saved = null; }
-    if (saved) { try { await controlAgent.restoreIfEmpty(saved); } catch { /* fresh bootstrap below */ } }
+    const saved = await readJsonCopy(vault, groupKeyVaultKey);
+    if (saved === UNREADABLE) {
+      // a copy that cannot be read: harmless where the pod holds the file (the pod wins, the copy is refreshed from
+      // it below); on an empty pod a bootstrap would mint a NEW key and save it over the copy, and every row sealed
+      // under the old key would be lost. Not built, nothing changed, as an unreadable controller key.
+      let podHolds = false;
+      try { const r = await podClient.read(keyResourceUri, { decode: 'text' }); podHolds = (typeof r === 'string' ? r : r?.content) != null; } catch { podHolds = false; }
+      if (!podHolds) {
+        throw Object.assign(new Error(`The circle's key copy on this device could not be read; nothing was changed (${circleId})`), { code: 'key-unreadable', what: 'group-key-copy' });
+      }
+    } else if (saved) { try { await controlAgent.restoreIfEmpty(saved); } catch { /* fresh bootstrap below */ } }
   }
   if (bootstrap && ownsRoot && controlAgent && mayMint) { await controlAgent.bootstrap(); await persistGroupKey(); }
 

@@ -328,6 +328,8 @@ async function buildCirclePod(circleId, policy) {
       if (typeof console !== 'undefined') console.warn('[circlePods] ensureCirclePod failed:', err?.message ?? err);
       return null;   // not cached: a later ask tries again
     }
+    // a key or key copy that is there but cannot be read (the controller key, the group-key copy): nothing was changed (web parity)
+    if (err?.code === 'key-unreadable') processRefusalLog().note({ tag: 'key', lane: 'key', check: 'producer', reason: `key-unreadable:${err.what ?? 'key'}` });
     if (typeof console !== 'undefined') console.warn('[circlePods] ensureCirclePod failed:', err?.message ?? err);
   }
   circlePods.set(circleId, producer);

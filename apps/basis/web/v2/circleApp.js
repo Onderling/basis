@@ -2265,6 +2265,8 @@ async function buildCirclePod(circleId, policy) {
       // the agent IS bound and still gives no key pair: a fault, said, not a wait nobody drains again
       processRefusalLog().note({ tag: 'key', lane: 'key', check: 'producer', reason: 'no-sealing-key-pair' });
     }
+    // a key or key copy that is there but cannot be read (the controller key, the group-key copy): nothing was changed
+    if (err?.code === 'key-unreadable') processRefusalLog().note({ tag: 'key', lane: 'key', check: 'producer', reason: `key-unreadable:${err.what ?? 'key'}` });
     if (typeof console !== 'undefined') console.warn('[circleApp] ensureCirclePod failed:', err?.message ?? err);
     return null;
   }

@@ -319,3 +319,25 @@ describe("the record of addresses seen alive is bounded", () => {
     await a.shutdown();
   });
 });
+
+/**
+ * THE ALPHA SIZE FITS IN THE OUTBOX (ledger L1103, the seeded Samsung 2026-11-22): five circles of fifteen members are
+ * ~75 addresses (one per circle each), above the old cap of 64 queues. A start that holds for every absent member
+ * then evicted whole queues, and the boot re-fan held their lines again, evicting others: ~1350 holds and ~90 evicted
+ * queues in a start's first 40 s, every one a write of the outbox. The default cap now holds the alpha size with room.
+ */
+describe('hold queue — the default holds the alpha size', () => {
+  it('80 absent members (5 circles x 16) each keep their held line; no queue is evicted', async () => {
+    const { createSecureAgent: make } = await import('../src/createSecureAgent.js');
+    const { VaultMemory: V } = await import('@onderling/vault');
+    const dropped = [];
+    const a = await make({ vault: new V(), warnOnInsecure: false, onHoldDropped: (e) => dropped.push(e) });
+    for (let i = 0; i < 80; i += 1) {
+      await a.peer.sendTo(`absent-member-${String(i).padStart(3, '0')}-0000000000000000000000`, { msgId: `m-${i}`, text: 'x' }, { firstSendTimeoutMs: 50, retryDelays: [], guarantee: 'hold-forward' });
+    }
+    let held = 0;
+    for (let i = 0; i < 80; i += 1) held += a.heldFor(`absent-member-${String(i).padStart(3, '0')}-0000000000000000000000`);
+    expect(held).toBe(80);
+    await a.shutdown();
+  }, 60_000);
+});

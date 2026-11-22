@@ -5,7 +5,7 @@
  * is not on is refused in words before anything is asked. The admin is on Telegram (a fake Bot API), the toolbox on a
  * real socket, the box is the device runner.
  */
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, afterAll, vi } from 'vitest';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -103,7 +103,13 @@ describe('the built screen client, on the booted box over the relay', () => {
 
     // the page for the toolbox that is on, opened from that link: pasted, the question names it and what it may do, the
     // code picked, granted: useTool and the placed ops, not the admin's whole column
-    const page = createScreenClient({ toolbox: 'boodschappen', bot: pageLink, label: 'boodschappenpagina', storage: memoryStorage(), makeAgent });
+    // A PAGE SERVED OVER PLAIN HTTP IN THE HOME NETWORK (L1183) has no crypto.subtle (a browser gives it to https and
+    // loopback only): this page pairs, calls and resumes without it. The bot is another process and keeps its own.
+    const realCrypto = globalThis.crypto;
+    vi.stubGlobal('crypto', { getRandomValues: (a) => realCrypto.getRandomValues(a), randomUUID: () => realCrypto.randomUUID() });
+    cleanup.push(() => vi.unstubAllGlobals());
+    const pageStorage = memoryStorage();
+    const page = createScreenClient({ toolbox: 'boodschappen', bot: pageLink, label: 'boodschappenpagina', storage: pageStorage, makeAgent });
     const p = await page.startPairing();
     expect(p.paste).toMatch(/^\/koppel-scherm onderling-connect:\/\//);
     const asked = await ask(p.paste);
@@ -124,6 +130,11 @@ describe('the built screen client, on the booted box over the relay', () => {
     // the other toolbox is ON here, and still not this page's: refused at the door
     expect(await page.call('tools.useTool', { toolbox: 'recepten', tool: 'products.choices', input: { query: 'soep' } })).toMatchObject({ ok: false, code: 'toolbox-not-yours' });
     expect(await page.call('assistant.assistant-import', {})).toMatchObject({ ok: false, code: 'op-not-allowed' });
+    // …and resumes from what it kept, still without crypto.subtle
+    expect(globalThis.crypto.subtle).toBeUndefined();
+    const resumed = createScreenClient({ toolbox: 'boodschappen', bot: pageLink, storage: pageStorage, makeAgent });
+    expect(await resumed.resume()).toEqual({ ok: true });
+    vi.unstubAllGlobals();
 
     // a page for a toolbox that is NOT on here (not even placed): refused in words, nothing asked
     const other = createScreenClient({ toolbox: 'klusjesdienst', bot, storage: memoryStorage(), makeAgent });

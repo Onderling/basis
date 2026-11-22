@@ -16,6 +16,7 @@
  *
  * WebCrypto only (`crypto.subtle`): this runs on the box, and web or a phone never verifies a code.
  */
+import { hashHex } from '@onderling/core';
 
 /** The role a code admits at, as its tag (a member's code has none; the tag is inside the signature). */
 const ROLE_TAGS = Object.freeze({ member: '', coordinator: 'c', observer: 'o' });
@@ -34,7 +35,9 @@ async function hmacHex(secret, msg) {
   const key = await globalThis.crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return hex(await globalThis.crypto.subtle.sign('HMAC', key, enc.encode(msg)));
 }
-export const sha256Hex = async (s) => hex(await globalThis.crypto.subtle.digest('SHA-256', enc.encode(String(s))));
+// the kernel's pure-JS SHA-256, never crypto.subtle: a toolbox page served over plain http in the home network has no
+// crypto.subtle (a browser gives it to https and loopback only), and the screen door's code is this hash (L1183)
+export const sha256Hex = async (s) => hashHex(String(s));
 
 /** Constant-time for equal lengths (the signature is fixed-length). */
 function sameText(a, b) {

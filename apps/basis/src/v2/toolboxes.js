@@ -29,11 +29,30 @@ const OP_ID = /^[a-z][a-zA-Z0-9-]{0,31}\.[a-zA-Z][a-zA-Z0-9-]{0,63}$/;
  * `127.0.0.1`, exactly; a port and a path are fine; no userinfo), so a page served by a local web server on the
  * same device pairs through the same link and ticket. Plain http on any other host is refused; `[::1]` is not admitted.
  */
-function pageAddressOk(s) {
+function pageAddressOk(s, { overHttp = null } = {}) {
   if (/^https:\/\/[^\s/]+/.test(s)) return true;
   if (/\s/.test(s)) return false;
   let u; try { u = new URL(s); } catch { return false; }
-  return u.protocol === 'http:' && !u.username && !u.password && (u.hostname === 'localhost' || u.hostname === '127.0.0.1');
+  if (u.protocol !== 'http:' || u.username || u.password) return false;
+  if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') return true;
+  // PLAIN HTTP IN THE HOME NETWORK (L1183), only as the operator's explicit choice in the placed file and only on a
+  // private address: the card says the risk before the yes (an active attacker on the same network can alter the page's
+  // code as it loads; the data between page and bot stays sealed end to end)
+  return overHttp === PAGE_OVER_HTTP_HOME && privateHomeHost(u.hostname);
+}
+
+/** The placed file's explicit choice for a page on plain http in the home network. */
+export const PAGE_OVER_HTTP_HOME = 'home-network';
+
+/** A private IPv4 address (10/8, 172.16/12, 192.168/16) or a `.local` name: the home network, never the internet. */
+function privateHomeHost(host) {
+  const h = String(host ?? '').toLowerCase();
+  if (/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.local$/.test(h)) return true;
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+  if (!m) return false;
+  const [a, b, c, d] = m.slice(1).map(Number);
+  if ([a, b, c, d].some((n) => n > 255)) return false;
+  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
 }
 
 /** A placed file as the operator wrote it, or null when it is not one (a bad name, address or words). */
@@ -53,8 +72,11 @@ function readPlaced(p) {
   // household's door that page may use beside `tools.useTool` for this toolbox (`ops`, `app.op`, the OPERATOR's words:
   // never read from the toolbox's own card). A page's grant is useTool + these, cut to the person's own role column.
   const ops = [...new Set((Array.isArray(p?.ops) ? p.ops : []).map((o) => String(o ?? '').trim()).filter((o) => OP_ID.test(o) && o !== 'tools.useTool'))];
-  const page = pageAddressOk(String(p?.page ?? '')) ? String(p.page) : null;
-  return { name, url: String(p.url), words, ...(ops.length ? { ops } : {}), ...(page ? { page } : {}) };
+  const overHttp = p?.pageOverHttp === PAGE_OVER_HTTP_HOME ? PAGE_OVER_HTTP_HOME : null;
+  const page = pageAddressOk(String(p?.page ?? ''), { overHttp }) ? String(p.page) : null;
+  // the choice is carried only when it is what admitted the page (a plain http page off this device's loopback)
+  const pageOverHttp = page && overHttp && !pageAddressOk(page) ? overHttp : null;
+  return { name, url: String(p.url), words, ...(ops.length ? { ops } : {}), ...(page ? { page } : {}), ...(pageOverHttp ? { pageOverHttp } : {}) };
 }
 
 /**
@@ -66,7 +88,7 @@ function readPlaced(p) {
  * @param {(...a: unknown[]) => void} [a.log]   codes only
  */
 /** What the admin's yes covered: the placed address and words (and a page's address and ops), as one comparable string (a change means a new yes). */
-const shownOf = (p) => JSON.stringify({ url: p.url, words: p.words, ...(p.ops ? { ops: p.ops } : {}), ...(p.page ? { page: p.page } : {}) });
+const shownOf = (p) => JSON.stringify({ url: p.url, words: p.words, ...(p.ops ? { ops: p.ops } : {}), ...(p.page ? { page: p.page } : {}), ...(p.pageOverHttp ? { pageOverHttp: p.pageOverHttp } : {}) });
 /** The origin of a URL, or null. */
 const originOf = (u) => { try { return new URL(u).origin; } catch { return null; } };
 
@@ -127,7 +149,7 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
       // what it receives, as codes the door words: the words of a question always; a list's references when a word's
       // tool is one that prices a list (a `keys` field, Fable's section 7)
       const receives = ['question', ...(p.words.some((w) => w.field === 'keys') ? ['list-refs'] : [])];
-      if (!confirm) return { ok: true, pending: true, name: n, title: card.name || n, url: p.url, words: p.words, receives };
+      if (!confirm) return { ok: true, pending: true, name: n, title: card.name || n, url: p.url, words: p.words, receives, ...(p.page ? { page: p.page } : {}), ...(p.pageOverHttp ? { pageOverHttp: p.pageOverHttp } : {}) };
       const onMap = await readOn();
       onMap[n] = { title: card.name || n, endpoint: card.endpoint, tools: card.tools.map((t) => ({ id: t.id, name: t.name })), shown: shownOf(p) };
       await writeOn(onMap);

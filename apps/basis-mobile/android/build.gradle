@@ -45,3 +45,15 @@ allprojects {
         maven { url "$rootDir/../node_modules/detox/Detox-android" }
     }
 }
+
+// OUR OWN LIBSODIUM (scripts/build-libsodium-android.sh, the pin in libsodium/PIN.json): built from the pinned and
+// minisign-verified source with the pinned NDK, its four libraries checked against their pinned SHA-256, and put where
+// react-native-libsodium's CMake reads them, in place of the package's prebuilt build.tgz. Before EVERY module's
+// preBuild, so no native build links the prebuilt; a gradle build whose libraries already match does nothing.
+def buildOwnLibsodium = tasks.register('buildOwnLibsodium', Exec) {
+    workingDir rootDir
+    commandLine 'bash', new File(rootDir, '../scripts/build-libsodium-android.sh').absolutePath
+}
+subprojects { p ->
+    p.tasks.matching { it.name == 'preBuild' }.configureEach { dependsOn(buildOwnLibsodium) }
+}

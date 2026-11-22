@@ -171,3 +171,72 @@ describe('a row that will not open is kept, not deleted (ledger L1079)', () => {
     expect(adapter.stored.get('c')).toBe(stored().get('c'));
   });
 });
+
+/**
+ * SEALED WHEN WRITTEN, NOT WHEN SCHEDULED (ledger L619, the seeded Samsung 2026-11-22). The adapters debounce: they keep
+ * the map handed to `scheduleSave` and write it when their timer fires, so a burst of changes is ONE write. The wrapper
+ * sealed at every `scheduleSave` call all the same: a one-row store of ~170 kB changed 418 times in a start's first
+ * 40 s was sealed 418 times (68 million characters, a third of the JS thread) for a handful of writes.
+ */
+/** An adapter that debounces as the real ones do: it keeps the last map and writes it only when `fire()` runs. */
+function debouncingAdapter() {
+  const a = { stored: new Map(), writes: 0, pending: null };
+  a.load = async () => new Map(a.stored);
+  a.save = async (m) => { a.writes += 1; a.stored = new Map(Object.entries(Object.fromEntries(m))); };
+  a.scheduleSave = (m) => { a.pending = m; };
+  a.fire = async () => { const m = a.pending; a.pending = null; if (m) await a.save(m); };
+  a.flush = async (m) => { a.pending = null; await a.save(m); };
+  a.cancel = () => { a.pending = null; };
+  return a;
+}
+
+describe('a sealed store seals at the write, not at every scheduled save', () => {
+  it('a one-row store changed 100 times before the timer fires is sealed ONCE, with the newest value', async () => {
+    const strategy = countingStrategy();
+    const adapter = debouncingAdapter();
+    const p = sealedPersist(adapter, strategy);
+    for (let i = 0; i < 100; i += 1) p.scheduleSave(new Map([['mem://basis/outbox.json', JSON.stringify({ n: i })]]));
+    expect(strategy.seals).toBe(0);
+    await adapter.fire();
+    expect(strategy.seals).toBe(1);
+    expect(adapter.writes).toBe(1);
+    expect(strategy.open(adapter.stored.get('mem://basis/outbox.json'))).toBe(JSON.stringify({ n: 99 }));
+  });
+
+  it('a scheduled save that is cancelled seals nothing', async () => {
+    const strategy = countingStrategy();
+    const adapter = debouncingAdapter();
+    const p = sealedPersist(adapter, strategy);
+    p.scheduleSave(new Map([['k', 'v']]));
+    p.cancel();
+    await adapter.fire();
+    expect(strategy.seals).toBe(0);
+    expect(adapter.stored.size).toBe(0);
+  });
+
+  it('what the adapter is handed reads like the Map it was: size, get, has, iteration, entries, instanceof', async () => {
+    const strategy = countingStrategy();
+    let handed = null;
+    const adapter = { load: async () => new Map(), scheduleSave: (m) => { handed = m; } };
+    const p = sealedPersist(adapter, strategy);
+    p.scheduleSave(new Map([['a', '1'], ['b', '2']]));
+    expect(handed instanceof Map).toBe(true);
+    expect(handed.size).toBe(2);
+    expect(handed.has('a')).toBe(true);
+    expect(strategy.open(handed.get('b'))).toBe('2');
+    expect([...handed.keys()]).toEqual(['a', 'b']);
+    expect(Object.keys(Object.fromEntries(handed))).toEqual(['a', 'b']);
+    expect([...handed.entries()].map(([k, v]) => [k, strategy.open(v)])).toEqual([['a', '1'], ['b', '2']]);
+    expect(strategy.seals).toBe(2);   // sealed once, on the first read, however often it is read after
+  });
+
+  it('a flush seals at once (an app going away must not wait on a timer)', async () => {
+    const strategy = countingStrategy();
+    const adapter = debouncingAdapter();
+    const p = sealedPersist(adapter, strategy);
+    p.scheduleSave(new Map([['k', 'old']]));
+    await p.flush(new Map([['k', 'new']]));
+    expect(strategy.seals).toBe(1);
+    expect(strategy.open(adapter.stored.get('k'))).toBe('new');
+  });
+});

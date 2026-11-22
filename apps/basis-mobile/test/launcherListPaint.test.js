@@ -53,3 +53,22 @@ describe('launcherListPaint — the wiring', () => {
     expect(src).not.toMatch(/hydrates from AsyncStorage a beat AFTER the agent bundle/);
   });
 });
+
+// THE KEPT PICTURE (the cold start): before the list is read, the circles the person had last time are painted from the
+// kept picture instead of the loading line; never once the list was read (an empty answer is then the truth), never
+// over circles already on screen, never over a boot failure.
+describe('the kept circles list stands in until the list is read', () => {
+  it('not settled, nothing live, a kept picture: the kept list', () => {
+    expect(launcherListPaint({ loading: true, settled: false, count: 0, keptCount: 3 })).toBe('kept');
+    expect(launcherListPaint({ loading: false, settled: false, count: 0, keptCount: 3 })).toBe('kept');
+  });
+  it('settled: the live answer, also when it is empty', () => {
+    expect(launcherListPaint({ loading: false, settled: true, count: 0, keptCount: 3 })).toBe('empty');
+    expect(launcherListPaint({ loading: false, settled: true, count: 2, keptCount: 3 })).toBe('list');
+  });
+  it('live circles on screen win; a boot failure wins; no picture is the loading line as before', () => {
+    expect(launcherListPaint({ loading: true, settled: false, count: 1, keptCount: 3 })).toBe('list');
+    expect(launcherListPaint({ loading: false, settled: false, count: 0, keptCount: 3, bootError: 'x' })).toBe('boot-failed');
+    expect(launcherListPaint({ loading: true, settled: false, count: 0, keptCount: 0 })).toBe('loading');
+  });
+});

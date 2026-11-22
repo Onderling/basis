@@ -7,12 +7,16 @@
  * for an account that had circles. Circles already on screen are never swapped for the loading line: a reload
  * repaints in place (React Native drops a press whose row unmounts mid-tap).
  *
- * @param {{ loading: boolean, settled: boolean, count: number, bootError?: unknown }} state
- * @returns {'boot-failed'|'list'|'loading'|'empty'}
+ * THE KEPT PICTURE (`keptPicture.js`): before the list is read, the circles of the last caught-up list (`keptCount`)
+ * stand in for the loading line, marked as refreshing; once the list is read its answer is the truth, empty or not.
+ *
+ * @param {{ loading: boolean, settled: boolean, count: number, bootError?: unknown, keptCount?: number }} state
+ * @returns {'boot-failed'|'list'|'kept'|'loading'|'empty'}
  */
-export function launcherListPaint({ loading, settled, count, bootError = null }) {
+export function launcherListPaint({ loading, settled, count, bootError = null, keptCount = 0 }) {
   if (bootError) return 'boot-failed';
   if (count > 0) return 'list';
+  if (!settled && keptCount > 0) return 'kept';
   if (loading || !settled) return 'loading';
   return 'empty';
 }

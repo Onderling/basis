@@ -19,6 +19,7 @@ import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from '../..
 import { encodePairingOffer, acceptConnectionGrant, CONNECTION_GRANT_SUBTYPE } from '../../basis/src/v2/connectionPairing.js';
 import { screenCode } from '../../basis/src/v2/screenDoor.js';
 import { bootMobileNode } from './support/mobileNode.js';
+import { parseScreenStartLink } from '../../basis/src/v2/botScreens.js';
 
 const RUNNER = fileURLToPath(new URL('../../basis/bin/device-runner.mjs', import.meta.url));
 const cardText = (stdout) => /onderling-contact:\/\/[A-Za-z0-9_-]+/.exec(stdout)?.[0] ?? null;
@@ -71,9 +72,17 @@ describe('a screen connected from the phone, over the relay', () => {
     await send(`/start ${code}`);
     expect(await until(async () => ((await botSaid()).length >= 1 ? true : null), { timeout: 30_000, step: 500 }), `not admitted:\n${out.slice(-1200)}`).toBe(true);
 
-    // the screen shows its own throwaway offer (its key, a fresh nonce): nothing is sent by the screen
+    // `/scherm` (the first person admitted is the admin: the paste route) sends the start address with its one-use
+    // ticket, which the screen reads and hands back in its offer (L1113: a pasted offer pairs only with one)
+    const before = (await botSaid()).length;
+    await send('/scherm');
+    const startLine = await until(async () => (await botSaid()).slice(before).find((t) => /#scherm-nieuw=/.test(t)) ?? null, { timeout: 30_000, step: 500 });
+    expect(startLine, `no start address in the phone's thread: ${JSON.stringify((await botSaid()).slice(-3))}`).toBeTruthy();
+    const { ticket } = parseScreenStartLink(/https?:\/\/\S+/.exec(startLine)[0]);
+    expect(ticket, 'the start address carries a ticket').toBeTruthy();
+    // the screen shows its own throwaway offer (its key, a fresh nonce, the ticket): nothing is sent by the screen
     const nonce = `n-${Date.now()}`;
-    const offer = encodePairingOffer({ viewPubKey: screen.pubKey, relayUrl: relay.url, nonce, label: 'keuken' });
+    const offer = encodePairingOffer({ viewPubKey: screen.pubKey, relayUrl: relay.url, nonce, label: 'keuken', ticket });
     const seen = (await botSaid()).length;
     await send(`/koppel-scherm ${offer}`);
     // the bot asks, privately in the phone's own thread, which of three codes the screen shows; nothing granted yet

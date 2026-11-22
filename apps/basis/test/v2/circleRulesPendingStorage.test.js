@@ -6,6 +6,11 @@
  * `storage` rather than jsdom so the test is fast + node-portable.
  */
 import { describe, it, expect } from 'vitest';
+import { groupKeyStrategy } from '@onderling/pod-client';
+import { setShellContentSeal, openStoredValue } from '../../src/v2/localStoreSeal.js';
+// the cache seals at rest (ledger L1083): a content key is published, as after a boot
+const SEAL = groupKeyStrategy({ groupKey: Buffer.from(new Uint8Array(32).fill(7)).toString('base64url') });
+setShellContentSeal(SEAL);
 import {
   localStorageCircleRulesPendingIo,
   createCircleRulesPendingStoreLocal,
@@ -26,8 +31,7 @@ describe('localStorageCircleRulesPendingIo · γ-next.rules', () => {
     const s = memStorage();
     const io = localStorageCircleRulesPendingIo(s);
     await io.save('g1', { purpose: 'Neighbourhood', agreements: 'be kind' });
-    expect(s._backing.get('cc.circleRulesPending.g1')).toBe(
-      JSON.stringify({ purpose: 'Neighbourhood', agreements: 'be kind' }),
+    expect(openStoredValue(SEAL, 'cc.circleRulesPending.g1', s._backing.get('cc.circleRulesPending.g1'))).toBe(JSON.stringify({ purpose: 'Neighbourhood', agreements: 'be kind' }),
     );
   });
 

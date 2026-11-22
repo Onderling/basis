@@ -86,7 +86,7 @@ export const tasksManifest = {
   // Keys ∈ itemTypes; atoms are CANONICAL SDK atoms.
   nouns: {
     // shown in a merged view: newest first; mine when I hold it
-    task:            { atoms: ['add', 'list', 'update', 'remove', 'complete', 'claim', 'reassign', 'submit', 'approve', 'reject', 'revoke'],
+    task:            { atoms: ['add', 'list', 'update', 'remove', 'complete', 'claim', 'confirm', 'reassign', 'submit', 'approve', 'reject', 'revoke'],
       presents: { primary: 'complete', label: 'title', moment: 'addedAt', order: 'desc', mine: ['assignee', 'holders', 'assignees'],
         done: { field: 'state', values: ['done', 'approved', 'completed', 'cancelled', 'archived'] } },
       names: { nl: { one: 'taak', other: 'taken' }, en: { one: 'task', other: 'tasks' } } },
@@ -100,7 +100,7 @@ export const tasksManifest = {
     {
       id:        'addTask', visibility: 'authenticated',
       verb:      'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'task' },
       params: [
         { name: 'text',             kind: 'string', required: true, ...STR_NONEMPTY },
@@ -138,7 +138,7 @@ export const tasksManifest = {
     {
       id:        'claimTask', visibility: 'authenticated',
       verb:      'claim',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'task', state: ['open'] },                      // F-SP3-a
       // DECLARATION LAYER (#34) — this op writes the task's `assignee` under the CLAIM policy (first-wins /
       // immutable-once-set): concurrent claims resolve to the first grab, not the latest write. Declared per-op,
@@ -181,7 +181,7 @@ export const tasksManifest = {
       // visibility live in the rolePolicy the projector reads.
       id:        'confirmClaim', visibility: 'authenticated',
       verb:      'confirm',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       // Shows on a PENDING claim (explicit-confirm, not yet ratified) — the state `effectiveStatus` reports
       // as `pending-confirmation`. An auto-confirmed / already-confirmed claim is `claimed` and needs no button.
       appliesTo: { type: 'task', state: ['pending-confirmation'] },
@@ -202,7 +202,7 @@ export const tasksManifest = {
     {
       id:        'completeTask', visibility: 'authenticated',
       verb:      'complete',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'task', state: ['claimed'] },                   // F-SP3-a
       params: [
         {
@@ -256,7 +256,7 @@ export const tasksManifest = {
     {
       id:        'removeTask', visibility: 'authenticated', group: 'compose',
       verb:      'remove',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'task' },
       params: [
         { name: 'id', kind: 'string', required: true, ...ID_NONEMPTY },
@@ -287,7 +287,7 @@ export const tasksManifest = {
     {
       id:        'attachTaskGrant', visibility: 'authenticated',
       verb:      'update',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       appliesTo: { type: 'task' },
       params: [
         { name: 'taskId', kind: 'string', required: true, ...ID_NONEMPTY  },
@@ -310,7 +310,7 @@ export const tasksManifest = {
     {
       id:        'reassignTask', visibility: 'authenticated', group: 'admin',
       verb:      'reassign',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'task' },
       params: [
         { name: 'id',          kind: 'string', required: true, ...ID_NONEMPTY  },
@@ -323,7 +323,7 @@ export const tasksManifest = {
     {
       id:        'submitTask', visibility: 'authenticated',
       verb:      'submit',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'task', state: ['claimed', 'rejected'] },        // F-SP3-a
       params: [
         {
@@ -344,7 +344,7 @@ export const tasksManifest = {
     {
       id:        'approveTask', visibility: 'authenticated',
       verb:      'approve',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'task', state: ['submitted'] },                  // F-SP3-a
       params: [
         {
@@ -365,7 +365,7 @@ export const tasksManifest = {
     {
       id:        'rejectTask', visibility: 'authenticated',
       verb:      'reject',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'task', state: ['submitted'] },                  // F-SP3-a
       params: [
         {
@@ -391,14 +391,13 @@ export const tasksManifest = {
     {
       id:        'revokeTask', visibility: 'authenticated',
       verb:      'revoke',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'task', state: ['claimed', 'submitted', 'rejected'] },  // F-SP3-a
       params: [
         { name: 'id',     kind: 'string', required: true, ...ID_NONEMPTY  },
         { name: 'reason', kind: 'string', required: true, ...STR_NONEMPTY },
       ],
       surfaces: {
-        chat: { hint: 'Revoke an assignment with a mandatory reason (master only).' },
         ui:   { control: 'button', labelKey: 'circle.button.tasks.revokeTask', label: 'Revoke' },
       },
     },
@@ -484,13 +483,12 @@ export const tasksManifest = {
       appliesTo: { type: 'task' },
       params:    [],
       surfaces: {
-        chat: { hint: 'List unresolved double-claim conflicts for this circle.' },
       },
     },
     {
       id:        'resolveClaim', visibility: 'authenticated', group: 'admin',
       verb:      'reassign',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'task' },
       params: [
         { name: 'taskId',   kind: 'string', required: true, ...ID_NONEMPTY },
@@ -537,7 +535,6 @@ export const tasksManifest = {
       appliesTo: { type: 'task' },
       params:    [],
       surfaces: {
-        chat: { hint: 'List open tasks where the caller is the master.' },
       },
     },
     {
@@ -592,13 +589,12 @@ export const tasksManifest = {
     {
       id:        'clearInboxItem', visibility: 'authenticated',
       verb:      'remove',
-      writes: { scope: 'person' },   // the inbox is per person and cross-app, not the circle's
+      writes: { scope: 'person', what: 'content' },   // the inbox is per person and cross-app, not the circle's
       appliesTo: { type: 'inbox-item' },
       params: [
         { name: 'id', kind: 'string', required: true, ...ID_NONEMPTY },
       ],
       surfaces: {
-        chat: { hint: 'Delete one inbox notification by id.' },
         ui:   { control: 'button', labelKey: 'circle.button.tasks.clearInboxItem', label: 'Dismiss' },
       },
     },
@@ -627,7 +623,7 @@ export const tasksManifest = {
     {
       id:        'approveSubtaskRequest', visibility: 'authenticated',
       verb:      'approve',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'inbox-item', kind: 'subtask-request' },
       params: [
         { name: 'requestId', kind: 'string', required: true, ...ID_NONEMPTY },
@@ -642,7 +638,7 @@ export const tasksManifest = {
     {
       id:        'declineSubtaskRequest', visibility: 'authenticated',
       verb:      'reject',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'inbox-item', kind: 'subtask-request' },
       params: [
         { name: 'requestId', kind: 'string', required: true, ...ID_NONEMPTY },
@@ -658,7 +654,7 @@ export const tasksManifest = {
     {
       id:        'approveSubtaskProposal', visibility: 'authenticated',
       verb:      'approve',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'inbox-item', kind: 'subtask-proposal' },
       params: [
         { name: 'proposalId', kind: 'string', required: true, ...ID_NONEMPTY },
@@ -673,7 +669,7 @@ export const tasksManifest = {
     {
       id:        'declineSubtaskProposal', visibility: 'authenticated',
       verb:      'reject',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'inbox-item', kind: 'subtask-proposal' },
       params: [
         { name: 'proposalId', kind: 'string', required: true, ...ID_NONEMPTY },
@@ -689,13 +685,12 @@ export const tasksManifest = {
     {
       id:        'clearInbox', visibility: 'authenticated',
       verb:      'remove',
-      writes: { scope: 'person' },   // the inbox is per person and cross-app, not the circle's
+      writes: { scope: 'person', what: 'content' },   // the inbox is per person and cross-app, not the circle's
       appliesTo: { type: 'inbox-item' },          // matches every event in the section
       params: [
         { name: 'olderThanMs', kind: 'number' },  // optional age cutoff
       ],
       surfaces: {
-        chat: { hint: 'Bulk-delete inbox notifications (optionally older than a cutoff).' },
         // section-level CTA. Renders in
         // `section.sectionActions[]`, NOT in per-row itemActions[]
         // or app-shell globals[].
@@ -738,7 +733,6 @@ export const tasksManifest = {
         { name: 'rootId', kind: 'string' },
       ],
       surfaces: {
-        chat: { hint: 'Return the sub-task tree rooted at rootId, or every top-level tree.' },
       },
     },
 
@@ -758,7 +752,7 @@ export const tasksManifest = {
     {
       id:        'archiveCircle', visibility: 'authenticated',
       verb:      'archive',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       // Part G (2026-06-17) — the mock declared a `confirm` flag; realAgent's
       // two-step gate reads `args.confirm`. Additive (real had no params).
       params:    [
@@ -786,7 +780,7 @@ export const tasksManifest = {
     {
       id:        'unarchiveCircle', visibility: 'authenticated',
       verb:      'unarchive',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params:    [],
       appliesTo: { type: 'circle' },
       surfaces: {
@@ -815,7 +809,7 @@ export const tasksManifest = {
      */
     {
       id:    'editTask', visibility: 'authenticated', verb: 'edit',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'task', state: ['open', 'claimed'] },
       // DECLARATION LAYER (#34) — an edit to the task's `text` (body content) resolves under the CONTENT policy
       // (LWW-register): the latest edit survives. Same `task` type as claimTask, different field, different
@@ -846,7 +840,7 @@ export const tasksManifest = {
      */
     {
       id:    'provisionMyCircle', visibility: 'authenticated', group: 'admin', verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params: [
         { name: 'name', kind: 'string', required: true },
         { name: 'kind', kind: 'enum',
@@ -887,7 +881,7 @@ export const tasksManifest = {
     },
     {
       id:    'setMyAvailability', visibility: 'authenticated', group: 'compose', verb: 'submit',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       params: [
         { name: 'cellKey', kind: 'string', required: true },
       ],
@@ -898,7 +892,7 @@ export const tasksManifest = {
     },
     {
       id:    'setAvailabilityOptIn', visibility: 'authenticated', group: 'compose', verb: 'submit',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params: [
         { name: 'on', kind: 'enum', of: ['on', 'off'], required: true },
       ],
@@ -926,7 +920,7 @@ export const tasksManifest = {
     },
     {
       id:    'acceptSchedule', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'schedule-slot' },
       params: [
         { name: 'slotKey', kind: 'string', required: true },
@@ -996,7 +990,7 @@ export const tasksManifest = {
     },
     {
       id:    'pauseCircle', visibility: 'authenticated', group: 'admin', verb: 'submit',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params: [],
       surfaces: {
         slash: { command: '/pause-circle' },
@@ -1005,7 +999,7 @@ export const tasksManifest = {
     },
     {
       id:    'unpauseCircle', visibility: 'authenticated', group: 'admin', verb: 'submit',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params: [],
       surfaces: {
         slash: { command: '/unpause-circle' },
@@ -1019,7 +1013,7 @@ export const tasksManifest = {
      */
     {
       id:    'issueInvite', visibility: 'authenticated', group: 'admin', verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params: [
         { name: 'role',      kind: 'enum',   of: ['member', 'admin'], required: false },
         { name: 'ttl-hours', kind: 'number', required: false },
@@ -1031,7 +1025,7 @@ export const tasksManifest = {
     },
     {
       id:    'redeemInvite', visibility: 'public', group: 'admin', verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params: [
         { name: 'invite',      kind: 'string', required: true },
         { name: 'displayName', kind: 'string', required: false },
@@ -1051,7 +1045,7 @@ export const tasksManifest = {
      */
     {
       id:    'addSubtask', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       // Also on a PENDING claim: the claimant may decompose optimistically (a provisional subtree, §2.5).
       appliesTo: { type: 'task', state: ['open', 'claimed', 'pending-confirmation'] },
       params: [
@@ -1071,7 +1065,7 @@ export const tasksManifest = {
     },
     {
       id:    'proposeSubtask', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'task', state: ['submitted'] },
       params: [
         { name: 'parentTaskId',     kind: 'string', required: true },
@@ -1089,7 +1083,7 @@ export const tasksManifest = {
     },
     {
       id:    'forceSpawnSubtask', visibility: 'authenticated', group: 'compose', verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       // Admin-only escape hatch — no row button (admins use the slash).
       params: [
         { name: 'parentTaskId',     kind: 'string', required: true },

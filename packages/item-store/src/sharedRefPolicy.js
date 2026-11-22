@@ -341,6 +341,8 @@ export function makeCircleShareEnforcement({ sharing, resourceUriFor, recipient,
   const out = {
     onShare: makeShareGrantHook({ sharing, resourceUriFor, mode, seal }),
     policy:  makeSharedRefPolicy({ sharing, open, recipient, resourceUriFor, mode }),
+    // the grant hook rewrites the SOURCE item in place (a change there) only when it is handed a re-sealer
+    resealsInPlace: typeof seal === 'function',
   };
   if (canonicalShare) {
     const canon = makeCanonicalShareHook({ canonicalShare, currentRecipients, grantRecipients, revokeRecipients, revokedKeysFor });

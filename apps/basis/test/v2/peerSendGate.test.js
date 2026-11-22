@@ -92,13 +92,13 @@ describe('sendDecisionFields: one record per decision, codes and scalars only', 
     );
     expect(f).toEqual({
       kind: 'circle-member', scope: 'circle', reason: 'roster-hit', chosen: 'relay',
-      t0: 'relay:ok:reach', t1: 'nkn:no-aliases:reach', candidates: 2, outcome: 'delivered',
+      t0: 'relay:ok:reach', t1: 'nkn:no-aliases:reach', candidates: 2, outcome: 'written',
     });
     expect(JSON.stringify(f)).not.toContain('c1-long');
   });
   it('a delivered send names the route it TOOK, and carries no candidate list', () => {
     const f = sendDecisionFields({ kind: 'person', circleId: null, reason: 'no-roster-hit' }, null, { held: false, delivered: true }, 'nkn');
-    expect(f).toEqual({ kind: 'person', scope: 'none', reason: 'no-roster-hit', chosen: 'nkn', outcome: 'delivered' });
+    expect(f).toEqual({ kind: 'person', scope: 'none', reason: 'no-roster-hit', chosen: 'nkn', outcome: 'written' });
   });
   it('a scoped send with no eligible transport and a point mismatch says point-mismatch', () => {
     const f = sendDecisionFields(

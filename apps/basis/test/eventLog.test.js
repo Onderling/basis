@@ -504,3 +504,36 @@ describe('compactEntries — the one way a record-class entry changes after it w
     expect(log.compactEntries(['membership:b'], () => ({ id: 'other' })), 'a transform that changes the id is refused').toBe(0);
   });
 });
+
+describe('dropKind: the person wipes one kind of their own record', () => {
+  it('drops every entry of that kind and nothing else; an audit kind is never dropped; it persists', async () => {
+    const now = Date.now();
+    const saved = [];
+    const log = new EventLog({ initial: [], muted: [], persist: async (evs) => { saved.push(evs.length); } });
+    log.append({ id: 'o1', type: 'own-action', ts: now - 10, payload: { op: 'a' } });
+    log.append({ id: 'o2', type: 'own-action', ts: now - 5, payload: { op: 'b' } });
+    log.append({ id: 'c1', type: 'chat-message', ts: now - 3, circleId: 'k', payload: { text: 'hoi' } });
+    log.append({ id: 'a1', type: 'agent-action', ts: now - 2, payload: { op: 'x' } });
+    expect(log.dropKind('own-action')).toBe(2);
+    expect(log.query().map((e) => e.id).sort()).toEqual(['a1', 'c1']);
+    expect(log.dropKind('agent-action'), 'an audit trail is never wiped this way').toBe(0);
+    expect(log.query().map((e) => e.id).sort()).toEqual(['a1', 'c1']);
+    expect(log.dropKind(''), 'no kind, nothing').toBe(0);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(saved.at(-1), 'the shrunk log is persisted').toBe(2);
+  });
+});
+
+describe('a settings change is a record inside the audit lane (the content line needs the whole settings history)', () => {
+  it('past the audit window a governance policy-update is KEPT; a vote on the same lane still compacts', () => {
+    let clock = 0;
+    const log = new EventLog({ now: () => clock, retention: { short: 500, chat: 1000, audit: 2000 } });
+    log.append(ev({ id: 'governance:p1', ts: 0, app: 'system', type: 'governance', circleId: 'c1', actor: 'anna', payload: { body: { kind: 'policy-update', hash: 'p1' } } }));
+    log.append(ev({ id: 'governance:v1', ts: 10, app: 'system', type: 'governance', circleId: 'c1', actor: 'bram', payload: { body: { kind: 'vote', hash: 'v1' } } }));
+    clock = 3000;
+    log.prune();
+    const ids = log.query().map((e) => e.id);
+    expect(ids).toContain('governance:p1');
+    expect(ids).not.toContain('governance:v1');
+  });
+});

@@ -6,6 +6,16 @@ before you start bisecting a build or native crash.
 
 ---
 
+## A browser walk that reloads right after an act can read an empty log (the write had not persisted yet)
+
+The device log persists asynchronously (the sealed web backend, IndexedDB). A walk that acts and then calls
+`page.goto('/')` within about a second can reload before the newest entry is on disk, and then reads the log as if
+the act never happened. Cost (2026-11-18, twice in one afternoon): the own-acts record "vanished" after a reload, and
+the "+" said its intro again on the next open. Both looked like product defects; a probe that waited 3 s before the
+reload showed the entry there at every moment after it. Before blaming the product, wait before the reload (a person's
+next open is never that close): `plus-intro.spec.js` has a `reload` helper that does, and `own-actions-mydata.spec.js`
+waits inline. If a reload must be immediate, that is a product question about flushing on unload, not a test fix.
+
 ## A Vite alias pointing at `./node_modules/<pkg>` cannot resolve under a hoisted install
 
 `apps/basis/vite.config.js` aliased the `events` polyfill to a path built with
@@ -801,6 +811,10 @@ Each one produced an APK that did not carry the code it was built to test.
 - **A release build fails at `:app:collectReleaseDependencies` with "Java heap space"** (2026-11-13): on a machine
   short of memory, the Gradle daemons left by earlier builds (one per worktree) hold gigabytes. `./gradlew --stop`
   in the worktree's `android/` freed ~7.6 GB and the next build went through.
+- **A release build fails at once in `settings.gradle` line 2: `Cannot run program "node" … Failed to exec spawn
+  helper`** (2026-11-20): a Gradle daemon left from an earlier build (after a JDK or system update) can no longer
+  start child processes. Not the code and not node: `./gradlew --stop` in that worktree's `android/`, then build
+  again (it went through on the next try).
 - **`mk-worktree.sh` stops part-way with "cp: cannot create hard link … Too many links"** (2026-11-13): every worktree
   hardlinks the same `node_modules`, and ext4 allows a file about 65,000 links, so with ~45 worktrees the most-shared
   files reach the cap. The copy stops at the first such file (an old demo app's), the script exits under `set -e`, and
@@ -909,3 +923,19 @@ whatwg-fetch, which does not send a cache mode: on a GET or HEAD with `no-cache`
 URL instead (a new URL each time, so the cache misses). The Community Solid Server ignores an unknown query (measured on
 7.2.0: `/` and `/?_=<ms>` give the same answer), so this works there. A pod server that does NOT ignore an unknown query
 would break on the phone only. Not yet proven on a phone: the DPoP proof with that query on the URL.
+
+## A worktree's APK will not install over the test phone's app (2026-11-19)
+
+The test phone runs Basis signed with the TEST key (`~/.onderling-keys/basis-test.jks`). An APK built in a worktree is
+signed with the debug key, and Android refuses to install it over an app with another signature
+(`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). Uninstalling first would wipe the phone's circles and identity, so don't. Re-sign
+the built APK with the test key instead: `zipalign -p -f 4 in.apk aligned.apk`, then `apksigner sign --ks
+~/.onderling-keys/basis-test.jks --out signed.apk aligned.apk` (zipalign BEFORE apksigner; the other order breaks the
+signature), then `adb install -r signed.apk`.
+
+## `vitest --root apps/basis` from the repo root breaks the tests that read files by a relative path (2026-11-19)
+
+Some basis tests read a sibling app's source relative to the WORKING DIRECTORY (e.g. `contactsHeaderClearsPersonaButton`
+reads `../basis-mobile/src/screens/v2/fab.js`). Run from the repo root with `--root apps/basis`, they look one level
+too high and fail with `ENOENT`, which reads like a real failure. Run basis tests from `apps/basis` (as CI does):
+`cd apps/basis && npx vitest run <files>`.

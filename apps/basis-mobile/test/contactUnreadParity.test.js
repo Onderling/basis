@@ -1,7 +1,7 @@
 /**
  * Unread on Contacten (2026-09-21) — web ≡ mobile, from ONE source: both shells build the map through the shared
- * `buildContactUnread` over the channel's `rehydrateAll`, keep the seen-marks through the shared `makeContactSeenStore`
- * (localStorage / AsyncStorage), sum it on the tab through `totalUnread`, and speak the same two keys. A shell that
+ * `buildContactUnread` over the channel's `rehydrateAll`, keep the seen-marks through the shared `sealedContactSeenStore`
+ * (localStorage / AsyncStorage, sealed at rest), sum it on the tab through `totalUnread`, and speak the same two keys. A shell that
  * counts for itself, or keeps its own seen-marks, is the drift this pins.
  */
 import { describe, it, expect } from 'vitest';
@@ -22,10 +22,14 @@ describe('unread on Contacten — parity', () => {
   it('both hosts build the map, keep the marks and sum the tab through the shared module', () => {
     for (const src of [webHost, launcher]) {
       expect(src).toMatch(/buildContactUnread\(/);
-      expect(src).toMatch(/makeContactSeenStore\(/);
+      expect(src).toMatch(/sealedContactSeenStore\(/);
+      expect(src).toMatch(/createCircleSeenMarks\(/);   // …and the circles' marks through the one shared holder
       expect(src).toMatch(/totalUnread\(/);
       expect(src).toMatch(/rehydrateAll/);
     }
+  });
+  it('no shell writes the circles\' seen-marks itself (an open before the load wrote over them — ledger L1085)', () => {
+    for (const src of [webHost, launcher]) expect(src).not.toMatch(/setItem\(\s*['"]cc\.circleSeenAt/);
   });
   it('both rosters show the count under the same key; both tab bars take `badges`', () => {
     for (const src of [webRoster, roster]) expect(src).toMatch(/circle\.contacts\.unread\b/);

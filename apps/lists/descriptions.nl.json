@@ -1,0 +1,58 @@
+{
+  "createList": {
+    "what": "Maak een nieuwe lijst.",
+    "params": { "text": "de naam van de lijst", "defaultChild": "wat er standaard op komt" }
+  },
+  "addToList": {
+    "what": "Zet iets op een lijst.",
+    "params": { "list": "op welke lijst", "text": "wat erop komt", "kind": "wat voor soort regel", "assignee": "wie het doet", "due": "op welke dag", "ref": "naar welk ding het verwijst", "quantity": "hoeveel" }
+  },
+  "listLists": {
+    "what": "Laat de lijsten zien.",
+    "params": {}
+  },
+  "markListItemDone": {
+    "what": "Vink iets af op een lijst.",
+    "params": { "item": "wat je afvinkt", "list": "op welke lijst" }
+  },
+  "makeChore": {
+    "what": "Maak van een regel een klus: wie het doet, of wanneer.",
+    "params": { "item": "welke regel", "list": "op welke lijst", "assignee": "wie het doet", "due": "op welke dag" }
+  },
+  "entryReminders": {
+    "what": "Stel in wanneer iedereen aan een regel wordt herinnerd.",
+    "params": { "item": "welke regel", "reminders": "wanneer, bijvoorbeeld 60 minuten ervoor of ochtend", "list": "op welke lijst" }
+  },
+  "shopVisit": {
+    "what": "Laat zien wat je in een winkel nodig hebt.",
+    "params": { "shop": "in welke winkel je bent", "general": "de gewone boodschappenlijst" }
+  },
+  "listEntries": {
+    "what": "Laat zien wat er op een lijst staat.",
+    "params": { "list": "welke lijst" }
+  },
+  "listDone": {
+    "what": "Laat zien wat de laatste dagen is afgevinkt.",
+    "params": { "days": "hoeveel dagen terug", "list": "op welke lijst" }
+  },
+  "removeFromList": {
+    "what": "Haal iets van een lijst.",
+    "params": { "item": "wat eraf gaat", "list": "van welke lijst" }
+  },
+  "removeList": {
+    "what": "Haal een hele lijst weg, met alles erop.",
+    "params": { "list": "welke lijst" }
+  },
+  "restoreList": {
+    "what": "Zet een weggehaalde lijst terug.",
+    "params": { "list": "welke lijst" }
+  },
+  "restoreEntry": {
+    "what": "Zet iets terug dat iemand anders van je lijst haalde.",
+    "params": { "item": "wat terug moet" }
+  },
+  "editEntry": {
+    "what": "Verander een regel op een lijst: de woorden of de tijd.",
+    "params": { "item": "welke regel", "text": "de nieuwe woorden", "list": "op welke lijst", "when": "de nieuwe tijd", "quantity": "hoeveel" }
+  }
+}

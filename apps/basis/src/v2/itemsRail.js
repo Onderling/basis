@@ -20,6 +20,11 @@ import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
 import { itemsManifest, ITEMS_LANE } from './itemsManifest.js';
 import { rosterBindingVerifier } from './membershipRail.js';
+import { judgeItemStatement } from './contentJudge.js';
+import { linksIndex } from './contentLine.js';
+import { keptPolicyChangesOf, onKeptPolicyChanges, requestKeptPolicyChanges } from './keptPolicyChanges.js';
+import { contentJudgmentsOn } from './contentJudgments.js';
+import { processRefusalLog } from './refusalLog.js';
 import { NOT_TAKEN } from '../core/handlers/peerRouter.js';   // a verdict the receive record reads: not taken, so a repeat is handed on again
 
 /** The statement kinds the items lane carries — DERIVED from the manifest's declared appends. */
@@ -32,6 +37,25 @@ export const ITEMS_RAIL_KINDS = entryKindRegistryFromManifests(itemsManifest).ki
  * next feature's rows) silently never reached a device that was away. The publish valve has no type gate
  * either (`routeItemsMirror`); catch-up below serves every row the store has a head for.
  */
+
+/**
+ * Oldest arrival first. The device log reads most-recent-first; a statement's place on it (`atSeq`, stamped where it
+ * landed, never by a writer) is the order it arrived here in. Every statement with a place is taken by its place (equal
+ * places in reading order); one without a place (a minimal log, a test's, reads oldest-first) comes after them, in the
+ * order it reads: its arrival is not known, so it is taken as the newest. One order for any mix (a comparator that
+ * compares places only when both have one is not an order, and the sort's answer would depend on where they started).
+ * @param {object[]} bodies
+ * @returns {object[]}
+ */
+export function inArrivalOrder(bodies) {
+  const placed = [];
+  const unplaced = [];
+  (Array.isArray(bodies) ? bodies : []).forEach((b, i) => {
+    if (Number.isFinite(b?.atSeq)) placed.push({ b, i, at: b.atSeq }); else unplaced.push(b);
+  });
+  placed.sort((x, y) => (x.at - y.at) || (x.i - y.i));
+  return [...placed.map(({ b }) => b), ...unplaced];
+}
 
 /** The wire subtypes for the items lane's fan + catch-up (the governance/membership pairs' sibling). */
 export const ITEMS_BROADCAST = 'circle-items-broadcast';
@@ -68,7 +92,7 @@ export const OWN_ITEMS_CATCHUP_SUBTYPES = Object.freeze({
  *   carried so a sibling verifies the chain without the registry. `belongs(scope, item)` says which lane an item of the
  *   one shared own store rides: a lane serves and applies only its own items (none of another self's).
  */
-export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, storeFor, verifyBinding = null, onItemApplied = null, onItemRemoved = null, own = null }) {
+export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, storeFor, verifyBinding = null, onItemApplied = null, onItemRemoved = null, own = null, judge = null, changedByOf = null }) {
   const refIn = selfRefIn(myRef);   // in each circle, the self this device is there
   if (typeof circleIdentityFor !== 'function' || typeof storeFor !== 'function') return null;
   const isOwn = (circleId) => (typeof own?.isOwn === 'function' ? own.isOwn(circleId) === true : (Boolean(own?.scope) && circleId === own.scope));
@@ -119,34 +143,310 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     console.warn(`[items-lane] refused an announcement in ${circleId}: its author ${String(ref).slice(0, 12)}… is not an admin there`);
   }
 
-  async function applyToHead(circleId, body) {
+  // ── THE CIRCLE'S SWITCHES BIND HERE (`contentJudge.js`) ─────────────────────────────────────────────────────────────
+  // Every statement that reaches the head is judged first, whatever brought it: the live fan, a catch-up, the re-apply
+  // when a store opens. Refused: kept on the log, not applied, said once per author. Parked (the settings it is judged
+  // by are not known here yet, or its place on the line is unknown and the readings differ): kept, judged again when
+  // the settings lane notes its kept changes or a link arrives. The own scope has no circle switches.
+  const judging = Boolean(judge) && Boolean(base.deviceLog);
+  const manifestsOf = () => { try { return (typeof judge?.manifests === 'function' ? judge.manifests() : judge?.manifests) ?? []; } catch { return []; } };
+  const parked = new Map();       // circleId → Map<hash, body>
+  const parkedIn = (cid) => parked.get(cid) ?? parked.set(cid, new Map()).get(cid);
+  const storeless = new Set();    // hashes that arrived while their circle's store was not open (their act is read on landing)
+  // what this device proved, and the row as it was where a take-back needs it: on the device log (`contentJudgments.js`)
+  const judgmentsOf = (cid) => contentJudgmentsOn(base.deviceLog, cid);
+  const switchRefused = new Set();
+  let noLaneSaid = false;
+  function saySwitchRefusal(circleId, ref, code) {
+    const key = `${circleId}\u0000${ref ?? ''}`;
+    if (switchRefused.has(key)) return;
+    switchRefused.add(key);
+    processRefusalLog().note({ tag: 'gate', lane: 'items', check: 'circle-switch', reason: code ?? 'capability-denied' });
+  }
+  /** A head SERVED in answer to a catch-up (signed by whoever served it, marked so inside the signed body): not an act. */
+  const isServedHead = (circleId, b) => !isOwn(circleId) && b?.kind === 'snapshot' && b?.payload?.served === true;
+  function refuseServed() {
+    processRefusalLog().note({ tag: 'gate', lane: 'items', check: 'served-head', reason: 'a served head this device did not ask for' });
+  }
+
+  // ── WHOSE ITEM IT IS BINDS HERE ─────────────────────────────────────────────────────────────────────────────────────
+  // Each item type declares who may change and remove a row (`changedByOf(type)`): 'author' (the member who added it,
+  // and any admin) or 'circle' (any member); nothing declared = 'author'. The receiver knows whose a row is from the
+  // statement that added it: its VERIFIED author, kept on the row as `madeBy` (the circle-scoped ref the rail checked,
+  // never `createdBy`, which is the writer's own id and travels unchecked). A new row gets its author as `madeBy`
+  // whatever it carries; a change keeps the held `madeBy` (one that names another is refused). A head SERVED in answer
+  // to a catch-up is not an act: it keeps the `madeBy` the server holds. A row whose maker is not known here (made
+  // before this, or served without one) takes any member's change: said in enforceability.md.
+  const whoseRefusedOnce = new Set();
+  function sayWhoseRefusal(circleId, ref, code) {
+    const key = `${circleId}\u0000${ref ?? ''}\u0000${code}`;
+    if (whoseRefusedOnce.has(key)) return;
+    whoseRefusedOnce.add(key);
+    processRefusalLog().note({ tag: 'gate', lane: 'items', check: 'whose-item', reason: code });
+  }
+  const ruleOf = (type) => {
+    if (typeof changedByOf !== 'function') return null;   // not composed with the declarations: no whose-check here
+    try { return changedByOf(type) === 'circle' ? 'circle' : 'author'; } catch { return 'author'; }
+  };
+  /** The maker of a held row (`madeBy`); null when not known here (made before makers were kept, or served without one). */
+  const makerOf = (_circleId, previous) => previous?.madeBy ?? null;
+  /**
+   * ADMIN AUTHORITY, judged once per statement on this device and KEPT: the first judgment asks the roster (the author an
+   * admin then); a re-apply or rebuild finds the kept verdict and takes the statement again without asking the roster as
+   * it stands now, so demoting an admin does not undo their moderation here. The membership lane is not linked to the
+   * items line, so "an admin at the statement's own place" has no causal answer yet (a cross-lane frontier: later); a
+   * device that first judges an old admin act after the demotion (a late joiner) refuses it (enforceability.md).
+   */
+  async function adminAuthority(circleId, author, body) {
+    const hash = body?.hash;
+    const kept = judging && typeof hash === 'string' && hash ? judgmentsOf(circleId) : null;
+    if (kept?.adminTaken?.(hash)) return true;
+    if (!(await authorIsAdmin(circleId, author))) return false;
+    kept?.noteAdminTaken?.(hash);
+    return true;
+  }
+  /** Why this statement may not change the row (a code), or null. `previous` is the row as held here (null: not held). */
+  async function whoseRefusal(circleId, item, body, previous, { remove = false } = {}) {
+    if (isOwn(circleId) || !previous) return null;   // a new row: its maker is its author (`fixMaker`)
+    const rule = ruleOf(previous.type ?? item?.type);
+    if (!rule) return null;
+    const author = body?.payload?.authorRef ?? null;
+    if (isServedHead(circleId, body)) return null;
+    const maker = makerOf(circleId, previous);
+    if (!remove && item && item.madeBy != null && maker != null && item.madeBy !== maker) return 'changed-maker';
+    if (rule === 'circle' || maker == null || maker === author) return null;
+    if (await adminAuthority(circleId, author, body)) return null;
+    return 'not-yours';
+  }
+  /** The row as it is put here: a new row's maker is the statement's verified author; a change keeps the held one. */
+  const fixMaker = (circleId, item, body, previous) => {
+    if (isOwn(circleId) || !item || typeof changedByOf !== 'function') return item;
+    if (previous) { const maker = makerOf(circleId, previous); return maker != null ? { ...item, madeBy: maker } : item; }
+    if (isServedHead(circleId, body)) return item;
+    const author = body?.payload?.authorRef;
+    return author ? { ...item, madeBy: author } : item;
+  };
+  const rowIdOf = (circleId, b) => (b?.kind === 'snapshot' ? (itemOf(circleId, b)?.id ?? b.subject) : (b?.payload?.id ?? b?.subject));
+  /**
+   * WHICH ACT a snapshot was is a fact of its ARRIVAL here: a row this device did not hold is an add, a held one a
+   * change. Read from the store when it first lands (`fresh`), and kept (`contentJudgments.js`), because a later
+   * judging cannot tell it from the log: the row's making may have aged out, and a sender chooses its own links.
+   * `held`: the row as the statements before this one left it (a re-judge); `undefined`: read it from the store.
+   * `unknownAct`: no kept act and no earlier statement of the row here: judged as both, and the same answer or none.
+   * `keptAct`: whether the kept act is the truth. Only for a row's FIRST statement on this log (nothing older here can
+   * say what came before it); every later statement of the row is the act `held` makes it, so a change whose add was
+   * taken back is an add of a row no longer held.
+   */
+  async function verdictFor(circleId, body, { held = undefined, linksOf = null, fresh = false, unknownAct = false, keptAct = true } = {}) {
+    if (!judging || isOwn(circleId) || (body?.kind !== 'snapshot' && body?.kind !== 'remove')) return { verdict: 'apply' };
+    const judgments = judgmentsOf(circleId);
+    let row = held;
+    if (row === undefined) {
+      const id = rowIdOf(circleId, body);
+      try { row = (typeof id === 'string' && id) ? ((await storeFor(circleId)?.get?.(id)) ?? null) : null; } catch { row = null; }
+    }
+    let acts; let type;
+    if (body.kind === 'snapshot') {
+      type = itemOf(circleId, body)?.type ?? null;
+      const known = keptAct ? judgments.act(body.hash) : undefined;
+      if (known) acts = [known];
+      else if (fresh) { acts = [row ? 'change' : 'add']; judgments.noteAct(body.hash, acts[0]); }
+      else acts = unknownAct ? ['add', 'change'] : [row ? 'change' : 'add'];
+    } else { if (!row) return { verdict: 'apply' }; acts = ['remove']; type = row.type ?? null; }
+    let kept = keptPolicyChangesOf(base.deviceLog, circleId);
+    // not known: asked of this device's settings lane. A composition with NO settings lane cannot judge at all: it
+    // applies as before and says so once (every shell hands its lane the rail at boot: the shell seams hold that)
+    if (kept === undefined && !requestKeptPolicyChanges(base.deviceLog, circleId)) {
+      if (!noLaneSaid) { noLaneSaid = true; console.warn('[items-lane] no settings lane on this device: the circle switches are not judged on arrival here'); }
+      kept = [];
+    }
+    const links = linksOf ?? linksIndex(base.storedStatements(circleId).map((st) => st.body));
+    // a head served in answer to this device's own catch-up ask (only such a one is on the log: see `ingest`)
+    const served = isServedHead(circleId, body);
+    const verdicts = acts.map((act) => judgeItemStatement({ body, act, type, linksOf: links, kept, manifests: manifestsOf(), served, proofs: judgments }));
+    return verdicts.every((v) => v.verdict === verdicts[0].verdict) ? verdicts[0] : { verdict: 'park' };
+  }
+
+  /**
+   * Judge every held statement of a circle again (the settings lane noted new kept changes, or a link arrived). A row
+   * with a statement that is now refused or still parked, or one a parked statement now joins, is REBUILT from the
+   * statements of it that are allowed, in log order, by the store's own merge (snapshots are whole rows): a later
+   * allowed change survives a take-back. No allowed statement left: an add taken back is dropped (no tombstone); a row
+   * older than the log goes back to the copy kept before the refused change, when this device kept one.
+   */
+  /**
+   * `reapply` (the store opened, `rebuildHead`): every row is put to the head again, not only the rows a verdict
+   * touched, so a statement that arrived while the store was not open lands now. Returns the statements applied.
+   */
+  async function rejudge(circleId, { reapply = false } = {}) {
+    if (!judging || isOwn(circleId)) return 0;
     const store = storeFor(circleId);
-    if (!store) return;
+    if (!store) return 0;
+    let bodies = [];
+    try { ({ bodies = [] } = await base.readVerifiedBodies(circleId)); } catch { return 0; }
+    bodies = inArrivalOrder(bodies);
+    const linksOf = linksIndex(bodies);
+    const byRow = new Map();
+    for (const b of bodies) {
+      if (b?.kind !== 'snapshot' && b?.kind !== 'remove') continue;
+      const id = rowIdOf(circleId, b);
+      if (typeof id === 'string' && id) (byRow.get(id) ?? byRow.set(id, []).get(id)).push(b);
+    }
+    const waiting = parkedIn(circleId);
+    let applied = 0;
+    for (const [rowId, list] of byRow) {
+      // in arrival order: whether the row is held at a statement follows from the ones taken before it, and the first
+      // one here is the act it was when it arrived (kept; a change: the row was held before it)
+      const first = list[0];
+      let firstAct = first?.kind === 'snapshot' ? judgmentsOf(circleId).act(first.hash) : null;
+      // a row's first statement that arrived while the store was not open lands on the head HERE for the first time: the
+      // act it arrived as is read now, as `ingest` reads it on a landing (a row not held: an add). Left unknown, a later
+      // re-judge that parks it could not tell its own add from a row older than the log, and kept it on the head
+      if (first?.kind === 'snapshot' && !firstAct && storeless.has(first.hash)) {
+        let row = null;
+        try { row = (await store.get?.(rowId)) ?? null; } catch { row = null; }
+        firstAct = row ? 'change' : 'add';
+        judgmentsOf(circleId).noteAct(first.hash, firstAct);
+      }
+      for (const b of list) storeless.delete(b.hash);
+      let held = null;
+      if (firstAct === 'change' || first?.kind === 'remove') {
+        held = judgmentsOf(circleId).previous(first.hash);
+        if (!held) { try { held = (await store.get?.(rowId)) ?? null; } catch { held = null; } }
+      }
+      const judged = [];
+      for (const b of list) {
+        const v = await verdictFor(circleId, b, { held, linksOf, keptAct: b === first, unknownAct: b === first && first.kind === 'snapshot' && !firstAct });
+        judged.push({ b, v });
+        if (v.verdict === 'apply') held = b.kind === 'snapshot' ? (itemOf(circleId, b) ?? held) : null;
+      }
+      const touched = judged.some(({ b, v }) => v.verdict !== 'apply' || waiting.has(b.hash));
+      if (!touched) {
+        if (!reapply) continue;
+        for (const { b } of judged) {
+          try { await landOnHead(circleId, store, b); applied += 1; } catch { /* one bad body must not stop the rest */ }
+        }
+        continue;
+      }
+      for (const { b, v } of judged) {
+        if (v.verdict === 'park') waiting.set(b.hash, b);
+        else waiting.delete(b.hash);
+        if (v.verdict === 'refuse') saySwitchRefusal(circleId, b.payload?.authorRef, v.code);
+      }
+      applied += await rebuildRow(circleId, store, rowId, judged);
+    }
+    return applied;
+  }
+
+  async function rebuildRow(circleId, store, rowId, judged) {
+    const allowed = judged.filter(({ v }) => v.verdict === 'apply').map(({ b }) => b);
+    let before = null;
+    try { before = (await store.get?.(rowId)) ?? null; } catch { before = null; }
+    try { await store.delete(rowId, { sync: false }); } catch { return 0; }
+    // the row as the rebuild has made it so far, tracked here (never read back mid-rebuild: no extra wait in it)
+    let held = null;
+    for (const b of allowed) {
+      if (b.kind === 'snapshot') {
+        const item = itemOf(circleId, b);
+        // the same refusals as a landing (a lane-carried row, an announcement by a non-admin): a rebuild is no back door
+        if (item && !(await refusedOnHead(circleId, item, b, held))) {
+          const row = fixMaker(circleId, item, b, held);
+          try { held = (await store.put(row, { sync: false, origin: true })) ?? row; } catch { /* a type not held here */ }
+        }
+      } else if (!(held && await whoseRefusal(circleId, null, b, held, { remove: true }))) {
+        try { await store.delete(rowId, { sync: false }); held = null; } catch { /* already gone */ }
+      }
+    }
+    if (allowed.length === 0) {
+      // the row's first statement here arrived as an add and is not allowed: the row goes. It changed a row held before:
+      // the copy kept beside it, or, when none was kept, the row as it stands (never lost on a guess)
+      const firstTaken = judged.find(({ b }) => b.kind === 'snapshot');
+      const kept = firstTaken ? judgmentsOf(circleId).previous(firstTaken.b.hash) : null;
+      const wasAdd = Boolean(firstTaken) && !kept && judgmentsOf(circleId).act(firstTaken.b.hash) === 'add';
+      const restore = kept ?? (wasAdd ? null : before);
+      if (restore) { try { await store.put(restore, { sync: false, origin: true }); } catch { /* best effort */ } }
+    }
+    let after = null;
+    try { after = (await store.get?.(rowId)) ?? null; } catch { after = null; }
+    if (!after && before && typeof onItemRemoved === 'function') { try { await onItemRemoved(circleId, rowId); } catch { /* never fails */ } }
+    return allowed.length;
+  }
+
+  if (judging) onKeptPolicyChanges(base.deviceLog, (cid) => { rejudge(cid).catch(() => {}); });
+
+  /** Does the log hold another statement of this row? Then the log rebuilds it, and no copy is kept beside this one. */
+  function otherStatementOf(circleId, rowId, hash) {
+    try {
+      return base.storedStatements(circleId).some((st) => st?.body?.hash !== hash && rowIdOf(circleId, st?.body) === rowId);
+    } catch { return true; }
+  }
+
+  async function applyToHead(circleId, body, { fresh = false } = {}) {
+    const store = storeFor(circleId);
+    if (!store) { if (fresh && judging && !isOwn(circleId) && body?.hash) storeless.add(body.hash); return; }
+    if (judging && !isOwn(circleId)) {
+      const v = await verdictFor(circleId, body, { fresh });
+      if (v.verdict === 'park') { if (body?.hash) parkedIn(circleId).set(body.hash, body); return; }
+      if (body?.hash) parkedIn(circleId).delete(body.hash);
+      if (v.verdict === 'refuse') { saySwitchRefusal(circleId, body.payload?.authorRef, v.code); return; }
+    }
+    await landOnHead(circleId, store, body, { fresh });
+  }
+
+  /** Whether a snapshot's row may not land here whatever the switches say (true: refused, and said where it is news). */
+  async function refusedOnHead(circleId, item, body, previous = undefined) {
+    // on an own lane, only that lane's self's items (one lane never writes another self's into the shared own store)
+    if (isOwn(circleId) && !ownBelongs(circleId, item)) return true;
+    // A roster row never lands through this lane: its addresses are proven facts patched in place,
+    // and a peer's snapshot of "the person's row" is that peer's view, not this device's — nor does the circle's
+    // rules head, which its own lane carries past an admin check. Refused here whatever served it (`rosterTrail.js`).
+    if (isLaneCarriedItem(item)) return true;
+    // An ANNOUNCEMENT is the store door's, but an admin's word: one whose author the folded roster does not name an
+    // admin is refused here, on the receiving device — the writer's own admin check binds only the writer's app.
+    if (item.type === 'announcement' && !(await adminAuthority(circleId, body.payload?.authorRef, body))) {
+      refusedOnce(circleId, body.payload?.authorRef);
+      return true;
+    }
+    let held = previous;
+    if (held === undefined) { try { held = (await storeFor(circleId)?.get?.(item.id)) ?? null; } catch { held = null; } }
+    const whose = await whoseRefusal(circleId, item, body, held);
+    if (whose) { sayWhoseRefusal(circleId, body.payload?.authorRef, whose); return true; }
+    return false;
+  }
+
+  /** Whether a remove may not take the row away here: whose it is (its maker, or an admin, for an 'author' type). */
+  async function removeRefused(circleId, store, id, body) {
+    let held = null;
+    try { held = (await store.get?.(id)) ?? null; } catch { held = null; }
+    if (!held) return false;
+    const whose = await whoseRefusal(circleId, null, body, held, { remove: true });
+    if (whose) { sayWhoseRefusal(circleId, body.payload?.authorRef, whose); return true; }
+    return false;
+  }
+
+  /** Put a statement the switches allow (or that no switch judges) on the circle's head: the store's causal merge. */
+  async function landOnHead(circleId, store, body, { fresh = false } = {}) {
     if (body.kind === 'snapshot') {
       const item = itemOf(circleId, body);
       if (!item || typeof item.id !== 'string' || !item.id) return;
-      // on an own lane, only that lane's self's items (one lane never writes another self's into the shared own store)
-      if (isOwn(circleId) && !ownBelongs(circleId, item)) return;
-      // A roster row never lands through this lane: its addresses are proven facts patched in place,
-      // and a peer's snapshot of "the person's row" is that peer's view, not this device's — nor does the circle's
-      // rules head, which its own lane carries past an admin check. Refused here whatever served it (`rosterTrail.js`).
-      if (isLaneCarriedItem(item)) return;
-      // An ANNOUNCEMENT is the store door's, but an admin's word: one whose author the folded roster does not name an
-      // admin is refused here, on the receiving device — the writer's own admin check binds only the writer's app.
-      if (item.type === 'announcement' && !(await authorIsAdmin(circleId, body.payload?.authorRef))) {
-        refusedOnce(circleId, body.payload?.authorRef);
-        return;
-      }
+      // the row as held here, read ONCE: the whose-check and the merge below see the same row, and no second read sits
+      // between the switches' verdict and the write (a re-judge running in that gap would be overtaken)
+      let previous = null;
+      try { previous = (await store.get?.(item.id)) ?? null; } catch { previous = null; }
+      if (await refusedOnHead(circleId, item, body, previous)) return;
       // sync:false — an ingest never re-publishes (the echo loop); origin:true — the causal merge keeps
       // the writer's clock and runs the claim fold, exactly like the legacy mirror's inbound path.
       // whether this device held the row before: a snapshot that is an UPDATE (a claim, an edit) is not a new arrival.
       // A read then a put: two snapshots of one new row landing in the same tick may both read 'new' (one extra
       // announcement at most, never a missed one).
       // …and the row as it was: an assignment is news only when it changed (`assignedEntryFor`)
-      let previous = null;
-      try { previous = (await store.get?.(item.id)) ?? null; } catch { previous = null; }
       const existed = !!previous;
-      try { await store.put(item, { sync: false, origin: true }); }
+      // the row as it was, kept only where a take-back would need it: a fresh change of a row whose making is not on the
+      // log (it is older than the log, or arrived by catch-up), so no allowed statement could rebuild it
+      if (fresh && judging && !isOwn(circleId) && previous && body?.hash && !otherStatementOf(circleId, item.id, body.hash)) {
+        judgmentsOf(circleId).keepPrevious(body.hash, previous);
+      }
+      try { await store.put(fixMaker(circleId, item, body, previous), { sync: false, origin: true }); }
       catch (err) {
         // a type this node does not hold (an extension it does not run): the row is not held, the statement stays on
         // the log — the head picks it up the day the type is installed here (a rebuild re-applies what the log holds).
@@ -163,6 +463,7 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     } else if (body.kind === 'remove') {
       const id = body.payload?.id ?? body.subject;
       if (typeof id === 'string' && id) {
+        if (await removeRefused(circleId, store, id, body)) return;
         await store.delete(id, { sync: false });
         if (typeof onItemRemoved === 'function') { try { await onItemRemoved(circleId, id); } catch { /* never fails the merge */ } }
       }
@@ -205,9 +506,11 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
       // the own scope serves what it sends: sealed to the person, or not at all
       const carried = isOwn(circleId) ? ownSnapshotPayload(circleId, item) : { item };
       if (!carried) return stored;
+      // `served`: a head this device SERVES, not an act of its writer: marked inside the signed body, so the asker can
+      // tell it from an author's statement (the person's own scope has no circle switches and is not marked)
       const statement = signSpine(resolved, {
         kind: 'snapshot', circleId, subject: item.id,
-        payload: { ...carried, authorRef: ref }, parent, deps,
+        payload: { ...carried, authorRef: ref, ...(isOwn(circleId) ? {} : { served: true }) }, parent, deps,
       });
       bodies.push(statement.body);   // chain the next synthesized statement after this one
       synthesized.push(statement);
@@ -230,14 +533,22 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
    * head is already current: a re-applied snapshot re-merges to the same result, and a re-applied
    * remove re-deletes nothing (the same idempotence `ingest` already relies on).
    *
+   * A circle whose switches are judged here re-applies through the same per-row pass as a re-judge: the statements of a
+   * row in arrival order, each the act the allowed ones before it make it (the kept act is the truth only for the row's
+   * first statement on this log). Statement by statement, a change whose add was taken back would be read against the
+   * store and its kept act, and put back a row the re-judge had dropped.
+   *
    * @returns {Promise<number>} statements applied (0 when the store still is not there)
    */
   async function rebuildHead(circleId) {
     if (!storeFor(circleId)) return 0;
+    if (judging && !isOwn(circleId)) return rejudge(circleId, { reapply: true });
     let bodies = [];
     try { ({ bodies = [] } = await base.readVerifiedBodies(circleId)); } catch { return 0; }
     let applied = 0;
-    for (const body of bodies) {
+    // in arrival order: the log reads most-recent-first, and a remove taken before the add it follows would let the add
+    // put the row back (a snapshot's merge is order-free by its clock; a remove is not)
+    for (const body of inArrivalOrder(bodies)) {
       try { await applyToHead(circleId, body); applied += 1; } catch { /* one bad body must not stop the rest */ }
     }
     return applied;
@@ -245,9 +556,20 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
 
   return {
     ...base,
+    /** The ref this device signs a circle's item statements with (null on an own lane): the maker a local new row is
+     *  stamped with (`madeBy`), so the maker's own device and every receiver hold the same one. */
+    selfRefFor: (circleId) => (isOwn(circleId) ? null : refIn(circleId)),
     /** The one write path; on the own scope the item is sealed to the person (or nothing is written to the lane). */
     async append(circleId, opts = {}) {
-      if (!isOwn(circleId)) return base.append(circleId, opts);
+      if (!isOwn(circleId)) {
+        const res = await base.append(circleId, opts);
+        // this device's own write: the act it was is what the store stamped (a new row is made and changed at one moment)
+        const item = opts.kind === 'snapshot' ? opts.payload?.item : null;
+        if (judging && res?.statement?.body?.hash && typeof item?.createdAt === 'string' && typeof item?.updatedAt === 'string') {
+          judgmentsOf(circleId).noteAct(res.statement.body.hash, item.createdAt === item.updatedAt ? 'add' : 'change');
+        }
+        return res;
+      }
       if (opts.kind === 'snapshot') {
         const payload = ownSnapshotPayload(circleId, opts.payload?.item);
         if (!payload) return null;
@@ -258,14 +580,30 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     },
     catchUpStatements,
     rebuildHead,
-    /** The full gate (signature + declared kind + key↔ref binding), then the head apply. */
-    async ingest(circleId, statement) {
+    /** Judge the circle's held statements again (the settings lane calls it through the kept-changes note). */
+    rejudge,
+    /**
+     * VERIFY without landing (a device that does not hold the lane, carrying on): a served head is never carried on,
+     * whoever asked for it asked for itself.
+     */
+    async verify(circleId, statement) {
+      if (isServedHead(circleId, statement?.body)) { refuseServed(); return { ok: false, reason: 'served head not asked for' }; }
+      return base.verify(circleId, statement);
+    },
+    /**
+     * The full gate (signature + declared kind + key↔ref binding), then the head apply. `ctx.asked`: the statement came in
+     * a catch-up batch this device asked for (`frontierReplay.js`); only then is a SERVED head taken.
+     */
+    async ingest(circleId, statement, ctx = {}) {
+      if (isServedHead(circleId, statement?.body) && ctx?.asked !== true) { refuseServed(); return { ok: false, reason: 'served head not asked for' }; }
       const res = await base.ingest(circleId, statement);
       // a statement this log already holds was applied when it first landed: applying it again would put back what a
       // later statement removed (a sibling re-carrying an old snapshot after the delete)
       if (res?.ok && !res.existed) {
-        try { await applyToHead(circleId, statement.body); }
+        try { await applyToHead(circleId, statement.body, { fresh: true }); }
         catch { /* the entry landed; the head converges on the next snapshot/catch-up */ }
+        // a statement that arrived may be the link a parked one waited for
+        if (judging && (parked.get(circleId)?.size ?? 0) > 0) { try { await rejudge(circleId); } catch { /* next arrival */ } }
       }
       return res;
     },

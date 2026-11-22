@@ -1,3 +1,4 @@
+import { causalOrder } from '@onderling/core';
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
@@ -15,7 +16,7 @@ function fakeEventLog() {
   const entries = []; const byId = new Set();
   return {
     entries,
-    query() { return entries.slice(); },
+    query() { return entries.slice().reverse(); },   // newest-first, as the device log reads
     appendSilentEntry({ circleId, kind, payload, id, ts }) {
       if (byId.has(id)) return entries.find((e) => e.id === id);
       byId.add(id);
@@ -113,7 +114,9 @@ describe('frontierReplay — the windowed lane catch-up', () => {
     const bo  = await device('webid:bo',  bindings);
     await append(ada, 5);
     // bo already has the first 3 (a previous sync): ingest them directly.
-    for (const s of ada.rail.storedStatements(CIRCLE).slice(0, 3)) await bo.rail.ingest(CIRCLE, s);
+    // the first 3 by the statements' own order (the log reads newest-first)
+    const inOrder = causalOrder(ada.rail.storedStatements(CIRCLE).map((s) => s.body)).map((b) => ada.rail.storedStatements(CIRCLE).find((s) => s.body === b));
+    for (const s of inOrder.slice(0, 3)) await bo.rail.ingest(CIRCLE, s);
 
     const { ra, rb, wires, drain } = connect(ada, bo);
     await rb.requestFrom('peer:ada', CIRCLE);      // lands in ada's queue
@@ -149,7 +152,7 @@ describe('frontierReplay — the windowed lane catch-up', () => {
     expect(rounds).toBeGreaterThan(1);                                  // via multiple paged rounds
   });
 
-  it('a fully-caught-up receiver gets SILENCE (no batch, no paging loop)', async () => {
+  it('a fully-caught-up receiver gets an EMPTY answer (no statements, no paging loop), so silence means "not reached"', async () => {
     const bindings = new Map();
     const ada = await device('webid:ada', bindings);
     const bo  = await device('webid:bo',  bindings);
@@ -160,7 +163,12 @@ describe('frontierReplay — the windowed lane catch-up', () => {
     const serve = makeFrontierReplay({ rail: ada.rail, subtypes: SUBTYPES, sendToPeer: (a, p) => sent.push(p) });
     const pull  = makeFrontierReplay({ rail: bo.rail,  subtypes: SUBTYPES, sendToPeer: () => {} });
     await serve.onRequest('peer:bo', { subtype: SUBTYPES.request, circleId: CIRCLE, frontier: pull.localFrontier(CIRCLE) });
-    expect(sent).toHaveLength(0);
+    expect(sent).toEqual([{ subtype: SUBTYPES.batch, circleId: CIRCLE, statements: [], seq: 0, done: true, more: false }]);
+    // …and the receiver does not page on an empty answer
+    const asked = [];
+    const pull2 = makeFrontierReplay({ rail: bo.rail, subtypes: SUBTYPES, sendToPeer: (a, p) => asked.push(p) });
+    await pull2.onBatch('peer:ada', sent[0]);
+    expect(asked).toHaveLength(0);
   });
 
   it('a PRUNED/unknown frontier degrades to over-serving; idempotent ingest drops the duplicates', async () => {

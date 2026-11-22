@@ -15,7 +15,7 @@ import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { FAB_CLEARANCE } from './fab.js';
 import FaceView from './FaceView.js';
-import { splitShownHidden, loadContactRoster, makeContactNameStore, contactRowMeta } from '../../../../basis/src/v2/contactsSource.js';
+import { splitShownHidden, loadContactRoster, sealedContactNameStore, contactRowMeta } from '../../../../basis/src/v2/contactsSource.js';
 import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
 import { DEFAULT_PERSONA } from '../../../../basis/src/v2/contactPersona.js';
 import { withHelpContact } from '../../../../basis/src/v2/helpContact.js';
@@ -25,7 +25,7 @@ import { acceptMessageRequest, ignoreMessageRequest, blockFromRequest, messageRe
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
 import { nameShown } from '../../../../basis/src/v2/personLabel.js';   // never the key on screen
 import { contactPointAdopter } from './RelayQuestionModal.js';
-import { HEADER_AVATAR_SIDE_CLEARANCE } from './fab.js';
+import { PERSONA_BUTTON_SIDE_CLEARANCE } from './fab.js';
 import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
@@ -58,7 +58,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
   const { shown, hidden } = useMemo(() => splitShownHidden(contacts), [contacts]);
   // What each row last read HERE — the rename marker's left-hand side. The launcher owns the same store;
   // this screen is the other door onto the same list, so it reads through the same one.
-  const contactNames = useMemo(() => makeContactNameStore(AsyncStorage), []);
+  const contactNames = useMemo(() => sealedContactNameStore(AsyncStorage), []);   // sealed; a read before the key waits
 
   // S1 #2 — the unified directory: PeerGraph bots/peers merged with the pinboard
   // ContactBook (people the user added, with trust/tags). Same shared helpers as web.
@@ -259,7 +259,7 @@ const makeStyles = (theme, insets) => StyleSheet.create({
   blockedText: { fontSize: 15, color: theme.color.ink },
   blockedArrow: { fontSize: 15, color: theme.color.inkSoft },
   wrap: { flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingRight: HEADER_AVATAR_SIDE_CLEARANCE },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingRight: PERSONA_BUTTON_SIDE_CLEARANCE },
   title: { fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink },
   acts: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end', flexShrink: 1 },
   add: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.color.accent },

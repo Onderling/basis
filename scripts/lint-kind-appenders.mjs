@@ -50,6 +50,8 @@ export const APPENDERS = {
   notification:      { file: 'apps/basis/src/core/handlers/circlePost.js', needle: "type: 'notification'" },
   // the landing of a row someone else wrote: written at the items rail's applied hook in the shared agent
   'item-landed':     { file: 'apps/basis/src/core/agent/realAgent.js', needle: 'landingEntryFor' },
+  // what a device proved about an items statement, written by the content judge's memory on the device's own log
+  'content-judged':  { file: 'apps/basis/src/v2/contentJudgments.js', needle: 'kind: CONTENT_JUDGED' },
   'nearby-line':     { file: 'apps/basis/src/v2/nearbyKept.js', needle: 'type: LINE_KIND' },
   'nearby-card':     { file: 'apps/basis/src/v2/nearbyKept.js', needle: 'type: CARD_KIND' },
   'intention-done':  { file: 'apps/basis/src/v2/intentionRunner.js', needle: 'INTENTION_DONE_KIND' },
@@ -57,6 +59,10 @@ export const APPENDERS = {
   membership:        { file: 'apps/basis/src/v2/membershipRail.js', needle: 'MEMBERSHIP_LANE' },
   grants:            { file: 'apps/basis/src/v2/grantsRail.js', needle: 'GRANTS_LANE' },
   'agent-action':    { file: 'apps/basis/src/core/agent/realAgent.js', needle: 'agent-action' },
+  'own-action':      { file: 'apps/basis/src/ownActions.js', needle: 'type: OWN_ACTION_KIND' },
+  // a toolbox call's record on the box (L1035): built here, appended by the box's egress gate (device-runner)
+  'tool-call':       { file: 'apps/basis/src/v2/toolboxes.js', needle: 'type: TOOL_CALL_KIND' },
+  'plus-told':       { file: 'apps/basis/src/v2/plusIntro.js', needle: 'type: PLUS_TOLD_KIND' },
   'settings-change': { file: 'apps/basis/src/core/agent/realAgent.js', needle: 'settings-change' },
   'audit-summary':   { file: 'apps/basis/src/eventLog.js', needle: 'audit-summary' },
 };

@@ -23,10 +23,14 @@ import { composeAssistantCatalogue } from './assistantCatalogue.js';
 import { catalogueManifests } from '../v2/manifestSources.js';
 import { withAssistantOps } from '../v2/assistantOps.js';
 import { assistantManifest } from '../v2/assistantManifest.js';
-import { opScopes, verbKind, isPeopleWritten } from '@onderling/app-manifest';
+import { opScopes, verbKind, isPeopleWritten, opWeight } from '@onderling/app-manifest';
+import { PLUS_CEILINGS } from '@onderling/agent-registry';
 import { OWN_DEVICES_SCOPE } from '../v2/grantsManifest.js';
 import { makeOpAvailability } from '../v2/opAvailability.js';
 import { ownPlacePolicy } from '../v2/circlePolicy.js';
+import { plusIntro, plusNews, plusHelp, plusNearest, readPlusTold, writePlusTold } from '../v2/plusIntro.js';
+import { HELP_CIRCLE_ID } from '../v2/helpCircle.js';
+import { plusSuggestionPool } from '../v2/vandaagPlus.js';
 import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer, actRunsAtOnce, plusDoneLine, plusLabel, plusSuggest, NO_OWN_LIST } from '../v2/vandaagPlus.js';
 import { plusAnswerLine, plusThreadId, PLUS_TURNS_SHOWN } from '../v2/plusThread.js';
 import { interpretToCommand } from '../v2/interpretCommand.js';
@@ -35,6 +39,7 @@ import { renderGate } from '@onderling/app-manifest';
 import { readDayAndTime } from '../forms/parseDate.js';
 import { createComposerCommands } from '../v2/composerCommands.js';
 import { loadOwnItems, cutToSelf } from './ownItems.js';
+import { redactPairingSecrets } from '../v2/connectionPairing.js';
 
 /**
  * The answer when no own model is set and the plain reading did not take the line: no model is set, what works without
@@ -47,7 +52,7 @@ export function plusNoModelAnswer({ t }) {
 
 /** The way to the person's own model setting, in the screens' own labels. */
 export function ownModelSettingPath({ t }) {
-  return ['circle.tab.mij', 'circle.settings_home.title', 'circle.settings_home.appearance', 'circle.userLlm.title'].map((k) => t(k)).join(' → ');
+  return ['circle.settings_home.title', 'circle.settings_home.appearance', 'circle.userLlm.title'].map((k) => t(k)).join(' → ');
 }
 
 /**
@@ -116,7 +121,7 @@ export function ownPlaceCatalogue({ householdManifest, apps } = {}) {
   const { catalogue: placed, manifestsByOrigin } = composeAssistantCatalogue({
     apps: apps ?? ownPlaceApps(catalogueManifests({ householdManifest })), householdManifest, place: 'own',
   });
-  const offered = proposable(availableOnly(placed, manifestsByOrigin, ownPlacePolicy(Object.keys(manifestsByOrigin))), manifestsByOrigin);
+  const offered = withinWeight(proposable(availableOnly(placed, manifestsByOrigin, ownPlacePolicy(Object.keys(manifestsByOrigin))), manifestsByOrigin), manifestsByOrigin, PLUS_CEILING, ownPlaceWeight);
   // no app's circle-bot background in the own place: the place's own lines say what it is (`OWN_PLACE_LINES`)
   const out = { catalogue: { ...offered, systemPromptFor: () => null }, manifestsByOrigin };
   byManifest.set(key, out);
@@ -129,6 +134,10 @@ const OWN_PLACE_CACHE = new WeakMap();
  * process, per thread, so the phone's door-per-call keeps it too; never written anywhere.
  */
 const PLUS_LAST_READS = createLastReads();
+// The door a form the "+" opened from a line came through, and the act it is for, per conversation, until it is
+// settled: the phone composes a door per call, so what a Save (`formDoor`) and `settled` need to name the same door for
+// the yes and the no (ownActions.js) lives beside the thread.
+const PLUS_OPEN_FORM_DOOR = new Map();
 
 /**
  * What the model is told about the place it answers in (LLM-facing; the circle door's twin is `CIRCLE_LINES`): the
@@ -162,6 +171,36 @@ export function proposable(catalogue, manifestsByOrigin = {}) {
 }
 
 /**
+ * How far the "+" goes: the heaviest weight it offers (`opWeight`, ledger L977). 3 = own things and a circle's through
+ * the card, what the "+" did before the weight existed. The ceiling per persona (hidden, 1, 2 or 3) will set it.
+ */
+export const PLUS_CEILING = 3;
+
+/**
+ * An op's weight IN THE OWN PLACE: what the "+" runs there lands in the person's own store (`OWN_DEVICES_SCOPE`), so a
+ * write that declares a circle as its widest place (`addToList`, a noun offered in both places) weighs as the person's
+ * own there: content 2, control 4; keys stay 6. A circle's act reaches the "+" only through a circle's line or card,
+ * which asks for 3 itself.
+ * @param {object} manifest @param {object} op
+ */
+export function ownPlaceWeight(manifest, op) {
+  if (op?.writes?.scope !== 'circle') return opWeight(manifest, op);
+  return opWeight(manifest, { ...op, writes: { ...op.writes, scope: 'person' } });
+}
+
+/**
+ * A catalogue cut to the ops whose weight is at most `ceiling`: a 4 or 5 (who reaches what) is only pointed to on its
+ * settings screen, a 6 (keys) never offered, and an op without a weight (a write that does not say what it writes) not
+ * offered at all. `ceiling` 0 is a hidden persona: nothing.
+ * @param {object} catalogue @param {object} manifestsByOrigin `{app → manifest}` @param {number} [ceiling]
+ */
+export function withinWeight(catalogue, manifestsByOrigin = {}, ceiling = PLUS_CEILING, weigh = opWeight) {
+  if (!catalogue?.opsById) return catalogue;
+  const fits = (e) => { const w = weigh(manifestsByOrigin?.[e?.appOrigin] ?? null, e?.op); return w !== null && w <= ceiling; };
+  return { ...catalogue, opsById: new Map([...catalogue.opsById].filter(([, e]) => fits(e))) };
+}
+
+/**
  * A catalogue cut to the ops `opAvailability` says may happen now (composition, feature, capability).
  * @param {object} catalogue @param {object} manifestsByOrigin @param {object|null} [policy]  the place's policy
  */
@@ -184,22 +223,32 @@ export function availableOnly(catalogue, manifestsByOrigin = {}, policy = null) 
  * @param {string} [a.lang]
  * @param {() => Promise<Array>} [a.circles]       the person's circles, as `plusLineOutcome` reads them
  * @param {(asSelf: string|null) => Promise<Array>} [a.ownListsOf]   the ticked self's own lists
- * @param {(command: object, circleId: string, asSelf: string|null) => Promise<any>} [a.runInCircle]  a circle act the
- *        plain reading runs at once (the circle is clear)
+ * @param {(command: object, circleId: string, asSelf: string|null, door?: string) => Promise<any>} [a.runInCircle]  a
+ *        circle act the plain reading runs at once (the circle is clear); `door` is the door it came through (`phrase`),
+ *        for the person's own record (ownActions.js), to be handed to the waist with the call
  * @param {Function} [a.interpret]                 the interpreter (default `interpretToCommand`; a stand-in in tests)
  * @param {object} [a.householdManifest]          the household manifest the person's agent carries (`agent.manifest`)
  * @param {string[]} [a.apps]                       the apps to compose (default: those that declare an own act)
  * @param {Array} [a.acts]                         the own acts (default: the catalogue's own-scope attach entries)
- * @param {(asSelf: string|null) => Function} [a.readAs]  the shell's call AS a self (the waist's `actAs`): what the
- *        assistant reads for a line (own notes, appointments, list entries), and a read the model picks, run through
- *        it as the self the "+" writes as
+ * @param {(asSelf: string|null, door?: string) => Function} [a.readAs]  the shell's call AS a self (the waist's `actAs`):
+ *        what the assistant reads for a line (own notes, appointments, list entries), and a read the model picks, run
+ *        through it as the self the "+" writes as. `door`: the door the read was asked through (slash, phrase, model),
+ *        handed to the waist with the call; none for what the door reads for itself (retrieval)
  * @param {(asSelf: string|null) => {key: string|null, isDefault: boolean}} [a.selfOf]  that self's key
  * A read takes `opts.onSlow`: called when the model is slow and retrying, so the sheet can say "even geduld".
  */
 export function createPlusDoor({
   llm = null, threads = null, threadId = null, t, lang = 'nl', circles = async () => [], ownListsOf = async () => [],
   runInCircle = null, interpret = interpretToCommand, householdManifest, apps, acts = PLUS_ACTS,
-  readAs = null, selfOf: selfOfIn = null, selfKeyOf = null,
+  readAs = null, selfOf: selfOfIn = null, selfKeyOf = null, toldLog = null, noteOwn = null,
+  // the line naming the model route that answers (the sheet's header, `plusRouteLine`), for help's last line; a string or
+  // a getter; absent/null: no model is set
+  routeLine = null,
+  // how far the "+" goes for a self (0 off · 1 reads · 2 own things · 3 a circle's after a yes): by default read as that
+  // self through the shell's own call (`agents.getPlusCeiling`, which answers 3 when nothing is said anywhere). A read
+  // that FAILS (throws, `ok:false`, or no ceiling in the answer) closes the "+" for that turn; only a shell with no way
+  // to read it at all gets 3, the "+" as before
+  ceilingOf = null,
 } = {}) {
   if (typeof t !== 'function') throw new TypeError('createPlusDoor: t required');
   const memory = threads?.memory ?? null;
@@ -219,21 +268,39 @@ export function createPlusDoor({
     return keys.length === 1 ? plusThreadId(keys[0]) : `own-combined:${keys.join('+')}`;
   };
   const { catalogue: cat, manifestsByOrigin } = ownPlaceCatalogue({ householdManifest, apps });
+  // THE CEILING of this turn (the strictest of its selves): what the model is handed, and what any way in may run
+  const ceilingOfSelf = typeof ceilingOf === 'function' ? ceilingOf
+    : (typeof readAs === 'function' ? async (self) => {
+      const r = await readAs(self)('agents', 'getPlusCeiling', { id: self ?? 'default' });
+      return r?.ok === false ? null : r?.ceiling;
+    } : null);
+  /** The strictest ceiling of the set, or `null` when any self's cannot be read (the turn then runs nothing). */
+  const ceilingFor = async (set) => {
+    if (!ceilingOfSelf) return PLUS_CEILING;
+    const each = await Promise.all(set.map((id) => Promise.resolve().then(() => ceilingOfSelf(id)).catch(() => null)));
+    if (!each.every((c) => PLUS_CEILINGS.includes(c))) return null;
+    return Math.min(...each);
+  };
+  let turnCeiling = PLUS_CEILING;
+  const CUTS = new Map();
+  const cutFor = (c) => { if (!CUTS.has(c)) CUTS.set(c, withinWeight(cat, manifestsByOrigin, c, ownPlaceWeight)); return CUTS.get(c); };
+  /** Is this op heavier than the turn allows (in the own place)? An op the door does not offer is not judged here. */
+  const overCeiling = (opId) => { const e = entryOf(opId); const w = e ? ownPlaceWeight(manifestsByOrigin?.[e.appOrigin] ?? null, e.op) : null; return Boolean(e) && (w === null || w > turnCeiling); };
   /** The catalogue entry of a model's pick (by op id: a key may carry its app's prefix). */
   const entryOf = (opId) => cat.opsById.get(opId) ?? [...cat.opsById.values()].find((e) => e?.op?.id === opId) ?? null;
   /** A pick that only READS (the atom catalogue, or the manifest's `domainVerbs`); one nothing classifies is a write. */
   const reads = (e) => verbKind(manifestsByOrigin?.[e?.appOrigin] ?? null, e?.op?.verb ?? e?.op?.__generic?.atom) === 'read';
   /** A read as the self the "+" writes as, on the own scope. */
   // a read as one self, cut to that self's rows where the route answers every self (the reader's own rule, `cutToSelf`)
-  const readOwn = async (asSelf, e, args) => cutToSelf(e.appOrigin, await readAs(asSelf)(e.appOrigin, e.op.id, { ...(args ?? {}), circleId: OWN_DEVICES_SCOPE }), selfOf(asSelf));
+  const readOwn = async (asSelf, e, args, door = undefined) => cutToSelf(e.appOrigin, await readAs(asSelf, door)(e.appOrigin, e.op.id, { ...(args ?? {}), circleId: OWN_DEVICES_SCOPE }), selfOf(asSelf));
   /**
    * A read for this conversation: as its one self, or, for a SET read together, as EACH self of the set (the same union
    * retrieval reads), every row tagged with the self it is (`self`); one self's refusal leaves the others' rows.
    */
   const readForTurn = async (ctx, e, args) => {
     const set = Array.isArray(ctx?.selves) && ctx.selves.length > 1 ? ctx.selves : null;
-    if (!set) return readOwn(ctx?.asSelf ?? null, e, args);
-    const parts = await Promise.all(set.map(async (id) => ({ id, r: await Promise.resolve(readOwn(id, e, args)).catch(() => null) })));
+    if (!set) return readOwn(ctx?.asSelf ?? null, e, args, ctx?.door);
+    const parts = await Promise.all(set.map(async (id) => ({ id, r: await Promise.resolve(readOwn(id, e, args, ctx?.door)).catch(() => null) })));
     const items = parts.flatMap(({ id, r }) => (Array.isArray(r?.items) ? r.items.map((it) => ({ ...it, self: id })) : []));
     return parts.every(({ r }) => r?.ok === false) ? parts[0].r : { ok: true, items };
   };
@@ -250,7 +317,18 @@ export function createPlusDoor({
     const said = typeof r?.message === 'string' ? r.message : typeof r?.reply === 'string' ? r.reply : null;
     return r?.ok === false ? { error: (typeof r.error === 'object' ? r.error?.message : r.error) || t('circle.vandaag.plus_line_unread') } : said ? { done: said } : unread();
   };
-  const unread = () => ({ error: t('circle.vandaag.plus_line_unread') });
+  // what the "+" could place nowhere: marked (never a field on the answer the sheets paint) so `read` notes it
+  const placedNowhere = new WeakSet();
+  const unread = () => { const r = { error: t('circle.vandaag.plus_line_unread') }; placedNowhere.add(r); return r; };
+  // THE PERSON'S OWN RECORD for what no op shows (ownActions.js): a proposal turned down (`declined`, naming the act it
+  // proposed) and a line placed nowhere (`no_act`, no op). The shell hands the agent's note, which follows the person's
+  // switch; never the words. A note that fails never breaks the turn.
+  const note = ({ app = null, op = null, outcome, door, circleId = null }) => {
+    if (typeof noteOwn !== 'function') return;
+    try { Promise.resolve(noteOwn({ app, op, outcome, door, circleId })).catch(() => {}); } catch { /* never the turn's */ }
+  };
+  // the door the line now being read came through (slash, phrase, model): what a `no_act` names
+  let lineDoor = null;
 
   // What this turn came to: set by the engine's sinks while the turn runs (the lane runs one turn at a time).
   let outcome = null;
@@ -293,6 +371,8 @@ export function createPlusDoor({
   // naming the act and its list, run only on the person's pick as the self.
   const answer = async (input, ctx) => {
     const cmd = typeof input === 'object' && input ? input : null;
+    // above this persona's ceiling: refused, whichever way it came in (a slash line, a phrase, the model's pick)
+    if (cmd && overCeiling(cmd.opId)) { outcome = { error: t('circle.vandaag.plus_ceiling_refused') }; return; }
     // the conversation's own settings (memory mode, language): the door's ops, run at once (they change no thing of
     // the person's, only how this thread talks; forgetting it is slash only and never a model's tool)
     if (cmd && DOOR_OP_IDS.has(cmd.opId)) { outcome = await runDoorOp(cmd.opId, cmd.args ?? {}, ctx?.id ?? threadId); return; }
@@ -312,7 +392,7 @@ export function createPlusDoor({
     }
     if (e && !reads(e) && !actRunsAtOnce(acts.find((a) => a.opId === cmd.opId))) {
       const { circleId: _c, ...args } = cmd.args ?? {};
-      outcome = { card: { line: currentLine, to: [{ circleId: OWN_DEVICES_SCOPE, name: '', own: true }], command: { appOrigin: e.appOrigin, opId: e.op.id, args } } };
+      outcome = { card: { line: currentLine, to: [{ circleId: OWN_DEVICES_SCOPE, name: '', own: true }], command: { appOrigin: e.appOrigin, opId: e.op.id, args }, door: ctx?.door ?? lineDoor } };
       return;
     }
     if (!act) { outcome = unread(); return; }
@@ -329,7 +409,7 @@ export function createPlusDoor({
   const commands = createComposerCommands({ kind: 'own', catalogue: cat });
 
   const engine = createAssistantEngine({
-    catalogue: cat, lang, llm, interpret, collectMs: 0, dispatchSlash: false, gateRules: [], promptLines: [...OWN_PLACE_LINES],
+    catalogue: cat, catalogueFor: () => cutFor(turnCeiling), lang, llm, interpret, collectMs: 0, dispatchSlash: false, gateRules: [], promptLines: [...OWN_PLACE_LINES],
     // a line about one family gets that family's tools (the own note's too); no family is kept regardless here
     // the read of the turn before, if any (one turn only)
     threadHints: (thread) => PLUS_LAST_READS.hintsFor(thread),
@@ -369,6 +449,43 @@ export function createPlusDoor({
     return { set, primary: asSelf ?? (set.length === 1 ? set[0] : null) };
   };
 
+  // "help", generated from what this door offers (plusIntro.js `plusHelp`): its reads by their "/" names, its own acts,
+  // the circle line when the person is in one, and the model's route (or how it works without one)
+  async function generatedHelp(asSelf = null) {
+    const readNames = commands.pool.filter((c) => { const e = entryOf(c.opId); return e && reads(e); }).map((c) => c.command);
+    const actNames = acts.filter((a) => !actRunsAtOnce(a)).map((a) => plusLabel(t, a));
+    const cs = await Promise.resolve(circles()).catch(() => []);
+    const route = typeof routeLine === 'function' ? routeLine() : routeLine;
+    const lists = await Promise.resolve(ownListsOf(asSelf)).catch(() => []);
+    const ex = plusIntro({ ownLists: lists, circles: cs, t });
+    return plusHelp({
+      reads: [...new Set(readNames)], acts: actNames, hasCircle: cs.some((c) => c?.id && c.id !== HELP_CIRCLE_ID),
+      tryLine: ex.examples.length ? `${ex.tryLabel} ${ex.examples.join(' · ')}` : null,
+      routeLine: llm ? route : null, modelPlace: ownModelSettingPath({ t }), t,
+    }).join('\n');
+  }
+
+  // NOTHING TO DO WITH A LINE, said with its reason (the plan's step B): a line that names one of the person's circles
+  // is about that circle, which the "+" does not read along in (what to do instead); with no model, the no-model answer
+  // and, when one fits, an example of a line the "+" reads here; a line the model found nothing in: "not understood"
+  // with that example, or today's line when none fits. Each stays no_act in the person's record (Fable's words).
+  async function nothingFor(text, said, { asError = false, asSelf = null, understood = true } = {}) {
+    const cs = await Promise.resolve(circles()).catch(() => []);
+    const low = ` ${String(text).toLowerCase()} `;
+    const names = cs.filter((c) => c?.id && c.id !== HELP_CIRCLE_ID && c.unnamed !== true && typeof c?.name === 'string' && c.name.trim());
+    const aboutCircle = names.find((c) => new RegExp(`[^\\p{L}\\p{N}]${c.name.trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^\\p{L}\\p{N}]`, 'u').test(low));
+    if (aboutCircle) { const r = { error: t('circle.vandaag.plus_not_my_reach', { circle: aboutCircle.name.trim() }) }; placedNowhere.add(r); return r; }
+    const lists = await Promise.resolve(ownListsOf(asSelf)).catch(() => []);
+    const pool = [...plusIntro({ ownLists: lists, circles: cs, t }).examples, ...plusSuggestionPool({ circles: cs, lang })];
+    const ex = plusNearest(text, pool);
+    const line = !ex ? said
+      : understood ? `${said} ${t('circle.vandaag.plus_try_example', { example: ex })}`
+        : t('circle.vandaag.plus_not_understood', { example: ex });
+    const r = asError ? { error: line } : { done: line };
+    placedNowhere.add(r);
+    return r;
+  }
+
   async function read(line, opts = {}) {
     const text = String(line ?? '').trim();
     if (!text) return unread();
@@ -377,19 +494,31 @@ export function createPlusDoor({
     // nothing is read and nothing reaches a model before it
     if (!primary) return { askSelf: true };
     const asSelf = primary;
+    const ceilingRead = await ceilingFor(set);
+    // unreadable: the "+" cannot know what it may do now, so this turn runs nothing and says so (a later turn reads again)
+    if (ceilingRead === null) { turnCeiling = 0; return { error: t('circle.vandaag.plus_ceiling_unread') }; }
+    turnCeiling = ceilingRead;
+    // 0: the "+" is off for this persona; nothing of it reaches a model
+    if (turnCeiling <= 0) return { done: t('circle.vandaag.plus_ceiling_off') };
     const slash = text.startsWith('/') ? commands.parse(text) : null;
     if (slash) {
+      lineDoor = 'slash';
       outcome = null;
       currentLine = text;
-      await answer({ opId: slash.opId, args: slash.args ?? {} }, { asSelf, selves: set, id: threadIdFor(set) });
+      await answer({ opId: slash.opId, args: slash.args ?? {} }, { asSelf, selves: set, id: threadIdFor(set), door: 'slash' });
       return outcome?.actId ? { ...outcome, asSelf } : (outcome ?? unread());
     }
+    lineDoor = 'phrase';
     const o = plusLineOutcome(text, { circles: await circles(), own: { lists: await ownListsOf(asSelf) }, lang });
-    if (o?.kind === 'help') return { done: plusHelpAnswer(o, { t }) };
+    // a help card's own text for a how-to question; plain "help" says what is offered HERE, generated from this door
+    if (o?.kind === 'help') return { done: o.card ? plusHelpAnswer(o, { t }) : await generatedHelp(asSelf) };
+    // a circle's act needs the ceiling that allows a circle's things (3)
+    if (o?.kind === 'circle' && turnCeiling < 3) return { error: t('circle.vandaag.plus_ceiling_refused') };
     // a circle act the plain reading runs at once: what the run says (`{error}` or `{done}`, its reply line)
-    if (o?.kind === 'circle' && o.atOnce) return (typeof runInCircle === 'function' ? await runInCircle(o.command, o.circleId, asSelf) : null) ?? unread();
-    if (o?.kind === 'circle') return { card: { line: text, to: o.to, command: o.command, ...(o.makeList ? { makeList: o.makeList } : {}), ...(o.followUp ? { followUp: o.followUp } : {}) } };
+    if (o?.kind === 'circle' && o.atOnce) return (typeof runInCircle === 'function' ? await runInCircle(o.command, o.circleId, asSelf, 'phrase') : null) ?? unread();
+    if (o?.kind === 'circle') return { card: { line: text, to: o.to, command: o.command, door: 'phrase', ...(o.makeList ? { makeList: o.makeList } : {}), ...(o.followUp ? { followUp: o.followUp } : {}) } };
     // an own act's form, filled as the primary self (the form may change it)
+    if (o?.kind === 'own' && o.actId && overCeiling(acts.find((x) => x.id === o.actId)?.opId)) return { error: t('circle.vandaag.plus_ceiling_refused') };
     if (o?.kind === 'own') return o.actId ? { actId: o.actId, values: o.values ?? {}, asSelf } : o;
     // the plain reading did not take it: the person's own model, or no model at all (the line goes nowhere, and the
     // "+" says what works without one and where to set one)
@@ -398,26 +527,35 @@ export function createPlusDoor({
     if (gated) {
       outcome = null;
       currentLine = text;
-      await answer(gated, { asSelf, selves: set, id: threadIdFor(set) });
+      await answer(gated, { asSelf, selves: set, id: threadIdFor(set), door: 'phrase' });
       return outcome?.actId ? { ...outcome, asSelf } : (outcome ?? unread());
     }
-    if (!llm) return { done: plusNoModelAnswer({ t }) };
+    if (!llm) return nothingFor(text, plusNoModelAnswer({ t }), { asSelf });
+    lineDoor = 'model';
     outcome = null;
     currentLine = text;
     currentOnSlow = typeof opts.onSlow === 'function' ? opts.onSlow : null;
     try { await engine.ask(threadIdFor(set), text, { asSelf, selves: set }); } finally { currentOnSlow = null; }
-    return outcome?.actId ? { ...outcome, asSelf } : (outcome ?? unread());
+    if (outcome?.actId) return { ...outcome, asSelf };
+    // the model found nothing to do: said with its reason (a circle's line, or an example that fits)
+    if (!outcome || placedNowhere.has(outcome)) return nothingFor(text, t('circle.vandaag.plus_line_unread'), { asError: true, asSelf, understood: false });
+    return outcome;
   }
 
   return {
     /** One line read, and kept: the line and what the door answered go into this conversation's thread afterwards. */
     async read(line, opts = {}) {
+      lineDoor = null;
       const r = await read(line, opts);
       const thread = r?.askSelf ? null : threadIdFor(setOf(opts).set);
+      if (r && placedNowhere.has(r) && lineDoor) note({ outcome: 'no_act', door: lineDoor });
+      // a form opened from a line: the door it came through, until it is settled (`settled` notes a refused one)
+      if (thread) { if (r?.actId) PLUS_OPEN_FORM_DOOR.set(thread, { door: lineDoor ?? 'phrase', actId: r.actId }); else PLUS_OPEN_FORM_DOOR.delete(thread); }
       // a turn ended: the read it made lives one turn more, an older one goes
       if (thread) PLUS_LAST_READS.turnEnded(thread);
       if (memory && thread) {
-        memory.remember(thread, 'you', String(line ?? '').trim());
+        // a pairing offer or a screen start link carries a one-use ticket: the thread keeps the line with it cut
+        memory.remember(thread, 'you', redactPairingSecrets(String(line ?? '').trim()));
         const said = plusAnswerLine({ error: r?.error ?? null, done: r?.done ?? null, circleCard: r?.card ?? null, ownActId: r?.actId ?? null, t });
         // only the model's reply is the assistant's words; a read, an act, a card, help or an error is the system speaking
         // (the household bot's rule, `aroundTurn`): the model then reads it as a result, never as something it said
@@ -449,7 +587,19 @@ export function createPlusDoor({
      * conversation, as a closed form is. Returns what was said, or null without a thread.
      * @param {{asSelf?: string|null, selves?: string[]|null}} opts @param {{line?: string}} card
      */
+    /**
+     * The door a Save of this act comes through: the door of the line the "+" opened its form from (the model's
+     * proposal, a phrase), so a yes is recorded by the same door as a no; none for a form the person opened by its
+     * button (the act strip's wrapper names that a tap). Read before the Save; `settled` clears it after.
+     * @param {{asSelf?: string|null, selves?: string[]|null}} opts @param {string} actId
+     * @returns {string|undefined}
+     */
+    formDoor(opts = {}, actId = null) {
+      const open = PLUS_OPEN_FORM_DOOR.get(threadIdFor(setOf(opts).set));
+      return open && open.actId === actId ? open.door : undefined;
+    },
     async cardRefused(opts = {}, card = null) {
+      if (card?.command?.opId) note({ app: card.command.appOrigin ?? null, op: card.command.opId, outcome: 'declined', door: card.door ?? 'phrase' });
       const thread = threadIdFor(setOf(opts).set);
       if (!memory || !thread) return null;
       const said = t('circle.vandaag.plus_card_not_done', { line: card?.line ?? '' });
@@ -466,6 +616,10 @@ export function createPlusDoor({
       if (!act) return null;
       // another act saved by its button while this form was open: THIS form was not saved (said now, not at a later close)
       const kept = saved && (!actId || actId === act.id);
+      const door = PLUS_OPEN_FORM_DOOR.get(thread)?.door ?? 'phrase';
+      PLUS_OPEN_FORM_DOOR.delete(thread);
+      // a proposal turned down: noted (a save is recorded by the waist, as the act it is)
+      if (!kept) note({ app: act.appOrigin ?? null, op: act.opId ?? null, outcome: 'declined', door });
       const said = t(kept ? 'circle.vandaag.plus_act_saved' : 'circle.vandaag.plus_act_not_saved', { act: plusLabel(t, act) });
       memory.remember(thread, 'system', said);
       return said;
@@ -487,7 +641,35 @@ export function createPlusDoor({
     // the sheet's length (`PLUS_TURNS_SHOWN`), never the model's memory window (six turns) the threads default to
     turns: (opts = {}, n = PLUS_TURNS_SHOWN) => { const th = threadIdFor(setOf(opts).set); return th && threads?.memory?.turns ? threads.memory.turns(th, n) : []; },
     /** "Forget this conversation": the door's own op (`assistant-forget`), for THIS conversation only. */
-    forget: (opts = {}) => runDoorOp('assistant-forget', {}, threadIdFor(setOf(opts).set)),
+    forget: async (opts = {}) => {
+      const thread = threadIdFor(setOf(opts).set);
+      const r = await runDoorOp('assistant-forget', {}, thread);
+      // forgetting the conversation forgets what it told, too: the next open says what it is again (Fable 2026-11-18)
+      writePlusTold(toldLog, thread, null);
+      return r;
+    },
+    /**
+     * The conversation opens (the sheet, for the ticked self): the first time, what the "+" is (`{intro}`: two lines and
+     * three examples from what the person has); later, once, the circles joined since (`{news}`); otherwise `{}`. What
+     * was told is kept on this device's log (`plus-told`, `toldLog`), so a door composed per call says it once too.
+     * No model call. Not an act: nothing of it is recorded as one.
+     * @param {{asSelf?: string|null, selves?: string[]|null}} opts
+     * @returns {Promise<{intro?: object, news?: string}>}
+     */
+    async opening(opts = {}) {
+      const { set, primary } = setOf(opts);
+      const thread = threadIdFor(set);
+      if (!thread) return {};
+      const cs = await Promise.resolve(circles()).catch(() => []);
+      const told = readPlusTold(toldLog, thread);
+      const n = plusNews({ told, circles: cs, t });
+      writePlusTold(toldLog, thread, n.told);
+      if (!told) {
+        const lists = await Promise.resolve(ownListsOf(primary ?? null)).catch(() => []);
+        return { intro: plusIntro({ ownLists: lists, circles: cs, t }) };
+      }
+      return n.line ? { news: n.line } : {};
+    },
     /** Resolves when no turn is running. */
     /** Resolves when THIS conversation has no turn running (no conversation named: every one). */
     idle: (opts) => engine.idle(opts ? (threadIdFor(setOf(opts).set) ?? undefined) : undefined),

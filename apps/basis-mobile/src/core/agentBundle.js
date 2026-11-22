@@ -65,18 +65,20 @@ import { createNearbyIdentity } from '../../../basis/src/v2/nearbyIdentity.js';
 import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../basis/src/v2/addressSharing.js';
 import { readNearbyRadio } from './nearbyAllowsStore.js';
 import { PeerGraph } from '@onderling/core';
-import { AsyncStorageAdapter } from '@onderling/react-native/storage/AsyncStorageAdapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createLocalStoragePeerBackend } from '../../../basis/src/web/localStoragePeerBackend.js';
+import { sealedKeyValue } from '../../../basis/src/v2/localStoreSeal.js';
+import { phoneConnectionPointsIo } from './connectionPointsRN.js';
 import { resolveRelayUrl, asyncStorageRelayIo } from '../../../basis/src/v2/relayPref.js';
 import { registerCircleAddressesOnRelays } from '../../../basis/src/v2/circleAddressRegistration.js';
 import { makeCircleReachable } from '../../../basis/src/v2/householdRosterPairing.js';
 import { pullCircleLanes } from '../../../basis/src/v2/circleLanes.js';
-import { createConnectionPoints, bootRelayUrl, bootRelayUrls, asyncStorageConnectionPointsIo, recordJoinedCirclePoints, POINT_KIND } from '../../../basis/src/v2/connectionPoints.js';
+import { createConnectionPoints, bootRelayUrl, bootRelayUrls, recordJoinedCirclePoints, POINT_KIND } from '../../../basis/src/v2/connectionPoints.js';
 // SILENT out-of-circle delivery — the per-user "shared with me" store (TIERED: AsyncStorage canonical + pod
 // mirror) and THIS device's network-derived sealing OPENER. Both are shared-src logic (web≡mobile): the store
 // factory mirrors web's tiered wiring in circleApp.js; the opener bridge injects the pod-client sealing adapter
 // into the ENCAPSULATED identity secret (only the closure escapes).
-import { makeSharedWithMeStoreRN, makeAvailabilityStoreRN } from './circleStoresRN.js';
+import { makeSharedWithMeStoreRN, makeAvailabilityStoreRN, makeCirclePolicyStoreRN, makeMemberOverrideStoreRN } from './circleStoresRN.js';
 import { openerForIdentity } from '../../../basis/src/v2/sharedCopyOpener.js';
 import { primeCircleSecurity, announceCircleAddresses, presenceCircleIds } from '../../../basis/src/v2/circleSecurityPriming.js';
 
@@ -118,7 +120,7 @@ export async function resolveBootRelayUrls() {
 
 /** A read-only view of the persisted connection points (the launcher owns the writing store). */
 async function loadConnectionPoints() {
-  const io = asyncStorageConnectionPointsIo(AsyncStorage);
+  const io = phoneConnectionPointsIo(AsyncStorage);
   return createConnectionPoints({ initial: await io.load(), save: () => {} });
 }
 import { discoverA2A } from '@onderling/core';
@@ -403,6 +405,16 @@ export async function bootAgentBundle(opts = {}) {
       seedPinboardProfile: opts.seedPinboardProfile,
       seedPinboardPosts:   opts.seedPinboardPosts,
       getActiveCircleId: getActiveCircle,   // per-circle store scoping — the active circle scopes chat ops
+      // a person's write in a circle asks that circle's capability set at the outer waist (L1042): the phone hands in
+      // only its stores (the same AsyncStorage keys the launcher's stores read); the decision is the agent's
+      circleCapabilityInputs: (() => {
+        let stores = null;
+        const open = () => (stores ??= { policy: makeCirclePolicyStoreRN(AsyncStorage), override: makeMemberOverrideStoreRN(AsyncStorage) });
+        return async (circleId) => ({
+          policy: (await open().policy.get(circleId).catch(() => null)) ?? {},
+          override: (await open().override.get(circleId).catch(() => null)) ?? {},
+        });
+      })(),
       // L3 — household routes through the uniform wired path (dissolved cores over the per-circle
       // CircleItemStore) by default; the legacy registry is retired. No flag: it's unconditional now.
     });
@@ -752,10 +764,11 @@ export async function bootAgentBundle(opts = {}) {
   // a2a bots); the channel carries the conversation over sa.peer. Exposed on
   // the bundle for the Contacten screens + Detox.
   // Persist the roster so v2 Contacten survives a reload (AsyncStorage on RN);
-  // the AsyncStorageAdapter implements the PeerGraph storageBackend interface
+  // the shared peer backend implements the PeerGraph storageBackend interface
   // (get/set/delete/list). Same pattern as pinboard-mobile's agentBundle.
+  // …SEALED at rest (ledger L1083), through the same backend the web uses; built here, after the agent, so the key exists
   const peerGraph = new PeerGraph({
-    storageBackend: new AsyncStorageAdapter({ prefix: 'cc-peers:' }),
+    storageBackend: createLocalStoragePeerBackend({ prefix: 'cc-peers:', storage: sealedKeyValue(AsyncStorage, { name: 'the peer graph', strict: true }) }),
   });
   const sendContactTask = async (peerUrl, skillId, args) => {
     const task = sendA2ATask(agent, peerUrl, skillId, args);
@@ -916,6 +929,9 @@ export async function bootAgentBundle(opts = {}) {
   // fires on a membership change, e.g. a REMOVE → rotation, so wiring here at boot is always in time).
   // Injected as an opts hook so this module keeps zero RN/screen imports; App.js passes circlePods'
   // setCircleKeyEventWiring. Absent (tests / stub boots) ⇒ single-device behaviour, unchanged.
+  // a share's own copy into its source circle asks that circle first, as its receivers will (the agent decides;
+  // App.js passes circlePods' setCircleWriteGate, which the share wrappers read)
+  opts.setWriteGate?.((circleId, act) => agent.mayWriteInto?.(circleId, act) ?? null);
   opts.setKeyEventWiring?.({
     sendPeer: (addr, payload, sendOpts) => (typeof agent.sendPeerMessage === 'function'
       ? agent.sendPeerMessage(addr, payload, sendOpts)
@@ -1008,7 +1024,7 @@ export async function bootAgentBundle(opts = {}) {
   // `loadConnectionPoints` is a read-only snapshot), recorded before presence and the pull; the send-time
   // circle → relays snapshot is refreshed from it at once, so the first send after a join is scoped right.
   const recordPointsFromInvite = async ({ invite, circleId }) => {
-    const pointsIo = asyncStorageConnectionPointsIo(AsyncStorage);   // the POINTS store's io (not the relay pref's)
+    const pointsIo = phoneConnectionPointsIo(AsyncStorage);   // the POINTS store's io (not the relay pref's)
     const store = createConnectionPoints({ initial: await pointsIo.load(), save: pointsIo.save });
     const r = recordJoinedCirclePoints({ store, invite, circleId });
     _pointsList = store.list();

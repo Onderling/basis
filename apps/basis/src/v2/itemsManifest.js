@@ -36,13 +36,13 @@ export const itemsManifest = Object.freeze({
     {
       id: 'items.snapshot',
       description: 'Any task write (add / claim / reassign / complete / update) fans the writer\'s full item snapshot; receivers causally merge it into their head.',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appends: [{ lane: ITEMS_LANE, kind: 'snapshot' }],
     },
     {
       id: 'items.remove',
       description: 'A task hard-delete; receivers delete their head row by id.',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appends: [{ lane: ITEMS_LANE, kind: 'remove' }],
     },
   ],

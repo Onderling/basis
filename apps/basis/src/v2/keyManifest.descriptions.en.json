@@ -1,0 +1,10 @@
+{
+  "keys.establish": {
+    "what": "Make the circle's first key.",
+    "params": {}
+  },
+  "keys.rotate": {
+    "what": "Replace the circle's key with a new one.",
+    "params": {}
+  }
+}

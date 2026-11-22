@@ -27,6 +27,7 @@ import { screenActsAs, BOT_SCREEN_NEVER } from '../src/v2/screenActing.js';
 import { listsManifest } from '../../lists/manifest.js';
 import { calendarManifest } from '../../calendar/manifest.js';
 import { assistantManifest } from '../src/v2/assistantManifest.js';
+import { toolsManifest } from '../src/v2/toolsManifest.js';   // the box exposes every door manifest to screens, the tools one too
 import { EventLog } from '../src/eventLog.js';
 import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
 
@@ -77,7 +78,7 @@ describe('a screen acts as its person, and no further', () => {
     const doorCall = withAssistantOps({ callSkill: (a, o, x, ctx) => agent.callSkill(a, o, x, ctx), threads, t, refusal: agent.doorRefusal, admin: {}, intentions: { book: planned } });
     const book = createBotUsers({ store: contactBookStore(own) });
     users = { list: async () => { if (failBook) throw new Error('book unreadable'); return book.list(); }, revoke: (w) => book.revoke(w) };
-    agent.exposeToPeers(renderA2A([listsManifest, calendarManifest, assistantManifest], { callSkill: doorCall }, { ctxFor: screenActsAs(users, { activeEntry: (id) => agent.surfaceTokenEntry(id) }), never: BOT_SCREEN_NEVER }));
+    agent.exposeToPeers(renderA2A([listsManifest, calendarManifest, assistantManifest, toolsManifest], { callSkill: doorCall }, { ctxFor: screenActsAs(users, { activeEntry: (id) => agent.surfaceTokenEntry(id) }), never: BOT_SCREEN_NEVER }));
     bot = agent.sa.agent;
     view = await AgentIdentity.generate(new VaultMemory());
     await agent.sa.trust?.setTier?.(view.pubKey, 'authenticated');
@@ -177,7 +178,7 @@ describe('a screen acts as its person, and no further', () => {
   });
 
   it('withheld means withheld: every shell- and kernel-withheld op, with a token the bot itself minted → refused', async () => {
-    const exposed = new Set(renderA2A([listsManifest, calendarManifest, assistantManifest], { callSkill: async () => ({}) }).map((d) => d.id));
+    const exposed = new Set(renderA2A([listsManifest, calendarManifest, assistantManifest, toolsManifest], { callSkill: async () => ({}) }).map((d) => d.id));
     const ids = [...BOT_SCREEN_NEVER, ...[...NEVER_DELEGABLE].filter((id) => exposed.has(id))];
     for (const id of ids) {
       expect(bot.skills.get(id)?.policy ?? bot.skills.get(id)?.meta?.policy, `${id} is withheld`).toBe('never');

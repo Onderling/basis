@@ -54,7 +54,7 @@ async function closePanel(page) {
 /** Open Mij's persona panel (the picture input and the per-circle table live there). */
 async function openPersonaPanel(page) {
   await closePanel(page);
-  await page.locator('[data-tab="mij"]').first().click(); await page.waitForTimeout(1500);
+  await page.locator('.cc-persona-button__button').click(); await page.waitForTimeout(1500);
   await page.locator('.circle-screen__identity-edit').first().click(); await page.waitForTimeout(2000);
 }
 /** Press this circle's share / stop-sharing button in Mij's table. Names the branch it took. */
@@ -101,8 +101,10 @@ const slotState = (locator) => locator.evaluate((el) => {
 
 test('in a circle: a face set under Mij and shared is drawn on the members tab and the member card; withdrawn, the initial returns', async ({ browser }) => {
   // KNOWN TO FAIL — a pod-less circle cannot seal the picture for its members (see the file header). Remove the mark
-  // when it passes.
+  // when it passes. The list reporter draws an expected failure as ✘ (counted as passed), so the line below says so
+  // beside it: two runs' ✘ were once read as a flaky first try.
   test.fail();
+  log('KNOWN GAP, EXPECTED TO FAIL (its ✘ is a pass)', 'EXPECTED', 'a pod-less circle cannot seal a picture yet');
   test.setTimeout(480_000);
   let A = null; let B = null;
   try {
@@ -164,6 +166,7 @@ test('in a circle: a face set under Mij and shared is drawn on the members tab a
 test('to a contact: the face shown to a contact is drawn on their Contacten row', async ({ browser }) => {
   // KNOWN TO FAIL — no road to show a picture to a contact yet (see the file header). Remove the mark when it passes.
   test.fail();
+  log('KNOWN GAP, EXPECTED TO FAIL (its ✘ is a pass)', 'EXPECTED', 'no road yet to show a picture to a contact');
   test.setTimeout(480_000);
   let A = null; let B = null;
   try {

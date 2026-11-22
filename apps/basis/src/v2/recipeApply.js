@@ -218,6 +218,8 @@ export async function applyRecipeToCircle({ circleId, recipe, sources = [], poli
   const mapped = recipeToCirclePolicyPatch(recipe, { sources });
   if (mapped.error) return { ok: false, error: mapped.error };
   const policy = await policyStore.update(circleId, mapped.patch);
+  // a store that states the settings to the circle answers `{ok: false}` when that did not go out: not applied
+  if (policy && policy.ok === false) return { ok: false, error: { code: 'not-stated', message: 'the settings could not be sent to the circle' } };
   return { ok: true, policy, patch: mapped.patch };
 }
 

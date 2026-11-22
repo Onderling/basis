@@ -82,7 +82,7 @@ describe('Slice B.1: renderWeb(tasksManifest) NavModel', () => {
     expect(op.params).toEqual([
       { name: 'rootId', kind: 'string' },          // optional — no `required`
     ]);
-    expect(op.surfaces?.chat?.hint).toBeTruthy();
+    expect(op.surfaces?.chat?.hint, 'withheld from a model: a task flow that lost its screen (L1025 prune, L442)').toBeUndefined();
     expect(op.surfaces?.slash).toBeUndefined();    // read-only structural query
   });
 

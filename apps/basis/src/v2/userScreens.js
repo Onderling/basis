@@ -41,6 +41,7 @@
 import { BLOCK_TYPES } from './circleRecipe.js';
 import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
 import { pinsOf } from './plusPins.js';
+import { sealedKeyValue } from './localStoreSeal.js';
 
 export const EMPTY_SCREEN_BOOK = Object.freeze({ screens: [], activeId: null });
 
@@ -299,7 +300,8 @@ export const SCREEN_VERSIONS_KEY = 'device';
 
 /** A device's own screen book with its versions (each change kept, so it can be undone) — what the web shell composes. */
 export function localUserScreenStore(storage = globalThis.localStorage) {
-  return createUserScreenStore({ io: localStorageScreenIo(storage), versions: localStorageObjectVersions('screens', storage) });
+  // the versions sealed too (they hold earlier books)
+  return createUserScreenStore({ io: localStorageScreenIo(storage), versions: localStorageObjectVersions('screens', sealedKeyValue(storage, { name: 'the page book versions', strict: true })) });
 }
 
 /**
@@ -308,15 +310,19 @@ export function localUserScreenStore(storage = globalThis.localStorage) {
  */
 export function localStorageScreenIo(storage = globalThis.localStorage) {
   const KEY = 'cc.userScreens';
+  // SEALED at rest (ledger L1083: the person's own pages). A read before the content key WAITS for it: a book that
+  // cannot be opened yet is "not read yet", never an empty book — an empty one would have the first-run seeding
+  // (`ensureVandaagBook`) write a fresh book over the person's own.
+  const kv = sealedKeyValue(storage, { name: 'the page book', strict: true, waitForKey: true, said: true, resealAtStart: [KEY] });
   return {
     load: async () => {
       try {
-        const s = storage?.getItem(KEY);
+        const s = await kv.getItem(KEY);
         return s ? JSON.parse(s) : null;
       } catch { return null; }
     },
     save: async (book) => {
-      try { storage?.setItem(KEY, JSON.stringify(book)); } catch { /* quota / disabled */ }
+      try { await kv.setItem(KEY, JSON.stringify(book)); } catch { /* quota / disabled / no content key yet */ }
     },
   };
 }

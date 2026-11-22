@@ -45,7 +45,8 @@ export async function createPersonClock({ agent, log, tz = null, AppState, run =
   const tick = createHostTick({ timers: foregroundTimers({ AppState }), onError });
   const runner = createIntentionRunner({
     book, log, tz, onFired,
-    run: run ?? ((o) => agent.callSkill(o.appOrigin ?? 'basis', o.op, { ...o.args, occurrence: o.id })),
+    // the door is the person's clock: their own record (ownActions.js) says so
+    run: run ?? ((o) => agent.callSkill(o.appOrigin ?? 'basis', o.op, { ...o.args, occurrence: o.id }, { door: 'clock' })),
   });
   tick.add('intentions', { every: 60_000, run: () => runner.pass() });
   return { tick, book, runner, start: () => tick.start(), stop: () => tick.stop() };

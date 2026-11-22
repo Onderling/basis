@@ -193,6 +193,71 @@ Where a writing op writes — the value set of an op's `writes: { scope }` decla
   • `circle` — the circle's shared store or log, which syncs to the circle's other members.
 Not the same axis as a setting's or a param's `scope` (who a SETTING applies to).
 
+### `WRITE_WHATS`
+
+**Kind:** constant · **Import:** `WRITE_WHATS` from `'@onderling/app-manifest'`
+
+WHAT a writing op writes — the second word of `writes: { scope, what }` (ledger L977):
+  • `content`    — things people make and use: notes, tasks, posts, appointments, answers;
+  • `preference` — how something looks or behaves for the one using it; harms nobody, undone in a tap;
+  • `control`    — who can reach what and where things go: members, roles, rules, invites, exposure, routes;
+  • `keys`       — devices, keys, identity, recovery, deleting for good.
+In doubt, the heavier one. An op that writes several things declares the heaviest.
+
+### `REVEALS`
+
+**Kind:** constant · **Import:** `REVEALS` from `'@onderling/app-manifest'`
+
+What a READ hands out, when that matters: `keys` (the answer is itself a key or a credential, e.g. an offer that
+adds a device) or `none`. Declared as `reveals` on the op row; a read in `group: 'device'` must say which.
+
+### `opWeight`
+
+**Kind:** function · **Import:** `opWeight` from `'@onderling/app-manifest'`
+
+```js
+opWeight(manifest, op)
+```
+
+How heavy an op is: a number from 1 to 6 that FOLLOWS from what the row declares, never declared itself.
+  1 reads · 2 writes my own content or preference (person/device) · 3 writes a circle's content or preference ·
+  4 writes my own control · 5 writes a circle's control · 6 writes keys, or any op that `reveals: 'keys'` (its
+  answer is itself a key or a credential: a device offer, an invite token).
+`null`: a writing op without a valid `writes.scope` + `writes.what`, or a verb nobody classified — no level, so a
+door that reads the level does not offer it. (Called a weight in code: the household bot's door map already uses
+"level" for its trust words, `authenticated`/`trusted`/`by-role`.)
+
+**Parameters**
+
+- `manifest` `object` — the op's manifest (for its `domainVerbs`)
+- `op` `object` — the op row
+
+**Returns:** `1|2|3|4|5|6|null`
+
+### `CIRCLE_ARG_NAMES`
+
+**Kind:** constant · **Import:** `CIRCLE_ARG_NAMES` from `'@onderling/app-manifest'`
+
+The names an op's parameters give the circle it is about: `groupId` (the older name, most ops) and `circleId`. One
+reading of them, so a caller that wants an op's circle (the person's own-act record, a peer clean-up) does not spell
+the pair out again; `circleId` first when both are given.
+
+### `circleArg`
+
+**Kind:** function · **Import:** `circleArg` from `'@onderling/app-manifest'`
+
+```js
+circleArg(args)
+```
+
+The circle an op's args name, or null.
+
+**Parameters**
+
+- `args` `object|null`
+
+**Returns:** `string|null`
+
 ## `src/capabilities.js`
 
 ### `opNouns`
@@ -200,10 +265,20 @@ Not the same axis as a setting's or a param's `scope` (who a SETTING applies to)
 **Kind:** function · **Import:** `opNouns` from `'@onderling/app-manifest'`
 
 ```js
-opNouns(op, itemTypes = [])
+opNouns(op, itemTypes = [], declaredNouns = null)
 ```
 
 The noun types an op names — via appliesTo.type (string|array|'*') and/or a type-enum param.
+
+### `declaredNounsOf`
+
+**Kind:** function · **Import:** `declaredNounsOf` from `'@onderling/app-manifest'`
+
+```js
+declaredNounsOf(manifest)
+```
+
+The nouns a manifest declares (`manifest.nouns`' keys), or null when it declares none.
 
 ### `capabilityKey`
 
@@ -371,6 +446,16 @@ extensionVerbsFor(noun, atom)
 ```
 
 The words an extension noun's free atom answers to, unless the noun declares its own: `<noun word> <atom>`.
+
+### `firstPartyFirstWords`
+
+**Kind:** function · **Import:** `firstPartyFirstWords` from `'@onderling/app-manifest'`
+
+```js
+firstPartyFirstWords(manifests = [])
+```
+
+The first word of every verb a first-party manifest's ops answer to (also: the words a door's toolbox may not take).
 
 ### `checkExtensionManifest`
 

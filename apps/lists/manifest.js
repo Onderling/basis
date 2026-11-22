@@ -46,7 +46,7 @@ export const listsManifest = {
       // offered in a circle and in the person's own "+" (their own lists): where, declared once (app-manifest scopes)
       scopes: ['circle', 'own'],
       verb:      'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'list' },
       requires:  ['lists'],
       // Two people naming a list at the same moment write the same field; last-writer-by-content is the
@@ -69,7 +69,7 @@ export const listsManifest = {
       id:        'addToList', visibility: 'authenticated',
       scopes: ['circle', 'own'],
       verb:      'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'list-item' },
       requires:  ['lists'],
       // The entry's own text merges by content. The CONTAINMENT edge it also writes is not a mergeable
@@ -100,6 +100,12 @@ export const listsManifest = {
         // `due` a local date without a zone. Who may be named is the bot's setting, decided at the waist.
         { name: 'assignee', kind: 'string', required: false },
         { name: 'due', kind: 'string', required: false },
+        // A THING the entry stands for (a product in a shop's range, say): a type word and a reference, as the toolbox
+        // that offered it names them. Kept in the entry's own `embeds` as a plain reference; the list never learns what
+        // the thing is (nothing here branches on the type). Two adds of the same thing are one entry, its quantity raised.
+        { name: 'ref', kind: 'object', required: false, form: false, schema: { type: 'object', properties: { type: { type: 'string', minLength: 1 }, ref: { type: 'string', minLength: 1 } }, required: ['type', 'ref'] } },
+        // How many: a whole number, at least one; absent means one.
+        { name: 'quantity', kind: 'number', required: false, schema: { type: 'integer', minimum: 1 } },
       ],
       surfaces: {
         slash: { command: '/add-to-list', body: 'flags' },
@@ -122,7 +128,7 @@ export const listsManifest = {
       id:        'markListItemDone', visibility: 'authenticated',
       scopes: ['circle', 'own'],
       verb:      'complete',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'list-item' },
       requires:  ['lists'],
       // Ticking off is a CLAIM in the same sense a task claim is: the first person to do it is the one
@@ -145,7 +151,7 @@ export const listsManifest = {
       // and task stay two types (their verbs differ); this is the one verb between them.
       id:        'makeChore', visibility: 'authenticated', group: 'compose',
       verb:      'update',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'list-item' },
       requires:  ['lists'],
       // the type is the line's content as anything else is: the later write wins (a chore stays one)
@@ -166,7 +172,7 @@ export const listsManifest = {
       // about it, in a person's words ("60", "ook avond", "7:30"; "gewoon" drops it) — whoever may edit the entry.
       id:        'entryReminders', visibility: 'authenticated', group: 'compose',
       verb:      'update',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'list-item' },
       requires:  ['lists'],
       resolves:  [{ field: 'reminders', policy: 'content' }],
@@ -227,7 +233,7 @@ export const listsManifest = {
       id:        'removeFromList', visibility: 'authenticated', group: 'compose',
       scopes: ['circle', 'own'],
       verb:      'remove',
-      writes:    { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'list-item' },
       requires:  ['lists'],
       params: [
@@ -246,7 +252,7 @@ export const listsManifest = {
       id:        'removeList', visibility: 'authenticated', group: 'compose',
       scopes: ['circle', 'own'],
       verb:      'remove',
-      writes:    { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       requires:  ['lists'],
       params: [
         { name: 'list', kind: 'string', required: true, schema: { minLength: 1 }, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
@@ -266,7 +272,7 @@ export const listsManifest = {
       id:        'restoreList', visibility: 'authenticated', group: 'compose',
       scopes: ['circle', 'own'],
       verb:      'unarchive',
-      writes:    { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       requires:  ['lists'],
       params: [
         { name: 'list', kind: 'string', required: false },
@@ -282,7 +288,7 @@ export const listsManifest = {
       id:        'restoreEntry', visibility: 'authenticated', group: 'compose',
       scopes: ['circle', 'own'],
       verb:      'unarchive',
-      writes:    { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       requires:  ['lists'],
       params: [
         { name: 'item', kind: 'string', required: false },
@@ -296,7 +302,7 @@ export const listsManifest = {
       id:        'editEntry', visibility: 'authenticated', group: 'compose',
       scopes: ['circle', 'own'],
       verb:      'edit',
-      writes:    { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'list-item' },
       requires:  ['lists'],
       // Two people fixing the same entry write the same field; the text merges by content.
@@ -308,10 +314,12 @@ export const listsManifest = {
         { name: 'list', kind: 'string', required: false, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
         // an appointment's new start (it keeps its length) or a chore's new due: the line's time, edited as its words are
         { name: 'when', kind: 'date', required: false },
+        // how many (a whole number, at least one): the toolbox's page and the doors set it alone or with the words
+        { name: 'quantity', kind: 'number', required: false, schema: { type: 'integer', minimum: 1 } },
       ],
       surfaces: {
         slash: { command: '/list-edit', body: 'flags' },
-        chat:  { reply: 'text', hint: 'Change an entry on a list: its words (text), and/or its time (when — an appointment moves, keeping its length; a chore gets a new due). "zet de tandarts op vrijdag 14:00" → item tandarts, when.' },
+        chat:  { reply: 'text', hint: 'Change an entry on a list: its words (text), and/or its time (when — an appointment moves, keeping its length; a chore gets a new due), and/or how many (quantity, a whole number). "zet de tandarts op vrijdag 14:00" → item tandarts, when.' },
       },
     },
   ],

@@ -257,9 +257,21 @@ rendezvous (WebRTC upgrade).
 
 If you want non-`@onderling` clients (curl, browser fetch, IoT
 devices, other agent frameworks) to call your agent's skills,
-attach an `A2ATransport`.  A2A is an industry-standard agent-to-
-agent protocol (JSON-RPC over HTTPS with JWT bearer auth, SSE for
-streaming).  The implementation lives at `packages/core/src/a2a/`.
+attach an `A2ATransport`.  The implementation lives at
+`packages/core/src/a2a/`: plain HTTP routes (`POST /tasks/send`, SSE
+on `/tasks/sendSubscribe`), JWT bearer auth, and an agent card at
+`/.well-known/agent.json`.
+
+> **Which A2A this is.** These routes follow an EARLIER, REST-shaped
+> draft of A2A. The current A2A protocol is JSON-RPC (what
+> `@a2a-js/sdk` 1.x speaks), and the two do not
+> understand each other without a translation. The decided direction
+> (2026-11-18): Basis turns to current A2A, first as a CLIENT that calls
+> a circle's toolboxes from the always-on box; this transport is not
+> renamed and keeps working for what it does today. Basis's own shells
+> (web, phone, the box) do not serve an agent card: an outside program
+> reaches a person's Basis through the native path (signed envelopes over
+> the relay) or as a paired screen of their household bot.
 
 ```js
 // my-agent.js  — extend the section-2 example

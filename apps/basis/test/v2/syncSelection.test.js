@@ -161,7 +161,7 @@ describe('the chat rail\'s verify is the same gate as its ingest (hold nothing, 
     const { VaultMemory } = await import('@onderling/vault');
     const id = await AgentIdentity.generate(new VaultMemory());
     const entries = [];
-    const eventLog = { query: () => entries, append: (e) => { entries.push(e); return e; }, appendSilentEntry: (e) => { entries.push(e); return e; } };
+    const eventLog = { query: () => entries.slice().reverse(), append: (e) => { entries.push(e); return e; }, appendSilentEntry: (e) => { entries.push(e); return e; } };
     const rail = makeChatRail({ eventLog, circleIdentityFor: async () => id, myRef: 'me', callSkill: async () => ({ members: [] }) });
     const good = signSpine(id, { kind: 'message', circleId: 'k1', subject: 'm1', payload: { msgId: 'm1', text: 'hoi', authorRef: 'me' }, parent: null, deps: [] });
     expect((await rail.verify('k1', good)).ok).toBe(true);

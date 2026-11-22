@@ -13,7 +13,7 @@
  * `apps/household` agent (skillRegistry.js skills over an ItemStore), not the
  * chore-vocab inline mock.  These tests assert the REAL household vocab:
  *   - seed items: Milk (shopping), Post a parcel (errand), Vacuum living
- *     room (task)
+ *     room (task) — demo data, asked for with `seedDemoData: true`
  *   - markComplete({match}) (keyword/id), not markComplete({choreId})
  *   - the household reply in the translator's words ("✓ Marked complete: <text>" in English)
  *
@@ -29,7 +29,7 @@ import { tEn } from './support/bundleTranslator.js';
 
 describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
   it("listOpen returns the 3 seed household items via real Agent.invoke roundtrip", async () => {
-    const a = await createRealHouseholdAgent();
+    const a = await createRealHouseholdAgent({ seedDemoData: true });
     const r = await a.callSkill('household', 'listOpenItems', {});
     expect(r.items.length).toBe(3);
     expect(r.items.map((c) => c.label).sort()).toEqual([
@@ -40,13 +40,13 @@ describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
   });
 
   it("listOpen({type}) filters to one list-type", async () => {
-    const a = await createRealHouseholdAgent();
+    const a = await createRealHouseholdAgent({ seedDemoData: true });
     const r = await a.callSkill('household', 'listOpenItems', { type: 'shopping' });
     expect(r.items.map((it) => it.label)).toEqual(['Milk']);
   });
 
   it("markComplete({match}) flips state + listOpen reflects it", async () => {
-    const a = await createRealHouseholdAgent({ t: tEn });
+    const a = await createRealHouseholdAgent({ seedDemoData: true, t: tEn });
     const done = await a.callSkill('household', 'markComplete', { match: 'Milk' });
     expect(done).toMatchObject({
       ok: true, message: '✓ Marked complete: Milk', text: 'Milk',
@@ -66,7 +66,7 @@ describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
   });
 
   it("markComplete with >1 candidate surfaces the disambiguation list (acts on NONE)", async () => {
-    const a = await createRealHouseholdAgent({ t: tEn });
+    const a = await createRealHouseholdAgent({ seedDemoData: true, t: tEn });
     // 'a' appears in "Post a parcel" + "Vacuum living room" → ambiguous.
     const r = await a.callSkill('household', 'markComplete', { match: 'a' });
     expect(r.ok).toBe(false);
@@ -78,7 +78,7 @@ describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
   });
 
   it("markComplete with exactly ONE candidate resolves + acts", async () => {
-    const a = await createRealHouseholdAgent({ t: tEn });
+    const a = await createRealHouseholdAgent({ seedDemoData: true, t: tEn });
     // 'Milk' is unique → completes it (single-match resolve, not a disambiguation prompt).
     const r = await a.callSkill('household', 'markComplete', { match: 'Milk' });
     expect(r).toMatchObject({ ok: true, message: '✓ Marked complete: Milk', text: 'Milk' });
@@ -133,7 +133,7 @@ describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
   });
 
   it('reset() restores the seed household state', async () => {
-    const a = await createRealHouseholdAgent();
+    const a = await createRealHouseholdAgent({ seedDemoData: true });
     // Part G — state()/reset() are now async (ItemStore-backed).
     await a.callSkill('household', 'markComplete', { match: 'Milk' });
     let open = await a.state();
@@ -196,7 +196,7 @@ describe('createRealHouseholdAgent — pipeline integration', () => {
       renderReply, Thread,
     } = await import('../src/index.js');
 
-    const a = await createRealHouseholdAgent({ t: tEn });
+    const a = await createRealHouseholdAgent({ seedDemoData: true, t: tEn });
     const catalogue = mergeManifests([{ manifest: a.manifest }]);
     const thread  = new Thread();
 
@@ -382,7 +382,7 @@ describe('createRealHouseholdAgent — L3 uniform wired path (default; legacy re
   });
 
   it('listOpen without a type returns every OPEN item across list-types (the legacy no-type call)', async () => {
-    const a = await createRealHouseholdAgent();
+    const a = await createRealHouseholdAgent({ seedDemoData: true });
     const open = await a.callSkill('household', 'listOpenItems', {});
     // seed: Milk (shopping) + Post a parcel (errand) + Vacuum living room (task) — all three.
     expect(open.items.map((i) => i.label).sort()).toEqual(['Milk', 'Post a parcel', 'Vacuum living room']);

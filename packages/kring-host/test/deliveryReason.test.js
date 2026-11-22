@@ -19,7 +19,7 @@ describe('the reason beside a failed state', () => {
     expect(classifyFanOut(held)).toBe('pending');
     expect(fanOutReason(held)).toBe('persona-waiting');
     // one recipient went out, or held for another reason: the ordinary answer
-    const mixed = { errors: [], outcomes: [{ webid: 'a', outcome: 'held:persona-no-connection' }, { webid: 'b', outcome: 'delivered' }] };
+    const mixed = { errors: [], outcomes: [{ webid: 'a', outcome: 'held:persona-no-connection' }, { webid: 'b', outcome: 'written' }] };
     expect(classifyFanOut(mixed)).toBe('maybe-received');
     expect(fanOutReason(mixed)).toBe(null);
     expect(classifyFanOut({ errors: [], outcomes: [{ webid: 'a', outcome: 'held' }] })).toBe('maybe-received');

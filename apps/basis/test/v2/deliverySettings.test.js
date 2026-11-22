@@ -21,7 +21,9 @@ import {
 import { RECEIPT_MESSAGE } from '../../src/v2/deliveryState.js';
 import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
 import { vi } from 'vitest';
-import { DELIVERY } from '../../src/v2/deliveryState.js';
+import { DELIVERY, DELIVERY_WAITING_ENTRY, DELIVERY_WAITING_LABEL } from '../../src/v2/deliveryState.js';
+import { deliveryPresentation } from '../../src/v2/deliverySettings.js';
+import { EventLog } from '../../src/eventLog.js';
 
 describe('the two settings pull in opposite directions', () => {
   it('receipts default ON, fallback default OFF', () => {
@@ -268,7 +270,7 @@ describe('the outbox as a PROJECTION — receipts on the log, the ladder rebuilt
   const CHAT = 'chat-message';
   const logOf = (entries) => ({
     entries,
-    query: () => entries,
+    query: () => entries.slice().reverse(),   // newest-first, as the device log reads
     appendSilentEntry: (e) => { entries.push({ type: e.kind, silent: true, ...e }); return e; },
   });
 
@@ -298,7 +300,7 @@ describe('the outbox as a PROJECTION — receipts on the log, the ladder rebuilt
     ]);
     const map = createDeliveryStateMap();
     const r = rehydrateDeliveryState({ eventLog: log, deliveryMap: map, localActor: 'me' });
-    expect(r).toEqual({ seeded: 2, stored: 1 });
+    expect(r).toMatchObject({ seeded: 2, stored: 1, waiting: 0 });
     expect(map.get('m-new')).toBe(DELIVERY.MAYBE);
     expect(map.get('m-confirmed')).toBe(DELIVERY.STORED);
     expect(map.get('m-old')).toBeNull();
@@ -318,5 +320,71 @@ describe('the outbox as a PROJECTION — receipts on the log, the ladder rebuilt
     expect(await onReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm-1' }, 'addr-bee'),
       'the late receipt is accepted because rehydration restored the key set').toBe(true);
     expect(freshMap.get('m-1')).toBe(DELIVERY.STORED);
+  });
+});
+
+
+describe('a line that still waits for members without an address: a side fact, never a rung', () => {
+  const CHAT = 'chat-message';
+  const logOf = (entries) => ({ query: () => entries });
+  const now = Date.now();
+  const waits = (msgId, waiting, reached, of, ts = now) => ({ type: 'delivery-state', ts, payload: { msgId, state: DELIVERY_WAITING_ENTRY, waiting, reached, of } });
+
+  it('the bubble says how many it was sent to while someone waits; a failure wins; the rung returns when nobody waits', () => {
+    const w = { sent: 9, of: 15 };
+    expect(deliveryPresentation(DELIVERY.MAYBE, { waiting: w })).toMatchObject({ state: DELIVERY.MAYBE, labelKey: DELIVERY_WAITING_LABEL, labelVars: { reached: 9, of: 15 } });
+    expect(deliveryPresentation(DELIVERY.STORED, { waiting: w })).toMatchObject({ state: DELIVERY.STORED, labelKey: DELIVERY_WAITING_LABEL });
+    expect(deliveryPresentation(DELIVERY.FAILED, { waiting: w }).labelKey).toBe('circle.chat.delivery.failed');
+    expect(deliveryPresentation(DELIVERY.UNDELIVERABLE, { waiting: w }).labelKey).toBe('circle.chat.delivery.undeliverable');
+    expect(deliveryPresentation(DELIVERY.STORED, { waiting: null }).labelKey).toBe('circle.chat.delivery.stored');
+    expect(deliveryPresentation(DELIVERY.MAYBE, { waiting: w, mine: false })).toBeNull();
+  });
+
+  it('the ladder is untouched: no new state, and a receipt still moves the rung while the side fact stays', () => {
+    expect(mod.deliverySettings).toBeTypeOf('function');
+    const map = createDeliveryStateMap();
+    map.set('m', DELIVERY.MAYBE);
+    map.setWaiting('m', { sent: 2, of: 3 });
+    map.set('m', DELIVERY.STORED);
+    expect(map.get('m')).toBe(DELIVERY.STORED);
+    expect(map.waitingOf('m')).toEqual({ sent: 2, of: 3 });
+    map.setWaiting('m', null);
+    expect(map.waitingOf('m')).toBeNull();
+  });
+
+  it('rehydrate seeds it from the NEWEST entry per line I sent, and ignores lines that are not mine', () => {
+    const log = logOf([
+      waits('m-a', [], 3, 3, now - 100),                  // newest: the re-tell reached the last one
+      waits('m-a', ['w3'], 2, 3, now - 200),
+      waits('m-b', ['w2', 'w3'], 1, 3, now - 300),
+      waits('m-theirs', ['w3'], 2, 3, now - 300),
+      { id: 'm-a', type: CHAT, actor: 'me', ts: now - 1000, payload: {} },
+      { id: 'm-b', type: CHAT, actor: 'me', ts: now - 1000, payload: {} },
+      { id: 'm-theirs', type: CHAT, actor: 'peer-x', ts: now - 1000, payload: {} },
+    ]);
+    const map = createDeliveryStateMap();
+    const r = rehydrateDeliveryState({ eventLog: log, deliveryMap: map, localActor: 'me' });
+    expect(r.waiting).toBe(1);
+    expect(map.waitingOf('m-a')).toBeNull();
+    expect(map.waitingOf('m-b')).toEqual({ sent: 1, of: 3 });
+    expect(map.waitingOf('m-theirs')).toBeNull();
+  });
+
+  it('PINNED: the count is SENDS, never receipts — receipts landing do not move it (a receipt count would show who has receipts off)', () => {
+    const log = new EventLog({ initial: [], muted: [] });
+    log.append({ id: 'm-1', type: CHAT, actor: 'me', ts: Date.now(), payload: {} });
+    const map = createDeliveryStateMap();
+    const { stop } = rehydrateDeliveryState({ eventLog: log, deliveryMap: map, localActor: 'me' });
+    log.appendSilentEntry({ circleId: 'c', kind: 'delivery-state', payload: { msgId: 'm-1', state: DELIVERY_WAITING_ENTRY, waiting: ['w3'], reached: 2, of: 3 } });
+    expect(map.waitingOf('m-1')).toEqual({ sent: 2, of: 3 });
+    for (const from of ['addr-1', 'addr-2']) {
+      log.appendSilentEntry({ circleId: 'c', kind: 'delivery-state', payload: { msgId: 'm-1', state: DELIVERY.STORED, from } });
+      map.set('m-1', DELIVERY.STORED);
+    }
+    expect(map.waitingOf('m-1'), 'two receipts later, still the fan\'s count of sends').toEqual({ sent: 2, of: 3 });
+    // the re-tell reaches the last one: the log says nobody waits, and the bubble's words follow it live
+    log.appendSilentEntry({ circleId: 'c', kind: 'delivery-state', payload: { msgId: 'm-1', state: DELIVERY_WAITING_ENTRY, waiting: [], reached: 3, of: 3 } });
+    expect(map.waitingOf('m-1')).toBeNull();
+    stop();
   });
 });

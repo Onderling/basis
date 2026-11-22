@@ -56,23 +56,23 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `submitTask` | submit | ✅ | ✅ | ✅ | · | ✅ | ✅ | submit, hand in, indienen, inleveren, ter review |
 |  | `approveTask` | approve | ✅ | ✅ | ✅ | · | ✅ | ✅ | approve, goedkeuren, akkoord |
 |  | `rejectTask` | reject | ✅ | ✅ | ✅ | · | ✅ | ✅ | reject, afkeuren, afwijzen, weiger |
-|  | `revokeTask` | revoke | ✅ | · | · | · | ✅ | ✅ |  |
+|  | `revokeTask` | revoke | · | · | · | · | ✅ | ✅ |  |
 |  | `listOpen` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `listMine` | list | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `listClaimable` | list | ✅ | · | · | · | · | · |  |
-|  | `listClaimConflicts` | list | ✅ | · | · | · | · | · |  |
+|  | `listClaimConflicts` | list | · | · | · | · | · | · |  |
 |  | `resolveClaim` | reassign | ✅ | · | · | · | · | · |  |
 |  | `listAwaitingApproval` | list | ✅ | · | · | · | · | · |  |
-|  | `listMyMasteredTasks` | list | ✅ | · | · | · | · | · |  |
+|  | `listMyMasteredTasks` | list | · | · | · | · | · | · |  |
 |  | `listMyPendingClaims` | list | ✅ | · | · | · | · | · |  |
 |  | `listMyInbox` | list | ✅ | · | · | · | · | · |  |
-|  | `clearInboxItem` | remove | ✅ | · | · | · | ✅ | ✅ |  |
+|  | `clearInboxItem` | remove | · | · | · | · | ✅ | ✅ |  |
 |  | `approveSubtaskRequest` | approve | ✅ | ✅ | · | · | ✅ | ✅ |  |
 |  | `declineSubtaskRequest` | reject | ✅ | ✅ | · | · | ✅ | ✅ |  |
 |  | `approveSubtaskProposal` | approve | ✅ | ✅ | · | · | ✅ | ✅ |  |
 |  | `declineSubtaskProposal` | reject | ✅ | ✅ | · | · | ✅ | ✅ |  |
-|  | `clearInbox` | remove | ✅ | · | · | · | ✅ | ✅ |  |
-|  | `getDagTree` | tree | ✅ | · | · | · | · | · |  |
+|  | `clearInbox` | remove | · | · | · | · | ✅ | ✅ |  |
+|  | `getDagTree` | tree | · | · | · | · | · | · |  |
 |  | `archiveCircle` | archive | ✅ | ✅ | · | · | ✅ | ✅ |  |
 |  | `unarchiveCircle` | unarchive | ✅ | ✅ | · | · | ✅ | ✅ |  |
 |  | `editTask` | edit | ✅ | ✅ | · | · | ✅ | ✅ |  |
@@ -168,7 +168,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `getGroupRules` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `acceptGroupRules` | add | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `listMyOfferings` | list | ✅ | · | · | · | ✅ | · |  |
-|  | `listOfferingCategories` | list | ✅ | · | · | · | ✅ | · |  |
+|  | `listOfferingCategories` | list | · | · | · | · | ✅ | · |  |
 |  | `setMyLocation` | add | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `clearMyLocation` | remove | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `getMyLocation` | list | ✅ | · | · | · | ✅ | · |  |
@@ -188,9 +188,9 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `podSignInStatus` | list | ✅ | · | · | · | ✅ | · |  |
 |  | `listMyCircles` | list | ✅ | · | · | · | ✅ | · |  |
 |  | `dismissRemovedCircle` | remove | ✅ | · | · | · | ✅ | ✅ |  |
-|  | `listCirclePostsSince` | list | ✅ | · | · | · | ✅ | · |  |
-|  | `getLatestPostAddedAt` | list | ✅ | · | · | · | ✅ | · |  |
-|  | `listConsentingPeers` | list | ✅ | · | · | · | ✅ | · |  |
+|  | `listCirclePostsSince` | list | · | · | · | · | ✅ | · |  |
+|  | `getLatestPostAddedAt` | list | · | · | · | · | ✅ | · |  |
+|  | `listConsentingPeers` | list | · | · | · | · | ✅ | · |  |
 |  | `getPrivacyNotice` | list | ✅ | · | · | · | ✅ | · |  |
 |  | `getMetrics` | list | ✅ | · | · | · | ✅ | · |  |
 |  | `createGroupV2` | add | ✅ | · | · | · | ✅ | · |  |
@@ -216,7 +216,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `broadcastCircleMembership` | share | ✅ | · | · | · | ✅ | · |  |
 |  | `broadcastCircleChatStatement` | share | ✅ | · | · | · | ✅ | · |  |
 |  | `broadcastCircleItems` | share | ✅ | · | · | · | ✅ | · |  |
-|  | `broadcastCircleRules` | share | ✅ | · | · | · | ✅ | · |  |
+|  | `broadcastCircleRules` | share | · | · | · | · | ✅ | · |  |
 |  | `broadcastCircleRecipe` | share | ✅ | · | · | · | ✅ | · |  |
 |  | `broadcastCircleAddresses` | share | ✅ | · | · | · | ✅ | · |  |
 |  | `recordCircleAddressAnnouncement` | add | ✅ | · | · | · | ✅ | · |  |
@@ -225,7 +225,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `forceRepush` | sync | · | · | · | · | ✅ | ✅ |  |
 |  | `syncOnce` | sync | ✅ | ✅ | ✅ | · | ✅ | ✅ | sync, synchroniseer, synchroniseren |
 |  | `watchStart` | watch | ✅ | ✅ | ✅ | · | ✅ | ✅ | watch, watch folder, let op, bewaak, bewaak map |
-|  | `watchStop` | watch | ✅ | · | · | · | ✅ | ✅ |  |
+|  | `watchStop` | watch | · | · | · | · | ✅ | ✅ |  |
 |  | `verifyPodState` | read | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `readNote` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `shareFolder` | add | ✅ | ✅ | ✅ | · | ✅ | · | share, deel |
@@ -265,6 +265,8 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `createProfile` | add | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `setProfileProperty` | update | ✅ | · | · | · | · | · |  |
 |  | `getProfileProperties` | get | ✅ | · | · | · | · | · |  |
+|  | `setPlusCeiling` | update | · | · | · | · | · | · |  |
+|  | `getPlusCeiling` | read-plus-ceiling | · | · | · | · | · | · |  |
 |  | `setProfileDriver` | update | ✅ | · | · | · | · | · |  |
 |  | `removeProfileDriver` | remove | ✅ | · | · | · | · | · |  |
 |  | `getProfileDrivers` | get | ✅ | · | · | · | · | · |  |
@@ -276,12 +278,12 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `getPersonaRelease` | get | ✅ | · | · | · | · | · |  |
 |  | `revokeAgent` | revoke | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `grantAgent` | update | ✅ | · | · | · | · | · |  |
-|  | `grantRole` | update | ✅ | · | · | · | · | · |  |
+|  | `grantRole` | update | · | · | · | · | · | · |  |
 |  | `revokeGrant` | revoke | ✅ | · | · | · | · | · |  |
 |  | `purgeAgent` | remove | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `listCatalogue` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `installAgent` | add | ✅ | · | · | · | ✅ | ✅ |  |
-|  | `listDataVersions` | list | ✅ | · | · | · | · | · |  |
+|  | `listDataVersions` | list | · | · | · | · | · | · |  |
 |  | `restoreDataVersion` | update | ✅ | · | · | · | ✅ | ✅ |  |
 | **params** | `set-param` | set-param | · | · | · | · | · | · |  |
 |  | `get-param` | get-param | · | · | · | · | · | · |  |
@@ -316,6 +318,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `assistant-rotate` | rotate | · | ✅ | · | · | · | · |  |
 |  | `assistant-circle` | join-circle | · | ✅ | · | · | · | · |  |
 |  | `assistant-circles` | list-circles | · | ✅ | · | · | · | · |  |
+|  | `assistant-toolbox` | toolbox | · | ✅ | · | · | · | · |  |
 |  | `assistant-revoke` | revoke-user | · | ✅ | · | · | · | · |  |
 |  | `assistant-menu` | show-settings | · | ✅ | · | · | · | · |  |
 |  | `assistant-view` | set-view | · | ✅ | · | · | · | · |  |
@@ -335,8 +338,14 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `assistant-exports` | list-exports | · | ✅ | · | · | · | · |  |
 |  | `assistant-export` | export-household | · | ✅ | · | · | · | · |  |
 |  | `assistant-import` | import-household | · | ✅ | · | · | ✅ | · |  |
+| **tools** | `useTool` | use | ✅ | · | · | · | · | · |  |
+|  | `pickThing` | pick | · | ✅ | · | · | ✅ | ✅ |  |
+|  | `moreThings` | list | · | ✅ | · | · | · | · |  |
+|  | `listTools` | list | ✅ | · | · | · | · | · |  |
+|  | `addToolbox` | add-toolbox | · | · | · | · | · | · |  |
+|  | `removeToolbox` | remove-toolbox | · | · | · | · | · | · |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 331 ops | | 237 | 183 | 29 | 8 | 144 | 69 | |
+| **totals** | 340 ops | | 225 | 186 | 29 | 8 | 145 | 70 | |
 
 ### Flows
 
@@ -353,6 +362,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 
 ## Gaps for the gate/LLM + inline-menu work
 
-- **missing gate** (302/331): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:feedback, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:screen-add-page, basis:screen-remove-page, basis:screen-rename-page, basis:screen-set-active, basis:screen-set-personas, basis:screen-set-circles, basis:screen-pin, basis:screen-unpin, basis:screen-add-block, basis:screen-remove-block, basis:screen-move-block …
-- **missing inline** (262/331): basis:help, basis:help-with, basis:embed-file, basis:embed-time, basis:logs, basis:feedback, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:screen-add-page, basis:screen-remove-page, basis:screen-rename-page, basis:screen-set-active, basis:screen-set-personas, basis:screen-set-circles, basis:screen-pin, basis:screen-unpin, basis:screen-add-block, basis:screen-remove-block, basis:screen-move-block, basis:screen-set-block-config …
-- **missing chat** (94/331): basis:signin, basis:signout, basis:screen-add-page, basis:screen-remove-page, basis:screen-rename-page, basis:screen-set-active, basis:screen-set-personas, basis:screen-set-circles, basis:screen-pin, basis:screen-unpin, basis:screen-add-block, basis:screen-remove-block, basis:screen-move-block, basis:screen-set-block-config, basis:screen-undo, household:revokeDevice, household:pairCirclePeer, household:stashEnrollOffer, household:bindCirclePersona, household:claimCompanion, household:companionGrantChoices, household:grantCompanion, household:companionGrantList, household:revokeCompanionGrant, household:listRecoveryCircles, household:exportRecoveryFile, household:listReceivablePersonas, household:removePersonaHere, household:ownSpineOutbox, household:setNearbyLevel, household:listPersonasHere, household:pausePersona, household:resumePersona, household:markRead, household:listReadMarks, household:receivePersonas, household:importRecoveryFile, household:restoreStatus, household:restoreSource, household:restoreIntent …
+- **missing gate** (311/340): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:feedback, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:screen-add-page, basis:screen-remove-page, basis:screen-rename-page, basis:screen-set-active, basis:screen-set-personas, basis:screen-set-circles, basis:screen-pin, basis:screen-unpin, basis:screen-add-block, basis:screen-remove-block, basis:screen-move-block …
+- **missing inline** (270/340): basis:help, basis:help-with, basis:embed-file, basis:embed-time, basis:logs, basis:feedback, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:screen-add-page, basis:screen-remove-page, basis:screen-rename-page, basis:screen-set-active, basis:screen-set-personas, basis:screen-set-circles, basis:screen-pin, basis:screen-unpin, basis:screen-add-block, basis:screen-remove-block, basis:screen-move-block, basis:screen-set-block-config …
+- **missing chat** (115/340): basis:signin, basis:signout, basis:screen-add-page, basis:screen-remove-page, basis:screen-rename-page, basis:screen-set-active, basis:screen-set-personas, basis:screen-set-circles, basis:screen-pin, basis:screen-unpin, basis:screen-add-block, basis:screen-remove-block, basis:screen-move-block, basis:screen-set-block-config, basis:screen-undo, tasks:revokeTask, tasks:listClaimConflicts, tasks:listMyMasteredTasks, tasks:clearInboxItem, tasks:clearInbox, tasks:getDagTree, household:revokeDevice, household:pairCirclePeer, household:stashEnrollOffer, household:bindCirclePersona, household:claimCompanion, household:companionGrantChoices, household:grantCompanion, household:companionGrantList, household:revokeCompanionGrant, household:listRecoveryCircles, household:exportRecoveryFile, household:listReceivablePersonas, household:removePersonaHere, household:ownSpineOutbox, household:setNearbyLevel, household:listPersonasHere, household:pausePersona, household:resumePersona, household:markRead …

@@ -26,7 +26,7 @@
  *   - COLLECTION atoms (list) → no positional (body kind `none`).
  */
 
-import { capabilitiesOf, encodeGenericOpId, isPeopleWritten, isWritingVerb, extensionVerbsFor } from '@onderling/app-manifest';
+import { capabilitiesOf, encodeGenericOpId, isPeopleWritten, isWritingVerb, extensionVerbsFor, opScopes } from '@onderling/app-manifest';
 
 /** Atoms whose slash positional is the item ID (bound to `id`); everything else binds to `body`. */
 const REFERENCE_ATOMS = new Set(['get', 'remove', 'delete']);
@@ -79,6 +79,12 @@ export function synthesizeGenericOps(manifest) {
       __generic: { app, atom, noun },
       // where the noun is offered (declared once on the noun; app-manifest scopes.js), so its ops are offered there too
       ...(Array.isArray(manifest?.nouns?.[noun]?.scopes) ? { scopes: [...manifest.nouns[noun].scopes] } : {}),
+      // what it writes, so it has a weight like a declared op (`opWeight`): generic CRUD only ever writes items, so
+      // content; in a circle when the noun is offered beyond the person's own place (a contact thread delivers to
+      // another person, which counts as a circle), else the person's own
+      ...(isWritingVerb(atom) ? { writes: {
+        scope: opScopes(manifest?.nouns?.[noun]).some((p) => p !== 'own') ? 'circle' : 'person', what: 'content',
+      } } : {}),
       surfaces: {
         slash: { command: `/${atom}-${noun}`, match },
         // LLM-facing tool description (like DEFAULT_INTERPRET_SYSTEM — internal, not shown to the member). A noun PEOPLE

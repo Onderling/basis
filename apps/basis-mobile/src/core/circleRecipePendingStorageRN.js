@@ -10,28 +10,13 @@
  */
 
 import { createCircleRecipePendingStore } from '../../../basis/src/v2/circleRecipePending.js';
+import { makeCircleKindPendingLocalIo } from '../../../basis/src/v2/circleKindFactory.js';
 
 const KEY_PREFIX = 'cc.circleRecipePending.';
 
+/** The same SEALED io as the web's (ledger L1083: an incoming circle document), over AsyncStorage. */
 export function asyncStorageCircleRecipePendingIo(storage) {
-  return {
-    load: async (circleId) => {
-      try {
-        const raw = await storage?.getItem?.(KEY_PREFIX + circleId);
-        return raw ? JSON.parse(raw) : null;
-      } catch { return null; }
-    },
-    save: async (circleId, recipe) => {
-      try {
-        await storage?.setItem?.(KEY_PREFIX + circleId, JSON.stringify(recipe));
-      } catch { /* ignore */ }
-    },
-    remove: async (circleId) => {
-      try {
-        await storage?.removeItem?.(KEY_PREFIX + circleId);
-      } catch { /* ignore */ }
-    },
-  };
+  return makeCircleKindPendingLocalIo(KEY_PREFIX, storage);
 }
 
 export function makeCircleRecipePendingStoreRN(storage) {

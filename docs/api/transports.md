@@ -267,6 +267,12 @@ slow connects: transient send retries, a soft warning, and a hard timeout with s
 
 ## `src/RelayTransport.js`
 
+### `RELAY_SEND_RATE`
+
+**Kind:** constant · **Import:** `RELAY_SEND_RATE` from `'@onderling/transports'`
+
+The pace this transport keeps on `send` frames (for the agreement test with the relay's own limit).
+
 ### `RelayTransport`
 
 **Kind:** class · **Import:** `RelayTransport` from `'@onderling/transports'`

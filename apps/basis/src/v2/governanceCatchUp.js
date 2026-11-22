@@ -14,6 +14,7 @@
 import { GOV_EVENT } from './governanceLog.js';
 import { catchUpTargets } from './catchUpTargets.js';
 import { sendOnOnlyChecked } from './sendOnOnlyChecked.js';
+import { RECORD_STATEMENTS } from '@onderling/item-store';
 
 export const GOV_CATCHUP_REQUEST = 'circle-governance-catchup-request';
 export const GOV_CATCHUP_BATCH   = 'circle-governance-catchup-batch';
@@ -55,7 +56,11 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
     if (typeof circleId !== 'string' || !circleId) return;
     try {
       if (mayServe && !(await mayServe(fromPeerAddr, circleId))) return;
-      const statements = rail.storedStatements(circleId).slice(0, MAX_BATCH);
+      // the record statements first (`RECORD_STATEMENTS`: the settings history), so a busy lane never pushes one of them
+      // past the batch: a joiner needs the whole chain to place a content statement's line, a head alone cannot
+      const all = rail.storedStatements(circleId);
+      const isRecord = (s) => RECORD_STATEMENTS.governance.includes(s?.body?.kind);
+      const statements = [...all.filter(isRecord), ...all.filter((s) => !isRecord(s))].slice(0, MAX_BATCH);
       if (typeof extraStatementsFor === 'function') {
         const seen = new Set(statements.map((s) => s?.body?.hash).filter(Boolean));
         try {

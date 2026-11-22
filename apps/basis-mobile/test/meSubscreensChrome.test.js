@@ -14,7 +14,9 @@ import { BASIS_USER_PARAMS, DEVELOPER_PARAM_KEY } from '../../basis/src/v2/param
 
 const read = (name) => readFileSync(fileURLToPath(new URL(`../src/screens/v2/${name}`, import.meta.url)), 'utf8');
 // where each one goes back to: Me, or My data (availability, shared with me and blocked sit behind My data since 2026-10-15)
-const SUBSCREENS = { 'ShareMyContactScreen.js': 'back_me', 'CircleAvailabilityScreen.js': 'back_mydata', 'SharedWithMeScreen.js': 'back_mydata', 'CircleBlockedScreen.js': 'back_mydata', 'CircleAdvancedScreen.js': 'back_me' };
+// (2026-11-20: Mij left the tab bar — share my card and shared with me go back to the tab they were opened from, named;
+// Advanced to the settings home)
+const SUBSCREENS = { 'ShareMyContactScreen.js': 'back_to', 'CircleAvailabilityScreen.js': 'back_mydata', 'SharedWithMeScreen.js': 'back_to', 'CircleBlockedScreen.js': 'back_mydata', 'CircleAdvancedScreen.js': 'settings_home\\.back' };
 
 describe('the screens under Me', () => {
   for (const [name, backKey] of Object.entries(SUBSCREENS)) {
@@ -22,7 +24,7 @@ describe('the screens under Me', () => {
       const src = read(name);
       expect(src).toMatch(/useSafeAreaInsets\(\)/);
       expect(src).toMatch(/insets\?\.top/);
-      expect(src).toMatch(new RegExp(`t\\('circle\\.${backKey}'\\)`));
+      expect(src).toMatch(new RegExp(`t\\('circle\\.${backKey}'`));
       expect(src).not.toMatch(/t\('circle\.back'\)/);
     });
   }
@@ -30,9 +32,13 @@ describe('the screens under Me', () => {
   it('Advanced has a back link, and the launcher hands Availability and Advanced their way back', () => {
     expect(read('CircleAdvancedScreen.js')).toMatch(/onBack/);
     const launcher = read('CircleLauncherScreen.js');
-    expect(launcher).toMatch(/<CircleAdvancedScreen[^>]*onBack=\{\(\) => setView\('profile'\)\}/);
-    // availability is a door in the Verbinding settings now: its back is that group's screen
-    expect(launcher).toMatch(/<CircleAvailabilityScreen\s+store=\{availabilityStore\}\s+onBack=\{\(\) => \{ setSettingsGroupId\('connection'\); setView\('settingsGroup'\); \}\}/);
+    expect(launcher).toMatch(/<CircleAdvancedScreen[^>]*onBack=\{\(\) => setView\('settingsHome'\)\}/);
+    // availability opens only from the persona panel's row (it left Verbinding and then Vandaag, 2026-11-20): back to the
+    // tab the panel was opened over
+    expect(launcher).toMatch(/<CircleAvailabilityScreen[\s\S]{0,400}onBack=\{\(\) => onTab\(lastTabRef\.current \?\? 'screens'\)\}/);
+    expect(launcher).not.toMatch(/availabilityFromRef/);
+    // the copy-log screen's door sits on the settings home: its back goes there
+    expect(launcher).toMatch(/<LogReportScreen onBack=\{\(\) => setView\('settingsHome'\)\} \/>/);
   });
 
   it('Availability paints its field text in ink, and its placeholders in the soft ink', () => {
@@ -48,7 +54,7 @@ describe('the developer switch', () => {
     expect(p).toMatchObject({ key: 'app.developer', kind: 'user', default: false });
   });
 
-  it('Advanced is offered on Me only when it is on (mobile and web)', () => {
+  it('Advanced is offered at the settings home\'s foot only when it is on (mobile and web)', () => {
     expect(read('CircleLauncherScreen.js')).toMatch(/onAdvanced=\{developerOn \? \(\) => setView\('advanced'\) : undefined\}/);
     const web = readFileSync(fileURLToPath(new URL('../../basis/web/v2/circleApp.js', import.meta.url)), 'utf8');
     expect(web).toMatch(/onAdvanced: developer \? showAdvanced : undefined/);

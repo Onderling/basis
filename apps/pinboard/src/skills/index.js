@@ -575,7 +575,7 @@ async function _fanOutViaReliableSend({
         }
         sent += 1;
         failure = null;
-        last = { webid, addr, outcome: r?.held ? `held${r.reason ? `:${r.reason}` : ''}` : 'delivered' };
+        last = { webid, addr, outcome: r?.held ? `held${r.reason ? `:${r.reason}` : ''}` : 'written' };   // written to the transport: a claim about this device, never about the recipient
         // Held because this circle has NO route it may use (its points cannot carry per-circle addressing
         // and the user has not accepted the fallback) — a standing fact, not a peer being briefly offline.
         // Report it as BLOCKED so it reaches the same offer the other blocked case does: holding silently
@@ -3464,15 +3464,19 @@ export function buildSkills({
       // Derived from the statement rather than passed in, so no caller can forget it and no new op
       // param can drift out of step with the statement it describes.
       const evictedSubject = a.event?.body?.kind === 'evict' ? a.event.body.subject : null;
+      // `only` (member webids): a RE-TELL to members whose address arrived after the first fan goes to them alone, never
+      // to the whole circle again (the founder's per-join fan grew with the circle and ran its socket over the relay's rate)
+      const only = Array.isArray(a.only) && a.only.length ? a.only : null;
       return broadcastToCircle({
         circleId: _groupId, kind: 'circle-membership-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
         metric: 'circle-membership-fanout',
         noWake: true,
+        ...(only ? { only } : {}),
         ...(typeof evictedSubject === 'string' && evictedSubject ? { alsoTo: [evictedSubject] } : {}),
       });
     }, {
-      description: 'Fan a signed membership statement (join/leave/evict/role) to every other member via subtype:circle-membership-broadcast — and, for an evict, to the removed member as well, so a device learns it was removed. Receivers verify at their membership rail before it lands. Never wakes.',
+      description: 'Fan a signed membership statement (join/leave/evict/role) to every other member via subtype:circle-membership-broadcast — and, for an evict, to the removed member as well, so a device learns it was removed. Receivers verify at their membership rail before it lands. Never wakes. Pass `only` (member webids) to narrow a re-tell to them.',
       visibility:  'authenticated',
     }),
 
@@ -3496,6 +3500,9 @@ export function buildSkills({
       // shared pod (pod-only: no fan — members read the pod; pod-signal: a ref envelope fans, carrying
       // this subtype so the resolver routes the row back to the chat rail). The pod stays transport,
       // never authority — whoever reads the row verifies the statement like any fanned one.
+      // `only` (member webids): a RE-TELL to members whose address arrived after the first fan goes to them alone, never
+      // to the whole circle again (the founder's per-join fan grew with the circle and ran its socket over the relay's rate)
+      const only = Array.isArray(a.only) && a.only.length ? a.only : null;
       return broadcastToCircle({
         circleId: _groupId, kind: 'circle-chat-statement', from,
         envelope: {
@@ -3505,6 +3512,7 @@ export function buildSkills({
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
         metric: 'circle-chat-statement-fanout',
         noWake: !kindWakes('chat-message'),
+        ...(only ? { only } : {}),
       });
     }, {
       description: 'Fan a signed chat statement to every other member via subtype:circle-chat-statement; receivers verify at their chat rail before it lands and renders. Wakes per the shared kind table (the conversation may wake).',
@@ -3526,11 +3534,15 @@ export function buildSkills({
       if (!a.event || typeof a.event !== 'object')                    return { error: 'event-required' };
       if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
+      // `only` (member webids): a RE-TELL to members whose address arrived after the first fan goes to them alone, never
+      // to the whole circle again (the founder's per-join fan grew with the circle and ran its socket over the relay's rate)
+      const only = Array.isArray(a.only) && a.only.length ? a.only : null;
       return broadcastToCircle({
         circleId: _groupId, kind: 'circle-items-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
         metric: 'circle-items-fanout',
         noWake: true,
+        ...(only ? { only } : {}),
       });
     }, {
       description: 'Fan a signed item statement (full-item snapshot or remove) to every other member via subtype:circle-items-broadcast; receivers verify at their items rail and causally merge the head. Never wakes.',

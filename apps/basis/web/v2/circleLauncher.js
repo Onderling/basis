@@ -10,6 +10,7 @@
 import { circleTint } from '../../src/v2/theme.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { splitBySight, SIGHT } from '../../src/v2/circleSight.js';
+import { bootFailureNotice, storedValueRefusedNotice } from '../../src/v2/bootFailure.js';
 
 // β.3 — fixed display order for circle-kind section headers; anything not in
 // this list is bucketed under 'other' (last).  Mirrors the values produced by
@@ -54,6 +55,12 @@ export function renderCircleLauncher(container, {
   // A failed agent boot, said HERE — the surface a person is looking at. Without it a dead boot and an
   // empty account paint the same "No circles yet.", and people conclude their data is gone.
   bootFailure = null,
+  // A save the person made that was refused because the value it would replace could not be opened (L1115), and the
+  // "try again" a start failure may offer (`bootFailureNotice`): a fresh start of the app.
+  storedRefusal = false,
+  onDismissStoredRefusal = null,
+  onRetryBoot = null,
+  onStartOver = null,
   // The circles an admin removed this person from (`loadRemovedCircles`): tiles of their own, marked, read-only, until
   // the person closes them from inside the circle. No context menu — pin, mute and leave mean nothing there.
   removedCircles = [],
@@ -78,12 +85,47 @@ export function renderCircleLauncher(container, {
     return container;
   }
 
-  if (bootFailure) {
+  const bootNotice = bootFailureNotice(bootFailure);
+  if (bootNotice) {
     const failed = document.createElement('div');
     failed.className = 'circle-launcher__boot-failed';
     failed.setAttribute('role', 'alert');
-    failed.textContent = tr('circle.boot_failed', { reason: String(bootFailure?.message ?? bootFailure) });
+    failed.textContent = tr(bootNotice.key, bootNotice.params);
     container.appendChild(failed);
+    if (bootNotice.retry && typeof onRetryBoot === 'function') {
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'cc-btn cc-btn--primary circle-launcher__boot-retry';
+      retry.textContent = tr('circle.boot_retry');
+      retry.addEventListener('click', () => onRetryBoot());
+      container.appendChild(retry);
+    }
+    // the way out when trying again does not help (L1115): second, after "Try again"
+    if (bootNotice.startOver && typeof onStartOver === 'function') {
+      const over = document.createElement('button');
+      over.type = 'button';
+      over.className = 'cc-btn cc-btn--quiet circle-launcher__start-over';
+      over.textContent = tr('circle.start_over.button');
+      over.addEventListener('click', () => onStartOver());
+      container.appendChild(over);
+    }
+  }
+  if (storedRefusal) {
+    const refused = document.createElement('div');
+    refused.className = 'circle-launcher__boot-failed';
+    refused.setAttribute('role', 'alert');
+    const n = storedValueRefusedNotice();
+    refused.textContent = tr(n.key, n.params);
+    container.appendChild(refused);
+    // said once: the person dismisses it, and it does not come back this session
+    if (typeof onDismissStoredRefusal === 'function') {
+      const ok = document.createElement('button');
+      ok.type = 'button';
+      ok.className = 'cc-btn cc-btn--quiet circle-launcher__refusal-ok';
+      ok.textContent = tr('circle.stored_value_unreadable_ok');
+      ok.addEventListener('click', () => onDismissStoredRefusal());
+      container.appendChild(ok);
+    }
   }
   if (!circles.length && !bootFailure) {
     const empty = document.createElement('div');

@@ -11,19 +11,20 @@ import { resolveDispatch } from '../router.js';
 /**
  * @param {object} a
  * @param {() => object} a.catalogue  the merged catalogue the shell dispatches over (a getter: it is rescoped)
- * @param {(ready: object) => Promise<any>} a.run  the shell's gated call for a ready dispatch (no painting)
+ * @param {(ready: object, ctx?: object) => Promise<any>} a.run  the shell's gated call for a ready dispatch (no painting);
+ *   `ctx` is the turn's (it names the door the read came through)
  * @param {(ready: object) => Promise<string|null|false>} [a.deny]  the shell's capability gate: truthy = refused
- * @returns {(cmd: {opId: string, args?: object, appOrigin?: string}) => Promise<any|null>}
+ * @returns {(cmd: {opId: string, args?: object, appOrigin?: string}, ctx?: object) => Promise<any|null>}
  */
 export function createPeek({ catalogue, run, deny = null }) {
   if (typeof run !== 'function') throw new TypeError('createPeek: run is required');
-  return async (cmd) => {
+  return async (cmd, ctx) => {
     if (!cmd?.opId) return null;
     let ready;
     try { ready = resolveDispatch({ kind: 'slash', opId: cmd.opId, args: cmd.args ?? {}, appOrigin: cmd.appOrigin, command: '(peek)', body: '' }, catalogue()); }
     catch { return null; }
     if (ready?.kind !== 'ready') return null;
     if (typeof deny === 'function' && await deny(ready)) return null;
-    try { return await run(ready); } catch { return null; }
+    try { return await run(ready, ctx); } catch { return null; }
   };
 }

@@ -18,6 +18,7 @@
  */
 import { Bootstrap } from '@onderling/core';
 import { RootKeyStoreVault, RootKeyStoreWebCrypto } from '@onderling/vault';
+import { KeyUnreadable } from './keyUnreadable.js';
 
 /** The vault key the PRE-CUTOVER cleartext phrase lived under (migration source only). */
 export const LEGACY_OWNER_PHRASE_KEY = 'owner-phrase';
@@ -56,8 +57,10 @@ export async function ensureOwnerRoot({ rootKeyStore, legacyVault } = {}) {
   const seed = await rootKeyStore.getSeed();
   if (seed) return Bootstrap.fromSeed(seed);
 
+  // a legacy phrase that could not be READ is not absent: a new root over it would make this a different person (L1115)
   let phrase = null;
-  try { phrase = await legacyVault?.get(LEGACY_OWNER_PHRASE_KEY); } catch { /* treat as absent */ }
+  try { phrase = await legacyVault?.get(LEGACY_OWNER_PHRASE_KEY); } catch (err) { throw new KeyUnreadable('legacy-phrase', err); }
+  if (phrase != null && phrase !== '' && typeof phrase !== 'string') throw new KeyUnreadable('legacy-phrase');
   if (phrase && typeof phrase === 'string' && phrase.trim().length > 0) {
     const root = Bootstrap.fromMnemonic(phrase);
     await rootKeyStore.setSeed(root.secret);
@@ -89,9 +92,14 @@ export const CUSTODY_MODE_KEY = 'custody-mode';
  * or `{mode:'delegation', deviceId, profileId}` after the cutover (`profileId`: the primary self).
  */
 export async function readCustodyMode(vault) {
-  try {
-    let m = await vault?.get(CUSTODY_MODE_KEY);
-    if (typeof m === 'string') { try { m = JSON.parse(m); } catch { m = null; } }
+  // ABSENT means root mode (every pre-cutover install); a marker that could not be READ, or that is there but is not a
+  // marker, stops the boot (L1115): read as root on a delegation device, the root fingerprint changes and the sealed
+  // vaults reset as if another person had restored here.
+  let m;
+  try { m = await vault?.get(CUSTODY_MODE_KEY); } catch (err) { throw new KeyUnreadable('custody-marker', err); }
+  if (m == null || m === '') return { mode: 'root' };
+  if (typeof m === 'string') { try { m = JSON.parse(m); } catch (err) { throw new KeyUnreadable('custody-marker', err); } }
+  {
     if (m && m.mode === 'delegation' && typeof m.deviceId === 'string' && m.deviceId) {
       // `fingerprint` = the ROOT's fingerprint captured at the ceremony (a non-secret binding
       // tag): the sealed vaults' sentinel was written with it, and a delegation boot has no root
@@ -104,8 +112,9 @@ export async function readCustodyMode(vault) {
         fingerprint: typeof m.fingerprint === 'string' ? m.fingerprint : null,
       };
     }
-  } catch { /* absent/unreadable → root mode */ }
-  return { mode: 'root' };
+    if (m && m.mode === 'root') return { mode: 'root' };
+  }
+  throw new KeyUnreadable('custody-marker');
 }
 
 /**

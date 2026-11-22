@@ -28,6 +28,7 @@
 
 import { objectDiff } from '@onderling/sync-engine/objectDiff';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import { sealedKeyValue } from './localStoreSeal.js';
 
 // Parameter register (#36) — bounded dedup-map cap (scope:device, kind:internal). Caller-overridable via arg.
 const DEFAULT_DEDUP_CAP = param({ key: 'circleKind.dedupCap', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 256 });
@@ -158,21 +159,23 @@ export function createCircleKindPendingStore({ load, save, remove } = {}) {
  * @returns {{ load: Function, save: Function, remove: Function }}
  */
 export function makeCircleKindPendingLocalIo(keyPrefix, storage = globalThis.localStorage) {
+  // SEALED at rest (ledger L1083: an incoming circle recipe or rules document), on web and phone alike
+  const kv = sealedKeyValue(storage, { name: `the pending ${keyPrefix}`, strict: true });
   return {
     load: async (circleId) => {
       try {
-        const raw = storage?.getItem?.(keyPrefix + circleId);
+        const raw = await kv.getItem(keyPrefix + circleId);
         return raw ? JSON.parse(raw) : null;
       } catch { return null; }
     },
     save: async (circleId, doc) => {
       try {
-        storage?.setItem?.(keyPrefix + circleId, JSON.stringify(doc));
-      } catch { /* quota / disabled */ }
+        await kv.setItem(keyPrefix + circleId, JSON.stringify(doc));
+      } catch { /* quota / disabled / no content key yet */ }
     },
     remove: async (circleId) => {
       try {
-        storage?.removeItem?.(keyPrefix + circleId);
+        await kv.removeItem(keyPrefix + circleId);
       } catch { /* ignore */ }
     },
   };

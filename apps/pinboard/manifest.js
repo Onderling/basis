@@ -139,7 +139,10 @@ export const pinboardManifest = {
     // an offer or a request in a merged view: newest first; mine when I placed it (still open is the read's own filter)
     offer:         { atoms: ['remove'], presents: { primary: 'open', label: 'title', moment: 'createdAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] },
       names: { nl: { other: 'aanbod' }, en: { one: 'offer', other: 'offers' } } },
-    lend:          { atoms: ['complete', 'reassign', 'remove'] },
+    // a loan: an `offer` of kind `lend`; its ops (`markReturned`, `assignLend`) are gated by these rows (`opNouns`: a
+    // declared kind is the op's noun)
+    lend:          { atoms: ['complete', 'reassign', 'remove'],
+      names: { nl: { one: 'uitlening', other: 'uitleningen' }, en: { one: 'loan', other: 'loans' } } },
     request:       { atoms: ['remove'], presents: { primary: 'open', label: 'title', moment: 'createdAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] },
       names: { nl: { one: 'vraag', other: 'vragen' }, en: { one: 'request', other: 'requests' } } },
     'group-leave': { atoms: ['remove'] },
@@ -163,7 +166,7 @@ export const pinboardManifest = {
       // everywhere (`circlePinboardScope.js`); an op that acts on an item without saying so fails a guard.
       circleScoped: true,
       verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       // No `appliesTo.type` — postRequest dispatches across ask/offer/
       // lend based on the `intent` arg, so it spans three types.
       params: [
@@ -275,7 +278,7 @@ export const pinboardManifest = {
       id:        'respondToItem', visibility: 'authenticated',
       circleScoped: true,
       verb:      'claim',  // canonical — `respondToItem` soft-claims the post.
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       // Part G dissolve (2026-06-17) — the former mock declared this op
       // WITHOUT a slash command but WITH a richer surface: an `appliesTo`
       // gate (so the [Help with] row button surfaces on open feed posts),
@@ -314,7 +317,7 @@ export const pinboardManifest = {
       id:        'cancelRequest', visibility: 'authenticated',
       circleScoped: true,
       verb:      'remove',  // canonical — cancelRequest removes the item.
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       // (2026-05-21, narrowed 2026-07-02 for) — cancelRequest spans the
       // user's own POST types (ask/offer/lend + the generic request/post the `mine`
       // section renders as).  It surfaces as `itemActions[]` in each of those sections
@@ -357,7 +360,7 @@ export const pinboardManifest = {
       id:        'assignLend', visibility: 'authenticated', group: 'admin',
       circleScoped: true,
       verb:      'reassign',  // canonical — assigns the borrower.
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'offer', kind: 'lend' },
       params: [
         { name: 'itemId',        kind: 'string', required: true, ...ID_NONEMPTY  },
@@ -383,7 +386,7 @@ export const pinboardManifest = {
       id:        'markReturned', visibility: 'authenticated',
       circleScoped: true,
       verb:      'complete',  // canonical — marks the lend complete.
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'offer', kind: 'lend' },
       params: [
         // Part G dissolve (2026-06-17) — `/lend-return` was declared in
@@ -418,7 +421,7 @@ export const pinboardManifest = {
       id:   'leaveGroup', visibility: 'authenticated', group: 'admin',
       circleScoped: false,
       verb: 'remove',  // canonical — leaving is a removal of self.
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'keys' },
       appliesTo: { type: 'group-leave' },
       params: [
         { name: 'groupId',     kind: 'string',  required: true, ...ID_NONEMPTY },
@@ -472,7 +475,7 @@ export const pinboardManifest = {
     {
       id:   'signOutOfPod', visibility: 'authenticated',
       verb: 'remove',  // canonical — signing out is removal of session.
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [],
       surfaces: {
         chat:  { hint: 'Sign out of the current Solid pod session.  Mid-sync state may be dropped; the user can sign back in any time.' },
@@ -558,7 +561,7 @@ export const pinboardManifest = {
      */
     {
       id:   'startDm', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'device' },   // opens a DM thread on this device
+      writes: { scope: 'device', what: 'content' },   // opens a DM thread on this device
       appliesTo: { type: ['contact', 'member'] },
       params: [{ name: 'webid', kind: 'string', required: true }],
       surfaces: {
@@ -572,7 +575,7 @@ export const pinboardManifest = {
     // adapter translates the chat-shell {on:'on'|'off'} enum → boolean.
     {
       id:   'setHolidayMode', visibility: 'authenticated', group: 'compose', verb: 'submit',
-      writes: { scope: 'circle' },   // the person's row in this circle's member map
+      writes: { scope: 'circle', what: 'preference' },   // the person's row in this circle's member map
       params: [
         { name: 'on', kind: 'enum', of: ['on', 'off'], required: true },
       ],
@@ -608,7 +611,7 @@ export const pinboardManifest = {
     },
     {
       id:   'addContact', visibility: 'authenticated', group: 'compose', verb: 'add',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       params: [
         { name: 'webid', kind: 'webid',  required: true },
         { name: 'name',  kind: 'string', required: false },
@@ -620,7 +623,7 @@ export const pinboardManifest = {
     },
     {
       id:   'setContactTrust', visibility: 'authenticated', group: 'admin', verb: 'submit',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'contact' },
       params: [
         { name: 'webid', kind: 'webid', required: true },
@@ -636,7 +639,7 @@ export const pinboardManifest = {
       // circles untouched — Contacten folds it away, and the contact's next message brings them back. On every
       // device of the person: the mark rides the own-devices carry, the newer change wins.
       id:   'setContactHidden', visibility: 'authenticated', group: 'admin', verb: 'submit',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'preference' },
       appliesTo: { type: 'contact' },
       resolves: [{ field: 'hidden', policy: 'content' }],   // a dropped hide heals on the next carry; the newer `hiddenAt` wins on landing
       params: [
@@ -681,7 +684,7 @@ export const pinboardManifest = {
       // someone else, a file, a turn larger than the bound).
       id:   'holdMessageRequest', visibility: 'private', verb: 'add',
       circleScoped: false,   // a person's own request, never a circle's
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'content' },
       appliesTo: { type: 'message-request' },
       resolves: [{ field: 'turns', policy: 'content' }],   // the held turns merge by union between the person's devices
       params: [
@@ -703,7 +706,7 @@ export const pinboardManifest = {
       // turns there; the Contacten section's button is that function. Not typed: a typed accept would drop the turns.
       id:   'acceptMessageRequest', visibility: 'authenticated', group: 'admin', verb: 'submit',
       circleScoped: false,
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'message-request' },
       resolves: [{ field: 'contact', policy: 'content' }],
       params: [
@@ -718,7 +721,7 @@ export const pinboardManifest = {
       // off every device of the person). Not typed: blocking from a request is the Contacten section's button.
       id:   'removeMessageRequest', visibility: 'authenticated', verb: 'remove',
       circleScoped: false,
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'content' },
       appliesTo: { type: 'message-request' },
       params: [
         { name: 'from',    kind: 'string', required: true, ...ID_NONEMPTY },
@@ -728,7 +731,7 @@ export const pinboardManifest = {
     },
     {
       id:   'ignoreMessageRequest', visibility: 'authenticated', group: 'admin', verb: 'submit',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'preference' },
       appliesTo: { type: 'message-request' },
       resolves: [{ field: 'state', policy: 'content' }],   // the newer write wins between the person's devices; a later turn keeps the mark
       params: [
@@ -748,7 +751,7 @@ export const pinboardManifest = {
       // The share screen's write, once per showing: never typed (a typed link would be a link nobody sees the state of).
       id:   'mintSharedCard', visibility: 'authenticated', verb: 'add',
       circleScoped: false,
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'shared-card' },
       resolves: [{ field: 'token', policy: 'content' }],   // a new row per link: nothing to merge but its use (the claim)
       params: [{ name: 'persona', kind: 'string', required: false }],
@@ -766,7 +769,7 @@ export const pinboardManifest = {
     {
       id:   'withdrawSharedCard', visibility: 'authenticated', group: 'admin', verb: 'remove',
       circleScoped: false,
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'shared-card' },
       params: [
         { name: 'token',   kind: 'string', required: true, ...ID_NONEMPTY },
@@ -781,7 +784,7 @@ export const pinboardManifest = {
       // The opener's side: the token a contact row kept (it came from a shared link) left with the first turn to them.
       id:   'clearContactLinkToken', visibility: 'private', verb: 'submit',
       circleScoped: false,
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'contact' },
       resolves: [{ field: 'linkToken', policy: 'content' }],
       params: [{ name: 'webid', kind: 'string', required: true, ...ID_NONEMPTY }],
@@ -792,7 +795,7 @@ export const pinboardManifest = {
       // first-wins claim between the person's devices.
       id:   'useSharedCard', visibility: 'private', verb: 'submit',
       circleScoped: false,
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'shared-card' },
       resolves: [{ field: 'assignee', policy: 'claim' }],
       params: [
@@ -809,7 +812,7 @@ export const pinboardManifest = {
       // header; the row travels to the person's other devices and the newer `personaAt` wins, like `hiddenAt`. The
       // release itself is said on the pair circle by the device where the change was made (`contactLens.js`).
       id:   'setContactPersona', visibility: 'authenticated', group: 'admin', verb: 'submit',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'contact' },
       resolves: [{ field: 'persona', policy: 'content' }],
       params: [
@@ -830,7 +833,7 @@ export const pinboardManifest = {
       // A contact's CURRENT person key: taken on first sight (the card), else verified as a chain of links from the
       // version already on record. Reached by the card scan and by the person-key chain lane — no surface of its own.
       id:   'setContactPersonKey', visibility: 'authenticated', group: 'data', verb: 'submit',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'keys' },
       appliesTo: { type: 'contact' },
       // Versions are monotonic and chain-verified at the receiver — two of my devices converge on the highest version
       // the chain reaches; content, not a claim.
@@ -865,7 +868,7 @@ export const pinboardManifest = {
     {
       id:   'conflictDisputeWizard', visibility: 'authenticated',
       circleScoped: false, verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       // per-bubble action on pinboard posts. Slash kept for
       // general-dispute (no postId) + LLM tool-call surface.
       appliesTo: { type: 'post', state: ['open'] },
@@ -882,7 +885,7 @@ export const pinboardManifest = {
     {
       id:   'postAudienceWizard', visibility: 'authenticated',
       circleScoped: false, verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       params: [
         { name: 'text', kind: 'string', required: false },
       ],
@@ -894,7 +897,7 @@ export const pinboardManifest = {
     },
     {
       id:   'createGroupWizard', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params: [],
       surfaces: {
         slash: { command: '/create-group' },
@@ -904,7 +907,7 @@ export const pinboardManifest = {
     },
     {
       id:   'joinGroupWizard', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params: [
         { name: 'invite', kind: 'string', required: true },
       ],
@@ -966,7 +969,7 @@ export const pinboardManifest = {
       // stale — the shells offer this from the stale-rules banner, so no slash surface is invented.
       id:   'acceptGroupRules', visibility: 'authenticated',
       circleScoped: false, verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       // A member's acceptance is SELF-ONLY (the fold ignores anyone else's statement about them) and
       // versions are monotonic, so two of their own devices converge on the causally-later acceptance —
       // content, not a claim: nobody races for exclusive ownership of someone's own consent.
@@ -993,7 +996,7 @@ export const pinboardManifest = {
       id:   'listOfferingCategories', visibility: 'authenticated', verb: 'list',
       // The offering taxonomy with localised labels; `lang` picks the label set.
       params: [{ name: 'lang', kind: 'string' }],
-      surfaces: { chat: { hint: 'The offering-category taxonomy with localised labels; pass `lang` for the label set.' } , ui: { control: 'page' } },
+      surfaces: { ui: { control: 'page' } },
     },
 
     // ── Where you are ───────────────────────────────────────────────
@@ -1001,7 +1004,7 @@ export const pinboardManifest = {
     // place into coordinates without storing anything — it is the lookup, not the setting.
     {
       id:   'setMyLocation', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },   // the person's row in this circle's member map
+      writes: { scope: 'circle', what: 'control' },   // the person's row in this circle's member map
       // One value, so the newest wins. A location is content, not a claim: two devices setting it
       // concurrently is a person moving, not a contest, and either answer is defensible.
       resolves: [{ field: 'location', policy: 'content' }],
@@ -1014,7 +1017,7 @@ export const pinboardManifest = {
     },
     {
       id:   'clearMyLocation', visibility: 'authenticated', verb: 'remove',
-      writes: { scope: 'circle' },   // the person's row in this circle's member map
+      writes: { scope: 'circle', what: 'control' },   // the person's row in this circle's member map
       params: [],
       surfaces: { chat: { hint: "Remove this person's stored location entirely." } , ui: { control: 'button' } },
     },
@@ -1041,7 +1044,7 @@ export const pinboardManifest = {
     // in another, and nothing links the two. That is why listMyHandles is plural.
     {
       id:   'setMyHandle', visibility: 'authenticated', verb: 'set',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'preference' },
       params: [{ name: 'handle', kind: 'string', required: true, ...STR_NONEMPTY }],
       surfaces: {
         chat: { hint: "Set this person's handle in the current circle. Refuses if the handle is taken there." },
@@ -1050,7 +1053,7 @@ export const pinboardManifest = {
     },
     {
       id:   'setMyDisplayName', visibility: 'authenticated', verb: 'set',
-      writes: { scope: 'circle' },   // the person's row in this circle's member map
+      writes: { scope: 'circle', what: 'preference' },   // the person's row in this circle's member map
       params: [{ name: 'displayName', kind: 'string', required: true, ...STR_NONEMPTY }],
       surfaces: {
         chat: { hint: 'Set the display name others see for this person.' },
@@ -1079,7 +1082,7 @@ export const pinboardManifest = {
     // enforced on the device and at the relay; holding a token buys no right to interrupt.
     {
       id:   'subscribeWebPush', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [{ name: 'subscription', kind: 'object', required: true }],
       resolves: [{ field: 'subscription', policy: 'content' }],
       surfaces: {
@@ -1089,7 +1092,7 @@ export const pinboardManifest = {
     },
     {
       id:   'unsubscribeWebPush', visibility: 'authenticated', verb: 'remove',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [{ name: 'endpoint', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
         chat: { hint: 'Remove a web-push subscription by endpoint.' },
@@ -1098,7 +1101,7 @@ export const pinboardManifest = {
     },
     {
       id:   'subscribeExpoPush', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [{ name: 'token', kind: 'string', required: true, ...ID_NONEMPTY }],
       resolves: [{ field: 'token', policy: 'content' }],
       surfaces: {
@@ -1108,7 +1111,7 @@ export const pinboardManifest = {
     },
     {
       id:   'unsubscribeExpoPush', visibility: 'authenticated', verb: 'remove',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [{ name: 'token', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
         chat: { hint: "Remove this device's Expo push token." },
@@ -1140,7 +1143,7 @@ export const pinboardManifest = {
     {
       id:   'setCircleStoragePolicy', visibility: 'authenticated',
       circleScoped: false, verb: 'set',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params: [
         { name: 'groupId',       kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'storagePolicy', kind: 'string', required: true, ...STR_NONEMPTY },
@@ -1175,7 +1178,7 @@ export const pinboardManifest = {
     {
       // closing a circle an admin removed you from: forgets what this device held of it (refused for one you are in)
       id:   'dismissRemovedCircle', visibility: 'private', verb: 'remove',
-      writes: { scope: 'device' },   // this device's copy only: nothing reaches a member
+      writes: { scope: 'device', what: 'keys' },   // this device's copy only: nothing reaches a member
       circleScoped: false,
       params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
@@ -1190,7 +1193,6 @@ export const pinboardManifest = {
         { name: 'sinceMs', kind: 'number' },
       ],
       surfaces: {
-        chat: { hint: 'Posts in one circle since a timestamp — the bulletin catch-up.' },
         ui:   { control: 'page' },
       },
     },
@@ -1199,7 +1201,6 @@ export const pinboardManifest = {
       // The cheap "is there anything new" probe — a timestamp, so a poll costs one number rather than a feed.
       params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
-        chat: { hint: 'When the newest post in a circle arrived — the cheap freshness probe.' },
         ui:   { control: 'page' },
       },
     },
@@ -1209,7 +1210,6 @@ export const pinboardManifest = {
       // membership: being in a circle is not by itself permission to be contacted.
       params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
-        chat: { hint: 'Members of a circle who have consented to be reached.' },
         ui:   { control: 'page' },
       },
     },
@@ -1238,7 +1238,7 @@ export const pinboardManifest = {
     // params below are the SUBSTRATE's contract for those — read from circles, not guessed from the wrapper.
     {
       id:   'createGroupV2', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       // Logic: @onderling/circles circleCreate.js
       params: [
         { name: 'groupId',               kind: 'string', required: true, ...ID_NONEMPTY },
@@ -1259,7 +1259,7 @@ export const pinboardManifest = {
     },
     {
       id:   'redeemMembershipCode', visibility: 'authenticated', verb: 'submit',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       // Logic: @onderling/circles circleMembershipWriters.js. The joiner presents their own per-circle
       // address WITH its proof; an unproven address is dropped at the substrate, never recorded.
       params: [
@@ -1276,7 +1276,7 @@ export const pinboardManifest = {
     },
     {
       id:   'verifyMembershipCodeForPeer', visibility: 'authenticated', verb: 'confirm',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       // Logic: @onderling/circles. The ADMIN half of the peer-bridge join: when a joiner cannot redeem
       // locally, the admin verifies and answers with a statement the joiner mirrors.
       params: [
@@ -1294,7 +1294,7 @@ export const pinboardManifest = {
     },
     {
       id:   'recordRemoteRedemption', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       // The JOINER's local mirror of an admin-confirmed join. Carries both sides' per-circle addresses with
       // their proofs, so the joiner can reach the admin afterwards even with address-fallback off.
       params: [
@@ -1318,7 +1318,7 @@ export const pinboardManifest = {
     },
     {
       id:   'acknowledgeCaretaker', visibility: 'authenticated', verb: 'update',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       // The caretaker signs for the appointment nobody made. When the last admin leaves, the roster
       // fold appoints a successor — derived, so that every device reaches it alone and offline, and
       // therefore silently: nothing recorded that it happened. This is the record.
@@ -1349,7 +1349,7 @@ export const pinboardManifest = {
     },
     {
       id:   'setMemberRole', visibility: 'authenticated', verb: 'update',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       // Promote a member to admin, or demote an admin back to member. The producer for the
       // membership lane's `role` statement kind, which was declared with nothing writing it.
       //
@@ -1383,7 +1383,7 @@ export const pinboardManifest = {
     },
     {
       id:   'removeMember', visibility: 'authenticated', verb: 'remove',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       // Logic: @onderling/circles. Admin-only, and NOT just a roster edit — it forces a key rotation and
       // reseal, so a removed member cannot read what comes next. The island guarantee.
       params: [
@@ -1423,7 +1423,7 @@ export const pinboardManifest = {
     },
     {
       id:   'rotateMyGroupCode', visibility: 'authenticated', verb: 'revoke',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       // Rotating INVALIDATES the old code — that is the point, and why it is `revoke` rather than `update`.
       params: [
         { name: 'groupId',               kind: 'string', required: true, ...ID_NONEMPTY },
@@ -1438,7 +1438,7 @@ export const pinboardManifest = {
     },
     {
       id:   'editGroupRules', visibility: 'authenticated', verb: 'update',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'rules',   kind: 'object', required: true },
@@ -1457,7 +1457,7 @@ export const pinboardManifest = {
       // The rules-update rider's RECEIVE half: land a peer-carried rules doc as the local mirror
       // head (idempotent by version; the statement's admin authority is verified at the caller).
       id:   'recordGroupRulesUpdate', visibility: 'authenticated', verb: 'update',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params: [
         { name: 'groupId',   kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'rules',     kind: 'object', required: true },
@@ -1475,7 +1475,7 @@ export const pinboardManifest = {
       // id-preserved so the roster projection has a head on a trail-less device. Device-set
       // authority is verified at the receiving module; this op guards shape + idempotency.
       id:   'recordRosterSeed', visibility: 'authenticated', verb: 'update',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'rows',    kind: 'object', required: true },
@@ -1502,7 +1502,7 @@ export const pinboardManifest = {
     {
       id:   'postAnnouncement', visibility: 'authenticated',
       circleScoped: true, verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'text',    kind: 'string', required: true, ...STR_NONEMPTY },
@@ -1525,7 +1525,7 @@ export const pinboardManifest = {
     // ── Reaching each other ─────────────────────────────────────────
     {
       id:   'addContactFromQr', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       params: [
         { name: 'linkToken', kind: 'string', required: false },   // a shared link's one-time token (L806)
         { name: 'payload', kind: 'string', required: true },   // the card as scanned or pasted (`onderling-contact://…`): every caller passes a string; the skill refuses anything else
@@ -1544,7 +1544,7 @@ export const pinboardManifest = {
     {
       id:   'acceptResponder', visibility: 'authenticated',
       circleScoped: false, verb: 'confirm',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       params: [
         { name: 'requestId',       kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'responderWebid',  kind: 'string', required: true, ...ID_NONEMPTY },
@@ -1563,7 +1563,7 @@ export const pinboardManifest = {
     // The INGEST ops take `fromPeerAddr` + `fromPubKey` from the AUTHENTICATED envelope, never the payload.
     {
       id:   'broadcastCircleGovernance', visibility: 'authenticated', verb: 'share',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'event',   kind: 'object', required: true },
@@ -1577,7 +1577,7 @@ export const pinboardManifest = {
     },
     {
       id:   'broadcastCircleKeyStatement', visibility: 'authenticated', verb: 'share',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'keys' },
       // The group-key lane's fan. Like the other lanes' broadcasts this goes through the circle
       // fan-out core, so the statement leaves under the sender's PER-CIRCLE address — a raw
       // sendPeerMessage signs with the canonical identity, which every receiver refuses inside a
@@ -1593,11 +1593,12 @@ export const pinboardManifest = {
       surfaces: {
         chat: { hint: 'Fan a signed group-key statement (establish/rotate) to a circle\u2019s current key recipients.' },
         ui:   { control: 'page' },
+        actState: 'none',   // background: the key fan-out a made circle or a rotation sets off; never a person's act
       },
     },
     {
       id:   'broadcastCircleMembership', visibility: 'authenticated', verb: 'share',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'event',   kind: 'object', required: true },
@@ -1611,7 +1612,7 @@ export const pinboardManifest = {
     },
     {
       id:   'broadcastCircleChatStatement', visibility: 'authenticated', verb: 'share',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'event',   kind: 'object', required: true },
@@ -1627,7 +1628,7 @@ export const pinboardManifest = {
     },
     {
       id:   'broadcastCircleItems', visibility: 'authenticated', verb: 'share',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'event',   kind: 'object', required: true },
@@ -1641,7 +1642,7 @@ export const pinboardManifest = {
     },
     {
       id:   'broadcastCircleRules', visibility: 'authenticated', verb: 'share',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       params: [
         { name: 'groupId',    kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'rulesDoc',   kind: 'object', required: true },
@@ -1650,13 +1651,13 @@ export const pinboardManifest = {
         { name: 'ts',         kind: 'number' },
       ],
       surfaces: {
-        chat: { hint: "Fan a circle's rules document to its members." },
+        actState: 'none',   // background: the rules fan a circle's change sets off; never a person's act (L1025 prune)
         ui:   { control: 'page' },
       },
     },
     {
       id:   'broadcastCircleRecipe', visibility: 'authenticated', verb: 'share',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       params: [
         { name: 'groupId',    kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'recipe',     kind: 'object', required: true },
@@ -1671,7 +1672,7 @@ export const pinboardManifest = {
     },
     {
       id:   'broadcastCircleAddresses', visibility: 'authenticated', verb: 'share',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       // Logic: @onderling/circles fanCircleAddresses. The send half of address announcing — each
       // announcement carries its own proof, and the receiver verifies before recording.
       params: [
@@ -1688,7 +1689,7 @@ export const pinboardManifest = {
     },
     {
       id:   'recordCircleAddressAnnouncement', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       // Logic: @onderling/circles recordCircleAddress. The RECEIVE half — the proof is verified here and
       // an unproven address is dropped, which is what stops a peer claiming somebody else's address.
       params: [

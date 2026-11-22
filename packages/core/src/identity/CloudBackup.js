@@ -41,6 +41,7 @@
  *   - `Design-v3/identity-pod-schema.md` §RecoveryHint.
  */
 import nacl              from 'tweetnacl';
+import { secretboxSeal, secretboxOpen } from '../crypto/secretbox.js';   // secretbox behind the port a shell may speed up (L619)
 import { argon2id }      from '@noble/hashes/argon2.js';
 
 import { Bootstrap }                       from './Bootstrap.js';
@@ -174,7 +175,7 @@ export class CloudBackup {
     const payloadBytes = utf8encode(JSON.stringify(payload));
 
     // 4. Encrypt.
-    const ct = nacl.secretbox(payloadBytes, nonce, key);
+    const ct = secretboxSeal(payloadBytes, nonce, key);
 
     // 5. Wrap envelope (Argon2 params included so restore can re-derive
     //    even if defaults change in future versions).
@@ -238,7 +239,7 @@ export class CloudBackup {
     // 4. Decrypt — null = wrong passphrase or tamper.
     const ct    = b64decode(env.ct);
     const nonce = b64decode(env.nonce);
-    const plain = nacl.secretbox.open(ct, nonce, key);
+    const plain = secretboxOpen(ct, nonce, key);
     if (!plain) {
       throw _err(
         'CLOUD_BACKUP_DECRYPT_FAILED',

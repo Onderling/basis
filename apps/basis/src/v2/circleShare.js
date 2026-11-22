@@ -22,6 +22,7 @@
  * shareIntoAudience / resolveSharedRef expect (they call getStore(circleId) synchronously).
  */
 import { shareIntoAudience, resolveSharedRef, listShared, unsealItem, isCanonicalPosture, shareContainerTree } from '@onderling/item-store';
+import { gateRefusalKey } from './circleActGate.js';
 import { normalizeCirclePolicy } from './circlePolicy.js';
 
 /**
@@ -74,6 +75,17 @@ function sealPromiseUnmet(policy, enforcement) {
  */
 export function outOfCircleShareOffered(policy) {
   return normalizeCirclePolicy(policy).shareOutOfCircle !== 'prohibit';
+}
+
+/**
+ * The words for a share that failed, the SAME on every shell: a source circle that refused the share's own write
+ * (`circle-refuses`) is told in the gate's words (`gateRefusalKey`); a person-share's other failures keep their
+ * template; a circle share's known codes their own key.
+ * @param {{error?: string, code?: string}|null} reply @param {{toPerson?: boolean}} [o]
+ */
+export function shareFailureKey(reply, { toPerson = false } = {}) {
+  if (reply?.error === 'circle-refuses') return gateRefusalKey(reply.code);
+  return toPerson ? 'circle.share.to_person_failed' : shareErrorStatusKey(reply?.error);
 }
 
 export function shareErrorStatusKey(code) {
@@ -178,7 +190,7 @@ export function makeCrossCircleStores(storeByCircle) {
  */
 export async function shareItemAcrossCircles({
   resolveService, itemId, fromCircleId, toCircleId, by,
-  recipient, recipients, recipientKeys, sealCopy, enforcementFor, postureOf, policyOf,
+  recipient, recipients, recipientKeys, sealCopy, enforcementFor, postureOf, policyOf, mayWriteInto,
 } = {}) {
   if (typeof resolveService !== 'function' || !itemId || !fromCircleId || !toCircleId) {
     return { ok: false, error: 'missing-args' };
@@ -219,8 +231,22 @@ export async function shareItemAcrossCircles({
 
   return shareOneResolved({
     stores, itemId, fromCircleId, toCircleId, by, posture,
-    recipient, recipients, recipientKeys, sealCopy, enforcement, postureOf,
+    recipient, recipients, recipientKeys, sealCopy, enforcement, postureOf, mayWriteInto,
   });
+}
+
+/**
+ * A SHARE'S OWN WRITE INTO ITS SOURCE CIRCLE asks that circle first, as its receivers will judge it: a copy
+ * (`sharedCopyOf`) is an add of the item's own type there, an in-place re-seal a change. Refused → the share stops
+ * before any write (no copy, no ref) with the refusal, which the caller tells in the door's words
+ * (`gateRefusalKey`). The `shared-ref` itself is not asked: no manifest declares it, so no receiver judges it.
+ * `mayWriteInto` is the agent's (`writeIntoRefusal` with this device's kept settings changes); absent → not asked.
+ * @returns {Promise<{ok:false, error:'circle-refuses', code:string, refusal:object}|null>}
+ */
+async function sourceRefuses(mayWriteInto, circleId, type, act) {
+  if (typeof mayWriteInto !== 'function') return null;
+  const refusal = await mayWriteInto(circleId, { type, act });
+  return refusal ? { ok: false, error: 'circle-refuses', code: refusal.code, refusal } : null;
 }
 
 /**
@@ -236,7 +262,7 @@ export async function shareItemAcrossCircles({
  */
 async function shareOneResolved({
   stores, itemId, fromCircleId, toCircleId, by, posture,
-  recipient, recipients, recipientKeys, sealCopy, enforcement, postureOf,
+  recipient, recipients, recipientKeys, sealCopy, enforcement, postureOf, mayWriteInto,
 }) {
   const keys = Array.isArray(recipientKeys) ? recipientKeys.filter(Boolean) : [];
 
@@ -275,6 +301,9 @@ async function shareOneResolved({
     const fromStore = stores.getStore(fromCircleId);
     const srcItem = await fromStore.get(itemId);
     if (!srcItem) return { ok: false, error: 'item-not-found' };
+    const refused = await sourceRefuses(mayWriteInto, fromCircleId, srcItem.type, 'add')
+      ?? (enforcement.resealsInPlace ? await sourceRefuses(mayWriteInto, fromCircleId, srcItem.type, 'change') : null);
+    if (refused) return refused;
     let copy;
     try {
       const sealed = await sealCopy(srcItem, keys);
@@ -302,6 +331,11 @@ async function shareOneResolved({
   // item and let the enforcement's injected `seal` (if any) re-wrap IN PLACE, fed the recipients' sealing keys.
   // A copy-reseal posture (copy/trusted/registered) reaches here only when the copy branch's preconditions
   // (pod onShare + a sealer + recipient keys) aren't ALL met, degrading to the pre-re-seal behaviour.
+  if (enforcement?.onShare && enforcement.resealsInPlace) {
+    const srcItem = await stores.getStore(fromCircleId).get(itemId);
+    const refused = srcItem ? await sourceRefuses(mayWriteInto, fromCircleId, srcItem.type, 'change') : null;
+    if (refused) return refused;
+  }
   return shareIntoAudience(stores, {
     itemId, fromCircleId, toCircleId, by, recipient, recipients, recipientKeys: keys, postureOf,
     onShare: enforcement?.onShare,
@@ -327,7 +361,7 @@ async function shareOneResolved({
  */
 export async function shareContainerAcrossCircles({
   resolveService, containerId, fromCircleId, toCircleId, by,
-  recipient, recipients, recipientKeys, sealCopy, enforcementFor, postureOf, policyOf, maxDepth,
+  recipient, recipients, recipientKeys, sealCopy, enforcementFor, postureOf, policyOf, maxDepth, mayWriteInto,
 } = {}) {
   if (typeof resolveService !== 'function' || !containerId || !fromCircleId || !toCircleId) {
     return { ok: false, error: 'missing-args' };
@@ -363,7 +397,7 @@ export async function shareContainerAcrossCircles({
     containerId, fromCircleId, toCircleId, maxDepth,
     shareNode: (itemId) => shareOneResolved({
       stores, itemId, fromCircleId, toCircleId, by, posture,
-      recipient, recipients, recipientKeys, sealCopy, enforcement, postureOf,
+      recipient, recipients, recipientKeys, sealCopy, enforcement, postureOf, mayWriteInto,
     }),
   });
 }
@@ -430,7 +464,7 @@ export async function shareContainerAcrossCircles({
 export async function shareItemToPublishedKey({
   resolveService, itemId, fromCircleId, toCircleId, by,
   recipient, recipientNetworkKey, includeHistory = false, verify,
-  enforcementFor, postureOf, policyOf, sealCopy, sealingKeyFromNetworkKey, notify, post, sendSharedCopy,
+  enforcementFor, postureOf, policyOf, sealCopy, sealingKeyFromNetworkKey, notify, post, sendSharedCopy, mayWriteInto,
 } = {}) {
   if (typeof resolveService !== 'function' || !itemId || !fromCircleId) {
     return { ok: false, error: 'missing-args' };
@@ -463,7 +497,7 @@ export async function shareItemToPublishedKey({
   if (outOfCircle === 'silent') {
     return shareSilentCopyToPublishedKey({
       stores, fromCircleId, toCircleId, itemId, by, recipient, recipientNetworkKey,
-      enforcement, sealCopy, sealingKeyFromNetworkKey, postureOf, sendSharedCopy,
+      enforcement, sealCopy, sealingKeyFromNetworkKey, postureOf, sendSharedCopy, mayWriteInto,
     });
   }
 
@@ -475,7 +509,7 @@ export async function shareItemToPublishedKey({
   if (enforcement?.leaveAudienceNeedsCopy) {
     const copyResult = await shareSilentCopyToPublishedKey({
       stores, fromCircleId, toCircleId, itemId, by, recipient, recipientNetworkKey,
-      enforcement, sealCopy, sealingKeyFromNetworkKey, postureOf, sendSharedCopy,
+      enforcement, sealCopy, sealingKeyFromNetworkKey, postureOf, sendSharedCopy, mayWriteInto,
     });
     if (copyResult.ok) {
       await emitOutOfCircleNotice({
@@ -568,11 +602,16 @@ async function grantToPublishedKey({ stores, fromCircleId, toCircleId, itemId, b
  */
 async function shareSilentCopyToPublishedKey({
   stores, fromCircleId, toCircleId, itemId, by, recipient, recipientNetworkKey,
-  enforcement, sealCopy, sealingKeyFromNetworkKey, postureOf, sendSharedCopy,
+  enforcement, sealCopy, sealingKeyFromNetworkKey, postureOf, sendSharedCopy, mayWriteInto,
 }) {
   const fromStore = stores.getStore(fromCircleId);
   const srcItem = await fromStore.get(itemId);
   if (!srcItem) return { ok: false, error: 'item-not-found' };
+  // every branch below writes a copy into the source (sealed, or plain on the memory path); the grant hook may
+  // also re-seal that copy in place
+  const refused = await sourceRefuses(mayWriteInto, fromCircleId, srcItem.type, 'add')
+    ?? (enforcement?.resealsInPlace ? await sourceRefuses(mayWriteInto, fromCircleId, srcItem.type, 'change') : null);
+  if (refused) return refused;
 
   // Best-effort relay delivery of the minted copy to the recipient's peer (their network key = their address).
   const deliverCopy = async (copy) => {

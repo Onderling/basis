@@ -340,25 +340,6 @@ export const KNOWN_HOLES = Object.freeze([
             + 'already works (`test/twoRelaysNoLinkage.test.js`).',
     filedIn: 'docs/decisions.md 2026-07-27 — accepted knowingly.',
   },
-  {
-    id: 'live-proxy-of-a-registration-challenge',
-    leaks: 'Nothing by itself — it is the residue of the hole that closed. Proof of possession '
-         + 'binds a registration to a nonce THIS relay issued, which kills capture-and-replay: a '
-         + 'proof is useless at another relay and at another time. It does not kill a LIVE PROXY. A '
-         + 'hostile relay a client is connected to can fetch a challenge from a THIRD relay, hand it '
-         + 'over as its own, and forward the answer — registering that client\'s address there and '
-         + 'taking over its inbound traffic on a relay the client never chose.',
-    reachableOnlyIf: 'The client is connected to a hostile relay AND the address is (or would be) '
-                   + 'used on another relay at the same time. Costly and targeted, unlike the claim '
-                   + 'anyone could make before Decision 3.',
-    guard: 'None yet, and that is stated rather than implied. Closing it needs the signed message to '
-         + 'name WHICH relay it is for — an audience — which needs a relay to have an identity it '
-         + 'can prove. Relays have no key today, and a url an operator configures is a knob whose '
-         + 'wrong value is invisible, which is the failure mode Decision 3 exists to avoid.',
-    exitPath: 'Add an audience field to `addressPossessionMessage` the day a relay has a verifiable '
-            + 'identity of its own (a key, or a proven url).',
-    filedIn: 'plans/DECISIONS-FOR-REVIEW.md, 2026-07-31, 🟡 · packages/core/src/identity/addressPossession.js header.',
-  },
 ]);
 // `unproven-registration` was the third entry here until 2026-07-31, and it read: *"anyone may
 // register any address"* — the relay believed `{type:'register', address}` and `clients.set`
@@ -367,7 +348,13 @@ export const KNOWN_HOLES = Object.freeze([
 // challenge-first, an address is a public key, and the only path to a routing-table entry runs
 // through a signature over a fresh single-use nonce. Recorded here rather than deleted silently,
 // because a hole that vanishes without a note reads the same as a hole nobody noticed — and what
-// remains of it is the entry above, which is a different and much narrower thing.
+// remains of it was `live-proxy-of-a-registration-challenge`, a different and much narrower thing.
+// `live-proxy-of-a-registration-challenge` was the last entry here until 2026-11-21: a hostile relay a client is
+// connected to could fetch a challenge from a third relay, hand it over as its own and forward the answer. Closed by
+// naming the relay in the signed message: the device signs the host it DIALLED (which TLS proves to it), and a relay
+// accepts a proof only when that name is one of its own (the Host the connection came in on, or a configured name
+// behind a proxy). A passed-on challenge gets an answer naming the hostile relay, which the honest one refuses
+// (`test/proofNamesItsRelay.test.js`).
 
 /* ════════════════════════════════════════════════════════════════════════════════════════════════
  * PART 2 — the dynamic side: what a relay may derive from a session, and what it may never.
@@ -496,7 +483,7 @@ export const WIRE_FRAMES = Object.freeze({
   // new frames carry an address the relay was going to be told anyway plus opaque random bytes, so
   // neither widens what a relay may learn — but they are listed, because an unmapped frame fails
   // this harness and that is exactly the property that must survive the protocol growing.
-  'register-proof':             { fact: 'address-possession',    allowedKeys: ['type', 'address', 'nonce', 'proof'] },
+  'register-proof':             { fact: 'address-possession',    allowedKeys: ['type', 'address', 'nonce', 'proof', 'relay'] },
   'send':                       { fact: 'message-hop',           allowedKeys: ['type', 'to', 'envelope', 'topic'] },
   'peer-list':                  { fact: 'peer-list',             allowedKeys: ['type', 'peers'] },
   'register-push-token':        { fact: 'push-token',            allowedKeys: ['type', 'token', 'platform'] },

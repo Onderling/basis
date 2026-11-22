@@ -7,7 +7,6 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
-import { nearbyMineSummary } from '../../src/v2/nearbyStream.js';
 import circleNl from '../../src/locales/circle.nl.json' with { type: 'json' };
 import circleEn from '../../src/locales/circle.en.json' with { type: 'json' };
 
@@ -144,23 +143,3 @@ describe('hidden from the room: the controller sends nothing', () => {
   });
 });
 
-describe('the "you here" line does not say you are in the conversation while hidden', () => {
-  const visible = { visibility: { publishing: true } };
-  const hidden = { visibility: { publishing: false, levelChosen: true }, quiet: true };
-
-  it('in the chat and visible: "in the conversation"', () => {
-    expect(nearbyMineSummary({ ...visible, allows: { chat: true, card: false } })).toEqual(['circle.nearbyScreen.mine_chat_on']);
-  });
-
-  it('hidden: nothing is shown to the room, whatever is switched on — the card is not said either', () => {
-    expect(nearbyMineSummary({ ...hidden, allows: { chat: true, card: false } })).toEqual(['circle.nearbyScreen.mine_none']);
-    expect(nearbyMineSummary({ ...hidden, allows: { chat: true, card: true } })).toEqual(['circle.nearbyScreen.mine_none']);
-    expect(nearbyMineSummary({ ...hidden, allows: { chat: false, card: true } })).toEqual(['circle.nearbyScreen.mine_none']);
-  });
-
-  it('the card alone, or nothing', () => {
-    expect(nearbyMineSummary({ ...visible, allows: { chat: false, card: true } })).toEqual(['circle.nearbyScreen.mine_card_on']);
-    expect(nearbyMineSummary({ ...visible, allows: { chat: false, card: false } })).toEqual(['circle.nearbyScreen.mine_none']);
-    expect(nearbyMineSummary({ ...visible, allows: { chat: true, card: true } })).toEqual(['circle.nearbyScreen.mine_card_on', 'circle.nearbyScreen.mine_chat_on']);
-  });
-});

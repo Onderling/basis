@@ -19,15 +19,22 @@
  * @param {string} a.circleId
  * @param {string|null} [a.selfWebid]            this device's person (its row is never a target)
  * @param {() => boolean} [a.allowGlobal]        the address-fallback setting, read live; absent = off
- * @returns {Promise<Array<{webid: string, addr: string, via: 'circle-address'|'webid'}>>}
+ * @param {string|null} [a.ownDevicesExcept]     this device's own address here: when given, this person's OTHER devices
+ *   in the circle (the other proven addresses on their own row) are targets too, first and marked `own: true`
+ * @returns {Promise<Array<{webid: string, addr: string, via: 'circle-address'|'webid', own?: true}>>}
  */
-export async function catchUpTargets({ callSkill, circleId, selfWebid = null, allowGlobal = null } = {}) {
+export async function catchUpTargets({ callSkill, circleId, selfWebid = null, allowGlobal = null, ownDevicesExcept = null } = {}) {
   if (typeof callSkill !== 'function' || typeof circleId !== 'string' || !circleId) return [];
   let rows = [];
   try { rows = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { return []; }
   let global = false;
   try { global = typeof allowGlobal === 'function' && allowGlobal() === true; } catch { global = false; }
   const out = []; const seen = new Set();
+  if (typeof ownDevicesExcept === 'string' && ownDevicesExcept && selfWebid) {
+    const mine = (Array.isArray(rows) ? rows : []).find((m) => (m?.webid ?? m?.addr ?? m?.ref) === selfWebid);
+    const addrs = [...new Set([mine?.circleAddress, ...(Array.isArray(mine?.circleAddresses) ? mine.circleAddresses : [])])];
+    for (const a of addrs) if (typeof a === 'string' && a && a !== ownDevicesExcept) out.push({ webid: selfWebid, addr: a, via: 'circle-address', own: true });
+  }
   for (const m of Array.isArray(rows) ? rows : []) {
     const webid = m?.webid ?? m?.addr ?? m?.ref ?? null;
     if (typeof webid !== 'string' || !webid || webid === selfWebid || seen.has(webid)) continue;

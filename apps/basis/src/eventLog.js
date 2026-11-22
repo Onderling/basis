@@ -22,7 +22,7 @@
 
 import { matchesFilter } from './filter.js';
 import {
-  ENTRY_KINDS, isSystemKind, isAuditKind, kindWakes, retentionOf, RETENTION_DEFAULTS,
+  ENTRY_KINDS, isSystemKind, isAuditKind, kindWakes, retentionOf, retentionOfEntry, RETENTION_DEFAULTS,
 } from '@onderling/item-store';
 import { log } from '@onderling/logger';
 
@@ -391,7 +391,7 @@ export class EventLog {
    * @returns {number}
    */
   setRetention(patch = {}) {
-    for (const k of ['short', 'chat', 'audit', 'room']) {
+    for (const k of ['short', 'chat', 'audit', 'room', 'own']) {
       if (typeof patch?.[k] === 'number' && patch[k] >= 0) this.#retention[k] = patch[k];
     }
     const dropped = this.prune();
@@ -451,6 +451,24 @@ export class EventLog {
   }
 
   /**
+   * WIPE one kind of the person's own record on this device: every entry of that kind, at their explicit ask (the
+   * record of their own acts, `own-action`, from My data). Not retention and not the conversation purge. An AUDIT kind
+   * is never dropped this way: a trail that can be wiped silently looks complete. Persists the shrunk log; returns how
+   * many entries went (the confirmation the screen says back).
+   *
+   * @param {string} type
+   * @returns {number}
+   */
+  dropKind(type) {
+    if (typeof type !== 'string' || !type || isAuditKind(type)) return 0;
+    const before = this.#events.length;
+    this.#events = this.#events.filter((e) => e.type !== type);
+    const dropped = before - this.#events.length;
+    if (dropped) { this.#changed(); this.#persist(this.#events.slice()).catch(() => {}); }
+    return dropped;
+  }
+
+  /**
    * COMPACT named entries in place — the ONE way a RECORD-class entry ever changes after it was written, and
    * only for a set the FOLD computed (L121: `member-props` statements every device agrees are dead —
    * `rosterFold.superseded`). The entry is not dropped: dropping it would shorten the author's chain and move
@@ -504,7 +522,7 @@ export class EventLog {
     const fold = [];
     for (const e of this.#events) {
       if (e.type === 'audit-summary') { keep.push(e); continue; }   // a fold never expires
-      const cls = retentionOf(e.type);
+      const cls = retentionOfEntry(e);   // a record statement inside an audit lane (`RECORD_STATEMENTS`) never expires
       // RECORD-class kinds never expire — the entry IS the record. Membership (the roster refolds from
       // these; one dropping away silently changes who-is-in on rebuild) and chat messages (the
       // conversation's record — dropping them is data destruction). Table-driven, not a per-kind hardcode.

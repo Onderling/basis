@@ -1,12 +1,21 @@
 # The person's own assistant (the "+")
 
-The "+" on every tab is a conversation with the person's OWN assistant: one kept thread per self, read by fixed
+The "+" sits in the middle of the tab bar (its place is declared in the manifest, `plus`) and opens into round buttons:
+Chat, Scan and My QR. Chat, on the "+"'s own spot by default, is a conversation with the person's OWN assistant: one kept thread per self, read by fixed
 phrases first and by the person's own model when one is set. It works on the person's own things only (own notes,
 own appointments, own lists); a circle's act reaches it through the which-circle card. Started 2026-11-17 with the
 assistant-thread build.
 
 ## What a person can do
 
+- Open the "+" in the tab bar into its round buttons and fold them back with a touch outside, the back gesture (phone)
+  or Escape (web). A double tap lands in the chat. Scan is the `scanQr` op and My QR the share-my-contact view, the same
+  doors as before (share my card is also in the persona panel). Choose per device which button sits on the "+"'s own spot, or none (then a second tap closes it): the
+  `plus.middle` setting under Appearance (`src/v2/plusDial.js`).
+- Choose per persona how far the "+" goes (`setPlusCeiling`, kept on the persona as `_plus.ceiling`, inherited from
+  the general persona): nothing (no model for it; the "+" and its chat stay), only looking things up, also their own things, or also their
+  circles' things after their yes on a card (the default). The "+" offers nothing heavier than that (`opWeight`,
+  `withinWeight`), and can never change it: the op weighs as the person's control and has no chat surface.
 - Ask in their own words ("wat kan je voor me doen?", "waar ligt de sleutel?") and get an answer in words from their
   own model, which is told it is their own place and reads their own notes, appointments and lists, as the self that
   is ticked.
@@ -49,6 +58,7 @@ assistant-thread build.
 
 <!-- catalogue-ops
 assistant: assistant-memory assistant-forget assistant-language
+agents: setPlusCeiling getPlusCeiling
 -->
 
 ## Proof

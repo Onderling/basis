@@ -33,7 +33,8 @@ import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import FaceView from './FaceView.js';
 import { t } from '../../core/localisation.js';
-import { identityLineWords, agentRowWords } from '../../../../basis/src/v2/mijWords.js';
+import { agentRowWords } from '../../../../basis/src/v2/mijWords.js';
+import { awaitingTitle } from '../../../../basis/src/v2/awaiting.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { whereTag } from '../../../../basis/src/v2/rowWhere.js';
 import { typedRowOp } from '../../../../basis/src/v2/rowPrimary.js';
@@ -221,7 +222,7 @@ function renderAwaiting(block, onAction, styles) {
   const items = block.content?.items ?? [];
   return (
     <View>
-      <Text style={styles.blockTitle}>{t('circle.recipe.block.awaiting')}</Text>
+      <Text style={styles.blockTitle}>{awaitingTitle(items, { t })}</Text>
       {items.map((it) => (
         <Pressable key={`${it.kind}-${it.circleId ?? ''}`} style={styles.noticeRow} testID={`awaiting-${it.kind}-${it.circleId ?? 'here'}`}
           disabled={typeof onAction !== 'function'} onPress={() => onAction?.({ ...it.open })}>
@@ -286,9 +287,8 @@ function renderCirclesUnread(block, onAction, styles) {
 }
 
 // Me's identity line: the name as the page's title, "Edit" beside it (`onAction({ kind: 'edit-me' })`, the person's
-// own editor), the readings below in one line, worded by the shared helper. Web parity: circleScreen.js.
+// own editor). Web parity: circleScreen.js.
 function renderIdentityLine(block, onAction, styles) {
-  const words = identityLineWords(block.content, { t, locale: dateLocaleOf(t) });
   return (
     <View>
       <View style={styles.identityHead}>
@@ -299,7 +299,6 @@ function renderIdentityLine(block, onAction, styles) {
           </Pressable>
         ) : null}
       </View>
-      {words.length ? <Text style={styles.noticeText} testID="mij-readings">{words.join(' · ')}</Text> : null}
     </View>
   );
 }
@@ -661,7 +660,7 @@ const makeStyles = (theme) => StyleSheet.create({
   moreLink:        { color: theme.color.inkSoft, fontSize: 13, textDecorationLine: 'underline', paddingVertical: 2 },
   blockError:      { borderColor: theme.color.accent, backgroundColor: theme.color.paper2 },
   blockErrorText:  { color: theme.color.accentInk, fontSize: 13 },
-  // "Edit" beside the name, as on web (`.cc-mij__head`): at the far edge it sat under the header avatar
+  // "Edit" beside the name, as on web (`.cc-mij__head`): at the far edge it sat under the persona button
   identityHead:   { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
   identityName:   { fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink },
   identityEdit:   { fontSize: 14, fontWeight: '600', color: theme.color.accent },

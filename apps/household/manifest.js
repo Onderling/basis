@@ -131,7 +131,7 @@ export const householdManifest = {
     {
       id:   'addItem', visibility: 'authenticated', group: 'compose',
       verb: 'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       params: [
         { name: 'type', kind: 'enum',   of: LIST_TYPES, required: true },
         { name: 'text', kind: 'string', required: true, ...STR_NONEMPTY  },
@@ -173,7 +173,7 @@ export const householdManifest = {
     {
       id:        'markComplete', visibility: 'authenticated',
       verb:      'complete',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       // surface as per-item button across all list-type
       // sections + tasks.  Multi-type via F-SP3-a; safe vs renderChat
       // byte-equivalence (toolCatalogue ignores appliesTo).
@@ -196,7 +196,7 @@ export const householdManifest = {
     {
       id:        'removeItem', visibility: 'authenticated',
       verb:      'remove',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: [...LIST_TYPES] },   // same as markComplete
       params: [
         { name: 'match', kind: 'string', required: true, ...STR_NONEMPTY },
@@ -218,7 +218,7 @@ export const householdManifest = {
     {
       id:        'registerName', visibility: 'authenticated', group: 'compose',
       verb:      'register',                                   // F-SP1-e
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'preference' },
       appliesTo: { type: 'contact' },
       params: [
         // `text` matches the F-SP2-a 'text-only' body shape; the contact
@@ -238,7 +238,7 @@ export const householdManifest = {
     {
       id:   'revokeDevice', visibility: 'private', group: 'device',
       verb: 'revoke-device',
-      writes: { scope: 'circle' },   // widest of what it writes: the registry tombstone, and an address-revoke statement in every circle
+      writes: { scope: 'circle', what: 'keys' },   // widest of what it writes: the registry tombstone, and an address-revoke statement in every circle
       // The device-revocation CEREMONY (the eviction machinery pointed inward): phrase-proven on a
       // SURVIVING device; tombstones the delegation and retires the device's per-circle addresses
       // from every roster set (fold-enforced at every member's end — the device becomes an island).
@@ -252,7 +252,7 @@ export const householdManifest = {
     {
       id:   'pairCirclePeer', visibility: 'authenticated', group: 'device',
       verb: 'pair-peer',
-      writes: { scope: 'circle' },   // the peer joins this circle's item sync, both ways (a __pairReq asks it back)
+      writes: { scope: 'circle', what: 'keys' },   // the peer joins this circle's item sync, both ways (a __pairReq asks it back)
       // Pair a device or agent into one of the person's circles: the code another device shows (`onderling-pair://…`, or
       // a bare address). The circle is PICKED from the person's own circles — the form paints the pick-list from the
       // param's pickerSource, skipped when there is only one. Reached from Me → Scan.
@@ -265,7 +265,7 @@ export const householdManifest = {
     {
       id:   'stashEnrollOffer', visibility: 'authenticated', group: 'device',
       verb: 'stash-enroll-offer',
-      writes: { scope: 'device' },   // this device's own storage: the offer waits there for the add-device ceremony
+      writes: { scope: 'device', what: 'keys' },   // this device's own storage: the offer waits there for the add-device ceremony
       // An add-device OFFER read off another device of the person's (its QR, its link, or pasted): kept on THIS device
       // so the ceremony that follows bootstraps the circles it names. Public data, never authority — the ceremony asks
       // for the recovery phrase. The first step of the enroll-device flow; absent offer → 'no-offer', nothing written.
@@ -277,7 +277,7 @@ export const householdManifest = {
     {
       id:   'bindCirclePersona', visibility: 'authenticated', group: 'device',
       verb: 'bind-circle-persona',
-      writes: { scope: 'device' },   // this device's own map of which persona a circle is joined as
+      writes: { scope: 'device', what: 'control' },   // this device's own map of which persona a circle is joined as
       // JOINING AS A PERSONA: before the redeem goes out, the circle is the persona's — its address, its link proof, its
       // "me" — and the persona is on the circle's relay on a socket of its own. `personaId` null gives the circle back to
       // the default (a join that did not happen). A persona this device does not run → 'no-such-persona'.
@@ -291,7 +291,7 @@ export const householdManifest = {
     {
       id:   'claimCompanion', visibility: 'private', group: 'device',
       verb: 'claim-companion',
-      writes: { scope: 'device' },   // the person's own list of the nodes they own; the node records its owner itself
+      writes: { scope: 'device', what: 'keys' },   // the person's own list of the nodes they own; the node records its owner itself
       // Become the owner of a companion node: the claim it printed (`<code>@<address>`), signed by THIS device's
       // delegation key with its root-signed delegation alongside — the node records the person's owner ROOT, so
       // every device of theirs manages it and a revoked one does not. Reached through the claim-companion flow.
@@ -302,6 +302,7 @@ export const householdManifest = {
     },
     {
       id:   'companionGrantChoices', visibility: 'private', group: 'device',
+      reveals: 'none',
       verb: 'list-companion-grants',
       // What a node the person owns can let another agent do there: its op FAMILIES, asked of the node itself (a
       // statement signed by this device). The tick list of the grant on My data is made of these.
@@ -313,7 +314,7 @@ export const householdManifest = {
     {
       id:   'grantCompanion', visibility: 'private', group: 'device',
       verb: 'grant-companion',
-      writes: { scope: 'person' },   // nothing on this device: the person's node keeps the grant, the agent its tokens
+      writes: { scope: 'person', what: 'control' },   // nothing on this device: the person's node keeps the grant, the agent its tokens
       // Let another agent (a household bot) do a family of a node's ops: signed by THIS device for the node the person
       // owns (`grants.mint`); the node mints one token per op to that agent's key and delivers them over the relay.
       // Owner-only and unreachable from chat, like every grant of authority.
@@ -326,6 +327,7 @@ export const householdManifest = {
     },
     {
       id:   'companionGrantList', visibility: 'private', group: 'device',
+      reveals: 'none',
       verb: 'read-companion-grants',
       // Who holds a grant on a node the person owns, and for which families — asked of the node (one truth), signed by
       // THIS device. The line under each agent on My data ("mag: agenda-bestanden plaatsen · intrekken").
@@ -337,7 +339,7 @@ export const householdManifest = {
     {
       id:   'revokeCompanionGrant', visibility: 'private', group: 'device',
       verb: 'revoke-companion-grant',
-      writes: { scope: 'person' },   // nothing on this device: the node revokes the agent's tokens
+      writes: { scope: 'person', what: 'control' },   // nothing on this device: the node revokes the agent's tokens
       // End what an agent holds on a node the person owns (`grants.revoke`), signed by THIS device: on `node`, or on
       // every node the person owns (a contact deleted). The agent's next call there is refused.
       params: [
@@ -348,6 +350,7 @@ export const householdManifest = {
     },
     {
       id:   'listRecoveryCircles', visibility: 'private', group: 'device',
+      reveals: 'none',
       verb: 'list-recovery-circles',
       // The circles a recovery file would carry, with their names — what the export door lists with its
       // per-circle choice (carry the member list so a new device can find the circle again).
@@ -357,7 +360,7 @@ export const householdManifest = {
     {
       id:   'exportRecoveryFile', visibility: 'private', group: 'device',
       verb: 'export-recovery-file',
-      writes: { scope: 'device' },   // reads the registry into a file; nothing shared is written
+      writes: { scope: 'device', what: 'keys' },   // reads the registry into a file; nothing shared is written
       // THE RECOVERY FILE, out: the registry (circles, devices, wrapped-key refs) sealed exactly as the pod
       // mirror seals it — to the profile-derived key the phrase re-derives — so the phrase is the only
       // secret. Reached from My data → "Save a recovery file" (both shells); no chat/slash surface.
@@ -370,6 +373,7 @@ export const householdManifest = {
     },
     {
       id:   'listReceivablePersonas', visibility: 'private', group: 'device',
+      reveals: 'none',
       verb: 'list',
       // THE RESTORE PICKER's list: the person's personas (their registry, as a restore brought it back) that THIS device
       // does not run yet — names and ids only. Reached from My data → "Persona's op dit apparaat"; no chat/slash surface.
@@ -379,7 +383,7 @@ export const householdManifest = {
     {
       id:   'removePersonaHere', visibility: 'private', group: 'device',
       verb: 'remove-persona',
-      writes: { scope: 'person' },   // this device's delegation under that persona, tombstoned on its record
+      writes: { scope: 'person', what: 'keys' },   // this device's delegation under that persona, tombstoned on its record
       // REMOVE A PERSONA FROM THIS DEVICE — a ceremony with the phrase, scoped to one persona: this device tombstoned
       // under it alone, its addresses in its circles retired, its device-map row removed, its keys and local content
       // wiped. Not undoable here. Refused: root custody, the primary (`key-holder`), a paused persona (resume first).
@@ -391,6 +395,7 @@ export const householdManifest = {
     },
     {
       id:   'ownSpineOutbox', visibility: 'private', group: 'device',
+      reveals: 'none',
       verb: 'read-own-spine-outbox',
       // WHAT THIS DEVICE HANDED THE MAIN DEVICE AND HAS NOT SEEN SIGNED — counts only: still waiting, waiting over a day,
       // and given up on (not sent: the main device was unreachable for the whole window). The admin panel's one line.
@@ -400,7 +405,7 @@ export const householdManifest = {
     {
       id:   'setNearbyLevel', visibility: 'private', group: 'device',
       verb: 'set-nearby-level',
-      writes: { scope: 'person' },   // a self's disclosure under the reserved context `nearby` — travels with the persona
+      writes: { scope: 'person', what: 'control' },   // a self's disclosure under the reserved context `nearby` — travels with the persona
       // WHAT THE NEARBY ROOM SEES OF A SELF: none · handle (the floor) · profile · full. The one writer of the `nearby`
       // context (the general disclosure op refuses it). Reached from Nearby → "Jij hier"; no chat/slash surface.
       params: [
@@ -411,6 +416,7 @@ export const householdManifest = {
     },
     {
       id:   'listPersonasHere', visibility: 'private', group: 'device',
+      reveals: 'none',
       verb: 'list',
       // THE PERSONAS ON THIS DEVICE — every self it holds, running or paused, and which is its primary (the self it
       // speaks as). Reached from My data → "Persona's op dit apparaat", and typed as `/hier` (this device's own line —
@@ -421,7 +427,7 @@ export const householdManifest = {
     {
       id:   'pausePersona', visibility: 'private', group: 'device',
       verb: 'pause-persona',
-      writes: { scope: 'device' },   // a device entry: which held personas do not run here
+      writes: { scope: 'device', what: 'control' },   // a device entry: which held personas do not run here
       // PAUSE A PERSONA ON THIS DEVICE — local and reversible, no phrase: from the next boot it does not run here (its
       // circles not reopened or served, out of the switcher); its keys and data stay, nothing reaches the registry or a
       // peer. The primary cannot be paused (`primary`), nor a self not held here (`not-held`). Typed by NAME (`/pauze Werk`):
@@ -432,7 +438,7 @@ export const householdManifest = {
     {
       id:   'resumePersona', visibility: 'private', group: 'device',
       verb: 'resume-persona',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       // The inverse: from the next boot the persona runs here again. Typed by name too (`/hervat Werk`).
       params: [ { name: 'personaId', kind: 'string', required: true, pickerSource: { listOp: 'listPersonasHere' } } ],
       surfaces: { slash: { command: '/hervat' } },
@@ -440,7 +446,7 @@ export const householdManifest = {
     {
       id:   'markRead', visibility: 'private', group: 'device',
       verb: 'mark-read',
-      writes: { scope: 'person' },   // the self's own read-marks row, carried to that self's other devices
+      writes: { scope: 'person', what: 'content' },   // the self's own read-marks row, carried to that self's other devices
       // WHAT I READ, ON ALL MY DEVICES — the ids just read in one group (a circle, a contact), each with its source's
       // own time; a grow-only set that merges as a union, pruned the same way everywhere. Called by the shells when a
       // circle or a conversation is opened; no chat or slash surface (reading is not an act a person types).
@@ -449,9 +455,12 @@ export const householdManifest = {
         { name: 'read',   kind: 'object', required: true },
         { name: 'selfId', kind: 'string', required: false },
       ],
+      // background: a screen marks what it showed; never a person's act (no strip, no tap, no own-action; actState.js)
+      surfaces: { actState: 'none' },
     },
     {
       id:   'listReadMarks', visibility: 'private', group: 'device',
+      reveals: 'none',
       verb: 'list',
       // every read-marks row this device holds (all selves): the one read set the news, the tiles and the badges test
       params: [],
@@ -459,7 +468,7 @@ export const householdManifest = {
     {
       id:   'receivePersonas', visibility: 'private', group: 'device',
       verb: 'receive-personas',
-      writes: { scope: 'person' },   // the picked personas' keys, into this install's sealed slots
+      writes: { scope: 'person', what: 'keys' },   // the picked personas' keys, into this install's sealed slots
       // THESE PERSONAS HERE TOO — a phrase ceremony (the root is in hand only now): the picked personas are handed to
       // this device (their chat identity, person key and their own delegation of it); the next boot runs them. The
       // phrase is SECRET-kind; the runner never persists it. CEREMONY-ONLY: no chat/slash surface.
@@ -473,7 +482,7 @@ export const householdManifest = {
     {
       id:   'importRecoveryFile', visibility: 'private', group: 'device',
       verb: 'import-recovery-file',
-      writes: { scope: 'circle' },   // widest of what it writes: the registry on this device, and the rosters the file carries into each circle
+      writes: { scope: 'circle', what: 'keys' },   // widest of what it writes: the registry on this device, and the rosters the file carries into each circle
       // THE RECOVERY FILE, in: opens the file with this device's key, upserts every entry through the
       // registry handle, and runs the boot re-open loop. Refuses `not-your-file` / `unreadable-file`.
       // Reached from My data → "Load a recovery file" after a phrase restore.
@@ -485,7 +494,7 @@ export const householdManifest = {
     {
       id:   'restoreStatus', visibility: 'private', group: 'device',
       verb: 'restore-status',
-      writes: { scope: 'device' },   // clears the note the restore ceremony left on this device
+      writes: { scope: 'device', what: 'keys' },   // clears the note the restore ceremony left on this device
       // The restore-finish flow's first step: what came back after a phrase restore (circles from the
       // pod or a file, other devices on the registry) — and it clears the note the ceremony left.
       params: [],
@@ -494,7 +503,7 @@ export const householdManifest = {
     {
       id:   'restoreSource', visibility: 'private', group: 'device',
       verb: 'restore-source',
-      writes: { scope: 'circle' },   // a file source lands like importRecoveryFile
+      writes: { scope: 'circle', what: 'keys' },   // a file source lands like importRecoveryFile
       // When nothing came back: load a recovery file now, or later (the honest "your circles are not
       // here" screen). Never "ask an admin" — that is the fallback of last resort, not an offered route.
       params: [
@@ -506,7 +515,7 @@ export const householdManifest = {
     {
       id:   'restoreIntent', visibility: 'private', group: 'device',
       verb: 'restore-intent',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'keys' },
       // The question: could anyone else still use the old device? Broken and lost run the same ceremony
       // and differ in what the screen says; adding means the other devices keep working, nothing retires.
       params: [
@@ -517,7 +526,7 @@ export const householdManifest = {
     {
       id:   'replaceDevice', visibility: 'private', group: 'device',
       verb: 'replace-device',
-      writes: { scope: 'circle' },   // widest of what it writes: retires the other devices in every circle and rotates keys
+      writes: { scope: 'circle', what: 'keys' },   // widest of what it writes: retires the other devices in every circle and rotates keys
       // THE REPLACE CEREMONY (one ceremony for both restore intents — a phone that broke, a phone that
       // walked away): on THIS, the restored device, phrase-proven; retires every other device the
       // registry lists (and the first device's profile-derived addresses) in every circle, absorbs the
@@ -531,7 +540,7 @@ export const householdManifest = {
     {
       id:   'enrollDevice', visibility: 'private', group: 'device',
       verb: 'enroll-device',
-      writes: { scope: 'person' },   // this install's delegation, sealed to the person's owner root
+      writes: { scope: 'person', what: 'keys' },   // this install's delegation, sealed to the person's owner root
       // The add-a-device CEREMONY (a host identity act, like restoreOwnerPhrase): restores the
       // owner root from the phrase — typed on THIS, the NEW device — and writes this install's
       // delegation blob, so the next boot derives per-circle keys from the delegation seed and
@@ -553,6 +562,7 @@ export const householdManifest = {
     },
     {
       id:   'buildEnrollOffer', visibility: 'private', group: 'device',
+      reveals: 'keys',   // the offer is itself a credential: it adds a device
       verb: 'get',
       // The add-a-device OFFER (`onderling-enroll://`) shown on the EXISTING device as a QR/copy
       // string: relay hint + per-circle {id, handle, this device's per-circle address} — the
@@ -567,7 +577,7 @@ export const householdManifest = {
     {
       id:   'revealOwnerPhrase', visibility: 'private', group: 'device',
       verb: 'reveal-owner-phrase',
-      writes: { scope: 'device' },   // shows the phrase; nothing is written
+      writes: { scope: 'device', what: 'keys' },   // shows the phrase; nothing is written
       // Shows the owner recovery phrase to the person already holding the device. Takes nothing:
       // possession of an unlocked device IS the authority, and asking for a secret to reveal a
       // secret would be theatre. Owner-only at the dispatch gate.
@@ -579,7 +589,7 @@ export const householdManifest = {
     {
       id:   'restoreOwnerPhrase', visibility: 'private', group: 'device',
       verb: 'restore-owner-phrase',
-      writes: { scope: 'circle' },   // widest of what it writes: the owner root on this device, and retiring this device's old row in the circle member map
+      writes: { scope: 'circle', what: 'keys' },   // widest of what it writes: the owner root on this device, and retiring this device's old row in the circle member map
       // The other direction: adopt an owner root from a phrase typed on THIS device. Distinct from
       // enrollDevice, which also writes a delegation blob for a device joining an existing account.
       params: [
@@ -591,7 +601,7 @@ export const householdManifest = {
       // The wizard a person types the phrase into: it runs restoreOwnerPhrase above, the one op that takes a phrase
       // onto this device. Declared beside it, so the phrase has one owner.
       id:   'restoreFromMnemonicWizard', visibility: 'private', group: 'device', verb: 'submit',
-      writes: { scope: 'device' },   // restores the identity onto this device
+      writes: { scope: 'device', what: 'keys' },   // restores the identity onto this device
       params: [],
       surfaces: {
         slash: { command: '/restore-from-mnemonic' },
@@ -602,7 +612,7 @@ export const householdManifest = {
     {
       id:   'grantSurface', visibility: 'private', group: 'admin',
       verb: 'grant-surface',
-      writes: { scope: 'person' },   // a connection is the person's: the grants lane travels between their own devices
+      writes: { scope: 'person', what: 'control' },   // a connection is the person's: the grants lane travels between their own devices
       // CONNECTIONS — a thing that is not this device (a screen, a bot, an always-on companion)
       // acting as you within limits you ticked. `ops` is the boundary: the pick IS the grant, and
       // nothing outside it verifies at the door. `reads` names which sections its lane may carry.
@@ -624,7 +634,7 @@ export const householdManifest = {
     {
       id:   'revokeSurface', visibility: 'private', group: 'admin',
       verb: 'revoke-surface',
-      writes: { scope: 'person' },   // a connection is the person's: the grants lane travels between their own devices
+      writes: { scope: 'person', what: 'control' },   // a connection is the person's: the grants lane travels between their own devices
       // Unpairing. Revoke-wins: the grant stops working regardless of what the other side still holds.
       params: [
         { name: 'viewPubKey', kind: 'string', required: true },

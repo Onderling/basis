@@ -18,7 +18,7 @@ async function waitFor(pred, ms = 2_000) {
 function stubRelay() {
   const wss = new WebSocketServer({ port: 0 });
   const state = { frames: [], registered: [] };
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
     const open = new Map();
     ws.on('message', (raw) => {
       let msg; try { msg = JSON.parse(raw); } catch { return; }
@@ -30,7 +30,7 @@ function stubRelay() {
       }
       if (msg.type === 'register-proof') {
         const address = open.get(msg.nonce); open.delete(msg.nonce);
-        if (address !== msg.address || !verifyAddressPossession(msg)) return;
+        if (address !== msg.address || !verifyAddressPossession({ ...msg, isOwnRelayName: (n) => n === req?.headers?.host })) return;
         state.registered.push(msg.address);
         ws.send(JSON.stringify({ type: 'registered', address: msg.address }));
       }

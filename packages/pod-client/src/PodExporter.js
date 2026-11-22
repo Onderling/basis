@@ -47,6 +47,7 @@
  * TODO(C3-followup): zip alternative + ACL re-establishment.
  */
 import nacl from 'tweetnacl';
+import { secretboxSeal } from '@onderling/core';   // secretbox behind the port a shell may speed up (L619)
 import { createHash } from 'node:crypto';
 
 // `node:crypto` is eager (previously lazy-loaded for the basis
@@ -312,7 +313,7 @@ export class PodExporter {
     const salt  = opts.salt  || nacl.randomBytes(SALT_LEN);
     const nonce = opts.nonce || nacl.randomBytes(NONCE_LEN);
     const key   = this.#bootstrap.deriveResourceKey(ENC_INFO, salt);
-    const ct    = nacl.secretbox(entriesBytes, nonce, key);
+    const ct    = secretboxSeal(entriesBytes, nonce, key);
 
     header.encryption = {
       alg:   ENC_ALG,

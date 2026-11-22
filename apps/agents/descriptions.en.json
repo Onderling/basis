@@ -1,0 +1,110 @@
+{
+  "listAgents": {
+    "what": "Show your agents: your devices and who works for you.",
+    "params": {}
+  },
+  "viewAgent": {
+    "what": "Show one agent: what it can do and may do.",
+    "params": {"agentId": "which agent"}
+  },
+  "setAgentSkillExposure": {
+    "what": "Show or hide one of an agent's skills from others.",
+    "params": {"agentId": "which agent", "skillId": "which skill", "exposed": "shown or not", "circleId": "only in this circle"}
+  },
+  "getAgentSkillExposure": {
+    "what": "Show which of an agent's skills others can see.",
+    "params": {"agentId": "which agent", "circleId": "as this circle sees it"}
+  },
+  "createProfile": {
+    "what": "Make a new persona, recoverable with your recovery phrase.",
+    "params": {"name": "the name", "id": "a fixed label", "properties": "what it takes over from you"}
+  },
+  "setPlusCeiling": {
+    "what": "Choose how far the + goes for a persona.",
+    "params": {"id": "which persona", "ceiling": "how far: 0 to 3"}
+  },
+  "getPlusCeiling": {
+    "what": "Show how far the + goes for a persona.",
+    "params": {"id": "which persona"}
+  },
+  "setProfileProperty": {
+    "what": "Record something about a persona, such as where you live.",
+    "params": {"id": "which persona", "key": "what", "value": "the value"}
+  },
+  "getProfileProperties": {
+    "what": "Show what is recorded about a persona.",
+    "params": {"id": "which persona"}
+  },
+  "setProfileDriver": {
+    "what": "Record what drives a persona: a goal, a hobby.",
+    "params": {"id": "which persona", "key": "a fixed label", "kind": "what kind", "text": "in a few words", "tags": "keywords, with commas"}
+  },
+  "removeProfileDriver": {
+    "what": "Remove something that drives a persona.",
+    "params": {"id": "which persona", "key": "which one"}
+  },
+  "getProfileDrivers": {
+    "what": "Show what drives a persona.",
+    "params": {"id": "which persona"}
+  },
+  "setProfileCircleMembership": {
+    "what": "Remember on a persona that it is in a circle.",
+    "params": {"id": "which persona", "circleId": "which circle", "handle": "its name there", "address": "its address there", "sight": "what it sees there"}
+  },
+  "removeProfileCircleMembership": {
+    "what": "Take a circle off a persona, after leaving it.",
+    "params": {"id": "which persona", "circleId": "which circle"}
+  },
+  "setProfileDisclosure": {
+    "what": "Choose whether a persona shares something about itself in a circle.",
+    "params": {"id": "which persona", "contextId": "in which circle", "key": "what", "enabled": "share or not", "rung": "how precisely"}
+  },
+  "getProfileDisclosure": {
+    "what": "Show what a persona shares where.",
+    "params": {"id": "which persona"}
+  },
+  "getPersonaView": {
+    "what": "Show \"About me\": what is recorded about a persona, and where it is shared.",
+    "params": {"id": "which persona"}
+  },
+  "getPersonaRelease": {
+    "what": "Show what a persona would share in a circle.",
+    "params": {"id": "which persona", "contextId": "in which circle", "keys": "only these things"}
+  },
+  "revokeAgent": {
+    "what": "Switch an agent off: all its rights end.",
+    "params": {"agentId": "which agent"}
+  },
+  "grantAgent": {
+    "what": "Give an agent a right, for a while.",
+    "params": {"agentId": "which agent", "skill": "for which act", "profile": "for which persona", "capability": "what kind of right", "expiresInDays": "for how many days it holds", "subject": "who gets the right", "persona": "as which persona you give it"}
+  },
+  "grantRole": {
+    "what": "Give someone a role in a circle.",
+    "params": {"groupId": "in which circle", "role": "which role", "agentId": "to which agent", "subject": "to whom", "expiresInDays": "for how many days it holds"}
+  },
+  "revokeGrant": {
+    "what": "Take one right from an agent; the agent stays.",
+    "params": {"agentId": "which agent", "tokenId": "which right"}
+  },
+  "purgeAgent": {
+    "what": "Delete an agent for good, keeping nothing of it.",
+    "params": {"agentId": "which agent"}
+  },
+  "listCatalogue": {
+    "what": "Show agents you can install.",
+    "params": {}
+  },
+  "installAgent": {
+    "what": "Install an agent, with no rights until you give them.",
+    "params": {"catalogueId": "which one from the list", "card": "or its card", "grants": "which rights it gets at once", "name": "the name", "persona": "as which persona you give the rights"}
+  },
+  "listDataVersions": {
+    "what": "Show earlier versions of something in a circle's storage.",
+    "params": {"circleId": "which circle", "uri": "of which file"}
+  },
+  "restoreDataVersion": {
+    "what": "Put something in a circle's storage back to an earlier version; that can be undone too.",
+    "params": {"circleId": "which circle", "uri": "which file", "version": "which version"}
+  }
+}

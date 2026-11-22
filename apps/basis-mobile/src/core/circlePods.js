@@ -14,7 +14,7 @@
 import { onPolicyPostureChange } from '../../../basis/src/v2/circlePolicyStore.js';
 import { VaultAsyncStorage } from '@onderling/react-native/identity/VaultAsyncStorage';
 import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
-import { sealedLocalBackend, sealedLocalVault } from '../../../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
+import { sealedNamedBackend, circleStorageName, sealedLocalVault } from '../../../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
 import { PodClient, generateKeypair as podGenerateKeypair, SolidOidcAuth,
   createSealedPodDataSource, podGroupPrefix,
@@ -37,7 +37,8 @@ import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore, selfMayEstablishKey
 import { createCirclePodProducer, createCircleControlAgentRouter, notePodAgentFor, seedCircleRoster, createProducerKeyWait, isSealedPosture, memberStatusReader } from '../../../basis/src/v2/circlePodProducer.js';
 import { createSingleFlight } from '../../../basis/src/v2/singleFlight.js';
 import { realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot } from '../../../basis/src/v2/circleRealPod.js';
-import { createConnectionPoints, asyncStorageConnectionPointsIo } from '../../../basis/src/v2/connectionPoints.js';
+import { createConnectionPoints } from '../../../basis/src/v2/connectionPoints.js';
+import { phoneConnectionPointsIo } from './connectionPointsRN.js';   // sealed at rest on the phone
 import { createCirclePodSharing } from '../../../basis/src/v2/circlePodSharing.js';
 // the SHARED cross-circle SHARE logic + the platform-neutral enforcement assembly.
 // Mobile calls the SAME builder + ops as web (circleApp.js) — invariant #1/#2, no mobile fork.
@@ -84,6 +85,11 @@ export function setCirclePodSession(sessionOrRef) { podSessionRef = sessionOrRef
 // doesn't). It backs `sealingKeyForRecipient`: an out-of-circle grantee's sealing key is RE-DERIVED from their
 // published network key, so a revoke can evict exactly that grantee instead of rotating away from all of them.
 // Absent ⇒ the enforcement falls back to the conservative roster-only rotation (safe, lossy).
+/** The agent's gate for a share's own write into its source circle (`agent.mayWriteInto`), set by the bundle at boot. */
+let _writeGate = null;
+export function setCircleWriteGate(fn) { _writeGate = typeof fn === 'function' ? fn : null; }
+const mayWriteInto = async (circleId, act) => (_writeGate ? (await _writeGate(circleId, act)) ?? null : null);
+
 let _contactsSource = null;
 export function setCircleContactsSource(fn) { _contactsSource = typeof fn === 'function' ? fn : null; }
 
@@ -241,7 +247,7 @@ export function getActiveRealPodRouting() {
 function makeCirclePodClient(circleId) {
   const deviceId = `circle-${circleId}`;
   const backend = asyncStorageRef
-    ? sealedLocalBackend(createAsBackend({ AsyncStorage: asyncStorageRef, scope: `cc-circle-${circleId}` }))
+    ? sealedNamedBackend(circleStorageName.store(circleId), (scope) => createAsBackend({ AsyncStorage: asyncStorageRef, scope }))
     : createMemoryBackend();
   // versioning: displaced bytes (overwrites · peer-updates · dropped
   // concurrent forks · deletes) land in `versions/` on the SAME backend —
@@ -283,7 +289,7 @@ async function buildCirclePod(circleId, policy) {
   let circleRootUri;
   if (routing) {
     let points = null;
-    try { if (asyncStorageRef) points = createConnectionPoints({ initial: await asyncStorageConnectionPointsIo(asyncStorageRef).load(), save: () => {} }); } catch { points = null; }
+    try { if (asyncStorageRef) points = createConnectionPoints({ initial: await phoneConnectionPointsIo(asyncStorageRef).load(), save: () => {} }); } catch { points = null; }
     const recorded = await recordedCirclePodUri({ callSkill: _keyEventWiring?.callSkill, points, circleId });
     circleRootUri = circleRootFor({ pod: policy?.pod, recordedPodUri: recorded, ownCircleRoot: routing.circleRootUri(circleId) });
     if (!circleRootUri) {
@@ -537,7 +543,7 @@ export async function shareItemIntoCircle({
     resolveService: resolveService ?? r.resolveService,
     enforcementFor: enforcementFor ?? r.enforcementFor,
     policyOf: r.policyOf,
-    recipientKeys, sealCopy,
+    recipientKeys, sealCopy, mayWriteInto,
     // objective L — thread the signed-in member's WebID as the initiator (mirrors web's `by ?? LOCAL_ACTOR`),
     // so the source circle's initiator gate sees a real actor. Null when signed out ⇒ deny-by-default holds.
     itemId, fromCircleId, toCircleId, by: by ?? getCircleActorWebId() ?? undefined, recipient, recipients,
@@ -564,6 +570,7 @@ export async function shareItemToPublishedKey({
     // adapter, kept out of shared src). `sealingKeyFromNetworkKey` derives the recipient's sealing key.
     sealCopy: _sealCopyToRecipients,
     sealingKeyFromNetworkKey: podSealingPublicKeyFromNetworkKey,
+    mayWriteInto,
     // NOTICE emitters routed by the circle's `notifyOutOfCircle` setting (mirror of web circleApp.js).
     // `notify` (admins) → @onderling/notify-envelope wiring is a follow-up; today it records the event.
     notify: (payload) => { try { console.info?.('[share] out-of-circle', payload); } catch { /* noop */ } },
@@ -665,7 +672,7 @@ export async function provisionCircleMedium(circleId) {
     if (typeof console !== 'undefined') console.info(`[cache-medium] ${circleId}: posture=${JSON.stringify(policy?.pod ?? null)} → ${mode}`);
     if (mode !== 'cache') return null;   // no-pod → shared local backing
     const localBackend = asyncStorageRef
-      ? sealedLocalBackend(createAsBackend({ AsyncStorage: asyncStorageRef, scope: `cc-circle-cache-${circleId}` }))
+      ? sealedNamedBackend(circleStorageName.cache(circleId), (scope) => createAsBackend({ AsyncStorage: asyncStorageRef, scope }))
       : createMemoryBackend();
     const medium = createCircleCacheMedium({
       localBackend,

@@ -52,6 +52,7 @@ import { contactRelayScope } from '../../v2/connectionPoints.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity, sealStrategyForRecipients } from '../../v2/sharedCopyOpener.js'; // seal-to-self for settings + recipient-widened seal for view lanes
 import { contentSealStrategy } from '../../v2/contentAtRest.js';   // the device's content-at-rest key — a person's own words on their own disk
+import { KeyUnreadable } from './keyUnreadable.js';   // a key that is there but will not read: the boot stops, nothing is minted (L1115)
 import { createSealingBackend } from '@onderling/pseudo-pod';            // the seal above a blind local store
 import { setShellContentSeal } from '../../v2/localStoreSeal.js';        // hand the content key to the shell's own stores
 import { wireEventLogPersistence } from '../../v2/eventLogPersistence.js';   // the device log hydrates HERE, where the key is
@@ -68,7 +69,7 @@ import { makeLateRecipientRetell } from '../../v2/membershipLateRecipient.js'; /
 import { makeItemsRail, makeItemsEmitter, routeItemsMirror, ITEMS_CATCHUP_SUBTYPES, OWN_ITEMS_CATCHUP_SUBTYPES, ITEMS_BROADCAST } from '../../v2/itemsRail.js';
 import { makeFrontierReplay } from '../../v2/frontierReplay.js'; // the content re-root — item snapshots ride the device log
 import { healRestoreList } from '../../v2/restoreListHeal.js'; // a circle missed on the restore list is written at the next boot
-import { makeChatRail, makeChatEmitter, owedChatStatements, CHAT_CATCHUP_SUBTYPES, CHAT_STATEMENT_BROADCAST } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
+import { makeChatRail, makeChatEmitter, owedChatStatements, awaitingChatRecipients, ON_ITS_WAY, CHAT_CATCHUP_SUBTYPES, CHAT_STATEMENT_BROADCAST } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { GOV_CATCHUP_BATCH } from '../../v2/governanceCatchUp.js'; // the governance catch-up's reply subtype (the rate-limit exemption set)
 
 /** The person's own device map carried between their devices (a self's delegation records). */
@@ -118,6 +119,9 @@ import { createKnownPeersSync, routeKnownPeersBySender } from '../../v2/knownPee
 import { backfillContactPersonas } from '../../v2/contactPersona.js';   // contacts from before the lens get `default`, where provable
 import { bookRowsOf } from '../../v2/contactsSource.js';   // a listContacts reply's rows, whole
 import { KEEP_DAYS_KEY, roomRetentionMs, makeRoomKeeper, earlierInTheRoom } from '../../v2/nearbyKept.js';
+import { recordOwnAction, ownRetentionMs, OWN_RECORD_KEY, OWN_KEEP_WEEKS_KEY, ownActionRows, ownActionsExport, OWN_ACTION_KIND, noteOwnOutcome } from '../../ownActions.js';   // the person's own acts, at the outer waist
+import { circleActRefusal, writeIntoRefusal, gateRefusalKey } from '../../v2/circleActGate.js';   // a person's write in a circle asks that circle's capability set, at the outer waist
+import { keptPolicyChangesOf, requestKeptPolicyChanges } from '../../v2/keptPolicyChanges.js';   // a write into another circle judged as its receivers judge it
 import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
 import { makeSyncSelection } from '../../v2/syncSelection.js';
 import { leaveCircleLocally } from '../../v2/circleMembershipHygiene.js';
@@ -132,7 +136,7 @@ import { makePolicyUpdateEmitter, denyWinsMerge, POLICY_UPDATE_KIND } from '../.
 import { normalizeCirclePolicy, decisionClassFor } from '../../v2/circlePolicy.js';
 import { chainOfBodies, judgePolicyChain, membershipGateFor, proposalsOn } from '../../v2/governanceReceiverGate.js';   // the governed gate's host half
 import { processRefusalLog } from '../../v2/refusalLog.js';   // every refusal says why
-import { onEarlierCircleLink } from '@onderling/core';
+import { onEarlierCircleLink, frontier } from '@onderling/core';
 // a link proof made before the member was named in it says so in the device log (no circle id, no address)
 onEarlierCircleLink(() => processRefusalLog().note({ tag: 'identity', lane: 'circle-link', check: 'link-proof', reason: 'earlier-link-proof' }));
 import { makeKeyRail, makeKeyEmitter, KEY_CATCHUP_SUBTYPES } from '../../v2/keyRail.js';   // the group-key lane — sealed key events as signed spine statements
@@ -195,6 +199,7 @@ import {
   effectiveProperties,
   profileFactsOf, withProfileFacts, factsDiffer, nextFactsAt, stampChangedFacts,
   firstMessagesOf, FIRST_MESSAGE_POLICIES, FIRST_MESSAGES_KEY, CIRCLE_MEMBERS_KEY, circleMembersMayWriteOf,
+  PLUS_CEILING_KEY, isPlusCeiling, plusCeilingFor,
 } from '@onderling/agent-registry';
 // REQUESTABLE BRIDGE (host-wiring seam J6) — the recipient's per-circle task
 // surface (`createTaskStore`) + the convergence handler (`requestableSkillHandler`)
@@ -239,12 +244,12 @@ function makeBrowserVault(prefix, { durabilityMatters = false } = {}) {
  * (Host-only helper; createSecureAgent handles this for the chat side.)
  */
 async function restoreOrGenerate(vault) {
-  try {
-    if (await vault.has('agent-privkey')) {
-      return await AgentIdentity.restore(vault);
-    }
-  } catch { /* fall through to generate */ }
-  return AgentIdentity.generate(vault);
+  // generate ONLY when the vault says nothing is stored: a key that is there but will not read (a wrong at-rest key, a
+  // storage error) stops the boot, never a new host key over the one issuer's (L1115)
+  let held;
+  try { held = await vault.has('agent-privkey'); } catch (err) { throw new KeyUnreadable('host-key', err); }
+  if (!held) return AgentIdentity.generate(vault);
+  try { return await AgentIdentity.restore(vault); } catch (err) { throw new KeyUnreadable('host-key', err); }
 }
 
 /**
@@ -332,21 +337,14 @@ import { opDeclared, allManifests } from '../../v2/manifestSources.js';         
 import { assignAllowed, assignPolicyFrom, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom, CANCEL_KEY, cancelPolicyFrom, ROLES_KEY, rolesPresetFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
 import { buildStandardRolePolicy } from '@onderling-app/tasks';                              // the one role rule for chores                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
-import { isGenericOpId, decodeGenericOpId, isPeopleWritten } from '@onderling/app-manifest';
+import { isGenericOpId, decodeGenericOpId, isPeopleWritten, circleArg } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
 import { makeIsKnownPeer, rosterRowNaming } from '../../v2/knownPeer.js';
 import { parseUntrustedJson } from '@onderling/core';
 import { createTimeSlice } from '@onderling/core';
 import { createInProcessSenderAuthorizer } from '@onderling/core';
+import { seedDemoHousehold, sweepDemoSeedOnce } from './demoHouseholdSeed.js';
 
-// Deterministic seed for the real household store.  Three open items across
-// list types so `/list shopping` + the brief demo are non-empty out of the
-// box.  Added oldest-first (the store preserves insertion order).
-const SEED_HOUSEHOLD_ITEMS = [
-  { type: 'shopping', text: 'Milk'                },
-  { type: 'errand',   text: 'Post a parcel'       },
-  { type: 'task',     text: 'Vacuum living room'  },
-];
 
 /**
  * Boot two in-process Agents on a shared InternalBus:
@@ -436,7 +434,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // the identity is up, below), else the legacy bucket.
   let homeCircleId = 'household';
   function resolveCircleId(args) {
-    return (args?.circleId ?? args?.circleId ?? args?.groupId ?? getActiveHouseholdCircleId()) || homeCircleId;
+    return (circleArg(args) ?? getActiveHouseholdCircleId()) || homeCircleId;
   }
   // cluster L · L3 — household is now the UNIFORM wired path by DEFAULT (the legacy agent is retired).
   // Household ops route to the dissolved pure cores (`v2/householdApp.js`) over the per-circle
@@ -543,7 +541,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // strand its entries under a key the next boot no longer derives.
   const sealedBackings = [];
   const sealedVault = async (backing) => {
-    await migrateVaultToEncrypted({ backing, key: atRestKey, fingerprint: rootFingerprint });
+    // the sentinel's read is the boot's first read of a sealed vault: a storage error there is the same "could not read"
+    // as a key's, said with the same words (L1115), never the generic failure
+    try { await migrateVaultToEncrypted({ backing, key: atRestKey, fingerprint: rootFingerprint }); }
+    catch (err) { throw new KeyUnreadable('vault-sentinel', err); }
     sealedBackings.push(backing);
     return new VaultEncrypted({ backing, key: atRestKey });
   };
@@ -656,6 +657,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     dataSourceFor: (id) => circleMedia.get(id) ?? null,
     // what a write is made for, when a planned row made it (`opts.writeOrigin`: the host's runner's ambient origin)
     ...(typeof opts.writeOrigin === 'function' ? { originOf: opts.writeOrigin } : {}),
+    // who made a NEW row written here (`madeBy`): the very ref the items lane signs this circle's statements with, from
+    // the rail's own function (one source, so the maker's device and every receiver agree); none before the rail exists
+    makerFor: (circleId) => itemsRail?.selfRefFor?.(circleId) ?? null,
   });
   // THE HISTORY KEYS (the replace ceremony's re-wrap, held locally): group-key versions this person is
   // entitled to that were wrapped to a RETIRED device's derivable sealing key. The ceremony unwraps them
@@ -663,13 +667,22 @@ export async function createRealHouseholdAgent(opts = {}) {
   // own key, so sealed history opens on the replacement with nobody else online. Keys wrapped only to a
   // retired device's random vault key are not recoverable this way — an admin re-grant is the route.
   const historyKeysVault = await sealedVault(opts.historyKeysVault ?? pickVault('cc-history-keys:'));
-  const historyKeyChainFor = async (circleId) => {
-    try { const raw = await historyKeysVault.get(`chain:${circleId}`); return raw ? JSON.parse(raw) : []; }
-    catch { return []; }
+  // the STRICT read: nothing stored is an empty chain; a chain that is there but will not read (a decrypt failure, not
+  // JSON, not a list) throws, so nothing is written over it (L1115): the history keys are not re-derivable
+  const readHistoryChain = async (circleId) => {
+    let raw;
+    try { raw = await historyKeysVault.get(`chain:${circleId}`); } catch (err) { throw new KeyUnreadable('history-keys', err); }
+    if (raw == null || raw === '') return [];
+    let chain;
+    try { chain = JSON.parse(raw); } catch (err) { throw new KeyUnreadable('history-keys', err); }
+    if (!Array.isArray(chain)) throw new KeyUnreadable('history-keys');
+    return chain;
   };
+  // the readers' view: what opens, else nothing (a reader never writes)
+  const historyKeyChainFor = async (circleId) => { try { return await readHistoryChain(circleId); } catch { return []; } };
   const absorbHistoryKeys = async (circleId, chain) => {
     if (!Array.isArray(chain) || !chain.length) return 0;
-    const cur = await historyKeyChainFor(circleId);
+    const cur = await readHistoryChain(circleId);   // throws on an unreadable chain: the merge is not written over it
     const byVersion = new Map(cur.map((k) => [k.version, k]));
     let added = 0;
     for (const k of chain) { if (!byVersion.has(k.version)) { byVersion.set(k.version, k); added += 1; } }
@@ -1387,6 +1400,13 @@ export async function createRealHouseholdAgent(opts = {}) {
   //   INBOUND — peer envelopes ingest back into THIS circle store (`wireCircleStoreInbound`, id-preserving,
   //             no echo). Best-effort (the op still runs locally). This is the SINGLE fan-out path for the
   //   circle: tasks ride it too now (tasks-v0's own substrate mirror is skipped when the store is injected).
+  // The restart's re-fan state (`reFanOwedChat`, below) lives HERE, above this function: the household circle is wired
+  // eagerly at boot, and its wiring asks for the re-fan; declared below that call, the read threw "before
+  // initialization", the household's wiring was caught as "NOT wired", and its re-fan never ran (2026-08-20 to 2026-11-20).
+  const reFannedCircles = new Set();
+  // (circleId) → the re-tell learns, from the log, what a restart still owes across it; bound with the membership rail
+  // further down — a circle opened before that is kept in `pending` and seeded when it binds
+  const seedWaitingRef = { current: null, pending: new Set() };
   async function ensureCircleSync(circleId) {
     const id = (typeof circleId === 'string' && circleId) ? circleId : 'household';
     if (circleSyncWired.has(id)) return;
@@ -1529,10 +1549,16 @@ export async function createRealHouseholdAgent(opts = {}) {
   // circle each boot, re-fan my own recent chat statements that have no logged receipt. A restart
   // therefore cannot silently break the hold promise: what was still owed goes out again, receivers'
   // rails dedup what they already have, and receipt-keyed removal stops the copies that arrive.
-  const reFannedCircles = new Set();
+  // (Its state, `reFannedCircles` and `seedWaitingRef`, is declared above `ensureCircleSync`.)
   function reFanOwedChat(circleId) {
-    if (!opts.deviceLog || !chatRail || reFannedCircles.has(circleId)) return;
+    if (!opts.deviceLog || reFannedCircles.has(circleId)) return;
+    // A circle is wired at boot BEFORE this factory has built its chat rail and composed its API (further down): a send
+    // made then waits on a roster read that is not served until the API exists. Such an early open waits in `pending`
+    // and runs once both are there — until 2026-11-20 it returned here, marked done, and the restart's re-fan never ran
+    if (!chatRail || !apiComposed) { seedWaitingRef.pending.add(circleId); return; }
     reFannedCircles.add(circleId);
+    // …and a line some members got while others had no address yet: the re-tell is seeded from the log
+    try { seedWaitingRef.current?.(circleId); } catch { /* best-effort: the member's own catch-up remains */ }
     try {
       for (const owed of owedChatStatements({ eventLog: opts.deviceLog, circleId, myRef: circleSelfRef(circleId) })) {
         callSkill('pinboard', 'broadcastCircleChatStatement', {
@@ -1952,6 +1978,20 @@ export async function createRealHouseholdAgent(opts = {}) {
         return { ok: true };
       },
       getProperties: async ({ profileId }) => (await agentsRegistry.lookup(profileId))?.properties ?? {},
+      // How far the person's own "+" goes for a persona (`_plus.ceiling`): a reserved key, so it has its own writer;
+      // the read resolves it as any property (own, else the general persona's), 3 when nothing is said
+      setPlusCeiling: async ({ profileId, ceiling }) => {
+        if (!isPlusCeiling(ceiling)) return { ok: false, reason: 'invalid-ceiling' };
+        const cur = await agentsRegistry.lookup(profileId);
+        if (!cur) return { ok: false, reason: 'no-such-profile' };
+        await agentsRegistry.register({ ...cur, properties: setOwn(cur.properties ?? {}, PLUS_CEILING_KEY, ceiling) });
+        return { ok: true };
+      },
+      plusCeilingOf: async ({ profileId }) => {
+        const [self, dflt] = await Promise.all([agentsRegistry.lookup(profileId), profileId === 'default' ? null : agentsRegistry.lookup('default')]);
+        const byId = { ...(self ? { [profileId]: self } : {}), ...(dflt ? { default: dflt } : {}) };
+        return plusCeilingFor((id) => byId[id] ?? null, profileId, { defaultProfileId: 'default' });
+      },
       // Drivers (#3) — set an OWN personal driver property: build+validate the { kind, text, tags[] } value
       // (createDriver throws on an empty driver → the core reports invalid-driver), then store it like any
       // property (setOwn merge + re-register the full entry). getDrivers filters the map to driver values.
@@ -3065,6 +3105,14 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   /** The point signs a sibling's spine act: from a live device of this person only, a declared membership kind only, as
    *  the circle's own self, on this device's own head. */
+  /** A WRITE INTO ANOTHER CIRCLE than the one a door asked (an appointment's copy into a pair circle, a share's copy
+   *  into its source circle) asks that circle as its receivers will: its kept settings changes on this device, its
+   *  settings through the shell's reader (`writeIntoRefusal`). Null = the write may go, else the door's refusal. */
+  const mayWriteInto = async (circleId, { type, act = 'add' } = {}) => {
+    const kept = keptPolicyChangesOf(opts.deviceLog, circleId);
+    if (kept === undefined) requestKeptPolicyChanges(opts.deviceLog, circleId);
+    return writeIntoRefusal({ circleId, type, act, manifests: allManifests(), inputs: opts.circleCapabilityInputs ?? null, kept });
+  };
   const spineActHandler = async (fromAddr, payload) => {
     if (payload?.subtype !== SPINE_ACT_SUBTYPE) return;
     const actId = typeof payload.actId === 'string' ? payload.actId : null;
@@ -3190,7 +3238,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     const { event, groupKey } = rotateKeyEvent({ groupId: circleId, priorEvents: events, recipients });
     const statement = await keyEmitRef.current(circleId, event);
     if (!statement) return null;
-    await absorbHistoryKeys(circleId, [{ version: event.version, groupKey }]);
+    // the new version is kept beside the old ones; a chain that will not read is not written over, said in the log (L1115)
+    try { await absorbHistoryKeys(circleId, [{ version: event.version, groupKey }]); }
+    catch (err) { console.warn(`[keys] ${String(circleId).slice(0, 12)}: the new key version was not kept locally; the stored history keys could not be read (${err?.what ?? err?.message ?? err})`); }
     await callSkill('pinboard', 'broadcastCircleKeyStatement', {
       groupId: circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now(),
     }).catch(() => {});
@@ -3204,6 +3254,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   const LATE_TOLD_FANS = new Set(['broadcastCircleItems', 'broadcastCircleChatStatement']);
   /** The members of a circle a fan had no address for, past the re-tell window (bound with the membership rail below). */
   const unreachableMembersRef = { current: null };
+  // A LINE THAT WAITS FOR A MEMBER WITHOUT AN ADDRESS: msgId → { refs: the member refs it still waits for, of }, the RAM mirror
+  // of the log's `on-its-way` entries (awaitingChatRecipients); bound with the membership rail below
+  const waitingByMsg = new Map();
+  const chatFanEndedRef = { current: null };   // (circleId, msgId, fanResult) → writes who still waits
   /** The point runs a sibling's KEY act: a current member only (its own roster fold), never a key the act brought. */
   const rotatesAwaitingRoot = [];   // rotations past this point's own address, until it takes the next root
   /** Rotate a circle's key past addresses of this person's that are gone, as the point: through the circle's key PRODUCER
@@ -3251,7 +3305,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const mine = rows.find((m) => m?.webid === circleSelfRef(act.circleId));
       const listed = new Set([mine?.circleAddress, ...(mine?.circleAddresses ?? []), ...((mine?.retiredAddresses ?? []).map((x) => x?.address))].filter(Boolean));
       const ok = exclude.filter((a) => a !== circleAddressFor(act.circleId) && listed.has(a));
-      if (!ok.length) return;
+      if (!ok.length) { console.warn(`[keys] ${String(act.circleId).slice(0, 12)}: a rotation past ${exclude.length} address(es) not on this person's row here was not done`); return; }
       await rotatePastOwnOld(act.circleId, ok);
       return;
     }
@@ -3260,7 +3314,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (typeof act.address !== 'string' || act.address === circleAddressFor(act.circleId)) return;
       const mine = rows.find((m) => m?.webid === circleSelfRef(act.circleId));
       const listed = new Set([mine?.circleAddress, ...(mine?.circleAddresses ?? []), ...((mine?.retiredAddresses ?? []).map((x) => x?.address))].filter(Boolean));
-      if (!listed.has(act.address)) return;
+      if (!listed.has(act.address)) { console.warn(`[keys] ${String(act.circleId).slice(0, 12)}: a ban of an address not on this person's row here was not done`); return; }
+      // the ban rotates the key: the address this point presents is a recipient first, so the rotation never leaves it out.
+      // A grant that fails stops the ban here (unacked, so the forwarder re-sends it): a rotation without the point is worse.
+      try {
+        await ctl.grantRecipient?.({ groupId: act.circleId, publicKey: sealingPublicKeyFromNetworkKey(circleAddressFor(act.circleId)), ownDevice: true });
+      } catch (e) {
+        console.warn(`[keys] ${String(act.circleId).slice(0, 12)}: the grant of this point's own address failed; the ban waits (${e?.message ?? e})`);
+        throw new Error('ban-waits-for-the-own-grant');
+      }
       await ctl.revokeRecipient?.({ groupId: act.circleId, publicKey: sealingPublicKeyFromNetworkKey(act.address), policy: 'ban' });
     }
   };
@@ -3285,7 +3347,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     // been signed and then superseded, and signing it again now would quietly undo the later change. One that is on this
     // device's rail as signed is dropped; the rest can now never be signed by anyone (this device is the point), so they
     // leave the outbox at once and the person is told they may not have come through.
-    for (const [actId, e] of [...spineOutbox]) {
+    // membership acts first (stable otherwise): a key act checks this person's row, and the membership acts that waited
+    // (a re-key's retirement of the old address) are what that row holds — signed after it, the rotation past the old
+    // address found it on no row and was not done
+    for (const [actId, e] of [...spineOutbox].sort(([, x], [, y]) => (x.lane === 'membership' ? 0 : 1) - (y.lane === 'membership' ? 0 : 1))) {
       if (e.ackedHash || e.act?.circleId !== circleId) continue;
       if (!e.local) {
         spineOutbox.delete(actId);
@@ -3680,7 +3745,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const w = personas.get(args.persona)?.chatId?.pubKey ?? null;
       if (w) return { actAs: w };
     }
-    const c = args?.groupId ?? args?.circleId ?? null;
+    const c = circleArg(args);
     if (typeof c !== 'string' || !c) return {};
     let as = null;
     try { as = circleSelf(c).sendAs ?? null; } catch { as = null; }   // (circleSelf is bound further down; early boot reads none)
@@ -4086,6 +4151,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         ...(expiresIn ? { expiresIn } : {}),
         // the person the screen acts as, when this agent answers for several (a household bot); else its own
         ...(typeof d.actingAs === 'string' && d.actingAs ? { actingAs: d.actingAs } : {}),
+        // a toolbox's page: the toolbox its useTool is for (L1049)
+        ...(typeof d.toolbox === 'string' && d.toolbox ? { toolbox: d.toolbox } : {}),
       });
       // The lane reconciler runs on the grant hook; surface its honest state: a read grant with
       // the mirror OFF (or no backend) yields no lane until the mirror runs.
@@ -5762,8 +5829,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         console.warn(`[remove-persona] the re-key failed — the next start asks for the recovery phrase: ${err?.message ?? err}`);
         return [DataPart({ ok: false, error: 'storage', rekeyFailed: true })];
       }
+      await rt?.forgetPeerKeys?.();   // the removed self's remembered peer keys, zeroed before the reload
       return [DataPart({ ok: true, personaId: pid, deviceId: wire, retiredIn, reloadRequired: true, rekeyedTo: next })];
     }
+    await rt?.forgetPeerKeys?.();   // the removed self's remembered peer keys, zeroed before the reload
     return [DataPart({ ok: true, personaId: pid, deviceId: wire, retiredIn, reloadRequired: true })];
   }, { visibility: 'private' });
   // WHAT THE NEARBY ROOM SEES OF A SELF — its level, on THAT self's disclosure under the reserved context `nearby`: the
@@ -5958,19 +6027,15 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   adoptInProcess(hostAgent);
 
-  // Seed a few household items so `/list shopping` + `/brief` are non-empty
-  // out of the box.  Deterministic order (added oldest-first); skip via
-  // opts.seedHousehold:false (clean-slate fixtures).
-  if (opts.seedHousehold !== false) {
-    const seedStore = householdService.stores.getStore(homeCircleId);
-    for (const seed of SEED_HOUSEHOLD_ITEMS) {
-      try {
-        await householdApp.addItem(seedStore, { type: seed.type, text: seed.text }, { by: 'webid:local-demo-user' });
-      } catch (err) {
-        if (typeof console !== 'undefined') {
-          console.warn('[realAgent] seed household item failed:', err?.message ?? err);
-        }
-      }
+  // The household's demo items are DEMO data (ledger L1069): written only when a demo boot asks (`seedDemoData`;
+  // `seedHousehold: false` still opts a demo fixture out). A real start writes none — and removes, once per device,
+  // the copies earlier starts left behind (only the demo author's items with a demo text; `demoHouseholdSeed.js`).
+  {
+    const homeStore = householdService.stores.getStore(homeCircleId);
+    if (seedDemoData) {
+      if (opts.seedHousehold !== false) await seedDemoHousehold(homeStore, householdApp.addItem);
+    } else {
+      await sweepDemoSeedOnce({ store: homeStore, markerVault: ownerRootVault });
     }
   }
 
@@ -6280,19 +6345,34 @@ export async function createRealHouseholdAgent(opts = {}) {
     const lateRecipients = makeLateRecipientRetell({
       // the window is the param's; a walk may shorten it to see the "not reachable yet" line without waiting minutes
       ...(Number.isFinite(opts.lateRecipientWindowMs) ? { windowMs: opts.lateRecipientWindowMs } : {}),
-      retell: (circleId, statement) => callSkill('pinboard', 'broadcastCircleMembership', {
-        groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
+      // a line whose recipient still waits for an address is kept while the log says so, not for a window
+      keep: (_circleId, msgId) => (waitingByMsg.get(msgId)?.refs?.size ?? 0) > 0,
+      retell: (circleId, statement, { only = null } = {}) => callSkill('pinboard', 'broadcastCircleMembership', {
+        groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(), ...(only ? { only } : {}),
       }).then((r) => { console.info(`[membership-fan] ${statement.body.kind} ${String(statement.body.hash).slice(0, 8)} in ${String(circleId).slice(0, 8)}: retold to a member who arrived after the fan — sent ${r?.sent ?? 0}/${r?.attempted ?? 0}`); return r; }),
     });
     // the current members' circle addresses on this device's roster (never this device's own)
+    async function rosterRowsOf(circleId) {
+      return (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members ?? [];
+    }
+    function addressesOfRow(m, circleId = null) {
+      const mine = circleId ? circleAddressFor(circleId) : null;
+      return (Array.isArray(m?.circleAddresses) ? m.circleAddresses : [m?.circleAddress]).filter((x) => x && x !== mine);
+    }
     async function rosterAddressesOf(circleId) {
       const mine = circleAddressFor(circleId);
-      const rows = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members ?? [];
-      return rows.flatMap((m) => (Array.isArray(m?.circleAddresses) ? m.circleAddresses : [m?.circleAddress])).filter((x) => x && x !== mine);
+      return (await rosterRowsOf(circleId)).flatMap((m) => addressesOfRow(m)).filter((x) => x !== mine);
     }
     function tellLateRecipients(circleId) {
-      if (!circleId || !lateRecipients.holds(circleId)) return;
-      rosterAddressesOf(circleId).then((addresses) => lateRecipients.rosterAddresses(circleId, addresses))
+      if (!circleId) return;
+      const waitsHere = [...waitingByMsg.values()].some((w) => w.circleId === circleId);
+      if (!lateRecipients.holds(circleId) && !waitsHere) return;
+      rosterRowsOf(circleId).then((rows) => {
+        if (waitsHere) dropDepartedFromWaits(circleId, rows);
+        const byAddress = new Map();
+        for (const m of rows) for (const a of addressesOfRow(m, circleId)) if (m?.webid) byAddress.set(a, m.webid);
+        return lateRecipients.rosterAddresses(circleId, [...byAddress.keys()], { webidsOf: (fresh) => fresh.map((a) => byAddress.get(a)) });
+      })
         .catch(() => { /* best-effort: the catch-up remains */ });
     }
     tellLateRecipientsRef.current = (circleId) => tellLateRecipients(circleId);
@@ -6300,9 +6380,62 @@ export async function createRealHouseholdAgent(opts = {}) {
     // hold yet is reached nowhere — not held — so an item or a chat line fanned in that moment never reached them (the
     // household bot writing in a circle it had just joined). Each is remembered like a membership statement and told
     // again, by its own lane's broadcast as the circle, when that member's address lands; never at the global key.
-    rememberFanRef.current = (circleId, statement, retell) => rosterAddressesOf(circleId)
-      .then((known) => lateRecipients.fanned(circleId, statement, known, retell))
+    rememberFanRef.current = (circleId, statement, retell, meta = null) => rosterAddressesOf(circleId)
+      .then((known) => lateRecipients.fanned(circleId, statement, known, retell, meta))
       .catch(() => { /* remembering is best-effort: the member's own catch-up remains */ });
+    // A LINE SOME MEMBERS GOT WHILE OTHERS HAD NO ADDRESS YET: the fan says, on the log, whom the line
+    // still waits for — a silent `delivery-state` entry per change, never a store. The re-tell (a fan of the whole
+    // circle again, deduped by every receiver) writes the next one; an empty `waiting` ends it. One receipt from
+    // someone else ends nothing here. A restart reads it back (`seedWaitingRef`), so the late member is not lost with
+    // the process.
+    chatFanEndedRef.current = (circleId, msgId, out) => {
+      const outcomes = Array.isArray(out?.outcomes) ? out.outcomes : null;
+      if (!outcomes) return;
+      // a re-tell goes to the late members ALONE (`only`), so its outcomes name only them: who still waits is the earlier
+      // set, plus whom this fan found without an address, minus whom it now sent to; `of` is the first fan's
+      const sentTo = new Set(outcomes.filter((o) => o?.webid && (o.outcome === 'written' || String(o.outcome ?? '').startsWith('held'))).map((o) => o.webid));
+      const noAddress = outcomes.filter((o) => o?.outcome === 'no-address' && o?.webid).map((o) => o.webid);
+      const prev = waitingByMsg.get(msgId) ?? null;
+      if (!noAddress.length && !prev) return;
+      const waiting = [...new Set([...(prev?.refs ?? []), ...noAddress])].filter((w) => !sentTo.has(w));
+      if (prev && prev.refs.size === waiting.length && waiting.every((w) => prev.refs.has(w))) return;   // nothing changed: no new entry
+      const of = prev?.of ?? outcomes.length;
+      writeWait(circleId, msgId, waiting, of);
+    };
+    function writeWait(circleId, msgId, waiting, of) {
+      opts.deviceLog?.appendSilentEntry?.({ circleId, kind: 'delivery-state', payload: { msgId, state: ON_ITS_WAY, waiting, reached: Math.max(0, of - waiting.length), of } });
+      if (waiting.length) { waitingByMsg.set(msgId, { circleId, refs: new Set(waiting), of }); lateRecipients.noAddress(circleId, waiting); }
+      else waitingByMsg.delete(msgId);
+    }
+    // A MEMBER A LINE WAITS FOR WHO LEFT (or was removed) will never be reached: off the wait, so the bubble stops saying
+    // the rest follows. Read against the roster the tell reads anyway.
+    function dropDepartedFromWaits(circleId, rows) {
+      const onRoster = new Set(rows.map((m) => m?.webid).filter(Boolean));
+      for (const [msgId, w] of [...waitingByMsg]) {
+        if (w.circleId !== circleId) continue;
+        const still = [...w.refs].filter((r) => onRoster.has(r));
+        if (still.length !== w.refs.size) writeWait(circleId, msgId, still, w.of);
+      }
+    }
+    seedWaitingRef.current = (circleId) => {
+      const owed = awaitingChatRecipients({ eventLog: opts.deviceLog, circleId, myRef: circleSelfRef(circleId) });
+      for (const o of owed) {
+        waitingByMsg.set(o.msgId, { circleId, refs: new Set(o.waiting), of: o.of });
+        // remembered as reached by NOBODY, without a roster read here: the next tell (any roster change, an address
+        // landing) finds every address new and tells the line to the circle once — every receiver dedupes it — and
+        // that fan writes who still waits
+        // …and the re-tell goes to the members this line still WAITS for, never to the others whose address is merely new
+        // to this fresh memory (they hold it already): one whole-circle fan per waiting line at a start would be the burst
+        // the narrowing removed
+        lateRecipients.fanned(circleId, o.statement, [], async (cid, st, { only = null } = {}) => {
+          const waits = waitingByMsg.get(o.msgId)?.refs ?? new Set();
+          const to = (only ?? [...waits]).filter((w) => waits.has(w));
+          if (!to.length) return { sent: 0, attempted: 0, outcomes: [] };
+          return callSkill('pinboard', 'broadcastCircleChatStatement', { groupId: cid, event: st, msgId: o.msgId, ts: Date.now(), only: to });
+        }, { msgId: o.msgId });
+        lateRecipients.noAddress(circleId, o.waiting);
+      }
+    };
     // NOT REACHABLE YET (Frits, 2026-11-02): a current member the fan had no address for, still without one after the
     // re-tell window, is said on their row — and said once in this device's log (the box has no row to paint)
     const saidUnreachable = new Set();
@@ -6478,6 +6611,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
       callSkill: (...a) => callSkill(...a),
       storeFor: (circleId) => (isOwnLane(circleId) ? ownStoreNow : (householdService.stores.has(circleId) ? householdService.stores.getStore(circleId) : null)),
+      // the circle's switches bind on arrival: each statement judged by the settings at its place (`contentJudge.js`),
+      // against the same manifests the sender's gate reads
+      judge: { manifests: () => allManifests() },
+      // whose item it is binds on arrival too: each type's declared `changedBy` ('author' | 'circle'; none = 'author'),
+      // read from the same registry the circle stores validate against
+      changedByOf: (type) => storeRegistry.schema?.(type)?.changedBy,
       // the person's own scope: between their own devices only (see the own store above)
       // …one lane per self this device holds: each signed, carried and verified as that self's devices
       own: {
@@ -6612,8 +6751,12 @@ export async function createRealHouseholdAgent(opts = {}) {
   // Every key statement this device writes — the shells' sinks and the revoke ceremony all emit through
   // here — also reaches its other devices by the one carry, whichever caller fans it to the members.
   const keyEmitBare = makeKeyEmitter({ rail: keyRail });
+  // …and reaches this device's OWN key store: a shell refreshes its store when a key statement ARRIVES, and one written
+  // here (a rotation on the key lane, as a re-key that waited for its catch-up runs) arrives from nobody
+  const ownKeyStatementListeners = new Set();
   const keyEmit = keyEmitBare ? async (circleId, event) => {
     const statement = await keyEmitBare(circleId, event);
+    if (statement) for (const fn of [...ownKeyStatementListeners]) { try { await fn(circleId); } catch { /* a shell's refresh is its own */ } }
     if (statement) siblingCarry.carry({ subtype: KEY_STATEMENT_BROADCAST, circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now() }).catch(() => {});
     return statement;
   } : null;
@@ -6660,6 +6803,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       .finally(() => siblingCarry.carry({ subtype: 'circle-governance-broadcast', circleId, event: statement, msgId: `policy:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
     // where my membership chain in the circle stood (the line the receivers judge my earlier removals and role changes by)
     membershipUpToFor: (circleId) => authorChainTip(circleId, circleAddressFor(circleId)),
+    // where the content lanes stood on this device (the line the receivers judge content by: contentLine.js). A lane this
+    // device cannot read gives no line (null), and the emitter then fails the change rather than state an empty one.
+    contentUpToFor: (circleId) => {
+      if (typeof itemsRail?.storedStatements !== 'function' || typeof chatRail?.storedStatements !== 'function') return null;
+      return {
+        items: frontier(itemsRail.storedStatements(circleId).map((s) => s.body)),
+        chat: frontier(chatRail.storedStatements(circleId).map((s) => s.body)),
+      };
+    },
   });
   /**
    * THE circle-scoped send — every piece of circle traffic leaves through it: the chat/noticeboard fan
@@ -7946,6 +8098,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       // The transport mode applies LIVE too — the register is the one home, this hook the one
       // application point (shells and builtins just set-param).
       // the kept Nearby conversations' window applies LIVE (a shortened one drops at once)
+      // the person's own acts: their window applies LIVE too (a shortened one drops at once)
+      if (opId === 'set-param' && paramsResult?.ok !== false && args?.key === OWN_KEEP_WEEKS_KEY) {
+        try { opts.deviceLog?.setRetention?.({ own: ownRetentionMs(args.value) }); } catch { /* the register still holds the value */ }
+      }
       if (opId === 'set-param' && paramsResult?.ok !== false && args?.key === KEEP_DAYS_KEY) {
         try { opts.deviceLog?.setRetention?.({ room: roomRetentionMs(args.value) }); } catch { /* the register still holds the value */ }
       }
@@ -8402,9 +8558,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       // send passes here (the web composer's fan-out, the box's bot, the lanes' emitters) — and told again, by the same op
       // as the circle, when a member it could not reach yet has an address (`tellLateRecipients` below)
       if (LATE_TOLD_FANS.has(realOpId) && typeof realArgs?.groupId === 'string' && realArgs?.event?.body?.hash) {
-        await rememberFanRef.current?.(realArgs.groupId, realArgs.event, (cid, st) => callSkill('pinboard', realOpId, { ...realArgs, groupId: cid, event: st, ts: Date.now() }));
+        await rememberFanRef.current?.(realArgs.groupId, realArgs.event, (cid, st, { only = null } = {}) => callSkill('pinboard', realOpId, { ...realArgs, groupId: cid, event: st, ts: Date.now(), ...(only ? { only } : {}) }),
+          realOpId === 'broadcastCircleChatStatement' && typeof realArgs.msgId === 'string' ? { msgId: realArgs.msgId } : null);
       }
       const out = await runPinboard();
+      // a chat line's fan that left members without an address — or a re-tell that reached them — is said on the log
+      if (realOpId === 'broadcastCircleChatStatement' && typeof realArgs?.groupId === 'string' && typeof realArgs?.msgId === 'string') {
+        try { chatFanEndedRef.current?.(realArgs.groupId, realArgs.msgId, out); } catch { /* the fan itself stands */ }
+      }
       rosterReads.afterWrite(realOpId);
       // a write that may have grown a roster (an address announced, a seed recorded): a statement this device fanned
       // before that member's address was known is told to them now (only circles with one remembered — cheap otherwise)
@@ -8527,6 +8688,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       await ensureCircleSync(pairCircleId);
       const store = householdService.stores.getStore(pairCircleId);
       const existing = await store.get(copyId).catch(() => null);
+      // the pair circle's own switches, asked here as its members' devices will ask them (the door asked only the op's)
+      const refusal = await mayWriteInto(pairCircleId, { type: 'calendar-event', act: existing ? 'change' : 'add' });
+      if (refusal) return { ok: false, code: refusal.code, error: tr(gateRefusalKey(refusal.code)), refusal };
       const fields = sharedFieldsOf(ev);
       if (existing) {
         await store.put({ ...existing, ...fields, ...(fields.state ? {} : { state: existing.state === 'cancelled' ? 'scheduled' : existing.state }) }, { by: self });
@@ -8949,7 +9113,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // no-op so existing tests keep their behaviour.
       if (opId === 'claimTask' && typeof claimRouterRef.hook === 'function') {
         // the call's own args (handed in: this adapter is not inside the call's scope)
-        const circleId = args?.circleId ?? args?.groupId ?? null;
+        const circleId = circleArg(args);
         if (circleId) {
           Promise.resolve(claimRouterRef.hook({ task, circleId, args }))
             .catch((err) => publishEvent?.({
@@ -9579,7 +9743,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // above; when invoked for real, friendly text.
     if (opId === 'leaveGroup' && data.ok) {
       // Forget the left circle's no-pod sync peers (stops stale-peer boot HI-pings).
-      clearCirclePeers(args?.groupId ?? args?.circleId ?? args?.circleId).catch(() => {});
+      clearCirclePeers(circleArg(args)).catch(() => {});
       return {
         ok: true,
         message: tr('circle.groups.left'),
@@ -9739,6 +9903,7 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   // the kept Nearby conversations' window, as the person set it
   try { opts.deviceLog?.setRetention?.({ room: roomRetentionMs(paramsService.register.valueOf(KEEP_DAYS_KEY)) }); } catch { /* the default stands */ }
+  try { opts.deviceLog?.setRetention?.({ own: ownRetentionMs(paramsService.register.valueOf(OWN_KEEP_WEEKS_KEY)) }); } catch { /* the default stands */ }
 
   // THE A2A SURFACE — the declared ops, projected onto the agent peers can reach (2026-08-19).
   //
@@ -9798,7 +9963,35 @@ export async function createRealHouseholdAgent(opts = {}) {
     // catalogue source of truth for the household surface.  (The mock manifest
     // + createMockHouseholdAgent stay in mockAgent.js as a test fixture.)
     manifest: householdManifest,
-    callSkill,
+    // THE OUTER WAIST: what the shells and the doors reach. The person's own acts are recorded HERE, once per act
+    // (`recordOwnAction`: the owner's writes, and the reads a door says they asked for), never at the inner `callSkill`,
+    // which this agent also calls for itself many times over. The record follows the person's switch.
+    callSkill: async (appOrigin, opId, args, ctx = {}) => {
+      const record = (result, threw, error = null) => recordOwnAction({
+        deviceLog: opts.deviceLog, enabled: paramsService.register.valueOf(OWN_RECORD_KEY) !== false,
+        app: appOrigin, op: opId, args, ctx, result, threw, error, manifests: allManifests(),
+      });
+      // a person's act that writes in a circle asks that circle's capability set HERE, where no tap can walk around it
+      // (L1042; the shell hands in only its stores, `circleCapabilityInputs`); refused, it is recorded as refused
+      const refusal = await circleActRefusal({
+        app: appOrigin, op: opId, args, ctx, manifests: allManifests(),
+        activeCircle: getActiveHouseholdCircleId, inputs: opts.circleCapabilityInputs ?? null,
+      });
+      if (refusal) { const refused = { ok: false, code: refusal.code, error: refusal.code, refusal }; record(refused, false); return refused; }
+      let result;
+      try { result = await callSkill(appOrigin, opId, args, ctx); } catch (err) { record(null, true, err); throw err; }
+      record(result, false);
+      return result;
+    },
+    // The person's own record, for My data (ownActions.js): the rows, one file to save, and the wipe (this kind only).
+    ownActionRows: () => ownActionRows(opts.deviceLog),
+    exportOwnActions: () => ownActionsExport(ownActionRows(opts.deviceLog)),
+    wipeOwnActions: () => (typeof opts.deviceLog?.dropKind === 'function' ? opts.deviceLog.dropKind(OWN_ACTION_KIND) : 0),
+    // What no op shows, noted in the person's own record by the door that knows it (the "+": a proposal declined, a
+    // line placed nowhere; ownActions.js `noteOwnOutcome`), under the same switch as the acts the waist records.
+    noteOwnAct: (e = {}) => noteOwnOutcome({
+      ...e, deviceLog: opts.deviceLog, enabled: paramsService.register.valueOf(OWN_RECORD_KEY) !== false,
+    }),
     // #36 — a consumer's read of a registered param's LIVE value (sync, from the hydrated register), e.g. the
     // retention window. Reads only; writes go through callSkill('params','set-param',…).
     getParamValue: (key) => paramsService.register.valueOf(key),
@@ -9832,19 +10025,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     // override store are both available.
     setAfterClaimHook(fn) { claimRouterRef.hook = typeof fn === 'function' ? fn : null; },
     // L3 — reset/state operate on the wired per-circle CircleItemStore (the live household data).
-    // `reset()` wipes every open item + reseeds the demo items; `state()` returns the current open items.
+    // `reset()` wipes every open item + reseeds the demo items on a demo boot; `state()` returns the current open items.
     async reset() {
       const store = householdService.stores.getStore(homeCircleId);
       const open = await householdApp.listOpen(store, {});
       for (const it of open) {
         try { await store.delete(it.id); } catch { /* defensive */ }
       }
-      if (opts.seedHousehold !== false) {
-        for (const seed of SEED_HOUSEHOLD_ITEMS) {
-          try { await householdApp.addItem(store, { type: seed.type, text: seed.text }, { by: 'webid:local-demo-user' }); }
-          catch { /* defensive */ }
-        }
-      }
+      if (seedDemoData && opts.seedHousehold !== false) await seedDemoHousehold(store, householdApp.addItem);
     },
     async state() {
       try { return await householdApp.listOpen(householdService.stores.getStore(homeCircleId), {}); }
@@ -10598,6 +10786,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     /** The migration to one address per persona: this device's own old address — retired here (root), else asked. */
     retireDeviceCircleAddresses,
     ownAddressRetireHandler,
+    /** A share's copy into its source circle asks that circle first, as its receivers will (both shells hand it to the
+     *  share functions, which the shells call directly). */
+    mayWriteInto,
     spineActHandler,
     spineAckHandler,
     spineAckSubtype: SPINE_ACK_SUBTYPE,
@@ -10696,6 +10887,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // catch-up pair over the rail, and refresh their key-event store as the lane's projection.
     keyRail,
     keyEmit,
+    /** `fn(circleId)` after every key statement THIS device writes (it reaches no receive handler here); → unsubscribe. */
+    onOwnKeyStatement: (fn) => { if (typeof fn !== 'function') return () => {}; ownKeyStatementListeners.add(fn); return () => ownKeyStatementListeners.delete(fn); },
     /** State the circle's policy on the governance lane: `{groupId, policy, version}` → the signed statement or null. */
     emitPolicyUpdate: policyUpdateEmit,
     registerSelfIdentity: (address, identity) => sa.registerSelfIdentity?.(address, identity) ?? false,
@@ -10896,6 +11089,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   apiComposed = true;
   for (const cid of rostersToRead) scheduleRosterRead(cid);
   rostersToRead.clear();
+  // the circles opened before the chat rail and the API existed: what a restart still owes them goes out now
+  { const early = [...seedWaitingRef.pending]; seedWaitingRef.pending.clear(); for (const cid of early) reFanOwedChat(cid); }
   runRosterLine();
   selfAgent = api;
   return api;

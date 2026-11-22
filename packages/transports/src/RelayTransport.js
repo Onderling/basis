@@ -41,7 +41,7 @@
  * Uses `ws` in Node.js; falls back to globalThis.WebSocket in browsers.
  */
 import {
-  Transport, addressPossessionMessage, signAddressPossession, b64encode,
+  Transport, addressPossessionMessage, signAddressPossession, b64encode, relayNameOf,
 } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { parseUntrustedJson } from '@onderling/core';
@@ -56,6 +56,38 @@ const PUSH_ACK_TIMEOUT_MS = param({ key: 'transports.pushAckTimeoutMs', scope: P
 const BIND_WAIT_WARN_MS = param({ key: 'transports.bindWaitWarnMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2_000 });
 // How long `disconnect()` waits for the socket's own close before it gives up waiting (the close still proceeds).
 const CLOSE_WAIT_MS = param({ key: 'transports.closeWaitMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2_000 });
+// A FRAME THE RELAY REFUSED AS OVER-RATE IS SENT AGAIN (ledger L1061). The relay's per-connection token bucket drops an
+// over-rate `send` and answers `OVER_RATE` naming the envelope's id; this transport keeps what it sent for a while, so
+// it can send exactly that frame again, paced, a capped number of times — after which the give-up path is told.
+// How long a sent frame is kept for a possible refusal (the relay answers at once; this covers a slow socket)…
+const OVER_RATE_KEEP_MS = param({ key: 'transports.overRateKeepMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10_000 });
+// …and how many at most (the oldest go first).
+const OVER_RATE_KEEP_MAX = param({ key: 'transports.overRateKeepMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2_000 });
+// The wait after a refusal before the first re-send: the relay's bucket (30/s by default) has refilled by then.
+const OVER_RATE_RESEND_DELAY_MS = param({ key: 'transports.overRateResendDelayMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1_000 });
+// The pace of re-sends: one at a time, well under the relay's default limit (30/s), so a re-send never floods.
+const OVER_RATE_RESEND_PER_SEC = param({ key: 'transports.overRateResendPerSec', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 });
+// How often one frame is sent in all before it is given up (the first send included).
+const OVER_RATE_MAX_ATTEMPTS = param({ key: 'transports.overRateMaxAttempts', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 });
+// How old a refused frame may be and still be sent again (from its signed `_ts`, else its first write). A receiver drops
+// a frame older than its replay window (`security.replayWindowMs`, ten minutes): well under that, so a re-sent frame can
+// still be taken; past it the frame is given up and said, also while the socket is down (a test pins the agreement).
+export const OVER_RATE_MAX_AGE_MS = param({ key: 'transports.overRateMaxAgeMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 * 60 * 1_000 });
+// How many refused frames may wait for a re-send at once; one more is given up and said, not held.
+const OVER_RATE_QUEUE_MAX = param({ key: 'transports.overRateQueueMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1_000 });
+// A frame written this shortly before its socket closed may have lost its refusal with the socket: it is sent once more
+// on the next socket (a receiver drops a copy it already holds by its id). Older ones would have had their answer.
+const UNANSWERED_AT_CLOSE_MS = param({ key: 'transports.unansweredAtCloseMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2_000 });
+// THIS TRANSPORT PACES ITS OWN SENDS UNDER THE RELAY'S LIMIT (the start burst, 2026-11-20): the relay counts `send` frames per socket in
+// a token bucket (30 a second, a burst of 60, `relay.msgRatePerSec` / `relay.msgRateBurst`) and refuses what is over it.
+// This keeps its own bucket WELL below that, so a start's burst is held here and sent as it allows. Well below, because the
+// relay counts frames on ARRIVAL and paced writes can arrive bunched: on the Samsung at 25 a second with a burst of 50 a
+// cold start was still refused (76, 8); at 20 with a burst of 20 it was not (0, 0) bar one bunch over adb reverse. A
+// test pins that these stay at or under the relay's.
+const RELAY_SEND_PER_SEC = param({ key: 'transports.relaySendPerSec', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 20 });
+const RELAY_SEND_BURST = param({ key: 'transports.relaySendBurst', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 20 });
+/** The pace this transport keeps on `send` frames (for the agreement test with the relay's own limit). */
+export const RELAY_SEND_RATE = Object.freeze({ perSec: RELAY_SEND_PER_SEC, burst: RELAY_SEND_BURST });
 
 /**
  * WebSocket relay-server `Transport`: registers this agent's address with the relay, which
@@ -116,6 +148,21 @@ export class RelayTransport extends Transport {
    * @type {Map<string, {resolve: Function, reject: Function, timer: any}>}
    */
   #pendingBinds      = new Map();
+  /** envelope id → `{to, envelope, at, attempts}`: frames sent lately, kept in case the relay refuses one as over-rate. */
+  #sentFrames        = new Map();
+  /** Frames the relay refused as over-rate, in the order it refused them, waiting for their paced re-send. */
+  #overRateQueue     = [];
+  #overRateTimer     = null;
+  /** A re-send in progress (its sender's bind may be awaited): no second one starts beside it, so the pace holds. */
+  #overRateBusy      = false;
+  /** `{delayMs, perSec, maxAttempts}` — the register's values unless the composition (a test) narrows them. */
+  #overRate;
+  /** The own pace (see RELAY_SEND_RATE): a token bucket, and what waits for a token in two classes — what a person waits
+   *  on first, background sends (catch-ups, re-announces) after; in order within each. */
+  #pace = { perSec: RELAY_SEND_PER_SEC, burst: RELAY_SEND_BURST, tokens: RELAY_SEND_BURST, at: 0 };
+  #waitingForeground = [];
+  #waitingBackground = [];
+  #paceTimer         = null;
 
   /**
    * @param {object} opts
@@ -139,6 +186,20 @@ export class RelayTransport extends Transport {
     // A plain assignable property rather than an event emitter — this class has no emitter, and one
     // consumer is all this has ever needed.
     this.onUndelivered = typeof opts.onUndelivered === 'function' ? opts.onUndelivered : null;
+    const o = opts.overRateResend ?? {};
+    const pos = (v, d) => (Number.isFinite(v) && v > 0 ? v : Number(d));
+    this.#overRate = {
+      delayMs: pos(o.delayMs, OVER_RATE_RESEND_DELAY_MS),
+      perSec: pos(o.perSec, OVER_RATE_RESEND_PER_SEC),
+      maxAttempts: Math.max(1, Math.floor(pos(o.maxAttempts, OVER_RATE_MAX_ATTEMPTS))),
+      maxAgeMs: pos(o.maxAgeMs, OVER_RATE_MAX_AGE_MS),
+      maxQueued: Math.max(1, Math.floor(pos(o.maxQueued, OVER_RATE_QUEUE_MAX))),
+      unansweredAtCloseMs: pos(opts.unansweredAtCloseMs, UNANSWERED_AT_CLOSE_MS),
+    };
+    const pc = opts.sendPace ?? {};
+    this.#pace.perSec = pos(pc.perSec, RELAY_SEND_PER_SEC);
+    this.#pace.burst = pos(pc.burst, RELAY_SEND_BURST);
+    this.#pace.tokens = this.#pace.burst;
   }
 
   // G13 — extra addresses. The alias SET, the public API and the replay rule live in the base `Transport`
@@ -297,6 +358,11 @@ export class RelayTransport extends Transport {
     this.#stopped = true;
     this.#knownPeers.clear();
     this.#settleAllBinds(new Error('Relay: transport disconnected before the address was acknowledged'));
+    this.#refusePaced();
+    // A refused frame still waiting for its re-send will not get one: said, never dropped silently.
+    if (this.#overRateTimer) { clearTimeout(this.#overRateTimer); this.#overRateTimer = null; }
+    for (const held of this.#overRateQueue.splice(0)) this.#reportUndelivered(held.id, 'over-rate', held.to);
+    this.#sentFrames.clear();
     // Reject any in-flight push-control acks; their reply will never arrive.
     while (this.#pendingPushAcks.length > 0) {
       const h = this.#pendingPushAcks[0];
@@ -318,7 +384,7 @@ export class RelayTransport extends Transport {
     this.emit('disconnect');
   }
 
-  async _put(to, envelope) {
+  async _put(to, envelope, sendMeta = undefined) {
     // A refused relay is a permanent verdict, so say so now rather than after the 5s timeout below:
     // waiting would read as "the network is slow" for something that is never going to happen.
     if (this.#unprovenRelay) {
@@ -338,6 +404,61 @@ export class RelayTransport extends Transport {
     // A frame sent AS an alias goes out only once the relay has acked that alias on THIS socket. Without this,
     // a message held while the socket was closed flushed at open ahead of the alias's replayed bind, and the
     // relay refused it as an unregistered sender — silently for the sender (the enrol walk, 2026-09-16).
+    await this.#awaitSenderBound(envelope);
+    await this.#paced(to, envelope, sendMeta?.background === true);
+  }
+
+  /** A token from the own bucket, or false (refilled by the time since the last look). */
+  #takeToken() {
+    const p = this.#pace; const now = Date.now();
+    p.tokens = Math.min(p.burst, p.tokens + ((now - (p.at || now)) * p.perSec) / 1000);
+    p.at = now;
+    if (p.tokens >= 1) { p.tokens -= 1; return true; }
+    return false;
+  }
+
+  /**
+   * Write a `send` frame now when the bucket has a token and nothing waits before it; else wait in its class. Resolves
+   * when the frame is written (a caller that awaits a send is paced with it), rejects when the write throws.
+   */
+  #paced(to, envelope, background) {
+    if (!this.#waitingForeground.length && !this.#waitingBackground.length && this.#takeToken()) {
+      this.#writeSend(to, envelope, 1);
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+      (background ? this.#waitingBackground : this.#waitingForeground).push({ to, envelope, resolve, reject });
+      this.#schedulePace();
+    });
+  }
+
+  #schedulePace() {
+    if (this.#paceTimer || this.#stopped) return;
+    const p = this.#pace;
+    const wait = p.tokens >= 1 ? 0 : Math.ceil(((1 - p.tokens) * 1000) / p.perSec);
+    this.#paceTimer = setTimeout(() => this.#drainPaced(), wait);
+  }
+
+  /** Everything waiting for a token is refused with the error a send made while offline gets (`_put`'s own). */
+  #refusePaced() {
+    if (this.#paceTimer) { clearTimeout(this.#paceTimer); this.#paceTimer = null; }
+    const waiting = [...this.#waitingForeground.splice(0), ...this.#waitingBackground.splice(0)];
+    for (const w of waiting) { try { w.reject(new Error('Relay: not connected')); } catch { /* the caller is gone */ } }
+  }
+
+  /** Send what waits as tokens allow: a person's sends first, then the background; in order within each. */
+  #drainPaced() {
+    this.#paceTimer = null;
+    if (this.#stopped || !this.connected) { this.#refusePaced(); return; }
+    while ((this.#waitingForeground.length || this.#waitingBackground.length) && this.#takeToken()) {
+      const w = this.#waitingForeground.length ? this.#waitingForeground.shift() : this.#waitingBackground.shift();
+      try { this.#writeSend(w.to, w.envelope, 1); w.resolve(); } catch (err) { w.reject(err); }
+    }
+    if (this.#waitingForeground.length || this.#waitingBackground.length) this.#schedulePace();
+  }
+
+  /** A frame sent AS an alias waits for that alias's ack on this socket (see `_put`). */
+  async #awaitSenderBound(envelope) {
     const from = envelope?._from;
     if (typeof from === 'string' && from !== this.address && this.#signers.has(from) && !this.#bound.has(from)) {
       const t0 = Date.now();
@@ -349,9 +470,113 @@ export class RelayTransport extends Transport {
           + (lost ? ` (unbound by ${lost.why} ${t0 - lost.at} ms before the send)` : ' (never bound on this socket)'));
       }
     }
+  }
+
+  /** Write one `send` frame, and keep it a while by its envelope id: the relay may refuse it as over-rate. */
+  #writeSend(to, envelope, attempts, { firstAt = null, closeResent = false } = {}) {
     const frame = { type: 'send', to, envelope };
     if (envelope._topic) frame.topic = envelope._topic;
     this.#ws.send(JSON.stringify(frame));
+    const id = envelope?._id;
+    if (typeof id !== 'string' || !id) return;
+    const now = Date.now();
+    this.#sentFrames.delete(id);
+    this.#sentFrames.set(id, { to, envelope, at: now, attempts, firstAt: firstAt ?? now, closeResent });
+    // the oldest first: past the keep window, or over the count
+    for (const [k, v] of this.#sentFrames) {
+      if (now - v.at <= Number(OVER_RATE_KEEP_MS) && this.#sentFrames.size <= Number(OVER_RATE_KEEP_MAX)) break;
+      this.#sentFrames.delete(k);
+    }
+  }
+
+  /**
+   * The relay refused the frame with envelope id `id` as over-rate. Kept → queued for a paced re-send, unless it has
+   * had its attempts; not kept (or out of attempts) → the give-up path is told, as for the relay's `undelivered`.
+   */
+  #onOverRate(id) {
+    const kept = this.#sentFrames.get(id);
+    this.#sentFrames.delete(id);
+    if (!kept || kept.attempts >= this.#overRate.maxAttempts) { this.#reportUndelivered(id, 'over-rate', kept?.to ?? null); return; }
+    if (this.#overRateQueue.some((h) => h.id === id)) return;
+    this.#hold({ id, ...kept });
+  }
+
+  /** Queue a frame for its paced re-send: given up and said when it is already too old or the queue is full. */
+  #hold(held) {
+    if (this.#tooOld(held)) { this.#reportUndelivered(held.id, 'over-rate-too-old', held.to); return; }
+    if (this.#overRateQueue.length >= this.#overRate.maxQueued) { this.#reportUndelivered(held.id, 'over-rate-queue-full', held.to); return; }
+    this.#overRateQueue.push(held);
+    if (!this.#overRateTimer && !this.#overRateBusy) this.#overRateTimer = setTimeout(() => this.#resendOne(), this.#overRate.delayMs);
+  }
+
+  /** Too old to be taken: its signed `_ts` (else its first write) is past the age limit, under the replay window. */
+  #tooOld(held) {
+    const ts = Number(held?.envelope?._ts);
+    const made = Number.isFinite(ts) && ts > 0 ? ts : Number(held?.firstAt ?? Date.now());
+    return Date.now() - made > this.#overRate.maxAgeMs;
+  }
+
+  /** Give up, and say, every waiting frame that is too old to be taken (also while the socket is down). */
+  #dropTooOld() {
+    const keep = [];
+    for (const held of this.#overRateQueue.splice(0)) {
+      if (this.#tooOld(held)) this.#reportUndelivered(held.id, 'over-rate-too-old', held.to);
+      else keep.push(held);
+    }
+    this.#overRateQueue.push(...keep);
+  }
+
+  /**
+   * The socket closed: a frame written on it just before, with no answer yet, may have lost its refusal with it. Each
+   * is sent once more on the next socket (a receiver drops a copy it already holds by its id); a frame already sent
+   * again for a close is not, so a flapping socket cannot repeat it. What was kept for the old socket is let go.
+   */
+  #holdUnansweredAtClose() {
+    const now = Date.now();
+    for (const [id, kept] of this.#sentFrames) {
+      if (now - kept.at > this.#overRate.unansweredAtCloseMs || kept.closeResent) continue;
+      if (this.#overRateQueue.some((h) => h.id === id)) continue;
+      this.#hold({ id, ...kept, closeResent: true });
+    }
+    this.#sentFrames.clear();
+  }
+
+  /** Send the oldest refused frame again; the next one follows after the pace's interval. Never faster, never more. */
+  async #resendOne() {
+    this.#overRateTimer = null;
+    if (this.#stopped) return;
+    this.#dropTooOld();
+    const held = this.#overRateQueue[0];
+    if (!held) return;
+    if (!this.connected) {   // no socket: nothing is sent; look again after the first wait
+      this.#overRateTimer = setTimeout(() => this.#resendOne(), this.#overRate.delayMs);
+      return;
+    }
+    this.#overRateQueue.shift();
+    this.#overRateBusy = true;
+    try {
+      await this.#awaitSenderBound(held.envelope);
+      this.#writeSend(held.to, held.envelope, held.attempts + 1, { firstAt: held.firstAt, closeResent: held.closeResent });
+    } catch {
+      this.#reportUndelivered(held.id, 'over-rate', held.to);
+    } finally {
+      this.#overRateBusy = false;
+    }
+    if (this.#overRateQueue.length && !this.#overRateTimer && !this.#stopped) {
+      this.#overRateTimer = setTimeout(() => this.#resendOne(), 1000 / this.#overRate.perSec);
+    }
+  }
+
+  /**
+   * Tell the give-up path the relay will not deliver the envelope `envelopeId`. The app's delivery state is keyed by the
+   * message id inside the payload — so report that one when this transport sent it, else the envelope id (an id-less
+   * payload is one the app never tracked).
+   */
+  #reportUndelivered(envelopeId, reason, to = null) {
+    const sent = this.sentEnvelopeFor(envelopeId);
+    const appId = sent?.msgId ?? null;
+    try { this.onUndelivered?.({ msgId: appId ?? envelopeId, envelopeId, reason, to: sent?.to ?? to ?? null, subtype: sent?.subtype ?? null }); }
+    catch { /* a consumer that throws must not take the socket down */ }
   }
 
   /**
@@ -418,7 +643,7 @@ export class RelayTransport extends Transport {
     }
     this.#proved.add(address);
     this.#proofsInFlight.set(address, (this.#proofsInFlight.get(address) ?? 0) + 1);
-    if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'register-proof', address, nonce, proof }));
+    if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'register-proof', address, nonce, proof, relay: relayNameOf(this.#relayUrl) }));
   }
 
   /**
@@ -428,12 +653,12 @@ export class RelayTransport extends Transport {
    */
   async #signFor(address, nonce) {
     if (address === this.address && this.identity) {
-      return signAddressPossession(this.identity, address, nonce);
+      return signAddressPossession(this.identity, address, nonce, relayNameOf(this.#relayUrl));
     }
     const sign = this.#signers.get(address);
     if (typeof sign !== 'function') return null;
     // The adapter builds the message; the caller only holds the key. See `Transport.addAddress`.
-    const sig = await sign(addressPossessionMessage(address, nonce));
+    const sig = await sign(addressPossessionMessage(address, nonce, relayNameOf(this.#relayUrl)));
     return typeof sig === 'string' ? sig : (sig ? b64encode(sig) : null);
   }
 
@@ -623,11 +848,14 @@ export class RelayTransport extends Transport {
         // id (an id-less payload is one the app never tracked). Until 2026-09-16 the envelope id was reported
         // as `msgId`, and both shells' give-up consumers marked a message that did not exist: a message the
         // relay threw away after 24 h kept looking fine.
-        const sent = this.sentEnvelopeFor(msg.id);
-        const appId = sent?.msgId ?? null;
         // who it was for and what kind it was: this transport's own memory of its send (the relay's frame names neither)
-        try { this.onUndelivered?.({ msgId: appId ?? msg.id, envelopeId: msg.id, reason: msg.reason ?? 'unknown', to: sent?.to ?? null, subtype: sent?.subtype ?? null }); }
-        catch { /* a consumer that throws must not take the socket down */ }
+        this.#reportUndelivered(msg.id, msg.reason ?? 'unknown');
+        return;
+      }
+      // An over-rate refusal that names its frame: sent again, paced (`#onOverRate`). One that names none (an older
+      // relay) is the generic error below, as before.
+      if (msg.type === 'error' && msg.message === 'OVER_RATE' && typeof msg.id === 'string' && msg.id) {
+        this.#onOverRate(msg.id);
         return;
       }
       if (msg.type === 'error') {
@@ -666,7 +894,11 @@ export class RelayTransport extends Transport {
       // Anything waiting on an ack from THIS socket will never get one; the alias stays in the
       // replay set and is re-proved on the next connect, but the caller is told now.
       this.#settleAllBinds(new Error('Relay: socket closed before the address was acknowledged'));
+      // …and a frame waiting for a token on it ends as a send made while offline does: refused, so each caller's own
+      // hold or retry decides — never written later on another socket behind the caller's back
+      this.#refusePaced();
       if (this.#stopped) return;
+      this.#holdUnansweredAtClose();
       // Immediately reset the connect promise so any concurrent _put calls will
       // wait for the new connection rather than using the stale resolved promise.
       this.#resetConnectPromise();

@@ -14,6 +14,14 @@ import { REMINDER_RULES_KEY, reminderRulesFrom, reminderRulesValue, reminderLaye
 import { layeredRules, reminderOccurrences } from './reminderOccurrences.js';
 import { upcoming } from './intentions.js';
 import { assistantManifest } from './assistantManifest.js';
+/** The ops beyond a role's weight at the bot, each named with its reason on its row (`botException`). */
+const BOT_EXCEPTIONS = new Set(assistantManifest.operations.filter((o) => o.botException).map((o) => o.id));
+/**
+ * The exceptions whose handler itself keeps the EFFECT and any secret in the person's private chat (Fable 2026-11-19):
+ * asked in a group, the screen link is sent privately and the group is told so; the in-app invite and the screen's yes
+ * refuse a group with their own line. The door's private check covers the other exceptions.
+ */
+const PRIVATE_BY_ITSELF = new Set(['assistant-screen', 'assistant-inapp', 'assistant-screen-confirm']);
 import { createIntentionBook } from './intentionBook.js';
 import { createOwnDevicesStore } from './ownDevicesStore.js';
 import { WEEK_OVERVIEW_OP, weekOverviewOn, switchWeekOverview } from './weekOverviewRows.js';
@@ -31,6 +39,10 @@ import { decodeContactCard } from '@onderling-app/pinboard/lib/contactCard';
 import { readDayAndTime } from '../forms/parseDate.js';
 import { replyLine } from './replyLine.js';
 import { THREAD_LANGS } from './botThreads.js';
+import { toolboxRefusalText, toolboxListLine } from './toolboxes.js';
+
+/** A toolbox page's offer refused for its ticket (L1113): said as 'open it from the link /scherm <toolbox> sends'. */
+const TOOLBOX_TICKET_REFUSALS = new Set(['toolbox-needs-ticket', 'pairing-needs-ticket', 'toolbox-ticket-unknown', 'toolbox-ticket-expired', 'toolbox-ticket-mismatch']);
 
 /** How many entries of one part the week overview shows before it says how many more there are. */
 export const WEEK_OVERVIEW_MAX_ITEMS = param({ key: 'assistant.weekOverviewMaxItems', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15 });
@@ -175,6 +187,12 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       // the host gate's refusal (`{layer, code}`, the one shape) rides along; the door says the admin's line
       if (refused) return { ok: false, error: { code: refused.code ?? String(refused), message: t('circle.bot.admin_only') }, refusal: refused };
     }
+    // an op beyond the role's weight at the bot (`botException` on its row: a person's own screen, identity link, the
+    // household in their own app) has its effect, and any secret, only in the person's OWN private chat: never in a
+    // group, never from a screen (the three that answer a group privately by themselves are `PRIVATE_BY_ITSELF`)
+    if (BOT_EXCEPTIONS.has(op) && !PRIVATE_BY_ITSELF.has(op) && !(await fromPrivateDoor(caller ?? ctx?.threadId, ctx))) {
+      return { ok: false, error: { code: 'not-private', message: t('circle.bot.kring_not_private') } };
+    }
     try {
       if (op === 'assistant-screen-approve') return approveOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
       if (op === 'assistant-link') return linkOp(caller ?? ctx?.threadId, args?.offer ?? args?._match, ctx);
@@ -185,6 +203,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-forget') return forgetOp(caller ?? ctx?.threadId, ctx);
       if (op === 'assistant-circle') return circleOp(caller ?? ctx?.threadId, args?.spec ?? args?._match, ctx);
       if (op === 'assistant-circles') return circlesOp(caller ?? ctx?.threadId);
+      if (op === 'assistant-toolbox') return toolboxOp(caller ?? ctx?.threadId, args?.spec ?? args?._match, ctx);
       // the export key's set and unlock exist for a screen alone: they run only as the yes to a screen's request
       if (op === 'assistant-export-key-set' || op === 'assistant-export-key-unlock') {
         if (ctx?.steppedUp !== true) return { ok: false, error: { code: 'screen-only', message: t('circle.bot.export_key_screen_only') } };
@@ -912,10 +931,20 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   async function screenOp(person, how) {
     if (!person || !admin.screens) return { ok: false, error: 'unwired' };
     const tp = personT(person);
+    // `/scherm <toolbox>`: that toolbox's own page, with its one-use ticket, to the person's private door (L1113)
+    const word = String(how ?? '').trim().toLowerCase();
+    if (word && word !== 'link' && typeof admin.screens.toolboxStart === 'function') {
+      const r = await admin.screens.toolboxStart(person, word, (link, minutes) => tp('circle.bot.screen_toolbox_link', { toolbox: word, link, minutes }), tp('circle.bot.screen_toolbox_link_remembered', { toolbox: word }));
+      if (!r.ok) {
+        const key = r.reason === 'toolbox-no-page' ? 'circle.bot.screen_toolbox_no_page' : r.reason === 'no-app-url' ? 'circle.bot.screen_no_app' : 'circle.bot.screen_not_reachable';
+        return { ok: false, error: { code: r.reason, message: tp(key, { toolbox: word }) } };
+      }
+      return { ok: true, message: tp('circle.bot.screen_sent_privately') };
+    }
     const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
     const wantsLink = /^\s*link\s*$/i.test(String(how ?? ''));
     if (row?.role === 'admin' && !wantsLink && typeof admin.screens.startPaste === 'function') {
-      const r = await admin.screens.startPaste(person, (link) => tp('circle.bot.screen_paste_link', { link }));
+      const r = await admin.screens.startPaste(person, (link, minutes) => tp('circle.bot.screen_paste_link', { link, minutes }), tp('circle.bot.screen_paste_remembered'));
       if (!r.ok) return { ok: false, error: { code: r.reason, message: tp(r.reason === 'no-app-url' ? 'circle.bot.screen_no_app' : 'circle.bot.screen_not_reachable') } };
       return { ok: true, message: tp('circle.bot.screen_sent_privately') };
     }
@@ -1079,6 +1108,52 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   }
 
   /** Is this turn from the person's PRIVATE door (on Telegram the chat whose id is their own; the inbox always)? */
+  /**
+   * `/toolbox` — the toolboxes the operator placed on the box (L1035). No argument: each with its words and on/off.
+   * `<naam> aan`: the card (its name, address, words, what it receives) with Ja/Nee, asked in the admin's own private
+   * chat; the Ja (`<naam> aan ja`) switches it on, from that chat only. `<naam> uit`: off. Calls the tools ops at the waist.
+   */
+  async function toolboxOp(person, spec, ctx) {
+    if (!person) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    const words = String(spec ?? '').trim().split(/\s+/).filter(Boolean);
+    const say = (r) => toolboxRefusalText(r, tp);
+    if (!words.length) {
+      const r = await callSkill('tools', 'listTools', { all: true }, ctx);
+      return { ok: true, message: toolboxListLine(r?.toolboxes ?? [], tp, { all: true }) };
+    }
+    const [name, verb, answer] = [words[0].toLowerCase(), String(words[1] ?? '').toLowerCase(), String(words[2] ?? '').toLowerCase()];
+    if (verb === 'uit' || verb === 'off') {
+      const r = await callSkill('tools', 'removeToolbox', { name }, ctx);
+      return r?.ok ? { ok: true, message: tp('circle.bot.toolbox_off', { title: r.title ?? name }) } : { ok: false, error: { code: r?.code, message: say(r) } };
+    }
+    if (verb !== 'aan' && verb !== 'on') return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.toolbox_usage') } };
+    // switching a toolbox on says what it will receive: asked and answered in the admin's own private chat only
+    if (!(await fromPrivateDoor(person, ctx))) return { ok: false, error: { code: 'not-private', message: tp('circle.bot.toolbox_not_private') } };
+    if (answer === 'nee' || answer === 'no') return { ok: true, message: tp('circle.bot.toolbox_unchanged') };
+    if (answer === 'ja' || answer === 'yes') {
+      const r = await callSkill('tools', 'addToolbox', { name, confirm: true }, ctx);
+      if (!r?.ok) return { ok: false, error: { code: r?.code, message: say(r) } };
+      const first = (await callSkill('tools', 'listTools', {}, ctx))?.toolboxes?.find((b) => b.name === name)?.words?.[0];
+      return { ok: true, message: tp('circle.bot.toolbox_on', { title: r.title, example: first ? `${first.word} …` : '/toolbox' }) };
+    }
+    const r = await callSkill('tools', 'addToolbox', { name }, ctx);
+    if (!r?.ok) return { ok: false, error: { code: r?.code, message: say(r) } };
+    return {
+      ok: true,
+      message: tp('circle.bot.toolbox_card', {
+        title: r.title, url: r.url, words: r.words.map((w) => `${w.word} <…>`).join(', '),
+        // per word with slots, the parameter and the phrases it listens for: a changed slot ends the yes, so the yes
+        // is to what is shown
+        slots: r.words.flatMap((w) => (w.slots ?? []).map((s) => `\n${tp('circle.bot.toolbox_card_slot', {
+          word: w.word, param: s.param, phrases: Object.entries(s.values ?? {}).map(([v, ps]) => `${v}: ${ps.join(' / ')}`).join('; '),
+        })}`)).join(''),
+        receives: tp(r.receives?.includes('list-refs') ? 'circle.bot.toolbox_receives_list' : 'circle.bot.toolbox_receives_question'),
+      }),
+      quickReplies: [{ slash: `/toolbox ${name} aan ja`, label: tp('circle.bot.toolbox_yes') }, { slash: `/toolbox ${name} aan nee`, label: tp('circle.bot.toolbox_no') }],
+    };
+  }
+
   async function fromPrivateDoor(person, ctx) {
     const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
     return ctx?.via !== 'screen' && Boolean(row) && (row.channel !== 'telegram' || isOwnTelegramChat(ctx?.chatId, row.uid));
@@ -1240,7 +1315,14 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const tp = personT(person);
     const offer = parsePairingOffer(String(text ?? '').trim());
     if (!offer.ok) return { ok: false, error: { code: offer.reason, message: tp('circle.bot.screen_paste_usage') } };
-    const r = await admin.screens.pasted(person, { viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label });
+    const r = await admin.screens.pasted(person, { viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label, toolbox: offer.toolbox, ticket: offer.ticket });
+    // a page for a toolbox that is not on here: said in words, nothing asked (L1049)
+    if (!r.ok && r.reason === 'toolbox-not-on') return { ok: false, error: { code: r.reason, message: tp('circle.bot.screen_toolbox_not_on', { toolbox: r.toolbox ?? offer.toolbox ?? '' }) } };
+    // a toolbox's page connects only from the link `/scherm <toolbox>` sent, once and in time (L1113): said in words
+    if (!r.ok && TOOLBOX_TICKET_REFUSALS.has(r.reason)) {
+      const toolbox = r.toolbox ?? offer.toolbox ?? null;
+      return { ok: false, error: { code: r.reason, message: toolbox ? tp('circle.bot.screen_toolbox_needs_link', { toolbox }) : tp('circle.bot.screen_paste_needs_link') } };
+    }
     if (!r.ok) return { ok: false, error: { code: r.reason, message: tp('circle.bot.screen_confirm_failed') } };
     return { ok: true, message: tp('circle.bot.screen_paste_asked') };
   }

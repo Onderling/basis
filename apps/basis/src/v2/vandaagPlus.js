@@ -372,7 +372,12 @@ export function plusLineOutcome(line, { circles = [], own = null, acts = PLUS_AC
     // nothing to do here: a line that ASKS how something works ("hoe …", gate words `_help.questions`) is looked up in the
     // help cards (before any model reads it); only such a line: the cards' matcher alone hits ordinary lines on a keyword
     const asks = helpQuestionOpeners().some((o) => text.toLowerCase().startsWith(o));
-    const card = asks ? answerHelp(text, { lang: lang ?? undefined }) : null;
+    // looked up WITHOUT the person's circle names: a circle called "Thuis" is no help topic (the personas card says
+    // "thuis"), so a line about a circle borrows no card by its name, while a real how-to question keeps its own
+    const withoutCircles = all.reduce((acc, c) => (c?.unnamed !== true && typeof c?.name === 'string' && c.name.trim()
+      ? acc.replace(new RegExp(`(^|[^\\p{L}\\p{N}])${c.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^\\p{L}\\p{N}])`, 'giu'), '$1')
+      : acc), text);
+    const card = asks ? answerHelp(withoutCircles, { lang: lang ?? undefined }) : null;
     return card ? { kind: 'help', card: { cardId: card.source?.cardId ?? null, text: card.text } } : null;
   }
   const to = readers.map(({ circle: c }) => ({ circleId: c.id, name: c.name ?? '' }));
@@ -509,15 +514,13 @@ export function plusDoneLine(result, { opId, args = {}, t } = {}) {
 }
 
 /**
- * What the "+" answers in its thread to a help reading (`plusLineOutcome` kind 'help'): a card's own text, or what the "+"
- * can do: its own acts by name, and that it answers how things work. Both shells say this one line.
- * @param {{acts?: string[], card?: {text: string}|null}} o
- * @param {{t: Function, acts?: object[]}} a
+ * What the "+" answers to a how-to question a help card knows (`plusLineOutcome` kind 'help' with a card): the card's
+ * own text. Plain "help" is generated from what the door offers (`plusHelp`, plusIntro.js).
+ * @param {{card?: {text: string}|null}} o
+ * @returns {string|null}
  */
-export function plusHelpAnswer(o, { t, acts = PLUS_ACTS } = {}) {
-  if (o?.card?.text) return o.card.text;
-  const names = (o?.acts ?? acts.map((a) => a.id)).map((id) => acts.find((a) => a.id === id)).filter(Boolean).map((a) => plusLabel(t, a));
-  return t('circle.vandaag.plus_help', { acts: names.join(', ') });
+export function plusHelpAnswer(o) {
+  return o?.card?.text ?? null;
 }
 
 /**

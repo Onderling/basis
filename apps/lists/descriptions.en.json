@@ -1,0 +1,58 @@
+{
+  "createList": {
+    "what": "Make a new list.",
+    "params": { "text": "the name of the list", "defaultChild": "what goes on it by default" }
+  },
+  "addToList": {
+    "what": "Put something on a list.",
+    "params": { "list": "which list", "text": "what goes on it", "kind": "what kind of entry", "assignee": "who does it", "due": "on which day", "ref": "the thing it refers to", "quantity": "how many" }
+  },
+  "listLists": {
+    "what": "Show the lists.",
+    "params": {}
+  },
+  "markListItemDone": {
+    "what": "Tick something off a list.",
+    "params": { "item": "what you tick off", "list": "on which list" }
+  },
+  "makeChore": {
+    "what": "Make an entry a chore: who does it, or when.",
+    "params": { "item": "which entry", "list": "on which list", "assignee": "who does it", "due": "on which day" }
+  },
+  "entryReminders": {
+    "what": "Set when everyone is reminded of an entry.",
+    "params": { "item": "which entry", "reminders": "when, for example 60 minutes before or morning", "list": "on which list" }
+  },
+  "shopVisit": {
+    "what": "Show what you need at a shop.",
+    "params": { "shop": "which shop you are in", "general": "the general shopping list" }
+  },
+  "listEntries": {
+    "what": "Show what is on a list.",
+    "params": { "list": "which list" }
+  },
+  "listDone": {
+    "what": "Show what was ticked off in the last days.",
+    "params": { "days": "how many days back", "list": "on which list" }
+  },
+  "removeFromList": {
+    "what": "Take something off a list.",
+    "params": { "item": "what comes off", "list": "from which list" }
+  },
+  "removeList": {
+    "what": "Remove a whole list, with everything on it.",
+    "params": { "list": "which list" }
+  },
+  "restoreList": {
+    "what": "Put a removed list back.",
+    "params": { "list": "which list" }
+  },
+  "restoreEntry": {
+    "what": "Put back something another person took off your list.",
+    "params": { "item": "what goes back" }
+  },
+  "editEntry": {
+    "what": "Change an entry on a list: its words or its time.",
+    "params": { "item": "which entry", "text": "the new words", "list": "on which list", "when": "the new time", "quantity": "how many" }
+  }
+}

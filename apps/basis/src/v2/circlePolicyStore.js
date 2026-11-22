@@ -24,7 +24,7 @@ import {
   normalizeCirclePolicy, mergeCirclePolicy,
   normalizeMemberOverride, mergeMemberOverride,
 } from './circlePolicy.js';
-import { withDerivedChatFeature } from './conversationKinds.js';
+import { withDerivedChatFeature, noteCirclePolicy } from './conversationKinds.js';
 import { processRefusalLog } from './refusalLog.js';
 
 const inMemoryByMarks = new WeakMap();   // marks backend → its in-memory marks (one per device storage)
@@ -75,7 +75,9 @@ export function createCirclePolicyStore({ load, save, versions, marks = null, on
       // store the same fact. Derived on read rather than rewritten on save, so there is one place that
       // decides it; `update` still merges the raw patch, so nothing is lost.
       const policy = withDerivedChatFeature(normalizeCirclePolicy(raw));
-      return (await pendingOf(circleId)) ? { ...policy, policyPending: true } : policy;
+      const out = (await pendingOf(circleId)) ? { ...policy, policyPending: true } : policy;
+      noteCirclePolicy(circleId, out);   // what the conversation shows, for every reader of an arrived line
+      return out;
     },
     /**
      * A circle that has just ARRIVED here (a join, an own device's carry, an enrolment, a restore): its policy is not
@@ -121,6 +123,7 @@ export function createCirclePolicyStore({ load, save, versions, marks = null, on
         try { await versions.capture(circleId, next); } catch { /* capture is best-effort */ }
       }
       if (save) await save(circleId, toSave);
+      noteCirclePolicy(circleId, (pendingNow === true && !seen) ? { ...next, policyPending: true } : next);
       // the circle's own policy arrived (the policy lane, the join's reply): its posture is known from here on
       if (seen && marks) {
         inMemory.set(circleId, false);
@@ -231,18 +234,20 @@ export function createMemberOverrideStore({ load, save } = {}) {
 
 /** localStorage-backed load/save for member overrides. Key: `cc.circleOverride.<circleId>`. */
 export function localStorageOverrideIo(storage = globalThis.localStorage) {
+  // SEALED at rest (ledger L1083: per-member overrides), on web and phone alike
+  const kv = sealedKeyValue(storage, { name: 'the member overrides', strict: true, said: true, resealAtStart: ['cc.circleOverride.'] });
   const key = (id) => `cc.circleOverride.${id}`;
   return {
     load: async (id) => {
       try {
-        const s = storage?.getItem(key(id));
+        const s = await kv.getItem(key(id));
         return s ? JSON.parse(s) : null;
       } catch {
         return null;
       }
     },
     save: async (id, override) => {
-      try { storage?.setItem(key(id), JSON.stringify(override)); } catch { /* ignore */ }
+      try { await kv.setItem(key(id), JSON.stringify(override)); } catch { /* ignore: quota, or no content key yet */ }
     },
   };
 }

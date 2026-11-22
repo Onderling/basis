@@ -1,5 +1,5 @@
 /**
- * The contact thread's header keeps the fixed header avatar's room (top-right on every screen), so its ⋯ (Hide, Delete)
+ * The contact thread's header keeps the fixed persona button's room (top-right on every screen), so its ⋯ (Hide, Delete)
  * is never under it. Found on the phone (2026-11-14: a tap on the ⋯ landed on the avatar); web paints the same avatar
  * `position: fixed` and its Contacten head already clears it, the thread header did not.
  */
@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const css = readFileSync(fileURLToPath(new URL('../../web/v2/circle.css', import.meta.url)), 'utf8');
 const rule = (sel) => (css.match(new RegExp(`\\${sel} \\{([^}]*)\\}`)) ?? [])[1] ?? '';
 
-describe('the thread header beside the header avatar', () => {
+describe('the thread header beside the persona button', () => {
   it('clears it as the Contacten head does', () => {
     const room = (rule('.cc-contacts__head').match(/padding-right: (\d+px)/) ?? [])[1];
     expect(room, 'the Contacten head clears the avatar').toBeTruthy();

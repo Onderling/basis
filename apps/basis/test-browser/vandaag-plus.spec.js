@@ -16,7 +16,7 @@ test('the "+" makes an own note and an own appointment, both on Vandaag as mine'
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head'), 'the app opens on Vandaag').toBeVisible({ timeout: 20_000 });
 
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await page.locator('.circle-vandaag-plus__act[data-act="household.note"]').click();
   await page.locator('.circle-vandaag-plus__body').fill('sleutel bij de buren');
   await page.locator('.circle-vandaag-plus__save').click();
@@ -28,7 +28,7 @@ test('the "+" makes an own note and an own appointment, both on Vandaag as mine'
   await expect(page.locator('.circle-vandaag__day')).not.toBeEmpty();
   await expect(page.locator('.circle-screen__block--empty').filter({ hasText: /^items/i })).toHaveCount(0);
 
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await page.locator('.circle-vandaag-plus__act[data-act="calendar.calendar-event"]').click();
   await page.locator('.circle-vandaag-plus__title').fill('tandarts');
   const when = await page.evaluate(() => { const d = new Date(Date.now() + 86_400_000); d.setHours(14, 0, 0, 0); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T14:00`; });
@@ -41,7 +41,7 @@ test('the "+" makes an own note and an own appointment, both on Vandaag as mine'
   await expect(tomorrow.locator('.circle-screen__agenda-row').filter({ hasText: 'tandarts' }).locator('.circle-screen__agenda-moment')).toHaveText('14:00');
 
   // an empty save says so and makes nothing
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await page.locator('.circle-vandaag-plus__act[data-act="household.note"]').click();
   await page.locator('.circle-vandaag-plus__save').click();
   await expect(page.locator('.circle-vandaag-plus__error')).toBeVisible();
@@ -55,7 +55,7 @@ test('the free line fills the sheet; an own row opens it on itself to change or 
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
 
   // the free line: "afspraak morgen 14:00 kapper" picks the appointment and fills its fields (editable), then Save
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await page.locator('.circle-vandaag-plus__line').fill('afspraak morgen 14:00 kapper');
   await page.locator('.circle-vandaag-plus__line').press('Enter');
   await expect(page.locator('.circle-vandaag-plus__form[data-act="calendar.calendar-event"]'), 'the line picked the appointment').toBeVisible();
@@ -66,7 +66,7 @@ test('the free line fills the sheet; an own row opens it on itself to change or 
   await expect(row, 'the appointment from the line shows').toBeVisible({ timeout: 20_000 });
 
   // a day said without a time: the form asks for the time on that day and the time stays empty (never 09:00); Save waits
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await page.locator('.circle-vandaag-plus__line').fill('afspraak morgen tandarts');
   await page.locator('.circle-vandaag-plus__line').press('Enter');
   await expect(page.locator('.circle-vandaag-plus__ask-time'), 'the form asks for the time').toBeVisible();
@@ -76,7 +76,7 @@ test('the free line fills the sheet; an own row opens it on itself to change or 
   await page.locator('.circle-vandaag-plus__close').click();
 
   // a line nothing reads, with no model set: it says no model is set and where to set one, and fills nothing
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await page.locator('.circle-vandaag-plus__line').fill('ooit eens iets');
   await page.locator('.circle-vandaag-plus__line').press('Enter');
   await expect(page.locator('.circle-vandaag-plus__turn--assistant').last()).toContainText(/(Assistent-endpoint|Assistant endpoint)/);
@@ -93,7 +93,7 @@ test('the free line fills the sheet; an own row opens it on itself to change or 
   await page.locator('.circle-vandaag-plus__remove').click();
 
   // an own NOTE's row opens the sheet on its words too (a listed note carries them as its text)
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await page.locator('.circle-vandaag-plus__line').fill('notitie: band plakken');
   await page.locator('.circle-vandaag-plus__line').press('Enter');
   await page.locator('.circle-vandaag-plus__save').click();
@@ -113,7 +113,7 @@ test('a Vandaag row is a card with ONE button — the action its noun declares',
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await page.locator('.circle-vandaag-plus__line').fill('notitie: fietsband plakken');
   await page.locator('.circle-vandaag-plus__line').press('Enter');
   await page.locator('.circle-vandaag-plus__save').click();
@@ -132,7 +132,7 @@ test('the "+" is on every tab — its sheet makes things; Share my card and Scan
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
   await page.locator('[data-tab="circles"]').first().click();
   await expect(page.locator('.cc-fab'), 'the floating "+" on the Circles tab').toHaveCount(1);
-  await page.locator('.cc-fab').click();
+  await page.locator('.cc-fab').dblclick();
   await expect(page.locator('[data-section="plus-own"] .circle-vandaag-plus__act').first()).toBeVisible();
   await expect(page.locator('[data-section="plus-me"]'), 'no Me actions in the "+"').toHaveCount(0);
   await expect(page.locator('.circle-vandaag-plus__read'), 'a button reads the free line').toBeVisible();
@@ -141,7 +141,7 @@ test('the "+" is on every tab — its sheet makes things; Share my card and Scan
 test('the free line: its button reads it, as Enter does', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
-  await page.locator('.cc-fab').click();
+  await page.locator('.cc-fab').dblclick();
   await page.locator('.circle-vandaag-plus__line').fill('notitie: melk halen');
   await page.locator('.circle-vandaag-plus__read').click();
   await expect(page.locator('.circle-vandaag-plus__form[data-act="household.note"]'), 'the line picked the note').toBeVisible({ timeout: 10_000 });
@@ -155,7 +155,7 @@ test('Vastgezet: a pinned own act is one tap; a pinned circle op OPENS its circl
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
   // pin an own act from the sheet (☆ → ★), and it shows under Vastgezet
-  await page.locator('.cc-fab').click();
+  await page.locator('.cc-fab').dblclick();
   await page.locator('.circle-vandaag-plus__pin[data-act="household.note"]').click();
   await expect(page.locator('.circle-vandaag-plus__pin[data-act="household.note"]')).toHaveAttribute('data-pinned', 'true');
   const pinned = page.locator('[data-section="plus-pinned"] .circle-vandaag-plus__pinned-open');
@@ -171,7 +171,7 @@ test('Vastgezet: a pinned own act is one tap; a pinned circle op OPENS its circl
   // the floating "+" lives where the tab bar lives (not inside a circle): back out, and open the bookmark from Vandaag
   await page.locator('.circle-view__back').click();
   await page.locator('[data-tab="screens"]').first().click();
-  await page.locator('.cc-fab').click();
+  await page.locator('.cc-fab').dblclick();
   const bm = page.locator('[data-section="plus-pinned"] .circle-vandaag-plus__pinned-open').filter({ hasText: ':' });
   await expect(bm, 'the bookmark is under Vastgezet, in its circle\'s name').toHaveCount(1);
   await bm.first().click();

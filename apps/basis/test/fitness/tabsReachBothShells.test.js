@@ -26,7 +26,7 @@ describe('every declared tab has a door on both shells', () => {
     for (const id of TAB_IDS) {
       expect(handlersLine, `web tab bar has no handler slot for "${id}"`).toMatch(new RegExp(`\\b${id}:\\s*on\\w+`));
       const prop = handlersLine.match(new RegExp(`\\b${id}:\\s*(on\\w+)`))?.[1];
-      const showTabBar = app.slice(app.indexOf('function showTabBar('), app.indexOf('function showTabBar(') + 600);
+      const showTabBar = app.slice(app.indexOf('function paintTabBar('), app.indexOf('function paintTabBar(') + 600);   // showTabBar paints through paintTabBar
       expect(showTabBar, `showTabBar does not pass "${prop}" for tab "${id}"`).toMatch(new RegExp(`\\b${prop}:\\s*\\w+`));
     }
   });

@@ -121,18 +121,25 @@ export function rosterBindingVerifier(callSkill) {
  * revoked by statement at all — deny, never the any-attested rule. Spineless roster reads, like the base
  * verifier (no recursion, no breaker).
  */
-export function membershipBindingVerifier(callSkill, { circleIdentityFor = null, ownCeremonyCommitmentFor = null, memoMs = SPINELESS_MEMO_MS, chainFor = null, storedFor = null } = {}) {
+export function membershipBindingVerifier(callSkill, { circleIdentityFor = null, ownCeremonyCommitmentFor = null, memoMs = SPINELESS_MEMO_MS, chainFor = null, storedFor = null, revokesFor = null } = {}) {
+  /** The lane's stored `address-revoke` bodies in one circle: the rail's index when it hands one (`revokesFor`, built once
+   *  per log version), else a scan of the stored statements. */
+  const revokeBodies = (circleId) => (typeof revokesFor === 'function'
+    ? (revokesFor(circleId) ?? [])
+    : (storedFor(circleId) ?? []).map((st) => st?.body).filter((b) => b?.kind === 'address-revoke'));
   /** THIS SELF's own retired address, where it stopped: its retirement is on this lane, and its reveal verifies against
    *  this self's OWN commitment (derived from the persona's authority this device holds) — no roster involved. A
-   *  device that has just re-keyed and reloaded holds no trail row yet, and its own history must still bind. */
+   *  device that has just re-keyed and reloaded holds no trail row yet, and its own history must still bind. The
+   *  commitment is asked for only once a stored revoke names this author: almost no statement's author has one. */
   const ownRetiredCut = (circleId, author, ref) => {
     if (typeof ownCeremonyCommitmentFor !== 'function' || typeof storedFor !== 'function') return null;
-    let commitment = null;
-    try { commitment = ownCeremonyCommitmentFor(circleId) ?? null; } catch { commitment = null; }
-    if (!commitment) return null;
-    for (const st of storedFor(circleId) ?? []) {
-      const b = st?.body;
+    let commitment;
+    for (const b of revokeBodies(circleId)) {
       if (b?.kind !== 'address-revoke' || b.subject !== author || typeof b.payload?.upTo !== 'string' || b.payload?.authorRef !== ref) continue;
+      if (commitment === undefined) {
+        try { commitment = ownCeremonyCommitmentFor(circleId) ?? null; } catch { commitment = null; }
+      }
+      if (!commitment) return null;
       const facts = ceremonyRevealFacts({ kind: b.kind, payload: b.payload });
       if (verifyCeremonyReveal(b.payload?.reveal, { circleId, kind: b.kind, subject: author, authorRef: ref, commitment, facts })) return b.payload.upTo;
     }
@@ -243,6 +250,17 @@ export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSki
     if (version !== null) chains.set(circleId, { version, lookup });
     return lookup;
   };
+  // …and its `address-revoke` statements, the same way (the retired-address rule looks for one at every binding)
+  const revokes = new Map();   // circleId → { version, bodies }
+  const revokesFor = (circleId) => {
+    const version = typeof eventLog?.version === 'number' ? eventLog.version : null;
+    const had = revokes.get(circleId);
+    if (had && version !== null && had.version === version) return had.bodies;
+    let bodies = [];
+    try { bodies = (railRef.current?.storedStatements?.(circleId) ?? []).map((x) => x?.body).filter((b) => b?.kind === 'address-revoke'); } catch { bodies = []; }
+    if (version !== null) revokes.set(circleId, { version, bodies });
+    return bodies;
+  };
   const rail = makeCircleEntryRail({
     eventLog,
     signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: refIn(circleId) }),
@@ -251,7 +269,7 @@ export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSki
     // the only statements the roster fold calls dead (`superseded`: member properties a later one replaced)
     compactableKinds: ['member-props'],
     verifyBinding: verifyBinding ?? membershipBindingVerifier(callSkill, {
-      circleIdentityFor, ownCeremonyCommitmentFor, chainFor,
+      circleIdentityFor, ownCeremonyCommitmentFor, chainFor, revokesFor,
       storedFor: (circleId) => { try { return railRef.current?.storedStatements?.(circleId) ?? []; } catch { return []; } },
     }),
   });

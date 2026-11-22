@@ -80,6 +80,12 @@ describe('runDispatch — error path', () => {
     expect(reply.error).toEqual({ code: 'unauthorised', message: 'not authorised' });
   });
 
+  it('a refusal whose error is an object with words ({code, message}) is an error bubble too, never painted as the op\'s shape (an empty list)', async () => {
+    const reply = await runDispatch({ ...readyDispatch, replyShape: 'list' }, async () => ({ ok: false, error: { code: 'list-gone', message: 'Die lijst is weg.' } }));
+    expect(reply.error).toMatchObject({ code: 'skill-error', message: 'Die lijst is weg.', reason: 'list-gone' });
+    expect(reply.shape).toBe('text');
+  });
+
   it('handles non-Error thrown values gracefully', async () => {
     const reply = await runDispatch(readyDispatch, async () => {
       throw 'string error';   // eslint-disable-line no-throw-literal
@@ -140,5 +146,15 @@ describe('runDispatch — integration with parser + router + manifestMerge', () 
     expect(calls).toEqual([
       { appOrigin: 'household', opId: 'markComplete', args: { choreText: 'dishwasher' } },
     ]);
+  });
+});
+
+describe('runDispatch — the call context travels', () => {
+  it('hands ctx (the door a person came through) to callSkill, and calls without it when there is none', async () => {
+    const callSkill = vi.fn(async () => ({ ok: true }));
+    await runDispatch(readyDispatch, callSkill, { door: 'slash' });
+    expect(callSkill).toHaveBeenLastCalledWith('household', 'markComplete', { choreText: 'dishwasher' }, { door: 'slash' });
+    await runDispatch(readyDispatch, callSkill);
+    expect(callSkill.mock.calls.at(-1)).toHaveLength(3);
   });
 });

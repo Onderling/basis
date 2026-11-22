@@ -37,9 +37,7 @@ export class TrustRegistry {
 
   /** @param {Tier} tier */
   async setTier(pubKey, tier) {
-    const rec = await this.#load(pubKey);
-    rec.tier  = tier;
-    await this.#save(pubKey, rec);
+    await this.#mutate(pubKey, (rec) => { rec.tier = tier; });
   }
 
   /** @returns {Tier} defaults to 'authenticated' for unknown peers */
@@ -65,23 +63,17 @@ export class TrustRegistry {
   // ── Groups ────────────────────────────────────────────────────────────────
 
   async addGroup(pubKey, groupId) {
-    const rec = await this.#load(pubKey);
-    if (!rec.groups.includes(groupId)) rec.groups.push(groupId);
-    await this.#save(pubKey, rec);
+    await this.#mutate(pubKey, (rec) => { if (!rec.groups.includes(groupId)) rec.groups.push(groupId); });
   }
 
   async removeGroup(pubKey, groupId) {
-    const rec    = await this.#load(pubKey);
-    rec.groups   = rec.groups.filter(g => g !== groupId);
-    await this.#save(pubKey, rec);
+    await this.#mutate(pubKey, (rec) => { rec.groups = rec.groups.filter(g => g !== groupId); });
   }
 
   // ── Token grants ──────────────────────────────────────────────────────────
 
   async addTokenGrant(pubKey, tokenId) {
-    const rec = await this.#load(pubKey);
-    if (!rec.tokenIds.includes(tokenId)) rec.tokenIds.push(tokenId);
-    await this.#save(pubKey, rec);
+    await this.#mutate(pubKey, (rec) => { if (!rec.tokenIds.includes(tokenId)) rec.tokenIds.push(tokenId); });
   }
 
   // ── Enumerate ─────────────────────────────────────────────────────────────
@@ -105,7 +97,16 @@ export class TrustRegistry {
     return raw ? JSON.parse(raw) : { tier: 'authenticated', groups: [], tokenIds: [] };
   }
 
-  async #save(pubKey, rec) {
-    await this.#vault.set(`trust:${pubKey}`, JSON.stringify(rec));
+  /**
+   * Change one record and write it ONLY when it changed: a start sets the same tiers and groups again, and every write
+   * is a seal on the start's busiest seconds (the upgrade walk, 2026-11-20). A record that was absent is written.
+   */
+  async #mutate(pubKey, change) {
+    const raw = await this.#vault.get(`trust:${pubKey}`);
+    const rec = raw ? JSON.parse(raw) : { tier: 'authenticated', groups: [], tokenIds: [] };
+    change(rec);
+    const next = JSON.stringify(rec);
+    if (raw != null && next === raw) return;
+    await this.#vault.set(`trust:${pubKey}`, next);
   }
 }

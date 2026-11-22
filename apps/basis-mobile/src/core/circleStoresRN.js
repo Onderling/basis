@@ -27,9 +27,11 @@ import {
   // α.2 — per-user screens store.
   createUserScreenStore,
   // β.5 — per-user pin-to-top store.
-  createCirclePinStore,
+  createCirclePinStore, localStoragePinIo,
   // γ.2 — per-circle rules store factory (new in γ.2).
   createCircleRulesStore,
+  // the shared ios of the person's content stores, SEALED at rest (ledger L1083) — the same ones the web uses
+  localStorageOverrideIo, localStorageAvailabilityIo, localStorageSharedWithMeIo, localStorageScreenIo,
 } from '@onderling-app/basis';
 // γ.2 — concrete `versions` adapter wiring AsyncStorage.  Imported via
 // the basis-mobile-local module that itself reaches into the
@@ -92,7 +94,7 @@ export function makeCirclePolicyStoreRN(rawStorage, { getPodWriter } = {}) {
 }
 
 export function makeMemberOverrideStoreRN(storage) {
-  return createMemberOverrideStore(asyncKeyedIo('cc.circleOverride.', storage));
+  return createMemberOverrideStore(localStorageOverrideIo(storage));   // sealed at rest (the shared io)
 }
 
 /**
@@ -104,7 +106,7 @@ export function makeMemberOverrideStoreRN(storage) {
  * null) to publish; omit it and behaviour is local-only (unchanged).
  */
 export function makeAvailabilityStoreRN(storage, { getPodWriter } = {}) {
-  const localIo = asyncFixedIo('cc.availability', storage);
+  const localIo = localStorageAvailabilityIo(storage);   // sealed at rest; a read before the key waits for it
   const podIo   = podAvailabilityIo({
     getWriter: typeof getPodWriter === 'function' ? getPodWriter : () => null,
   });
@@ -120,7 +122,7 @@ export function makeAvailabilityStoreRN(storage, { getPodWriter } = {}) {
  * (web≡mobile: the SAME tiered factory web wires in circleApp.js).
  */
 export function makeSharedWithMeStoreRN(storage, { getPodWriter } = {}) {
-  const localIo = asyncFixedIo('cc.sharedWithMe', storage);
+  const localIo = localStorageSharedWithMeIo(storage);   // sealed at rest (the shared io)
   const podIo   = podSharedWithMeIo({
     getWriter: typeof getPodWriter === 'function' ? getPodWriter : () => null,
   });
@@ -170,7 +172,8 @@ export function makeCircleRulesStoreRN(storage) {
 
 /** The person's pages on this device (single book; key: `cc.userScreens`), each change kept as a version (undoable). */
 export function makeUserScreenStoreRN(storage) {
-  return createUserScreenStore({ io: asyncFixedIo('cc.userScreens', storage), versions: asyncStorageObjectVersions('screens', storage) });
+  // sealed at rest; a read before the key waits for it, so the first-run seeding never writes over the person's book
+  return createUserScreenStore({ io: localStorageScreenIo(storage), versions: asyncStorageObjectVersions('screens', storage) });
 }
 
 /**
@@ -192,9 +195,9 @@ export function asyncRawIo(storage) {
 }
 
 
-/** β.5 — per-user "pin to top" store (single key: `cc.circlePinned`). */
+/** β.5 — per-user "pin to top" store (single key: `cc.circlePinned`), sealed at rest through the shared io (web ≡ mobile). */
 export function makeCirclePinStoreRN(storage) {
-  return createCirclePinStore(asyncFixedIo('cc.circlePinned', storage));
+  return createCirclePinStore(localStoragePinIo(storage));
 }
 
 /**

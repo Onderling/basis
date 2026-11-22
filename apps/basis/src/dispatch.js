@@ -44,9 +44,11 @@ import { runCompositeOp } from './composite.js';
  *
  * @param {import('./router.js').ReadyDispatch}  ready
  * @param {CallSkill}                            callSkill
+ * @param {object}                               [ctx]  the call's context (the door a person came through, a self it is
+ *                                                       made as), handed to `callSkill` as its fourth argument; never dropped
  * @returns {Promise<Reply>}
  */
-export async function runDispatch(ready, callSkill) {
+export async function runDispatch(ready, callSkill, ctx) {
   if (!ready || ready.kind !== 'ready') {
     throw new Error(
       `runDispatch: expected ready dispatch, got kind=${ready?.kind ?? '(none)'}`,
@@ -59,26 +61,31 @@ export async function runDispatch(ready, callSkill) {
   const { opId, args, appOrigin, threadId, replyShape } = ready;
 
   try {
-    const payload = await callSkill(appOrigin, opId, args);
+    const payload = await (ctx === undefined ? callSkill(appOrigin, opId, args) : callSkill(appOrigin, opId, args, ctx));
     // v0.5.x defensive guard — when the skill returns an explicit
     // {ok: false, error} envelope, elevate it to reply.error so the
     // renderer falls back to the error-bubble path instead of force-
     // rendering the failure as the declared replyShape (which led to
     // a broken '? (unnamed)' embed-card in v0.5.0 when a skill was
     // missing on the real agent — user-reported 2026-05-23).
-    if (payload && typeof payload === 'object'
-        && payload.ok === false
-        && typeof payload.error === 'string') {
+    // …and the same for an error that is an object WITH words (`{code, message}`, how a door's refusals say themselves):
+    // painted as the op's shape it read as an empty list (the "meer" of a list that is gone, a toolbox that is off)
+    const words = payload && typeof payload === 'object' && payload.ok === false
+      ? (typeof payload.error === 'string' ? payload.error : (typeof payload.error?.message === 'string' && payload.error.message ? payload.error.message : null))
+      : null;
+    if (words !== null) {
+      const reason = (typeof payload.code === 'string' && payload.code) ? payload.code
+        : (typeof payload.error?.code === 'string' && payload.error.code ? payload.error.code : null);
       return {
         payload:  null,
         shape:    'text',
         threadId: threadId ?? null,
         error: {
           code:    'skill-error',
-          message: payload.error,
+          message: words,
           // the op's own reason, when it gave one ("not-found": the words named nothing) — read by a rule that may
           // fall back to the model
-          ...(typeof payload.code === 'string' && payload.code ? { reason: payload.code } : {}),
+          ...(reason ? { reason } : {}),
         },
       };
     }

@@ -26,10 +26,10 @@ async function bodies(src) {
 }
 
 describe('the history mirror keeps what each kind declares', () => {
-  it('every kind declares it (true or false); the three left out are the assistant conversation and what was heard nearby', () => {
+  it('every kind declares it (true or false); left out: the assistant conversation and what its "+" told (forgotten with it), what was heard nearby, item changes and notifications, a box\'s toolbox calls (they name housemates: the box\'s own record), and what a device proved about a content statement (its own judgment)', () => {
     for (const [kind, v] of Object.entries(ENTRY_KINDS)) expect(typeof v.mirrored, kind).toBe('boolean');
     const out = Object.entries(ENTRY_KINDS).filter(([, v]) => v.mirrored === false).map(([k]) => k).sort();
-    expect(out).toEqual(['assistant-turn', 'item-changed', 'nearby-card', 'nearby-line', 'notification']);
+    expect(out).toEqual(['assistant-turn', 'content-judged', 'item-changed', 'nearby-card', 'nearby-line', 'notification', 'plus-told', 'tool-call']);
   });
 
   it('an assistant turn (the "+" thread) written with the mirror on is not in the mirror; a circle line beside it is', async () => {

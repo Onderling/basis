@@ -17,17 +17,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, View, Text, Pressable, ScrollView, Switch, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
+import { capabilityLabel } from '../../../../basis/src/v2/capabilityLabel.js';   // a capability as a person reads it, one lookup (web twin)
 import { declinedKeysFrom } from '../../core/recipeConsentWiring.js';
 import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
 
-/** Localised atom verb label, falling back to the atom when no key is translated (t() echoes on a miss). */
-function verbLabel(atom) {
-  const k = `circle.settings.verb.${atom}`;
-  const v = t(k);
-  return v && v !== k ? v : atom;
-}
 function capLabel(cap) {
-  return `${verbLabel(cap.atom)} · ${cap.noun}`;
+  return capabilityLabel(t, cap);
 }
 
 export default function RecipeConsentCard({ model, visible, onAgree, onDecline }) {

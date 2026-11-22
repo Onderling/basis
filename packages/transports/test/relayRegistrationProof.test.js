@@ -44,7 +44,7 @@ async function waitFor(pred, ms = 2_000) {
 function stubRelay({ demandProof }) {
   const wss = new WebSocketServer({ port: 0 });
   const state = { registered: [], challenged: [] };
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
     const open = new Map();                    // nonce → address
     ws.on('message', (raw) => {
       let msg; try { msg = JSON.parse(raw); } catch { return; }
@@ -63,7 +63,7 @@ function stubRelay({ demandProof }) {
       if (msg.type === 'register-proof') {
         const address = open.get(msg.nonce);
         open.delete(msg.nonce);
-        if (address !== msg.address || !verifyAddressPossession(msg)) {
+        if (address !== msg.address || !verifyAddressPossession({ ...msg, isOwnRelayName: (n) => n === req?.headers?.host })) {
           ws.send(JSON.stringify({ type: 'error', message: 'PROOF_INVALID' }));
           return;
         }
@@ -220,7 +220,7 @@ describe('the client audits the relay', () => {
     let seenRegisters = 0;
     const wss = new WebSocketServer({ port: 0 });
     const registered = [];
-    wss.on('connection', (ws) => {
+    wss.on('connection', (ws, req) => {
       const open = new Map();
       ws.on('message', (raw) => {
         let msg; try { msg = JSON.parse(raw); } catch { return; }
@@ -236,7 +236,7 @@ describe('the client audits the relay', () => {
           ws.send(JSON.stringify({ type: 'challenge', address: msg.address, nonce }));
           return;
         }
-        if (msg.type === 'register-proof' && verifyAddressPossession(msg) && open.delete(msg.nonce)) {
+        if (msg.type === 'register-proof' && verifyAddressPossession({ ...msg, isOwnRelayName: (n) => n === req?.headers?.host }) && open.delete(msg.nonce)) {
           registered.push(msg.address);
           ws.send(JSON.stringify({ type: 'registered', address: msg.address }));
         }
@@ -266,11 +266,11 @@ describe('the client audits the relay', () => {
 describe('what the client signs', () => {
   it('is built by the transport out of the relay\'s nonce — never handed over by the relay', async () => {
     // Registration must not be a signing oracle. The relay contributes randomness and nothing else:
-    // whatever it sends, the message signed is `addressPossessionMessage(address, nonce)`.
+    // whatever it sends, the message signed is `addressPossessionMessage(address, nonce, relay)`.
     const wss = new WebSocketServer({ port: 0 });
     const signedOver = [];
     const evilMessage = 'ik draag mijn huis over aan de relay-beheerder';
-    wss.on('connection', (ws) => {
+    wss.on('connection', (ws, req) => {
       ws.on('message', (raw) => {
         const msg = JSON.parse(raw);
         if (msg.type === 'register') {
@@ -292,7 +292,10 @@ describe('what the client signs', () => {
     const proof = signedOver[0];
     expect(proof.nonce).toBe('n-1');
     // The signature verifies against the canonical message and nothing else.
-    expect(verifyAddressPossession({ address: identity.pubKey, nonce: 'n-1', proof: proof.proof })).toBe(true);
+    const port = wss.address().port;
+    // it names the relay it dialled, and the signature verifies against the canonical message naming it and nothing else
+    expect(proof.relay).toBe(`127.0.0.1:${port}`);
+    expect(verifyAddressPossession({ address: identity.pubKey, nonce: 'n-1', proof: proof.proof, relay: proof.relay, isOwnRelayName: () => true })).toBe(true);
     expect(AgentIdentity.verify(evilMessage, proof.proof, identity.pubKey)).toBe(false);
     expect(addressPossessionMessage(identity.pubKey, 'n-1')).toContain(identity.pubKey);
   });

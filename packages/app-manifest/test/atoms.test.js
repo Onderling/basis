@@ -111,3 +111,16 @@ describe('verbKind — an unclassified domain verb is never a silent read', () =
     expect(verbKind({ domainVerbs: ['help'] }, 'help')).toBe(null);
   });
 });
+
+describe('circleArg — the circle an op is about, by the parameter name the manifests use', () => {
+  it('reads circleId or groupId (the two names the manifests give it); a blank or non-string is no circle', async () => {
+    const { circleArg, CIRCLE_ARG_NAMES } = await import('../src/index.js');
+    expect(CIRCLE_ARG_NAMES).toEqual(['circleId', 'groupId']);
+    expect(circleArg({ groupId: 'g1' })).toBe('g1');
+    expect(circleArg({ circleId: 'c1' })).toBe('c1');
+    expect(circleArg({ circleId: 'c1', groupId: 'g1' })).toBe('c1');
+    expect(circleArg({ circleId: '', groupId: 'g1' })).toBe('g1');
+    expect(circleArg({ circleId: 5 })).toBe(null);
+    expect(circleArg(null)).toBe(null);
+  });
+});

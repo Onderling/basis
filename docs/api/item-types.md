@@ -178,6 +178,17 @@ chores. That is what happened the day lists moved onto the circle's own store, a
 question, not a storage one — which types a given surface shows is that surface's decision, and this
 names the set so each surface can decide it out loud instead of guessing per type.
 
+### `CHANGED_BY`
+
+**Kind:** constant · **Import:** `CHANGED_BY` from `'@onderling/item-types'`
+
+WHO MAY CHANGE AND REMOVE A ROW, per type (`changedBy`), judged by every receiving device (the items lane):
+  • 'author': the member who added the row, and any admin (a person's own words, asks, answers);
+  • 'circle': any member of the circle (a shared list and its entries, a task, an appointment).
+A type with no value counts as 'author'; the guard test (`changedBy.test.js`) is red for a registered type that has
+none, so every type is decided on purpose. Types that never ride a circle's items lane (the own scope, membership,
+governance) are 'author' for completeness. A type may add a finer rule on top (the tasks role rule).
+
 ### `registerCanonicalTypes`
 
 **Kind:** function · **Import:** `registerCanonicalTypes` from `'@onderling/item-types'`

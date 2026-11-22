@@ -83,7 +83,7 @@
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "editEntry": {
-      "text": "Verander de woorden van een regel: item = de oude woorden of het id, text = de nieuwe woorden. De lijst is niet nodig.",
+      "text": "Verander de woorden van een regel: item = de oude woorden of het id, text = de nieuwe woorden; quantity = hoeveel (een heel getal), ook zonder nieuwe woorden. De lijst is niet nodig.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "removeList": {

@@ -39,5 +39,20 @@ export function multiplexBridges(bridges) {
       if (!door) return Promise.resolve();
       return door.sendReply({ ...rest, chatId: s.slice(i + SEP.length) });
     },
+    /**
+     * Can this chat's door show pictures of its own (a group of pictures, side by side)? A door without gets the rows in
+     * words, and the box fetches no picture for it.
+     */
+    canSendPhoto(chatId) {
+      const s = String(chatId ?? ''); const i = s.indexOf(SEP);
+      const door = i > 0 ? doors.find((b) => b.id === s.slice(0, i)) : null;
+      return typeof door?.sendAlbum === 'function';
+    },
+    sendAlbum({ chatId, ...rest }) {
+      const s = String(chatId ?? ''); const i = s.indexOf(SEP);
+      const door = i > 0 ? doors.find((b) => b.id === s.slice(0, i)) : null;
+      if (typeof door?.sendAlbum !== 'function') return Promise.resolve();
+      return door.sendAlbum({ ...rest, chatId: s.slice(i + SEP.length) });
+    },
   };
 }

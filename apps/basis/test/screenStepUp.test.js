@@ -16,7 +16,7 @@ import { composeAssistantCatalogue } from '../src/assistant/assistantCatalogue.j
 const t = (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k);
 const ADMIN = 'telegram:9';
 const BERT = 'telegram:7';
-const STEP_UP = ['assistant-invite', 'assistant-cohort', 'assistant-role', 'assistant-revoke', 'assistant-rotate', 'assistant-circle'];
+const STEP_UP = ['assistant-invite', 'assistant-cohort', 'assistant-role', 'assistant-revoke', 'assistant-rotate', 'assistant-circle', 'assistant-toolbox'];   // /toolbox (L1035): from a screen, only after a yes in the admin's private chat
 // …and the export key's set and unlock: screen-only ops, held the same way
 const SCREEN_ONLY_STEP_UP = ['assistant-export-key-set', 'assistant-export-key-unlock'];
 const PRIVATE = { caller: ADMIN, threadId: ADMIN, chatId: '9' };
@@ -50,7 +50,7 @@ function door({ catalogue = null, callSkill = async () => ({ ok: true }) } = {})
 }
 
 describe('the admin\'s step-up ops from a screen', () => {
-  it('the six ops (and the export key\'s two, screen-only) declare the private-door step-up', () => {
+  it('the seven ops (and the export key\'s two, screen-only) declare the private-door step-up', () => {
     const declared = assistantManifest.operations.filter((o) => o.stepUp === 'private-door').map((o) => o.id).sort();
     expect(declared).toEqual([...STEP_UP, ...SCREEN_ONLY_STEP_UP].sort());
   });
@@ -218,6 +218,6 @@ describe('the admin\'s step-up ops from a screen', () => {
   it('a screen\'s call is marked as a screen\'s, with its key and name', async () => {
     const actsAs = screenActsAs({ list: async () => [{ id: ADMIN }] }, { activeEntry: async () => ({ viewPubKey: 'VIEW', actingAs: ADMIN, label: 'laptop' }) });
     const ctx = await actsAs({ envelope: { payload: { _token: { id: 'T', subject: 'VIEW', constraints: { actingAs: ADMIN } } } } });
-    expect(ctx).toEqual({ caller: ADMIN, threadId: ADMIN, via: 'screen', viewPubKey: 'VIEW', screenLabel: 'laptop' });
+    expect(ctx).toEqual({ caller: ADMIN, threadId: ADMIN, via: 'screen', viewPubKey: 'VIEW', screenLabel: 'laptop', toolbox: null });
   });
 });

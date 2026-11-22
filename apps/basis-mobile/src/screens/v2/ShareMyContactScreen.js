@@ -21,7 +21,7 @@ import { FAB_CLEARANCE } from './fab.js';
 
 export const WEB_APP_URL = process.env.EXPO_PUBLIC_WEB_APP_URL || null;
 
-export default function ShareMyContactScreen({ callSkill, onBack, appUrl = WEB_APP_URL }) {
+export default function ShareMyContactScreen({ callSkill, onBack, backLabel = null, appUrl = WEB_APP_URL }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar: a back link under it cannot be tapped
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
@@ -57,7 +57,7 @@ export default function ShareMyContactScreen({ callSkill, onBack, appUrl = WEB_A
   return (
     <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingBottom: FAB_CLEARANCE }]} testID="share-my-contact-screen">
       <Pressable onPress={onBack} accessibilityRole="button" testID="share-contact-back">
-        <Text style={styles.back}>{t('circle.back_me')}</Text>
+        <Text style={styles.back}>{backLabel ?? t('circle.back_to', { place: t('circle.tab.vandaag') })}</Text>
       </Pressable>
       <Text style={styles.title}>{t('circle.shareContact.title')}</Text>
       {state.loading ? (

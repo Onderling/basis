@@ -31,10 +31,41 @@ import { isKeyLike } from './personLabel.js';
 import { isItemLanding } from './itemLanding.js';
 import { landedTimeOf } from '../eventLog.js';
 import { itemKindChip } from './embedChips.js';
+import { knownConversationKindsOf, showsInConversation } from './conversationKinds.js';
 import { param, PARAM_SCOPE, PARAM_KIND, entryKind, LANE } from '@onderling/item-store';
 
 // Parameter register (#36) — tile subtitle render cap (scope:device, kind:internal). `param()` returns 60.
 const MAX_SUBTITLE_LEN = param({ key: 'circleTile.maxSubtitleLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60 });
+/** How long the circles list waits after a line lands before it paints, so a burst (a catch-up) paints once. */
+const TILE_REPAINT_WAIT_MS = param({ key: 'circleTile.repaintWaitMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 250 });
+
+/** Whether a logged entry can change a circle's tile: the same rule `buildTilePreviews` reads by. */
+function speaksOnTile(event) {
+  if (!event || typeof event !== 'object' || !eventCircleId(event)) return false;
+  return isItemLanding(event) || entryKind(event.type).lane === LANE.HUMAN;
+}
+
+/**
+ * THE CIRCLES LIST HEARS A LINE THAT LANDS WHILE IT IS ON SCREEN. Calls `fn` once per burst of entries that can change a
+ * tile (a line on the human lane, a landed item), a short wait after the first. The host paints its list in `fn` (web:
+ * only when the list is the tab showing; mobile: a tick its previews read). Until 2026-11-20 nothing told the list: a
+ * line landed and was in the circle, and the tile kept its old preview and count until the person left and came back.
+ *
+ * @param {{subscribe: (fn: (event: object) => void) => (() => void)}} eventLog
+ * @param {() => void} fn
+ * @param {object} [o]
+ * @returns {() => void} stop
+ */
+export function subscribeTileChanges(eventLog, fn, { waitMs = TILE_REPAINT_WAIT_MS, setTimer = (f, ms) => setTimeout(f, ms), clearTimer = (h) => clearTimeout(h) } = {}) {
+  if (typeof eventLog?.subscribe !== 'function' || typeof fn !== 'function') return () => {};
+  let pending = null;
+  const off = eventLog.subscribe((event) => {
+    if (pending || !speaksOnTile(event)) return;
+    pending = setTimer(() => { pending = null; try { fn(); } catch { /* the next landing paints again */ } }, Number(waitMs));
+  });
+  return () => { try { off?.(); } catch { /* already gone */ } if (pending) clearTimer(pending); pending = null; };
+}
+
 
 /**
  * Project an event list + seenAt snapshot into per-circle tile previews.
@@ -46,9 +77,11 @@ const MAX_SUBTITLE_LEN = param({ key: 'circleTile.maxSubtitleLen', scope: PARAM_
  * @param {string[]} [opts.myRefs=[]]  this person's refs — their own lines are never unread
  * @param {(key: string) => string} [opts.t]  the translator: a landed item's subtitle names its kind in words
  * @param {Set<string>} [opts.readIds]  every id the person READ, on any of their devices (`readMarks.js`): never new
+ * @param {number} [opts.since]  the news window's start (0 = none): older is not new (`unreadOnAnyDevice`)
+ * @param {(event: object) => boolean} [opts.skip]  an event another block holds: not counted here
  * @returns {Object<string, {subtitle: string|null, ts: number, unread: number, kinds: string[], unreadIds: Array<{id: string, at: number}>}>}
  */
-export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRefs = [], actorLabel = null, t = null, readIds = null } = {}) {
+export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRefs = [], actorLabel = null, t = null, readIds = null, since = 0, skip = null } = {}) {
   const known = new Set((circles || []).map((c) => c?.id).filter(Boolean));
   const out = {};
   // Seed entries for every known circle so the host can drive layout
@@ -67,6 +100,8 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRe
     // statement) never speaks on the tile
     const landing = isItemLanding(event);
     if (!landing && entryKind(event.type).lane !== LANE.HUMAN) continue;
+    // …and a line of a kind this circle's conversation has off does not speak on the tile either (the one filter)
+    if (!landing && !showsInConversation(event, knownConversationKindsOf(cid))) continue;
 
     // First touch sets subtitle + ts (sorted newest-first).
     if (entry.subtitle === null && entry.ts === 0) {
@@ -74,12 +109,16 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRe
       if (sub) entry.subtitle = sub;
       entry.ts = landedTimeOf(event);
     }
-    // Unread: what someone ELSE said, newer than the host-supplied seenAt.
+    // Unread: what someone ELSE said, newer than the host-supplied seenAt. `seenAt: null` is "the marks are not known
+    // yet" (sealed, not loaded): then nothing is counted, never everything (ledger L1085); `{}` is known and empty.
+    if (seenAt === null) continue;
     const seen = typeof seenAt[cid] === 'number' ? seenAt[cid] : 0;
     // new = LANDED here after I looked (a line the relay held for hours counts once it arrives)
     // …and read on none of my devices (the read set holds the source's id: a landed item's, a line's own)
     const sourceId = landing ? event.payload.itemId : event.id;
-    if (landedTimeOf(event) > seen && countsAsUnread(event, { myRefs }) && !(readIds && readIds.has(sourceId))) {
+    // `skip`: what another block holds (Vandaag's circle block leaves out what is addressed to the person)
+    if (landedTimeOf(event) > seen && countsAsUnread(event, { myRefs }) && !(typeof skip === 'function' && skip(event))
+      && unreadOnAnyDevice({ id: sourceId, landedAt: landedTimeOf(event) }, { readIds, since })) {
       entry.unread += 1;
       // what opening the circle marks read: the id with the SOURCE's time (the same on every device)
       entry.unreadIds.push({ id: sourceId, at: landing ? (event.payload.saidAt ?? event.ts ?? 0) : (event.ts ?? 0) });
@@ -90,6 +129,18 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRe
   }
 
   return out;
+}
+
+/**
+ * THE READ RULE — "read on any device": a thing is unread when it landed here inside the window (`since`, the news
+ * window; 0 = no window) and its source id is in no read set of the person's devices (`readMarks.js`). The one test both
+ * of Vandaag's news blocks read ("Nieuw voor jou" through `notificationRows`, "Kringen met nieuws" through the tiles'
+ * count), so a thing read on any device leaves both at once.
+ * @param {{id: string, landedAt: number}} thing
+ * @param {{readIds?: Set<string>|null, since?: number}} [o]
+ */
+export function unreadOnAnyDevice({ id, landedAt } = {}, { readIds = null, since = 0 } = {}) {
+  return landedAt >= since && !(readIds && typeof readIds.has === 'function' && readIds.has(id));
 }
 
 /**
@@ -109,6 +160,8 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRe
 export function countsAsUnread(event, { myRefs = [] } = {}) {
   if (!event || typeof event !== 'object') return false;
   if (!isItemLanding(event) && entryKind(event.type).lane !== LANE.HUMAN) return false;
+  // a kind the circle's conversation has off is not news (the circle's kinds bind on every reader, not only the thread)
+  if (!isItemLanding(event) && !showsInConversation(event, knownConversationKindsOf(eventCircleId(event)))) return false;
   const actor = event.actor ?? event.payload?.actor ?? null;
   if (actor === 'bot' && event.payload?.scope === 'self') return false;
   return !(actor && myRefs.includes(actor));

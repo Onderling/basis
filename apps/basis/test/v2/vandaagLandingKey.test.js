@@ -38,3 +38,14 @@ describe('vandaagLandingKey', () => {
     expect(typeof vandaagLandingKey({ book: null, circles: [] })).toBe('string');
   });
 });
+
+describe('the landing key and a host that learns its circles later (ledger L1051)', () => {
+  it('changes when the circles become known, so a person in no circle gets the strip when the list was read', () => {
+    const book = { screens: [{ id: 'v', blocks: [{ id: 'o', type: 'onboarding' }] }], activeId: 'v' };
+    expect(vandaagLandingKey({ book, circles: [], circlesKnown: false })).not.toBe(vandaagLandingKey({ book, circles: [], circlesKnown: true }));
+    // a host that does not say (the web) keeps the key it had
+    expect(vandaagLandingKey({ book, circles: [] })).toBe(vandaagLandingKey({ book, circles: [] }));
+    expect(vandaagLandingKey({ book, circles: [] })).not.toContain('circlesKnown');
+  });
+});
+

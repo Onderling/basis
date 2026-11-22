@@ -24,7 +24,8 @@ describe('createCircleTurn (web interceptor)', () => {
     const scope = { id: 'thread-1' };
     const r = await handle('@helper add milk', scope);
     expect(r).toBe(true);
-    expect(dispatched).toEqual([{ cmd: { opId: 'addTask', args: { title: 'milk' } }, scope }]);
+    // the turn's scope, with the door the engine names (the model picked it)
+    expect(dispatched).toEqual([{ cmd: { opId: 'addTask', args: { title: 'milk' } }, scope: { ...scope, door: 'model' } }]);
   });
 
   it('falls through (false) for slash commands — the shell handles them', async () => {

@@ -25,7 +25,7 @@ export const LATE_RECIPIENT_WINDOW_MS = param({ key: 'membership.lateRecipientWi
  *             holds: (circleId: string) => boolean, fanned: (circleId: string, statement: object, reached: string[]) => void,
  *             rosterAddresses: (circleId: string, addresses: string[]) => Promise<number> }}
  */
-export function makeLateRecipientRetell({ retell, now = Date.now, windowMs = LATE_RECIPIENT_WINDOW_MS } = {}) {
+export function makeLateRecipientRetell({ retell, now = Date.now, windowMs = LATE_RECIPIENT_WINDOW_MS, keep = null } = {}) {
   if (typeof retell !== 'function') throw new Error('makeLateRecipientRetell: `retell` is required');
   const byCircle = new Map();   // circleId → Array<{ statement, reached: Set<string>, at }>
   // members a fan had NO ADDRESS for (circleId → webid → since): past the window with still none, the person is told
@@ -33,10 +33,19 @@ export function makeLateRecipientRetell({ retell, now = Date.now, windowMs = LAT
   // a statement is kept for the window — and beyond it while a member the circle's fans had no address for still waits
   // (their address landing later must still bring them the statement); bounded, newest kept
   const KEEP_WHILE_WAITING = 200;
+  // `keep(circleId, msgId)`: the log says a recipient of this line still waits for an address — such a line is
+  // kept whatever the window and the bound say; the log's projection decides its life (the hold's 24 h), not this memory
+  const kept = (circleId, e) => {
+    if (typeof keep !== 'function' || !e.msgId) return false;
+    try { return keep(circleId, e.msgId) === true; } catch { return false; }
+  };
   const prune = (circleId) => {
     const waiting = (missing.get(circleId)?.size ?? 0) > 0;
-    let list = (byCircle.get(circleId) ?? []).filter((e) => waiting || now() - e.at <= windowMs);
+    const all = byCircle.get(circleId) ?? [];
+    const held = all.filter((e) => kept(circleId, e));
+    let list = all.filter((e) => !held.includes(e) && (waiting || now() - e.at <= windowMs));
     if (list.length > KEEP_WHILE_WAITING) list = list.slice(-KEEP_WHILE_WAITING);
+    list = all.filter((e) => held.includes(e) || list.includes(e));
     if (list.length) byCircle.set(circleId, list); else byCircle.delete(circleId);
     return list;
   };
@@ -70,22 +79,29 @@ export function makeLateRecipientRetell({ retell, now = Date.now, windowMs = LAT
     },
     /** Whether any statement of this circle is still remembered (so the caller reads the roster only then). */
     holds(circleId) { return prune(circleId).length > 0; },
-    fanned(circleId, statement, reached = [], ownRetell = null) {
+    /** `meta.msgId`: the line's id, so the log can keep it (`keep`) while a recipient waits for an address. */
+    fanned(circleId, statement, reached = [], ownRetell = null, meta = null) {
       if (typeof circleId !== 'string' || !circleId || !statement?.body?.hash) return;
       const list = prune(circleId);
       // a retell passes the fan again: the statement is remembered once, with whom its first fan reached
       if (list.some((e) => e.statement?.body?.hash === statement.body.hash)) return;
-      list.push({ statement, reached: new Set((reached ?? []).filter(Boolean)), at: now(), ...(typeof ownRetell === 'function' ? { retell: ownRetell } : {}) });
+      list.push({ statement, reached: new Set((reached ?? []).filter(Boolean)), at: now(), ...(typeof ownRetell === 'function' ? { retell: ownRetell } : {}), ...(typeof meta?.msgId === 'string' ? { msgId: meta.msgId } : {}) });
       byCircle.set(circleId, list);
     },
-    /** The roster's member addresses now; every remembered statement is told again to the circle if one is new to it. */
-    async rosterAddresses(circleId, addresses = []) {
+    /**
+     * The roster's member addresses now; every remembered statement is told again to the members whose address is new to
+     * it — to THEM, not to the circle (`webidsOf(addresses)` names them; the retell gets `{ only }`). A retell to the whole
+     * circle made a join cost every member every remembered statement: the founder's fan grew with the square of the
+     * circle and ran its socket over the relay's rate. Without `webidsOf` the retell goes to the circle, as before.
+     */
+    async rosterAddresses(circleId, addresses = [], { webidsOf = null } = {}) {
       let told = 0;
       for (const e of prune(circleId)) {
         const fresh = (addresses ?? []).filter((a) => a && !e.reached.has(a));
         if (!fresh.length) continue;
         for (const a of fresh) e.reached.add(a);
-        try { await (e.retell ?? retell)(circleId, e.statement); told += 1; } catch { /* the catch-up remains */ }
+        const only = typeof webidsOf === 'function' ? [...new Set(webidsOf(fresh) ?? [])].filter(Boolean) : null;
+        try { await (e.retell ?? retell)(circleId, e.statement, only?.length ? { only } : {}); told += 1; } catch { /* the catch-up remains */ }
       }
       return told;
     },

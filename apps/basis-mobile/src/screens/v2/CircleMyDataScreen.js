@@ -30,6 +30,7 @@ import {
 // "Never share my global address" (J-CS8) — the strictest privacy position in the product: one address
 // across everything is what links a person's circles together.
 import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../../basis/src/v2/addressSharing.js';
+import { ownActionsLines, OWN_RECORD_KEY } from '../../../../basis/src/ownActions.js';   // the record's row (web twin)
 // CONNECTIONS — the same shared projections the web shell paints from, so the two shells cannot
 // drift on what a connection may see or do (invariant 2: web ≡ mobile by construction).
 import {
@@ -47,6 +48,8 @@ import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/res
 import RecoveryFileWizardModal from '../../../../basis/src/rn/wizards/recoveryFileWizardModal.js';
 import { historyStatusLine } from '../../../../basis/src/v2/historyMirror.js';
 import { START_SCREEN_CHOICES } from '../../../../basis/src/v2/startScreen.js';
+import { plusDialFor, PLUS_MIDDLE_KEY, PLUS_MIDDLE_CHOICES, PLUS_MIDDLE_NONE } from '../../../../basis/src/v2/plusDial.js';
+import { renderMobile } from '@onderling/app-manifest';
 import { forgetCircleSealStrategies } from '../../core/circlePods.js';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
@@ -92,6 +95,8 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
       {children}
     </View>
   ), [styles]);
+  // a section of one act or two: the button says what it does, so no heading
+  const ActSection = useCallback(({ children }) => <View style={styles.section}>{children}</View>, [styles]);
   const KV = useCallback(({ k, v }) => (
     <View style={styles.kv}>
       <Text style={styles.k}>{k}</Text>
@@ -101,6 +106,10 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
   const [dataLocation, setDataLocation] = useState({});
   // Re-read tick for the history-mirror row (the flip is live on the agent; the row re-reads it).
   const [, setHistoryTick] = useState(0);
+  // the record of what you do (ownActions.js): repaint after a switch or a wipe; the wipe's first tap arms it
+  const [, setOwnTick] = useState(0);
+  const [ownWipeArmed, setOwnWipeArmed] = useState(false);
+  const [ownWiped, setOwnWiped] = useState(null);
   const [podStatus, setPodStatus] = useState({});
   // The pod session as the `whoami` op reports it — `ok:false` means this build has no pod session
   // capability at all, which is what used to be read off the presence of a `podAuth` prop.
@@ -485,6 +494,32 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
       </>
     ),
     // only for a person with a bot that acts (a contact bot other than Help): the launcher reads it (showsBotActionsSetting)
+    'plus-middle': () => (
+      <>
+        {/* Which round button sits on the docked "+"'s own spot (the `plus.middle` setting, shared plusDial.js), or none:
+            then a second tap closes it. Written through set-param like every setting. Web parity: circleMyData.js. */}
+        {agent && typeof agent.getParamValue === 'function' ? (
+          <Section title={t('circle.params.key.plus_middle')}>
+            <Text style={styles.relayHint}>{t('circle.plus.middle_hint')}</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {PLUS_MIDDLE_CHOICES.map((c) => {
+                const on = (plusDialFor(basisManifest, { middle: agent.getParamValue(PLUS_MIDDLE_KEY), renderer: renderMobile }).middle?.id ?? PLUS_MIDDLE_NONE) === c.value;
+                return (
+                  <Pressable key={c.value} style={[styles.action, on && { borderColor: theme.color.ink }]} testID={`mydata-plus-middle-${c.value}`}
+                    accessibilityState={{ selected: on }}
+                    onPress={async () => {
+                      try { await callSkill('params', 'set-param', { key: PLUS_MIDDLE_KEY, value: c.value }); } catch { /* the row re-reads the truth */ }
+                      setHistoryTick((n) => n + 1);
+                    }}>
+                    <Text style={styles.actionLabel}>{t(c.labelKey)}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Section>
+        ) : null}
+      </>
+    ),
     'bot-actions': () => (showBotActions ? (
       <>
         <Section title={t('circle.mydata.surface_pref')}>
@@ -557,18 +592,6 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
             <UserLlmSettings current={userLlm || {}} onSave={onSaveUserLlm} validate={validateUserLlm} />
           </Section>
         )}
-      </>
-    ),
-    'availability': () => (
-      <>
-        {typeof doors.availability === 'function' ? (
-          <Section title={t('circle.profile.availability')}>
-            <Pressable style={styles.doorRow} onPress={doors.availability} accessibilityRole="button" testID="settings-door-availability">
-              <Text style={styles.doorText}>{t('circle.profile.availability')}</Text>
-              <Text style={styles.doorArrow}>→</Text>
-            </Pressable>
-          </Section>
-        ) : null}
       </>
     ),
     'connection-points': () => (
@@ -736,6 +759,46 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
         })() : null}
       </>
     ),
+    'own-actions': () => {
+      // the record of what you do in the app, this device only (ledger L203; web twin: circleMyData.js own-actions)
+      if (!agent || typeof agent.ownActionRows !== 'function') return null;
+      const on = agent.getParamValue?.(OWN_RECORD_KEY) !== false;
+      const count = agent.ownActionRows().length;
+      const lines = ownActionsLines({ on, count, t });
+      return (
+        <Section title={t('circle.params.key.ownActions_record')}>
+          <Text style={styles.privacyBody}>{t('circle.mydata.own_actions_note')}</Text>
+          <Pressable style={styles.action} testID="mydata-own-actions-toggle"
+            onPress={async () => {
+              try { await callSkill('params', 'set-param', { key: OWN_RECORD_KEY, value: !on }); } catch { /* the row re-reads the truth */ }
+              setOwnTick((n) => n + 1);
+            }}>
+            <Text style={styles.actionLabel}>{on ? t('circle.mydata.history_disable') : t('circle.mydata.history_enable')}</Text>
+          </Pressable>
+          {lines.off ? <Text style={styles.privacyBody} testID="mydata-own-actions-off">{lines.off}</Text> : null}
+          <Text style={styles.privacyBody} testID="mydata-own-actions-count">{ownWiped != null ? t('circle.mydata.own_actions_wiped', { n: ownWiped }) : lines.count}</Text>
+          {count ? (
+            <>
+              <Pressable style={styles.action} testID="mydata-own-actions-export"
+                onPress={async () => {
+                  try { await Share.share({ message: agent.exportOwnActions(), title: 'onderling-handelingen.json' }); } catch { /* dismissed */ }
+                }}>
+                <Text style={styles.actionLabel}>{t('circle.mydata.own_actions_export')}</Text>
+              </Pressable>
+              <Pressable style={styles.action} testID="mydata-own-actions-wipe"
+                onPress={() => {
+                  // two taps, as on web: the first says it cannot be undone
+                  if (!ownWipeArmed) { setOwnWipeArmed(true); return; }
+                  const n = agent.wipeOwnActions?.() ?? 0;
+                  setOwnWipeArmed(false); setOwnWiped(n); setOwnTick((x) => x + 1);
+                }}>
+                <Text style={styles.actionLabel}>{ownWipeArmed ? t('circle.mydata.own_actions_wipe_confirm') : t('circle.mydata.own_actions_wipe')}</Text>
+              </Pressable>
+            </>
+          ) : null}
+        </Section>
+      );
+    },
     'message-cleanup': () => (
       <>
         {/* Message cleanup (web parity) — the record never expires by policy; this is the explicit,
@@ -1047,98 +1110,128 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
         </Section>
       </>
     ),
-    'keys': () => (
-      <>
-        <Section title={t('circle.mydata.keys')}>
-          <Pressable style={styles.action} onPress={revealMnemonic} testID="mydata-mnemonic">
-            <Text style={styles.actionLabel}>{t('circle.mydata.view_mnemonic')}</Text>
-          </Pressable>
-          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('restore')} testID="mydata-restore">
-            <Text style={styles.actionMutedLabel}>{t('circle.mydata.restore')}</Text>
-          </Pressable>
-          {/* Add-a-device: run the enroll ceremony ON THIS device (the phrase is typed here). */}
-          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('enroll')} testID="mydata-enroll">
-            <Text style={styles.actionMutedLabel}>{t('circle.mydata.enroll_device')}</Text>
-          </Pressable>
-          {/* After a restore (or any time): which of the person's personas this device also gets — the phrase is typed here. */}
-          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('receive-personas')} testID="mydata-receive-personas">
-            <Text style={styles.actionMutedLabel}>{t('circle.mydata.receive_personas')}</Text>
-          </Pressable>
-          {/* The recovery file: the circle list sealed to the phrase — save it, or load it after a restore. */}
-          <Pressable style={styles.action} onPress={() => setWizard('recovery-export')} testID="mydata-recovery-export">
-            <Text style={styles.actionLabel}>{t('circle.mydata.recovery_export')}</Text>
-          </Pressable>
-          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('recovery-import')} testID="mydata-recovery-import">
-            <Text style={styles.actionMutedLabel}>{t('circle.mydata.recovery_import')}</Text>
-          </Pressable>
-          {/* The replace ceremony: after a restore, retire every other device in one act. */}
-          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('replace')} testID="mydata-replace">
-            <Text style={styles.actionMutedLabel}>{t('circle.mydata.replace_device')}</Text>
-          </Pressable>
-          {/* A companion node of your own: claim it with the line it prints in its log. */}
-          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('claim-companion')} testID="mydata-claim-companion">
-            <Text style={styles.actionMutedLabel}>{t('circle.companionClaim.button')}</Text>
-          </Pressable>
-          {/* A household bot's `/koppel` link, pasted: link this person's Basis identity to their row there. */}
-          {agent?.identityLinks ? (
-            <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setBotLink(botLink ? null : { text: '', view: null, made: null, linked: false })} testID="mydata-link-bot">
-              <Text style={styles.actionMutedLabel}>{t('circle.identityLink.open')}</Text>
-            </Pressable>
-          ) : null}
-          {botLink ? (
-            <View testID="mydata-link-bot-panel" style={{ paddingVertical: 4 }}>
-              {!botLink.view?.bot?.ok ? (
-                <View>
-                  <Text style={styles.privacyBody}>{t('circle.identityLink.paste_link')}</Text>
-                  <ThemedTextInput
-                    style={styles.relayInput}
-                    value={botLink.text}
-                    onChangeText={(text) => setBotLink({ text, view: text.trim() ? agent.identityLinks.view(text.trim()) : null, made: null, linked: false })}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    testID="mydata-link-bot-input"
-                  />
-                  {botLink.text.trim() && botLink.view && !botLink.view.bot.ok ? <Text style={styles.privacyBody}>{t('circle.identityLink.not_a_link')}</Text> : null}
-                </View>
-              ) : null}
-              {botLink.view?.bot?.ok && !botLink.made ? (
-                <View>
-                  <Text style={styles.privacyBody}>{t('circle.identityLink.which_bot', { bot: botLink.view.label })}</Text>
-                  <Text style={styles.privacyBody}>{t('circle.identityLink.means')}</Text>
-                  <Pressable
-                    style={styles.action}
-                    testID="mydata-link-bot-make"
-                    onPress={async () => {
-                      const made = await botLink.view.offer().catch(() => ({ ok: false }));
-                      setBotLink((b) => ({ ...b, made }));
-                    }}
-                  >
-                    <Text style={styles.actionLabel}>{t('circle.identityLink.make')}</Text>
-                  </Pressable>
-                </View>
-              ) : null}
-              {botLink.made && !botLink.made.ok ? <Text style={styles.privacyBody}>{t('circle.identityLink.no_device_key')}</Text> : null}
-              {botLink.made?.ok && !botLink.linked ? (
-                <View>
-                  <Text style={styles.privacyBody}>{t('circle.identityLink.paste_this', { bot: botLink.view.label })}</Text>
-                  <Text selectable style={styles.privacyBody} testID="mydata-link-bot-line">{botLink.made.line}</Text>
-                  <Pressable onPress={() => { Share.share({ message: botLink.made.line }).catch(() => {}); }} testID="mydata-link-bot-share">
-                    <Text style={styles.actionMutedLabel}>{t('circle.identityLink.share')}</Text>
-                  </Pressable>
-                  <Text style={styles.privacyBody}>{t('circle.identityLink.code')}</Text>
-                  <Text style={[styles.privacyBody, { fontWeight: '600' }]} testID="mydata-link-bot-code">{botLink.made.code}</Text>
-                  <Text style={styles.privacyBody}>{t('circle.identityLink.waiting')}</Text>
-                </View>
-              ) : null}
-              {botLink.linked ? <Text style={styles.privacyBody} testID="mydata-link-bot-linked">{t('circle.identityLink.linked', { bot: botLink.view.label })}</Text> : null}
-            </View>
-          ) : null}
-          {/* The member's choice of which device others deliver to first — their primary contact address. */}
-          <Pressable style={[styles.action, styles.actionMuted]} onPress={makePrimary} testID="mydata-make-primary">
-            <Text style={styles.actionMutedLabel}>{t('circle.mydata.make_primary')}</Text>
-          </Pressable>
-        </Section>
-      </>
+    // ── Apparaten: the device acts, each a section of its own (the button says what it does) ──
+    // Add-a-device: run the enroll ceremony ON THIS device (the phrase is typed here).
+    'device-add': () => (
+      <ActSection>
+        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('enroll')} testID="mydata-enroll">
+          <Text style={styles.actionMutedLabel}>{t('circle.mydata.enroll_device')}</Text>
+        </Pressable>
+      </ActSection>
+    ),
+    // The replace ceremony: after a restore, retire every other device in one act.
+    'device-replace': () => (
+      <ActSection>
+        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('replace')} testID="mydata-replace">
+          <Text style={styles.actionMutedLabel}>{t('circle.mydata.replace_device')}</Text>
+        </Pressable>
+      </ActSection>
+    ),
+    // The member's choice of which device others deliver to first — their primary contact address.
+    'device-primary': () => (
+      <ActSection>
+        <Pressable style={[styles.action, styles.actionMuted]} onPress={makePrimary} testID="mydata-make-primary">
+          <Text style={styles.actionMutedLabel}>{t('circle.mydata.make_primary')}</Text>
+        </Pressable>
+      </ActSection>
+    ),
+    // A companion node of your own: claim it with the line it prints in its log.
+    'companion-claim': () => (
+      <ActSection>
+        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('claim-companion')} testID="mydata-claim-companion">
+          <Text style={styles.actionMutedLabel}>{t('circle.companionClaim.button')}</Text>
+        </Pressable>
+      </ActSection>
+    ),
+    // A household bot's `/koppel` link, pasted: link this person's Basis identity to their row there.
+    'bot-link': () => (agent?.identityLinks ? (
+      <ActSection>
+        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setBotLink(botLink ? null : { text: '', view: null, made: null, linked: false })} testID="mydata-link-bot">
+          <Text style={styles.actionMutedLabel}>{t('circle.identityLink.open')}</Text>
+        </Pressable>
+        {botLink ? (
+          <View testID="mydata-link-bot-panel" style={{ paddingVertical: 4 }}>
+            {!botLink.view?.bot?.ok ? (
+              <View>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.paste_link')}</Text>
+                <ThemedTextInput
+                  style={styles.relayInput}
+                  value={botLink.text}
+                  onChangeText={(text) => setBotLink({ text, view: text.trim() ? agent.identityLinks.view(text.trim()) : null, made: null, linked: false })}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  testID="mydata-link-bot-input"
+                />
+                {botLink.text.trim() && botLink.view && !botLink.view.bot.ok ? <Text style={styles.privacyBody}>{t('circle.identityLink.not_a_link')}</Text> : null}
+              </View>
+            ) : null}
+            {botLink.view?.bot?.ok && !botLink.made ? (
+              <View>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.which_bot', { bot: botLink.view.label })}</Text>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.means')}</Text>
+                <Pressable
+                  style={styles.action}
+                  testID="mydata-link-bot-make"
+                  onPress={async () => {
+                    const made = await botLink.view.offer().catch(() => ({ ok: false }));
+                    setBotLink((b) => ({ ...b, made }));
+                  }}
+                >
+                  <Text style={styles.actionLabel}>{t('circle.identityLink.make')}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+            {botLink.made && !botLink.made.ok ? <Text style={styles.privacyBody}>{t('circle.identityLink.no_device_key')}</Text> : null}
+            {botLink.made?.ok && !botLink.linked ? (
+              <View>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.paste_this', { bot: botLink.view.label })}</Text>
+                <Text selectable style={styles.privacyBody} testID="mydata-link-bot-line">{botLink.made.line}</Text>
+                <Pressable onPress={() => { Share.share({ message: botLink.made.line }).catch(() => {}); }} testID="mydata-link-bot-share">
+                  <Text style={styles.actionMutedLabel}>{t('circle.identityLink.share')}</Text>
+                </Pressable>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.code')}</Text>
+                <Text style={[styles.privacyBody, { fontWeight: '600' }]} testID="mydata-link-bot-code">{botLink.made.code}</Text>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.waiting')}</Text>
+              </View>
+            ) : null}
+            {botLink.linked ? <Text style={styles.privacyBody} testID="mydata-link-bot-linked">{t('circle.identityLink.linked', { bot: botLink.view.label })}</Text> : null}
+          </View>
+        ) : null}
+      </ActSection>
+    ) : null),
+    // ── Herstel: the way back, in a group of its own ──
+    'recovery-phrase': () => (
+      <ActSection>
+        <Pressable style={styles.action} onPress={revealMnemonic} testID="mydata-mnemonic">
+          <Text style={styles.actionLabel}>{t('circle.mydata.view_mnemonic')}</Text>
+        </Pressable>
+      </ActSection>
+    ),
+    'restore': () => (
+      <ActSection>
+        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('restore')} testID="mydata-restore">
+          <Text style={styles.actionMutedLabel}>{t('circle.mydata.restore')}</Text>
+        </Pressable>
+      </ActSection>
+    ),
+    // The recovery file: the circle list sealed to the phrase — save it, or load it after a restore.
+    'recovery-file': () => (
+      <ActSection>
+        <Pressable style={styles.action} onPress={() => setWizard('recovery-export')} testID="mydata-recovery-export">
+          <Text style={styles.actionLabel}>{t('circle.mydata.recovery_export')}</Text>
+        </Pressable>
+        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('recovery-import')} testID="mydata-recovery-import">
+          <Text style={styles.actionMutedLabel}>{t('circle.mydata.recovery_import')}</Text>
+        </Pressable>
+      </ActSection>
+    ),
+    // After a restore (or any time): which of the person's personas this device also gets — the phrase is typed here.
+    'personas-receive': () => (
+      <ActSection>
+        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('receive-personas')} testID="mydata-receive-personas">
+          <Text style={styles.actionMutedLabel}>{t('circle.mydata.receive_personas')}</Text>
+        </Pressable>
+      </ActSection>
     ),
     'storage': () => (
       <>
@@ -1176,18 +1269,6 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
             </Pressable>
           )}
         </Section>
-      </>
-    ),
-    'log-report': () => (
-      <>
-        {typeof doors.logReport === 'function' ? (
-          <Section title={t('circle.profile.logReport')}>
-            <Pressable style={styles.doorRow} onPress={doors.logReport} accessibilityRole="button" testID="settings-door-log-report">
-              <Text style={styles.doorText}>{t('circle.profile.logReport')}</Text>
-              <Text style={styles.doorArrow}>→</Text>
-            </Pressable>
-          </Section>
-        ) : null}
       </>
     ),
   };
@@ -1247,7 +1328,7 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
   return (
     <ScrollView keyboardShouldPersistTaps="handled" style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }, { paddingBottom: FAB_CLEARANCE }]} testID="circle-settings-group">
       <View style={styles.header}>
-        {typeof onBack === 'function' && <Pressable onPress={onBack} testID="mydata-back"><Text style={styles.back}>{t('circle.mydata.back')}</Text></Pressable>}
+        {typeof onBack === 'function' && <Pressable onPress={onBack} testID="mydata-back"><Text style={styles.back}>{t('circle.settings_home.back')}</Text></Pressable>}
         <Text style={styles.title}>{groupTitle ?? t('circle.settings_home.title')}</Text>
       </View>
       {(Array.isArray(only) ? only : []).map((id) => <React.Fragment key={id}>{painters[id]?.() ?? null}</React.Fragment>)}

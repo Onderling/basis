@@ -58,6 +58,7 @@ import { VaultNodeFs } from '@onderling/vault';
 import { flushPendingSaves } from '@onderling/local-store';
 
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
+import { bootFailureNotice } from '../src/v2/bootFailure.js';
 import { initLocalisation, t } from '../src/localisation.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
 import { loadAssistantItems } from '../src/v2/assistantEngine.js';
@@ -70,7 +71,7 @@ import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createInboundAdmission } from '../src/v2/inboundAdmission.js';
 import { makeCarriedTurnLanding } from '../src/v2/contactTurnFan.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
-import { createBotScreens, encodeScreenLaunchLink, SCREEN_CALL_BUDGET } from '../src/v2/botScreens.js';
+import { createBotScreens, encodeScreenLaunchLink, SCREEN_CALL_BUDGET, endPreTicketToolboxGrants } from '../src/v2/botScreens.js';
 import { createIdentityLink, createLinkTombstones, linkedCompanionSkill } from '../src/v2/botIdentityLink.js';
 import { IDENTITY_LINK_REVOKE_SUBTYPE, LINKED_COMPANION_OP } from '../src/v2/identityLink.js';
 import { createBotCircles, botCircleHandle } from '../src/v2/botCircles.js';
@@ -87,7 +88,7 @@ import { createHouseholdInApp } from '../src/v2/householdInApp.js';
 import { createScreenStepUp, SCREEN_STEP_UP_SUBTYPE } from '../src/v2/screenStepUp.js';
 import { SCREEN_OFFER_SUBTYPE, SCREEN_REFUSED_SUBTYPE, SCREEN_WAITING_SUBTYPE } from '../src/v2/screenView.js';
 import { SURFACE_GRANT_TTL_MS } from '../src/v2/surfaceGrants.js';
-import { screenColumnFor, exposeDoorToScreens } from '../src/v2/screenActing.js';
+import { screenColumnFor, exposeDoorToScreens, screenToolboxRefusal } from '../src/v2/screenActing.js';
 import { parsePairingOffer } from '../src/v2/connectionPairing.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
 import { createHostTick } from '../src/v2/hostTick.js';
@@ -119,6 +120,11 @@ import { ensureHouseholdLists, householdBotApps, templateLists, loadListItems, e
 import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
+import { opDescription } from '../src/v2/opDescriptions.js';
+import { createPageEntries, createToolboxPages, TOOLBOX_PAGE_PORT } from '../src/v2/toolboxPages.js';
+import { makeToolboxOps, toolboxListLine, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords, makeChoiceKeeper, toolChoicesReply, makePickThing, makeMoreThings, toolChoiceGateRule, choiceThreadOf } from '../src/v2/toolboxes.js';
+import { wrapCallSkillWithEgressGate, isExternalEgressOp } from '../src/core/agent/egressGate.js';   // what leaves for a toolbox, and its record   // a circle's toolboxes (L1035): the key from the operator's config
+import { toolsManifest } from '../src/v2/toolsManifest.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
 import { turnLogFor } from '../src/v2/turnLog.js';
 import { buildAssistantLlm } from '../src/telegram/assistantLlm.js';
@@ -128,14 +134,14 @@ import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
 import { EventLog } from '../src/eventLog.js';
 import { fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
 import { besidePersistDb } from '../src/household/persist.js';
-import { boxStores } from '../src/v2/boxStorage.js';
+import { boxStores, vaultFilesMissing, BOX_REGISTRY_DIR, startFailures, markBoxStarted, startBackoffMs, failureIsPermanent, BOX_START_FAILURES_BEFORE_HOLD } from '../src/v2/boxStorage.js';
 import { resolveVaultPassphrase } from '../src/v2/boxVaultPassphrase.js';
 import { retentionFromDays } from '../src/v2/retentionPref.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, openOfferPersonas, pickByNames, enrolPickArgs, pickPrimary } from '../src/v2/enrollOffer.js';
 import { primeCircleSecurity, announceCircleAddresses, presenceCircleIds } from '../src/v2/circleSecurityPriming.js';
 import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } from '../src/v2/circleAddressRegistration.js';
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
-import { installBoxSignatureEquation } from '../src/v2/signatureEquations.js';
+import { installBoxSignatureEquation, installBoxSigning } from '../src/v2/signatureEquations.js';
 import { buildCircleLanes, pullCircleLanes } from '../src/v2/circleLanes.js';
 import { runStartQueue, startQueueSiblings } from '../src/v2/startQueue.js';
 import { createNodeFsBackend } from '@onderling/pseudo-pod/node';
@@ -150,7 +156,7 @@ import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGr
 import { createPairRoster } from '../src/v2/pairRoster.js';
 import { makeCircleReachable } from '../src/v2/householdRosterPairing.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../src/v2/rulesUpdateLane.js';
-import { makeCirclePolicyLane, makePolicyHeadStore, membersOfViaSkill } from '../src/v2/policyUpdateLane.js';
+import { makeCirclePolicyLane, membersOfViaSkill } from '../src/v2/policyUpdateLane.js';
 import { createCirclePolicyStore, localStoragePolicyIo } from '../src/v2/circlePolicyStore.js';
 import { makeGovernanceRail } from '../src/v2/governanceAppWiring.js';
 import { runPendingForget } from '../src/v2/enrolForgets.js';
@@ -216,6 +222,49 @@ function promptCacheSecret() {
   return readFileSync(f, 'utf8').trim();
 }
 
+// A VAULT FILE MISSING BESIDE OTHER STATE is a loss, not a first start (L1115): a partly restored backup or an unmounted
+// folder would read as "nothing stored" and mint new keys over the household. Said, counted, and the box stops.
+const failedStarts = startFailures(dataDir);
+/** What to do, in words that name a step that works (the enrol runs only on an EMPTY data folder: it is a first start). */
+const WAY_OUT = `Fix the data folder (put the missing or damaged file back, or mount the right folder), or start the box over from the phrase: stop the container, move ${dataDir} aside (keep it), and run the enrol (--enrol) on an empty folder; its circles come back from the members.`;
+/** One line on the bot's admin line, when the box knows its token and its admin (no agent runs: one plain Bot API call). */
+async function tellAdmin(count, held) {
+  const token = String(process.env.TG_BOT_TOKEN ?? '').trim(); const admin = String(process.env.TG_ADMIN_UID ?? '').trim();
+  if (!token || !admin || typeof fetch !== 'function') return;
+  const root = (String(process.env.ONDERLING_TELEGRAM_API_ROOT ?? '').trim() || 'https://api.telegram.org').replace(/\/+$/, '');
+  const text = t(held ? 'circle.bot.box_stopped_trying' : 'circle.bot.box_cannot_start', { count });
+  try { await fetch(`${root}/bot${token}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: admin, text }), signal: AbortSignal.timeout?.(10_000) }); } catch { /* the log says it either way */ }
+}
+/**
+ * A start that could not read its keys (L1115): said with the run's count. It backs off (minutes, then hours) before it
+ * exits for the container's restart, so a cause that passes by itself is retried without a tight loop. Only a key that
+ * fails to DECRYPT, after `BOX_START_FAILURES_BEFORE_HOLD` in the window, HOLDS: says so once and stays up, idle. The
+ * admin line hears it once at the third failure and once at the hold. The enrol never counts.
+ */
+async function stopOnUnreadable(line, what, { permanent = false } = {}) {
+  if (values.enrol) { console.error(`${line} The enrol runs on an empty data folder: ${WAY_OUT}`); process.exit(1); }
+  const run = failedStarts.note(what);
+  console.error(`${line} Failed starts in a row: ${run.count}, since ${run.since}. ${WAY_OUT}`);
+  const hold = permanent && run.count >= Number(BOX_START_FAILURES_BEFORE_HOLD);
+  if (hold || run.count === Number(BOX_START_FAILURES_BEFORE_HOLD)) await tellAdmin(run.count, hold);
+  if (hold) {
+    console.error(`device-runner: STOPPED TRYING after ${run.count} starts that could not decrypt this box's keys: that does not pass by itself. Nothing was changed and nothing runs. ${WAY_OUT} Then restart the container. Waiting.`);
+    // stay up, idle: the container's restart policy would otherwise loop. ONE timeout, the longest a timer takes (about
+    // 24 days), no clock: when it ends the box exits once, restarts, counts one more and holds again
+    await new Promise((resolve) => { setTimeout(resolve, 2 ** 31 - 1); });
+  } else {
+    const wait = startBackoffMs(run.count);
+    console.error(`device-runner: trying again in ${Math.round(wait / 60_000)} minute(s).`);
+    await new Promise((resolve) => { setTimeout(resolve, wait); });
+  }
+  process.exit(1);
+}
+{
+  const missing = vaultFilesMissing(dataDir, existsSync, (d) => (existsSync(d) ? readdirSync(d) : []));
+  if (missing.length) {
+    await stopOnUnreadable(`device-runner: ${missing.join(' and ')} is missing in ${dataDir}, a folder that ran a box before; nothing was changed. Stopping.`, 'vault-file-missing');
+  }
+}
 const vault = new VaultNodeFs(path.join(dataDir, 'vault.json'), vaultPassphrase());
 // The CHAT-side vault, durable, because on a box there is no browser storage to fall back to.
 //
@@ -230,7 +279,7 @@ const chatVault = new VaultNodeFs(path.join(dataDir, 'chat-vault.json'), vaultPa
 // that booted unenrolled first (every box does; the service starts before anyone can enrol it) holds the
 // content of a throwaway identity, and that content does not carry over.
 const contentPaths = {
-  registry:  path.join(dataDir, 'registry'),
+  registry:  path.join(dataDir, BOX_REGISTRY_DIR),   // its rows also say "this folder ran a box" (vaultFilesMissing)
   pinboard:     path.join(dataDir, 'pinboard-items.json'),
   household: path.join(dataDir, 'household-items.json'),
   tasks:     path.join(dataDir, 'tasks-items.json'),
@@ -291,6 +340,9 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
   // THE SIGNATURE CHECK: node:crypto behind the one strict rule (taken only if it agrees on the edge-case vectors and on an
   // honest and a tampered signature; else tweetnacl stays). Before any store is read, so every check of this run is the fast one.
   { const eq = await installBoxSignatureEquation(nodeCrypto); console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`); }
+  { const sg = installBoxSigning(nodeCrypto); console.info(`[security] signing: ${sg.ok ? sg.name : `tweetnacl (${sg.reason})`}`); }
+  // Secretbox stays tweetnacl here: node:crypto offers no XSalsa20-Poly1305 (core `useSecretbox`; the phone installs libsodium).
+  console.info('[security] secretbox: tweetnacl (node:crypto has no XSalsa20-Poly1305)');
   try {
     const forgot = await runPendingForget({
       markerVault: vault,
@@ -370,12 +422,30 @@ const agent = await createRealHouseholdAgent({
   seedDemoData: false,
   seedHousehold: false,
   enrollOfferStorage: offerStash,
+}).catch(async (err) => {
+  // THE CONTENT KEY COULD NOT BE READ (L1115): nothing was minted or written. Said in the log in words, and the box stops
+  // so its service manager starts it again: a read that failed once may pass at the next start (the shells' "try again").
+  if (bootFailureNotice(err)?.retry) {
+    const what = String(err?.what ?? err?.cause?.what ?? 'key');
+    await stopOnUnreadable(`device-runner: a key on this box could not be read (${what}); nothing was changed. Stopping.`, what, { permanent: failureIsPermanent(err) });
+  }
+  throw err;
 });
 // The device log's windows from the register (the agent hydrated it at boot), as web and mobile apply them: the
 // windowed classes — the bot's turns with each person among them (chat class) — age out on this device's chat window.
 try { deviceLog.setRetention(retentionFromDays(agent.getParamValue?.('retention.chatDays'))); } catch { /* the defaults stand */ }
 // `ctx` carries a door's person (`{caller}`) to the host gate — dropping it here would run every door call as the owner.
-const callSkill = (app, op, args, ctx) => agent.callSkill(app, op, args, ctx);
+// THE EGRESS GATE (L1035): a call to an app that reaches outside (its manifest declares the host '@placed') passes it:
+// exactly a toolbox's tool and its input leave, a toolbox that is not on is refused before the call, and every call is
+// recorded on this box (who, which toolbox, which tool, how it ended; never the words). `ctx` travels on.
+let toolboxesRef = null;
+const callSkill = wrapCallSkillWithEgressGate((app, op, args, ctx) => agent.callSkill(app, op, args, ctx), {
+  isExternalEgress: (app, op) => isExternalEgressOp(app, op),
+  toolCall: {
+    isOn: async (name) => Boolean(await toolboxesRef?.isOn?.(name)),
+    record: (r) => { try { deviceLog.append(makeToolCallEntry(r)); } catch { /* the record never breaks a call */ } },
+  },
+});
 // A household bot's companion is not configured here: the person linked as its admin hands it the companion's card
 // from their app, in the same act as granting it the agenda files there (`identity-link.companion`, below).
 
@@ -608,11 +678,14 @@ if (relayUrl) {
   const circlePolicyStore = createCirclePolicyStore(localStoragePolicyIo(circlePolicyKv));
   const circlePolicyLane = makeCirclePolicyLane({
     emitter: () => agent.emitPolicyUpdate ?? null,
-    headStore: makePolicyHeadStore(circlePolicyKv),
+    headStore: stores.policyHeadStore,
     readPolicy: (cid) => circlePolicyStore.get(cid),
     writePolicy: (cid, policy) => circlePolicyStore.update(cid, policy),
     membersOf: membersOfViaSkill(callSkill),   // the roster the receiver gate counts
   });
+  // the lane is handed its rail at boot (web and phone alike): a content rail that finds a circle's kept settings changes
+  // not known asks the lane, and a quiet start brings no settings statement that would make it apply by itself
+  if (govRail) circlePolicyLane.useRail(govRail);
   // A landed governance statement may be a rules-update or a policy-update: fold it into this device's heads — the
   // same reaction for a catch-up batch and a live statement.
   const govChanged = (cid) => {
@@ -980,6 +1053,8 @@ const hostTick = createHostTick({ onError: (e) => walkLog({ kind: 'tick-error', 
 
 // ── The assistant: its doors (Telegram, the bot's inbox), ONE engine behind them ─────────────────────────────
 let tgRunner = null;
+// the door bridge (Telegram + the in-app inbox), set when the runner is built: a tool call asks it whether its chat shows pictures
+let doorBridge = null;
 if (tgToken || inboxDoor.bridge) {
   const { TelegramBridge } = tgToken ? await import('@onderling/chat-agent/bridges/telegram') : {};
   // Who gets in without a code: the admin named at start and a configured allow-list (the bootstrap). Everyone else
@@ -1221,10 +1296,22 @@ if (tgToken || inboxDoor.bridge) {
     launchLabel: (person) => t('circle.bot.screen_label_telegram', {}, threads.langOf(person) ?? undefined),
     // the offer's question, in the person's own language, with the code their screen shows; Ja / Nee buttons send
     // `/koppelen`, which counts only from this private door
-    ask: (person, { codes, replaced }) => {
+    ask: (person, { codes, replaced, label = null, toolbox = null, ops = null }) => {
       const lang = threads.langOf(person) ?? undefined;
       const tp = (k, p) => t(k, p, lang);
-      const text = [tp('circle.bot.screen_confirm_question'), ...(replaced ? [tp('circle.bot.screen_confirm_replaced')] : [])].join('\n');
+      // a toolbox's page says which toolbox it pairs for: '<label> wil koppelen voor toolbox <naam>' (L1049), and what it
+      // may then do, one line per op in the household's own words: the question is as wide as the grant (L1113)
+      const opLine = (id) => { const [app, op] = String(id).split('.'); return `• ${opDescription(app, op, lang)?.what ?? id}`; };
+      const who = toolbox ? [
+        tp('circle.bot.screen_confirm_toolbox', { label: label ?? 'scherm', toolbox }),
+        // `tools.useTool` is said once in words ('use the toolbox X'), never as an op id; the rest one line each
+        ...(Array.isArray(ops) && ops.length ? [
+          tp('circle.bot.screen_confirm_toolbox_ops'),
+          ...(ops.includes('tools.useTool') ? [tp('circle.bot.screen_confirm_toolbox_use', { toolbox })] : []),
+          ...ops.filter((op) => op !== 'tools.useTool').map(opLine),
+        ] : []),
+      ] : [];
+      const text = [...who, tp('circle.bot.screen_confirm_question'), ...(replaced ? [tp('circle.bot.screen_confirm_replaced')] : [])].join('\n');
       // the person PICKS the code their screen shows; "none of these" when it is not there (or they did not ask)
       return reach.sendToPerson(person, {
         text, rememberAs: tp('circle.bot.screen_confirm_remembered'),
@@ -1235,8 +1322,15 @@ if (tgToken || inboxDoor.bridge) {
     tellRefused: (viewPubKey) => agent.sendPeerMessage(viewPubKey, { subtype: SCREEN_REFUSED_SUBTYPE }),
     expectRefusal: (viewPubKey) => agent.inviteExchange?.expectScreenRefusal?.(viewPubKey),
     columnOf: async (person) => screenColumnFor(doorCatalogue.catalogue(), (await botUsers.list()).find((u) => u.id === person)?.role ?? null, rolesPreset()),
+    // a toolbox's page pairs only for a toolbox that is ON here (the toolboxes are made further down; asked at pairing time)
+    toolboxOn: async (name) => ((await toolboxes?.listTools?.({}))?.toolboxes ?? []).some((b) => b.name === name),
+    // its placed page (the address and the ops its operator named, L1113): the link `/scherm <toolbox>` sends, and the grant
+    toolboxPage: async (name) => (await toolboxes?.pageOf?.(name)) ?? null,
+    // a page this box serves itself: the entry its link carries, and a leaver's entries and cookies (made further down)
+    pageEntry: async (person, name) => (await toolboxPages?.entryFor?.(person, name)) ?? null,
+    dropPageEntries: async (person) => toolboxPages?.dropPerson?.(person),
     grant: async (g) => {
-      const r = await agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce });
+      const r = await agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce, ...(g.toolbox ? { toolbox: g.toolbox } : {}) });
       // whether the grant reached the screen, or is held until it next speaks (the screen's address, its first characters)
       walkLog({ kind: 'screen-grant', screen: String(g.viewPubKey).slice(0, 8), ok: r?.ok !== false, delivery: r?.delivery ?? null });
       return r;
@@ -1367,6 +1461,85 @@ if (tgToken || inboxDoor.bridge) {
       } catch (err) { console.warn(`device-runner: a removal from a circle was not handled: ${err?.message ?? err}`); }
     };
   }
+  // A CIRCLE'S TOOLBOXES (L1035). The operator PLACES a toolbox as one file, <data-dir>/toolboxes/<name>.json
+  // ({name, url, words: [{word, tool, field, says?, slots?}]}; `slots`: phrases that fill a tool parameter, read in
+  // toolboxes.js), beside its key, <data-dir>/toolboxes/<name>.key (or the env value
+  // TOOLBOX_KEY_<NAME>): no chat line carries an address, a tool id or a key, and the key never appears in a reply, a
+  // refusal, a log line or the list of tools. A placed toolbox is off until the admin's yes (`/toolbox <naam> aan`);
+  // which are on lives in this box's vault. Mounted on the waist like any app.
+  const toolboxDir = path.join(dataDir, 'toolboxes');
+  const toolboxes = makeToolboxOps({
+    store: new VaultNodeFs(path.join(dataDir, 'toolboxes.json'), vaultPassphrase()),
+    placedOf: async () => {
+      let files = [];
+      try { files = readdirSync(toolboxDir).filter((f) => f.endsWith('.json')); } catch { return []; }
+      return files.map((f) => { try { return JSON.parse(readFileSync(path.join(toolboxDir, f), 'utf8')); } catch { return null; } }).filter(Boolean);
+    },
+    keyOf: async (name) => {
+      const fromEnv = process.env[`TOOLBOX_KEY_${String(name).toUpperCase().replace(/[^A-Z0-9]/g, '_')}`];
+      if (typeof fromEnv === 'string' && fromEnv.trim()) return fromEnv.trim();
+      try { return readFileSync(path.join(toolboxDir, `${String(name).replace(/[^a-z0-9-]/g, '')}.key`), 'utf8').trim() || null; } catch { return null; }
+    },
+    log: (tag, what, fields) => walkLog({ kind: 'toolbox', what, ...fields }),
+    // the words this door already uses (its commands, its manifests' gate words, its own gate's examples): not a toolbox's
+    takenWords: () => doorTakenWords({
+      // …and `help`, which the Telegram runner answers itself before the catalogue (src/telegram/runner.js: the slash `help`)
+      commands: ['/help', ...['admin', 'member', 'observer'].flatMap((role) => (scopeCatalogueToRole(doorCatalogue.catalogue(), role, rolesPreset()).commandMenu ?? []).map((e) => e.command))],
+      manifests: Object.values(doorCatalogue.manifestsByOrigin()),
+    }),
+  });
+  await toolboxes.load();
+  toolboxesRef = toolboxes;
+  // A TOOLBOX'S PAGE served from this box: its files placed in <data-dir>/toolboxes/<name>/page/, served on localhost
+  // only (the https server in front is the operator's), while that toolbox is on, to a browser that came in with the
+  // entry of the link `/scherm <toolbox>` sends, or holds the cookie it was spent into. Entries and cookies live in a
+  // sealed store of this box. ONDERLING_TOOLBOX_PAGE_PORT moves the port (0: any free one, said below).
+  const pagePortEnv = Number.parseInt(process.env.ONDERLING_TOOLBOX_PAGE_PORT ?? '', 10);
+  const toolboxPages = createToolboxPages({
+    entries: createPageEntries({ store: new VaultNodeFs(path.join(dataDir, 'toolbox-pages.json'), vaultPassphrase()) }),
+    pagesDir: toolboxDir,
+    onToolboxes: async () => (screens ? ((await toolboxes.listTools({}))?.toolboxes ?? []).map((b) => b.name) : []),
+    pageOf: (name) => toolboxes.pageOf(name),
+    mayEnter: async (person, name) => Boolean(await screens?.mayUseToolbox?.(person, name)),
+    t, port: Number.isInteger(pagePortEnv) && pagePortEnv >= 0 ? pagePortEnv : TOOLBOX_PAGE_PORT,
+    log: (e) => {
+      walkLog({ kind: 'toolbox-page', ...e });
+      if (e.what === 'listening') console.log(`device-runner: toolbox pages on 127.0.0.1:${e.port}`);
+      if (e.what === 'not-listening') console.warn(`device-runner: toolbox pages not served (${e.reason})`);
+    },
+  });
+  await toolboxPages.sync();
+  // the last list of things shown per thread, so a button carries only its number (L1035)
+  const toolChoices = makeChoiceKeeper();
+  // through the box's own gated call, as the person who tapped (`ctx`); the shopping list is the template's role
+  const pickThing = makePickThing({ keeper: toolChoices, callSkill, shoppingList: () => templateLists(t).find((l) => l.kind === 'shopping')?.name ?? null });
+  agent.mountAppOps('tools', {
+    // a refusal or an empty answer told in the person's own language (`ctx.lang`): the sentence, never the key or an address
+    useTool: async (args, ctx) => {
+      // pictures only for a door that shows them (Telegram); the in-app thread paints words, so nothing is fetched for it
+      // a screen (a toolbox's own page) calls only ITS toolbox, the one its grant names (L1049)
+      const notYours = screenToolboxRefusal(ctx, args);
+      if (notYours) return { ...notYours, error: { code: notYours.code, message: t('circle.bot.toolbox_not_yours', { toolbox: String(args?.toolbox ?? '') }, ctx?.lang ?? undefined) } };
+      // a screen (a toolbox's own page) gets the toolbox's raw output too; a chat door only the rows
+      const r = await toolboxes.useTool(args, { pictures: doorBridge?.canSendPhoto?.(ctx?.chatId) === true, forScreen: ctx?.via === 'screen' });
+      const tp = (k, p) => t(k, p, ctx?.lang ?? undefined);
+      if (!r.ok) return { ...r, error: { code: r.code, message: toolboxRefusalText(r, tp) } };
+      if (Array.isArray(r.items) && !r.items.length) return { ...r, message: tp('circle.bot.toolbox_none_found', { title: r.title ?? r.name }) };
+      return toolChoicesReply(r, { threadId: choiceThreadOf(ctx), keeper: toolChoices, t: tp });
+    },
+    // the answer to "which one" after a list of things (the row's button, `/kies <n>`), in the person's own language
+    pickThing: (args, ctx) => pickThing(args, ctx, (k, p) => t(k, p, ctx?.lang ?? undefined)),
+    // "meer" under a shop's cards: the rest of that shop from the kept list, in the person's own language
+    moreThings: (args, ctx) => makeMoreThings({ keeper: toolChoices, t: (k, p) => t(k, p, ctx?.lang ?? undefined) })(args, ctx),
+    // which toolboxes are on, in words wherever it is painted (a screen too, never a bare tick): `/toolbox`'s own wording
+    listTools: async (args, ctx) => {
+      const r = await toolboxes.listTools(args);
+      return { ...r, message: toolboxListLine(r?.toolboxes ?? [], (k, p) => t(k, p, ctx?.lang ?? undefined), { all: Boolean(args?.all) }) };
+    },
+    // switching a toolbox on or off opens or closes its page's door on this box
+    addToolbox: async (args) => { const r = await toolboxes.addToolbox(args); await toolboxPages.sync(); return r; },
+    removeToolbox: async (args) => { const r = await toolboxes.removeToolbox(args); await toolboxPages.sync(); return r; },
+  }, toolsManifest);
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,
     // feedback about the app: the link to add the feedback contact (the same card the apps seed), nothing forwarded
@@ -1490,7 +1663,9 @@ if (tgToken || inboxDoor.bridge) {
         return;
       }
       const offer = parsePairingOffer(payload?.offer);
-      const r = offer.ok ? await screens.offer({ from, viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label }) : { ok: false, reason: offer.reason };
+      // a toolbox's page over the relay names its toolbox and hands back its ticket, as a pasted one does (L1113): an offer
+      // that names a toolbox is never granted as Basis's own screen
+      const r = offer.ok ? await screens.offer({ from, viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label, toolbox: offer.toolbox, ticket: offer.ticket }) : { ok: false, reason: offer.reason };
       // an offer is granted, or (the usual way) waits for the person's code, or was declined — each logs what it is
       walkLog({ kind: 'screen-offer', ok: r.ok, ...(!r.ok ? { reason: r.reason } : r.declined ? { declined: true } : { to: String(r.person).slice(-4), ...(r.pending ? { pending: true } : { ops: r.ops?.length ?? 0 }) }) });
     };
@@ -1498,12 +1673,25 @@ if (tgToken || inboxDoor.bridge) {
     // whether the grants lane folded after this boot: until it does, every screen token is refused as revoked (fail
     // closed) — the walk log says so, with how many screens hold a live grant (their keys' first characters)
     Promise.resolve(agent.surfaceGrantsReady?.()).then(async (ready) => {
+      // ONCE: a toolbox page's grant from before the ticketed link (L1113) is ended and its person told how to reconnect
+      if (ready === true) {
+        try {
+          const ended = await endPreTicketToolboxGrants({
+            listGrants: async () => (await agent.callSkill('household', 'listSurfaceGrants', {}))?.surfaces ?? [],
+            revokeView: async (viewPubKey) => (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true,
+            notify: async (person, key, params) => { await reach.sendToPerson(person, { text: t(key, params, threads.langOf(person) ?? undefined) }); },
+            marker: new VaultNodeFs(path.join(dataDir, 'screens-upgrade.json'), vaultPassphrase()),
+            grantTtlMs: SURFACE_GRANT_TTL_MS,
+          });
+          if (ended.ran) walkLog({ kind: 'toolbox-grants-ended', ended: ended.ended });
+        } catch (err) { console.warn('device-runner: the pre-ticket toolbox grants were not ended now; tried again at the next start:', err?.message ?? err); }
+      }
       const live = ((await agent.callSkill('household', 'listSurfaceGrants', {}).catch(() => null))?.surfaces ?? []);
       walkLog({ kind: 'surface-grants', ready: ready === true, screens: live.map((g) => String(g.viewPubKey).slice(0, 8)) });
     }, (err) => walkLog({ kind: 'surface-grants', ready: false, error: String(err?.message ?? err).slice(0, 120) }));
   }
   tgRunner = createTelegramRunner({
-    bridge: multiplexBridges([tgBridge, inboxDoor.bridge]),
+    bridge: (doorBridge = multiplexBridges([tgBridge, inboxDoor.bridge])),
     catalogue: doorCatalogue.catalogue,
     manifestsByOrigin: doorCatalogue.manifestsByOrigin,
     // The door's own ops — a person's memory mode and language, the admin's app list, status and users — are
@@ -1528,14 +1716,15 @@ if (tgToken || inboxDoor.bridge) {
       hintsFor: (threadId) => roleHintsFor(doorAdmit.roleOf(threadId), t, rolesPreset()),
       // one add per thing named ("melk en kaas" → two), whether the gate or the model chose the add
       expand: expandAdds({ t }),
-      gateRules: listsGateRules(values.lang, templateLists(t)),
+      // the lists' words, then the words a toolbox's admin named (read live: adding or removing one changes them at once)
+      gateRules: [toolChoiceGateRule(toolChoices), ...listsGateRules(values.lang, templateLists(t)), toolboxGateRule(() => toolboxes.wordsNow())],
       // the first message says what this bot does for this person, and how the reminders stand and change
-      welcomeFor: ({ role, ops, t: tp }) => welcomeLines({ ops, role, lists: templateLists(t), t: tp ?? t, settings: reminderSettings() }),
+      welcomeFor: ({ role, ops, t: tp }) => welcomeLines({ ops, role, lists: templateLists(t), t: tp ?? t, settings: reminderSettings(), toolboxLine: toolboxWelcomeLine(toolboxes.wordsNow(), tp ?? t) }),
       // without the model (off, or not answering): what does work, for this person — the word rules and the commands
       basicHelpFor: ({ ops, t: tp }) => basicModeLines({ ops, lists: templateLists(t), t: tp ?? t }),
       // `/help` for a person: their language, grouped, the admin's commands last (their level on the bot's map)
       // …and when the bot reminds, in the welcome's own line (the household's rules as they stand)
-      helpLines: ({ commandMenu, opsById, t: tp }) => botHelpLines({ commandMenu, opsById, t: tp, reminders: { on: reminderSettings().reminders !== 'off', rules: reminderSettings().rules } }),
+      helpLines: ({ commandMenu, opsById, t: tp }) => botHelpLines({ commandMenu, opsById, t: tp, reminders: { on: reminderSettings().reminders !== 'off', rules: reminderSettings().rules }, extraLines: toolboxHelpLines(toolboxes.wordsNow(), tp) }),
     } : {}),
   });
   await tgRunner.start();
@@ -1634,6 +1823,8 @@ const card = await callSkill('pinboard', 'getContactShareQr', {}).catch(() => nu
 walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken, clock: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone });
 // what other agents' task requests reach on this node (ids only), so a walk — or an operator — reads it from the box
 walkLog({ kind: 'peer-callable', accepts: agent.peer?.acceptsSkillCalls === true, skills: agent.peer?.callableSkills?.() ?? [] });
+failedStarts.clear();   // the box came up: a run of failed starts (L1115) ends here
+markBoxStarted(dataDir);   // written LAST: from now on a missing vault file here is a loss, not a first start
 console.log(`\ndevice-runner: up — data in ${dataDir}`);
 console.log(`  log       ${deviceLog.size} entr${deviceLog.size === 1 ? 'y' : 'ies'} restored from disk`);
 console.log(`  wire      ${relayUrl || 'LOCAL ONLY (set ONDERLING_RELAY_URL to join the relay)'}`);

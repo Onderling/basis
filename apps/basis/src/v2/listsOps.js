@@ -13,7 +13,7 @@
  */
 import { parseDateInput, hasTimeOfDay } from '@onderling-app/calendar';
 import { reminderLayerFromWords, describeRules } from './reminderWords.js';
-import { makeCircleLists } from '@onderling/kring-host/circleLists';
+import { makeCircleLists, entryWords } from '@onderling/kring-host/circleLists';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { matchEntry, choicesOf } from './entryRef.js';
 import { childIdsOf, deleteContainer, contain, RETAIN, retentionWindowFor } from '@onderling/item-store';
@@ -44,6 +44,37 @@ const holdersOf = (c) => {
   const ids = [...new Set([...(Array.isArray(c.assignees) ? c.assignees : []), c.assignee].filter((x) => typeof x === 'string' && x))];
   // its day goes with it: a reader of the list (the week overview, a screen) says when, not only who
   return { holders: ids, ...(c.dueAt ? { dueAt: c.dueAt } : {}) };
+};
+
+/**
+ * The THING an entry stands for and how many: the entry's plain reference (`rel: 'refers'`,
+ * never a containment edge) and its quantity (absent = one). Data for every door; nothing here reads what the type means.
+ */
+export const thingOf = (c) => {
+  const e = (Array.isArray(c?.embeds) ? c.embeds : []).find((x) => x?.rel === 'refers' && typeof x.type === 'string' && typeof x.ref === 'string');
+  return e ? { type: e.type, ref: e.ref } : null;
+};
+export const quantityOf = (c) => (Number.isInteger(c?.quantity) && c.quantity > 1 ? c.quantity : 1);
+const entryFacts = (c) => {
+  const thing = thingOf(c);
+  return { quantity: quantityOf(c), ...(thing ? { ref: thing } : {}) };
+};
+/** A ref and a quantity as the caller gave them: absent is fine; present must be well formed, or the add is refused. */
+/**
+ * What a form sends for a field left alone (an empty string, whitespace, an empty object) is ABSENT, not malformed:
+ * a screen's or a page's form posts every field it painted (development was red on this, 2026-11-18). A whole number a
+ * form sends as text ('3') is that number.
+ */
+const blank = (v) => v === undefined || v === null || (typeof v === 'string' && !v.trim())
+  || (typeof v === 'object' && !Array.isArray(v) && Object.values(v).every((x) => x === undefined || x === null || (typeof x === 'string' && !x.trim())));
+const wholeOf = (v) => (typeof v === 'string' && /^\s*\d+\s*$/.test(v) ? Number(v) : v);
+const readThing = (args) => {
+  const ref = blank(args?.ref) ? undefined : args.ref;
+  const okRef = ref === undefined
+    || (ref && typeof ref === 'object' && typeof ref.type === 'string' && ref.type.trim() && typeof ref.ref === 'string' && ref.ref.trim());
+  const q = blank(args?.quantity) ? undefined : wholeOf(args.quantity);
+  const okQ = q === undefined || (Number.isInteger(q) && q >= 1);
+  return { ok: Boolean(okRef && okQ), ref: okRef && ref ? { type: ref.type.trim(), ref: ref.ref.trim() } : null, quantity: okQ && Number.isInteger(q) ? q : 1, badRef: !okRef, badQuantity: !okQ };
 };
 
 // An item id (a ULID) — what a button carries; a person never types one.
@@ -164,6 +195,9 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       const ref = String(args?.list ?? '').trim();
       if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
       if (!text || !ref) return { ok: false, error: t('circle.lists.need_list_and_text') };
+      const thingIn = readThing(args);
+      if (thingIn.badRef) return { ok: false, error: t('circle.lists.bad_ref') };
+      if (thingIn.badQuantity) return { ok: false, error: t('circle.lists.bad_quantity') };
       const target = await findList(circleId, ref);
       if (!target) return { ok: false, error: t('circle.lists.no_such_list', { name: ref }) };
       // WHICH KIND of child is the container's `accepts` policy's decision, not this handler's: `hint`
@@ -172,17 +206,29 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       // An appointment needs a time: a bare add to a list whose entries are events (the Agenda) goes through the
       // calendar's own add, which asks when — never as an event with no date.
       if ((kind ?? target.defaultChild) === 'calendar-event') return { ok: false, error: t('circle.calendar.say_when', { name: target.text ?? ref }) };
+      // The same THING already open on this list (by its reference, never by what it is): its quantity goes up.
+      if (thingIn.ref) {
+        const held = (await entriesOf(circleId, target.id)).find((c) => { const th = thingOf(c); return th && th.type === thingIn.ref.type && th.ref === thingIn.ref.ref; });
+        if (held) {
+          const quantity = quantityOf(held) + thingIn.quantity;
+          const by = writer(circleId, ctx);
+          await svc.storeFor(circleId).put({ ...held, quantity }, { by });
+          return { ok: true, itemId: held.id, duplicate: true, quantity, entry: held.text ?? text, list: target.text ?? ref,
+            message: t('circle.lists.quantity_raised', { item: held.text ?? text, list: target.text ?? ref, quantity }) };
+        }
+      }
       // The same words already open on this list: not a second entry (the walk: "lamp vervangen" twice on Klusjes).
-      const same = (await entriesOf(circleId, target.id)).find((c) => String(c.text ?? '').trim().toLowerCase() === text.toLowerCase());
+      // An add that names a thing is matched by the thing above, never by its words.
+      const same = thingIn.ref ? null : (await entriesOf(circleId, target.id)).find((c) => String(c.text ?? '').trim().toLowerCase() === text.toLowerCase());
       if (same) return { ok: true, itemId: same.id, duplicate: true, message: t('circle.lists.already_there', { item: same.text ?? text, list: target.text ?? ref }) };
       // who added it: the door's person (the id the tasks record — the bot's own key is nobody), else this device's own
-      const made = await svc.addItem(circleId, target.id, text, writer(circleId, ctx), kind ? { hint: kind } : undefined);
+      const made = await svc.addItem(circleId, target.id, text, writer(circleId, ctx), { ...(kind ? { hint: kind } : {}), ...(thingIn.ref ? { ref: thingIn.ref } : {}), quantity: thingIn.quantity });
       if (!made) return { ok: false, error: t('circle.lists.not_accepted', { name: target.text ?? ref }) };
       return {
         ok: true, itemId: made.id ?? null, kind: made.type ?? null,
         // what was put on which list: the door words it (`replyLine`), folding several adds into one line
-        entry: text, list: target.text ?? ref,
-        message: t('circle.lists.added', { text, name: target.text ?? ref }),
+        entry: text, list: target.text ?? ref, ...(thingIn.quantity > 1 ? { quantity: thingIn.quantity } : {}),
+        message: t('circle.lists.added', { text: entryWords({ text, quantity: thingIn.quantity }), name: target.text ?? ref }),
       };
     },
 
@@ -230,7 +276,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       const parts = [];
       for (const list of [...(generalList ? [generalList] : []), ...own]) {
         const open = await entriesOf(circleId, list.id);
-        parts.push(open.length ? t('circle.lists.shop_part', { list: list.text, items: open.map((c) => c.text).filter(Boolean).join(', ') }) : t('circle.lists.shop_part_empty', { list: list.text }));
+        parts.push(open.length ? t('circle.lists.shop_part', { list: list.text, items: open.map((c) => entryWords(c)).filter(Boolean).join(', ') }) : t('circle.lists.shop_part_empty', { list: list.text }));
       }
       return { ok: true, message: parts.join('\n') };
     },
@@ -289,7 +335,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       // the list's own name goes with its entries: a read of five lists says which is which
       if (typeof passed !== 'function') {
         const open = await entriesOf(circleId, target.id);
-        return { ok: true, title: target.text ?? ref, items: open.map((c) => ({ id: c.id, label: c.text ?? c.id, type: c.type, ...holdersOf(c) })) };
+        return { ok: true, title: target.text ?? ref, items: open.map((c) => ({ id: c.id, label: entryWords(c) || c.id, type: c.type, ...entryFacts(c), ...holdersOf(c) })) };
       }
       // A household bot: what is done (ticked, completed) or has passed (an appointment before now) follows its setting.
       const { mode, days } = passed();
@@ -302,10 +348,10 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
         const doneAt = c.completedAt ? new Date(c.completedAt).getTime() : null;
         const startAt = c.type === 'calendar-event' && c.startsAt ? new Date(c.startsAt).getTime() : null;
         const at = doneAt ?? (startAt !== null && startAt < now ? startAt : null);
-        if (at === null) { items.push({ id: c.id, label: c.text ?? c.id, type: c.type, ...holdersOf(c) }); continue; }
+        if (at === null) { items.push({ id: c.id, label: entryWords(c) || c.id, type: c.type, ...entryFacts(c), ...holdersOf(c) }); continue; }
         if (mode === 'delete') { await svc.remove(circleId, c.id); continue; }
         if (mode === 'keep' || now - at < keepMs) {
-          items.push({ id: c.id, label: t(doneAt !== null ? 'circle.lists.entry_done' : 'circle.lists.event_passed', { text: c.text ?? c.id }), type: c.type, done: true });
+          items.push({ id: c.id, label: t(doneAt !== null ? 'circle.lists.entry_done' : 'circle.lists.event_passed', { text: entryWords(c) || c.id }), type: c.type, done: true });
         }
       }
       return { ok: true, title: target.text ?? ref, items };
@@ -316,7 +362,8 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
       const ref = String(args?.list ?? '').trim();
       const target = ref ? await findList(circleId, ref) : null;
-      if (!target) return { ok: false, error: t('circle.lists.no_such_list', { name: ref }) };
+      // a fixed code beside the words: a toolbox's page (and any caller) tells "no such list" from other refusals
+      if (!target) return { ok: false, code: 'not-found', error: t('circle.lists.no_such_list', { name: ref }) };
       // What goes: the list, and every item under it that has no parent left once it is gone (children of children
       // too). An item on another list as well is detached from this one and stays there.
       const store = svc.storeFor(circleId);
@@ -446,7 +493,11 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       // a new time: an appointment moves (keeping its length), a chore gets a new due — the line's time, as its words
       const when = args?.when ? parseDateInput(args.when) : null;
       if (args?.when && !when) return { ok: false, error: t('circle.lists.need_list_and_text') };
-      if (!text && !when) return { ok: false, error: t('circle.lists.need_list_and_text') };
+      // how many: a whole number of at least one, or absent (the same reading an add makes: `readThing`)
+      const q = blank(args?.quantity) ? undefined : wholeOf(args.quantity);   // a form's empty field is absent (readThing)
+      const hasQuantity = q !== undefined;
+      if (hasQuantity && !(Number.isInteger(q) && q >= 1)) return { ok: false, error: t('circle.lists.bad_quantity') };
+      if (!text && !when && !hasQuantity) return { ok: false, error: t('circle.lists.need_list_and_text') };
       const at = await locate(args);
       if (at.error) return { ok: false, error: at.error, ...(at.notFound ? { code: 'not-found' } : {}) };
       const timed = {};
@@ -460,8 +511,12 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
         Object.assign(timed, { dueAt: when });
       }
       const words = text || at.entry.text || at.entry.title || '';
-      await svc.storeFor(at.circleId).put({ ...at.entry, ...(text ? { text, ...(at.entry.type === 'calendar-event' ? { title: text } : {}) } : {}), ...timed }, { by: writer(at.circleId, ctx) });
-      return { ok: true, message: t('circle.lists.edited', { text: words, name: at.target.text ?? '' }) };
+      // stored only above one (absent = one), as an add stores it
+      const { quantity: _was, ...rest } = at.entry;
+      const counted = hasQuantity ? (q > 1 ? { ...rest, quantity: q } : rest) : at.entry;
+      await svc.storeFor(at.circleId).put({ ...counted, ...(text ? { text, ...(at.entry.type === 'calendar-event' ? { title: text } : {}) } : {}), ...timed }, { by: writer(at.circleId, ctx) });
+      const shown = entryWords({ text: words, quantity: hasQuantity ? q : at.entry.quantity });
+      return { ok: true, message: t('circle.lists.edited', { text: shown, name: at.target.text ?? '' }) };
     },
 
     /**

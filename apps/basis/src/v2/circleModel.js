@@ -12,6 +12,7 @@
 
 /** Normalise one circle-like raw item to a launcher tile, or null if it has no id. */
 import { isPairCircleId } from './pairCircleId.js';
+import { warmConversationKinds } from './conversationKinds.js';
 
 export function normalizeCircle(raw = {}) {
   const id = raw.id ?? raw.circleId ?? raw.circleId ?? raw.groupId ?? null;
@@ -26,6 +27,8 @@ export function normalizeCircle(raw = {}) {
     lastActivity: raw.lastActivity ?? raw.lastMessageAt ?? raw.updatedAt ?? null,
     features: Array.isArray(raw.features) ? raw.features : null,
     ...(raw.removed === true ? { removed: true } : {}),
+    // no name reached this device: the name is a placeholder (the sources' word) or the id itself
+    ...(raw.unnamed === true || (raw.name == null && raw.title == null) ? { unnamed: true } : {}),
   };
 }
 
@@ -49,9 +52,12 @@ export function mergeCircles(...sources) {
 }
 
 function mergeOne(a, b) {
+  // a real name from either source wins over a placeholder
+  const named = a.unnamed && !b.unnamed ? b : a;
   return {
     id: a.id,
-    name: a.name ?? b.name,
+    name: named.name ?? b.name,
+    ...(a.unnamed && b.unnamed ? { unnamed: true } : {}),
     kind: a.kind ?? b.kind,
     memberCount: a.memberCount ?? b.memberCount,
     lastActivity: pickLatest(a.lastActivity, b.lastActivity),
@@ -71,14 +77,17 @@ function pickLatest(x, y) {
  * source is tolerated — it contributes nothing rather than breaking the
  * launcher. Result is sorted most-recent-activity first, then by name.
  */
-export async function loadCircles({ fetchTasksCircles, fetchGroups, fetchCircles } = {}) {
+export async function loadCircles({ fetchTasksCircles, fetchGroups, fetchCircles, policyStore = null } = {}) {
   const [tasksCircles, groups, circles] = await Promise.all([
     safe(fetchTasksCircles),
     safe(fetchGroups),
     safe(fetchCircles),
   ]);
   // A pair roster (a contact's, made automatically — `pairRoster.js`) is never a tile.
-  return mergeCircles(tasksCircles, groups, circles).filter((c) => !isPairCircleId(c?.id)).sort(byActivityThenName);
+  const list = mergeCircles(tasksCircles, groups, circles).filter((c) => !isPairCircleId(c?.id)).sort(byActivityThenName);
+  // each circle's conversation kinds known before a tile, Today or the assistant reads a line of it (one filter)
+  await warmConversationKinds(policyStore, list);
+  return list;
 }
 
 /**

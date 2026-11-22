@@ -52,6 +52,15 @@ export const DELIVERY_REASON_LABELS = Object.freeze({
   'waiting-for-connection': 'circle.chat.delivery.waiting_for_connection',
 });
 
+/**
+ * WHO A LINE STILL WAITS FOR: the `state` of the silent `delivery-state` log entry a circle fan writes when some members
+ * had no address yet (`{ msgId, state: 'on-its-way', waiting, reached, of }`). NOT a rung of the ladder — a side fact
+ * beside it, like a reason — and never a receipt (the owed re-fan counts only `stored`).
+ */
+export const DELIVERY_WAITING_ENTRY = 'on-its-way';
+/** Its words on the bubble, in place of the rung's while someone waits: `{{reached}}` sent of `{{of}}`. */
+export const DELIVERY_WAITING_LABEL = 'circle.chat.delivery.on_its_way';
+
 /** How long a message may say "sending" before it says it is waiting for a connection. */
 export const PENDING_SAYS_WAITING_MS = param({ key: 'delivery.pendingSaysWaitingMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });
 

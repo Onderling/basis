@@ -1147,20 +1147,31 @@ export async function createSecureAgent(opts = {}) {
    * Bounded (see the note on `pendingHold`): expired entries are swept first, then the per-peer and
    * across-peers caps are enforced by dropping the OLDEST — reported, never silently.
    */
+  /** Two JSON-shaped values equal as stored (the outbox round-trips them through JSON); unserialisable: never equal. */
+  function sameJson(a, b) {
+    try { return JSON.stringify(a ?? null) === JSON.stringify(b ?? null); } catch { return false; }
+  }
   function enqueueHold(addr, payload, sendOpts, reason = 'unreachable') {
     const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
     sweepExpiredHolds();
     let q = pendingHold.get(addr);
     if (!q) { q = new Map(); pendingHold.set(addr, q); }
     const key = holdKeyFor(payload, sendOpts);
+    // a held entry keeps the send's terms, not its caller's callback (the send that asked for it has already answered)
+    const { onRouteTaken: _cb, ...heldOpts } = sendOpts ?? {};   // eslint-disable-line no-unused-vars
     if (q.has(key)) {
       if (!key.startsWith('key:')) {
         return { held: true, delivered: false, deduped: true, msgId, pending: q.size, reason };
       }
+      // A SLOT THAT CHANGES NOTHING WRITES NOTHING (the start-writes count on the phone): every start sends the boot
+      // catch-up requests again, and for a member who is not there each one is held under its slot. The same payload
+      // under the same terms is the same hold: kept as it is (its age too), the outbox not written again.
+      const held = q.get(key);
+      if (sameJson(held?.payload, payload) && sameJson(held?.opts ?? null, heldOpts)) {
+        return { held: true, delivered: false, deduped: true, msgId, pending: q.size, reason };
+      }
       q.delete(key);   // a slot: the newest supersedes (re-set below keeps it at the young end)
     }
-    // a held entry keeps the send's terms, not its caller's callback (the send that asked for it has already answered)
-    const { onRouteTaken: _cb, ...heldOpts } = sendOpts ?? {};   // eslint-disable-line no-unused-vars
     q.set(key, { payload, opts: heldOpts, ts: Date.now() });
     // Per-peer cap — a Map iterates in insertion order, so the first key IS the oldest.
     while (holdMaxPerPeer > 0 && q.size > holdMaxPerPeer) {

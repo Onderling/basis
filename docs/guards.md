@@ -97,7 +97,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `untrusted-json` | — | JSON that someone else wrote is parsed with `parseUntrustedJson` (@onderling/core) |
 | `web-buttons` | — | no bare <button> in the web shell |
 
-## Named design guards (`G-*`, in fitness tests) · 28
+## Named design guards (`G-*`, in fitness tests) · 29
 
 *From an explicit `@guard [<id>] — <claim>` tag in a fitness test (preferred), or a `G-*` id in a
 `describe(...)` block (fallback). Tag a fitness test with `@guard` to add it here — an id is optional.*
@@ -117,6 +117,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | — | a write a circle switched off is refused when tapped, the same refusal as the typed line; a door-less call (plumbing,… | `apps/basis/test/tapAsksTheCircle.test.js` |
 | — | on the booted box, a toolbox's list of things comes with a button each, and tapping one puts that thing on the househ… | `apps/basis/test/toolboxButtons.box.test.js` |
 | — | every op is gated by exactly one capability row, and every row gates at least one op | `apps/basis/test/v2/lendCapabilityRows.test.js` |
+| — | forget list of a freshly enrolled device and the start-over's names are read from the storage register, and every reg… | `apps/basis/test/v2/storageRegister.test.js` |
 | — | confirming a claim, editing and sharing an appointment pass the capability gate in a circle that did not switch them off | `apps/basis/test/v2/threeActsRows.test.js` |
 | — | a toolbox's list of things gets one /kies button per thing, and the tap adds THAT thing (its reference, quantity 1) t… | `apps/basis/test/v2/toolboxChoices.test.js` |
 | — | a tool call speaks the recorded wire (card, SendMessage, A2A-Version 1.0, bearer) and every failure ends in ONE code,… | `apps/basis/test/v2/toolboxClient.test.js` |

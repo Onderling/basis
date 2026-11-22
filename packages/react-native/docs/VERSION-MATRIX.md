@@ -37,9 +37,10 @@ expo-file-system                   ~18.0.12
 
 # Native modules
 react-native-libsodium              1.7.0       (EXACT pin: the phone's Ed25519 check over JSI; ships libsodium 1.0.21
-                                              PREBUILT in libsodium/build.tgz, unpacked by its postinstall — an accepted
-                                              risk for the alpha; a public release builds libsodium in CI from the signed
-                                              source with the package's build.sh. Measured 2026-11-12 on a Samsung A33:
+                                              PREBUILT in libsodium/build.tgz; NOT linked since 2026-11-22: gradle first
+                                              builds libsodium from the source pinned in apps/basis-mobile/libsodium/PIN.json
+                                              (SHA-256 + minisign, NDK pinned, each library's SHA-256 pinned; the build is
+                                              reproducible) and puts it in the package's build dir. Measured 2026-11-12 on a Samsung A33:
                                               ~0.07 ms a check vs ~59 ms tweetnacl; +2.26 MB native libs over 4 ABIs)
 react-native-ble-plx              ^3.5.1
 react-native-keychain             ^10.0.0

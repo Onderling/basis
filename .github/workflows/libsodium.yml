@@ -1,0 +1,36 @@
+# OUR OWN LIBSODIUM, BUILT IN THE OPEN (ledger L835). The phone links libsodium built from the source pinned in
+# apps/basis-mobile/libsodium/PIN.json (by SHA-256 and libsodium.org's minisign signature) with the pinned NDK; the
+# build is reproducible, so this job builds it on a clean runner and compares each library's SHA-256 with the pin. Its
+# log is the published record: the source verified, the four sums. Red when the source, the signature or a library
+# differs. Runs by hand and whenever the pin or the build script changes.
+name: libsodium
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [development]
+    paths:
+      - 'apps/basis-mobile/libsodium/**'
+      - 'apps/basis-mobile/scripts/build-libsodium-android.sh'
+  pull_request:
+    paths:
+      - 'apps/basis-mobile/libsodium/**'
+      - 'apps/basis-mobile/scripts/build-libsodium-android.sh'
+
+jobs:
+  build-and-compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: minisign
+        run: sudo apt-get update -q && sudo apt-get install -y -q minisign
+      - name: the pinned NDK
+        run: |
+          NDK=$(node -p 'require("./apps/basis-mobile/libsodium/PIN.json").ndk')
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK" > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK" >> "$GITHUB_ENV"
+      - name: build from the verified source and compare with the pin
+        run: bash apps/basis-mobile/scripts/build-libsodium-android.sh --check

@@ -1,0 +1,29 @@
+{
+  "about": "Our own libsodium build for the phone (replaces react-native-libsodium's prebuilt build.tgz). The source is libsodium's VERSIONED release tarball (immutable; the '-stable' tarball is re-rolled over time and would one day fail its pin), pinned by its SHA-256 AND verified with libsodium.org's minisign key; the build is reproducible with the pinned NDK, so each library's SHA-256 is pinned too. Built by scripts/build-libsodium-android.sh before every gradle build. Change the source or the NDK: rebuild with --print, review, and pin the new sums here.",
+  "package": "react-native-libsodium@1.7.0",
+  "version": "1.0.21",
+  "url": "https://download.libsodium.org/libsodium/releases/libsodium-1.0.21.tar.gz",
+  "sourceSha256": "9e4285c7a419e82dedb0be63a72eea357d6943bc3e28e6735bf600dd4883feaf",
+  "minisignUrl": "https://download.libsodium.org/libsodium/releases/libsodium-1.0.21.tar.gz.minisig",
+  "minisignPublicKeyFile": "libsodium.org.minisign.pub",
+  "ndk": "26.1.10909125",
+  "androidPlatform": "android-21",
+  "abis": {
+    "armv7-a": {
+      "dir": "libsodium-android-armv7-a",
+      "soSha256": "09d5bbc3ec0e2b4cfa6bc9b0689546969953b7207a3779e0e2da76cf2795c491"
+    },
+    "armv8-a": {
+      "dir": "libsodium-android-armv8-a+crypto",
+      "soSha256": "9ee37ab0af618c8a5c7401439049334160a1374cbe3860792a0ff97087dddf83"
+    },
+    "x86": {
+      "dir": "libsodium-android-i686",
+      "soSha256": "97778b940023b7595e29ce741bfae628a66891e549daa7c9a9951462e24c1bc2"
+    },
+    "x86_64": {
+      "dir": "libsodium-android-westmere",
+      "soSha256": "8095d5a41b3c95859569e35fcd4f1d6460432001fb56b378789b7dee70397c30"
+    }
+  }
+}

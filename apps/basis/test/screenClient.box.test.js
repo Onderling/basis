@@ -108,8 +108,11 @@ describe('the built screen client, on the booted box over the relay', () => {
     const realCrypto = globalThis.crypto;
     vi.stubGlobal('crypto', { getRandomValues: (a) => realCrypto.getRandomValues(a), randomUUID: () => realCrypto.randomUUID() });
     cleanup.push(() => vi.unstubAllGlobals());
+    // the page's own browser: its storage and its vault outlive a reload (L1179)
     const pageStorage = memoryStorage();
-    const page = createScreenClient({ toolbox: 'boodschappen', bot: pageLink, label: 'boodschappenpagina', storage: pageStorage, makeAgent });
+    const pageVault = new VaultMemory();
+    const pageAgent = async () => { const a = await createSecureAgent({ vault: pageVault, transportMode: 'relay', warnOnInsecure: false }); agents.push(a); return a; };
+    const page = createScreenClient({ toolbox: 'boodschappen', bot: pageLink, label: 'boodschappenpagina', storage: pageStorage, makeAgent: pageAgent });
     const p = await page.startPairing();
     expect(p.paste).toMatch(/^\/koppel-scherm onderling-connect:\/\//);
     const asked = await ask(p.paste);
@@ -134,7 +137,13 @@ describe('the built screen client, on the booted box over the relay', () => {
     expect(globalThis.crypto.subtle).toBeUndefined();
     const resumed = createScreenClient({ toolbox: 'boodschappen', bot: pageLink, storage: pageStorage, makeAgent });
     expect(await resumed.resume()).toEqual({ ok: true });
-    vi.unstubAllGlobals();
+
+    // THE PAGE RELOADED (L1179): the link's fragment is gone, the page has only its own address; it resumes from what
+    // this browser kept (the bot's address, the grant) and calls again, with no new link and no pairing
+    const reloaded = createScreenClient({ toolbox: 'boodschappen', bot: 'https://boodschappen.example/pagina', storage: pageStorage, makeAgent: pageAgent });
+    expect(await reloaded.resume()).toEqual({ ok: true });
+    const foundAgain = await reloaded.call('tools.useTool', { toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'melk' } });
+    expect(foundAgain, JSON.stringify(foundAgain).slice(0, 400)).toMatchObject({ ok: true, output: { '@type': 'ItemList' } });
 
     // a page for a toolbox that is NOT on here (not even placed): refused in words, nothing asked
     const other = createScreenClient({ toolbox: 'klusjesdienst', bot, storage: memoryStorage(), makeAgent });

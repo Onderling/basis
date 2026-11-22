@@ -92,7 +92,7 @@ const shownOf = (p) => JSON.stringify({ url: p.url, words: p.words, ...(p.ops ? 
 /** The origin of a URL, or null. */
 const originOf = (u) => { try { return new URL(u).origin; } catch { return null; } };
 
-export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch = globalThis.fetch, log = () => {}, takenWords = () => new Set() } = {}) {
+export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch = globalThis.fetch, log = () => {}, takenWords = () => new Set(), appUrl = null } = {}) {
   const readOn = async () => { try { const v = JSON.parse((await store.get(ON_KEY)) ?? '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } };
   const placed = async () => { try { return (await placedOf() ?? []).map(readPlaced).filter(Boolean); } catch { return []; } };
   const keyFor = async (name) => { try { const k = await keyOf(name); return typeof k === 'string' && k.trim() ? k.trim() : null; } catch { return null; } };
@@ -134,6 +134,13 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
       const p = (await placed()).find((x) => x.name === n);
       if (!p) return { ok: false, code: 'toolbox-not-placed', name: n };
       if (!(await keyFor(n))) { log('tools', 'refused', { check: 'switch-on', reason: 'toolbox-no-key' }); return { ok: false, code: 'toolbox-no-key', name: n }; }
+      // A TOOLBOX'S PAGE IS NEVER ON THE WEB APP'S OWN ORIGIN (L1041 b): a page there shares everything the app keeps in
+      // the browser (its storage, its key door), so the switch is refused before anything is asked or turned on
+      const appOrigin = appUrl ? originOf(appUrl) : null;
+      if (p.page && appOrigin && originOf(p.page) === appOrigin) {
+        log('tools', 'refused', { check: 'switch-on', reason: 'toolbox-page-is-app-origin' });
+        return { ok: false, code: 'toolbox-page-is-app-origin', name: n };
+      }
       const card = await readToolboxCard(p.url, { fetch });
       if (!card.ok) { log('tools', 'refused', { check: 'card', reason: card.code }); return { ok: false, code: card.code, name: n }; }
       // the card's endpoint must be the PLACED address's origin: the key and every question go only where the admin saw
@@ -333,6 +340,7 @@ const REFUSAL_KEY = Object.freeze({
   'toolbox-unreachable': 'toolbox_unreachable', 'toolbox-no-endpoint': 'toolbox_unreachable', 'toolbox-unauthorized': 'toolbox_unreachable',
   'toolbox-error': 'toolbox_unreachable', 'toolbox-timeout': 'toolbox_timeout', 'tool-not-offered': 'toolbox_tool_not_offered', 'toolbox-word-taken': 'toolbox_word_taken',
   'tool-error': 'toolbox_tool_failed', 'toolbox-bad-answer': 'toolbox_failed',
+  'toolbox-page-is-app-origin': 'toolbox_page_app_origin',
 });
 
 /**

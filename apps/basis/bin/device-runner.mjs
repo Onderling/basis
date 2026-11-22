@@ -1470,6 +1470,8 @@ if (tgToken || inboxDoor.bridge) {
   const toolboxDir = path.join(dataDir, 'toolboxes');
   const toolboxes = makeToolboxOps({
     store: new VaultNodeFs(path.join(dataDir, 'toolboxes.json'), vaultPassphrase()),
+    // a toolbox's page is never placed on the web app's own origin (refused at the switch)
+    appUrl: appUrl || null,
     placedOf: async () => {
       let files = [];
       try { files = readdirSync(toolboxDir).filter((f) => f.endsWith('.json')); } catch { return []; }

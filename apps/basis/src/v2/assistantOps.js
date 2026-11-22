@@ -1077,7 +1077,10 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (typeof pass !== 'string' || pass.length < MIN_PASSPHRASE) return { ok: false, error: { code: 'too-short', message: tp('circle.bot.export_key_too_short', { n: MIN_PASSPHRASE }) } };
     if (op === 'assistant-export-key-set' && args?.passphraseAgain !== pass) return { ok: false, error: { code: 'mismatch', message: tp('circle.bot.export_key_mismatch') } };
     if (op === 'assistant-export-key-unlock' && !key.exists()) return { ok: false, error: { code: 'no-key', message: tp('circle.bot.export_key_none') } };
-    const note = op === 'assistant-export-key-set' && key.exists() ? tp('circle.bot.stepup_export_key_replaces') : null;
+    if (op === 'assistant-export-key-unlock' && key.unreadable?.()) return { ok: false, error: { code: 'key-unreadable', message: tp('circle.bot.export_key_unreadable') } };
+    const note = op !== 'assistant-export-key-set' ? null
+      : key.unreadable?.() ? tp('circle.bot.stepup_export_key_replaces_unreadable')
+      : key.exists() ? tp('circle.bot.stepup_export_key_replaces') : null;
     return { ok: true, args: { passphrase: pass }, shown: '—', ...(note ? { note } : {}) };
   }
 
@@ -1091,7 +1094,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       return { ok: true, message: tp(r.replaced ? 'circle.bot.export_key_replaced' : 'circle.bot.export_key_set') };
     }
     const r = await key.unlock(passphrase);
-    if (!r.ok) return { ok: false, error: { code: r.reason, message: tp(r.reason === 'wrong-passphrase' ? 'circle.bot.export_key_wrong' : 'circle.bot.export_key_none') } };
+    if (!r.ok) return { ok: false, error: { code: r.reason, message: tp(r.reason === 'wrong-passphrase' ? 'circle.bot.export_key_wrong' : r.reason === 'key-unreadable' ? 'circle.bot.export_key_unreadable' : 'circle.bot.export_key_none') } };
     return { ok: true, message: tp('circle.bot.export_key_unlocked') };
   }
 

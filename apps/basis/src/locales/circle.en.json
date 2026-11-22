@@ -6176,6 +6176,8 @@
     "secret_check_limit": "Note: the language model provider refuses: a limit or credit (status {{status}}). Free-text questions get no answer until that is sorted; commands and buttons still work.",
     "secret_check_refused": "Note: the language model provider refuses (status {{status}}). Free-text questions get no answer until that is sorted; commands and buttons still work.",
     "stepup_export_key_replaces": "A key is set already: files sealed with it open only with the old passphrase.",
+    "stepup_export_key_replaces_unreadable": "The key on the box cannot be read (made by a newer version, or damaged): a new key replaces it. Files sealed with the old key still open with their own passphrase.",
+    "export_key_unreadable": "The key on the box cannot be read (made by a newer version, or damaged). Nothing changed: set a new key, or open the key a file carries.",
     "export_key_too_short": "The passphrase needs at least {{n}} characters. Nothing asked, nothing changed.",
     "export_key_none": "No export key is set on the box yet.",
     "export_key_set": "The export key is set: each night the export is sealed with it. Keep the passphrase off the box.",

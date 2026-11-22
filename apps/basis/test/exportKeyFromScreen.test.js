@@ -96,6 +96,17 @@ describe('the export key from the admin\'s screen', () => {
     expect(b.asked.at(-1).text).toContain('circle.bot.stepup_export_key_replaces');
   });
 
+  it('a key file that cannot be read: an unlock is refused in words, nothing asked; a set says the new key replaces it', async () => {
+    const b = box();
+    b.m.set(EXPORT_KEY_FILE, '{"publicKey": "trunc');
+    const u = await b.call('assistant', 'assistant-export-key-unlock', { passphrase: PASS }, b.fromScreen());
+    expect(u).toMatchObject({ ok: false, error: { code: 'key-unreadable', message: 'circle.bot.export_key_unreadable' } });
+    expect(b.asked).toEqual([]);
+    await b.call('assistant', 'assistant-export-key-set', { passphrase: PASS, passphraseAgain: PASS }, b.fromScreen());
+    expect(b.asked.at(-1).text).toContain('circle.bot.stepup_export_key_replaces_unreadable');
+    expect(b.m.get(EXPORT_KEY_FILE)).toBe('{"publicKey": "trunc');   // nothing written before the yes
+  });
+
   it('checked before the question: too short, a member\'s screen, an unlock with no key — refused, nothing asked', async () => {
     const b = box();
     expect((await b.call('assistant', 'assistant-export-key-set', { passphrase: 'kort', passphraseAgain: 'kort' }, b.fromScreen())).ok).toBe(false);

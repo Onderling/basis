@@ -50,7 +50,10 @@ function ask(question) {
 
 const cmd = positionals[0];
 if (cmd === 'set') {
-  if (exportKey.exists()) {
+  if (exportKey.unreadable()) {
+    console.log('export-key: the key file on this box cannot be read (made by a newer version, or damaged). A new key replaces it; files sealed with the old key still open with their own passphrase (unlock --from <file>).');
+    if ((await askPlain('Replace it? Type yes: ')).trim().toLowerCase() !== 'yes') { console.log('export-key: nothing changed.'); process.exit(0); }
+  } else if (exportKey.exists()) {
     console.log('export-key: a key is already set. Files sealed with it keep needing ITS passphrase (unlock --from <file>); a new key seals only the files from now on.');
     if ((await askPlain('Replace it? Type yes: ')).trim().toLowerCase() !== 'yes') { console.log('export-key: nothing changed.'); process.exit(0); }
   }
@@ -69,7 +72,7 @@ if (cmd === 'set') {
   const pass = await ask('Passphrase: ');
   try {
     const r = await exportKey.unlock(pass, { source });
-    if (!r.ok) { console.error(`export-key: ${r.reason === 'wrong-passphrase' ? 'that passphrase does not open this key' : r.reason}`); process.exit(1); }
+    if (!r.ok) { console.error(`export-key: ${r.reason === 'wrong-passphrase' ? 'that passphrase does not open this key' : r.reason === 'key-unreadable' ? 'the key file on this box cannot be read; set a new key, or unlock --from <file>' : r.reason}`); process.exit(1); }
     console.log('export-key: unlocked — it closes after the next /import, or by itself within the hour. `lock` closes it now.');
   } catch (e) {
     console.error(`export-key: ${e?.message ?? e}`);

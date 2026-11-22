@@ -939,3 +939,14 @@ Some basis tests read a sibling app's source relative to the WORKING DIRECTORY (
 reads `../basis-mobile/src/screens/v2/fab.js`). Run from the repo root with `--root apps/basis`, they look one level
 too high and fail with `ENOENT`, which reads like a real failure. Run basis tests from `apps/basis` (as CI does):
 `cd apps/basis && npx vitest run <files>`.
+
+## A phone build first builds libsodium itself; it needs minisign and the pinned NDK (2026-11-22)
+
+`android/build.gradle` runs `scripts/build-libsodium-android.sh` (task `buildOwnLibsodium`) before every module's
+`preBuild`: react-native-libsodium's prebuilt `build.tgz` is replaced by our build from the source pinned in
+`apps/basis-mobile/libsodium/PIN.json`. A machine that builds the APK needs `minisign` (`apt install minisign`; a
+missing one fails the build, it never skips the check) and the NDK named in the pin (the app's own `ndkVersion`). The
+first build of a checkout takes ~75 s (four ABIs); later builds see the pinned sums in place and take ~1 s. The source
+is cached in `~/.cache/onderling-libsodium/<sha256>`. A failure says which ABI and where its log is. A library whose
+SHA-256 differs from the pin fails the build: a different NDK or source is a change to pin on purpose (`--print`),
+never a fallback to the prebuilt. Two builds at once each use their own work folder.

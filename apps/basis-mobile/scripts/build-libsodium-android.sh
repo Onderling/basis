@@ -10,8 +10,9 @@
 #   • the libraries in place already match the pin: nothing is done (a gradle build pays this once).
 #
 # Run by gradle before every build (android/build.gradle, task buildOwnLibsodium) and by CI (.github/workflows/
-# libsodium.yml), which prints the sums. Usage: build-libsodium-android.sh [--print]   (--print: build, print the sums,
-# check nothing: for pinning a new source or NDK, after review)
+# libsodium.yml), which prints the sums. Usage: build-libsodium-android.sh [--check | --print]
+#   --check  build and compare with the pinned sums, place nothing (CI: no app install needed; fails on a difference)
+#   --print  build and print the sums, compare nothing (for pinning a new source or NDK, after review)
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,9 +27,12 @@ url="$(field url)"; source_sha="$(field sourceSha256)"; sig_url="$(field minisig
 pubkey="$app/libsodium/$(field minisignPublicKeyFile)"; ndk_version="$(field ndk)"; platform="$(field androidPlatform)"
 abis=(armv7-a armv8-a x86 x86_64)
 
-# where react-native-libsodium's CMake reads the libraries
-pkg="$(cd "$app" && node -p 'require("path").dirname(require.resolve("react-native-libsodium/package.json"))')"
-target="$pkg/libsodium/build"
+# where react-native-libsodium's CMake reads the libraries (only when placing them)
+target=""
+if [ -z "$mode" ]; then
+  pkg="$(cd "$app" && node -p 'require("path").dirname(require.resolve("react-native-libsodium/package.json"))')"
+  target="$pkg/libsodium/build"
+fi
 
 in_place() {
   for abi in "${abis[@]}"; do
@@ -36,7 +40,7 @@ in_place() {
     [ -f "$so" ] && [ "$(sha "$so")" = "$(field "abis.$abi.soSha256")" ] || return 1
   done
 }
-if [ "$mode" != "--print" ] && in_place; then echo "libsodium: our build is in place (pinned sums match)"; exit 0; fi
+if [ -z "$mode" ] && in_place; then echo "libsodium: our build is in place (pinned sums match)"; exit 0; fi
 
 # the pinned NDK, exactly
 sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
@@ -55,20 +59,22 @@ curl -fsSL "$sig_url" -o "$cache/source.tar.gz.minisig"
 minisign -Vm "$tarball" -x "$cache/source.tar.gz.minisig" -p "$pubkey" >/dev/null || { echo "libsodium: the source's signature does not verify" >&2; exit 1; }
 echo "libsodium: source verified (sha256 $source_sha, minisign $(head -1 "$pubkey" | awk '{print $NF}'))"
 
-work="$cache/work"; rm -rf "$work"; mkdir -p "$work"
+# a work folder of its own per run: two builds at once (two worktrees, a developer and CI) never share one
+work="$(mktemp -d "$cache/work.XXXXXX")"
+trap 'rm -rf "$work"' EXIT
 tar -xzf "$tarball" -C "$work"
 src="$(find "$work" -mindepth 1 -maxdepth 1 -type d | head -1)"
 
 failed=0
 for abi in "${abis[@]}"; do
-  (cd "$src" && ANDROID_NDK_HOME="$ndk" NDK_PLATFORM="$platform" "dist-build/android-$abi.sh" > "$cache/build-$abi.log" 2>&1) \
-    || { echo "libsodium: the $abi build failed (log: $cache/build-$abi.log)" >&2; exit 1; }
+  (cd "$src" && ANDROID_NDK_HOME="$ndk" NDK_PLATFORM="$platform" "dist-build/android-$abi.sh" > "$cache/build-$abi.$$.log" 2>&1) \
+    || { echo "libsodium: the $abi build failed (log: $cache/build-$abi.$$.log)" >&2; exit 1; }
   dir="$(field "abis.$abi.dir")"; got="$(sha "$src/$dir/lib/libsodium.so")"; want="$(field "abis.$abi.soSha256")"
   echo "libsodium: $abi $got"
   if [ "$mode" != "--print" ] && [ "$got" != "$want" ]; then echo "libsodium: $abi differs from the pinned $want" >&2; failed=1; fi
 done
 [ "$failed" = 0 ] || exit 1
-[ "$mode" = "--print" ] && exit 0
+[ -n "$mode" ] && { echo "libsodium: $mode done (nothing placed)"; exit 0; }
 
 # in place of the prebuilt: only the four Android directories this build owns
 mkdir -p "$target"

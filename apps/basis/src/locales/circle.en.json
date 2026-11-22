@@ -6289,6 +6289,10 @@
       "text": "It receives the words of a question, and nothing about who asks.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
+    "toolbox_page_over_http": {
+      "text": "Note: the page at {{page}} arrives over plain http within the home network. What page and bot say to each other stays encrypted, but someone on the same network can change the page itself while it loads and then read and change your lists with this page's rights. Only turn this on on your own, secured wifi network.",
+      "doc": "The /toolbox card when the placed page is on plain http in the home network (the operator's pageOverHttp choice): the risk, said before the yes. {{page}}: the page address."
+    },
     "toolbox_receives_list": {
       "text": "It receives the words of a question, and when a price is asked the marks of the things on a list; nothing about who asks.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."

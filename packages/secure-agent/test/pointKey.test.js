@@ -40,3 +40,24 @@ describe('pointKey — the one comparison form of a connection point', () => {
     expect(samePoint('wss://relay.example.org', null)).toBe(false);
   });
 });
+
+/**
+ * ONE PARSE PER SPELLING (ledger L619, the seeded Samsung 2026-11-22). Every send decides its route and every send's
+ * log line explains it, and both compare each candidate transport's url with the circle's points through `pointKey`.
+ * On the phone `URL` is a JavaScript polyfill: `pointKey` and the URL parse were ~17% of the JS thread between 8 and
+ * 12 s after a cold start. The key is a pure function of its string, so each spelling is parsed once.
+ */
+describe('pointKey parses each spelling once', () => {
+  it('a thousand calls over three spellings construct a URL three times', () => {
+    const Real = globalThis.URL;
+    let made = 0;
+    globalThis.URL = class extends Real { constructor(...a) { made += 1; super(...a); } };
+    try {
+      const spellings = ['wss://memo-a.example/', 'WSS://Memo-A.example:443', 'https://memo-b.example/x/'];
+      const first = spellings.map(pointKey);
+      for (let i = 0; i < 1000; i += 1) expect(pointKey(spellings[i % 3])).toBe(first[i % 3]);
+      expect(made).toBe(3);
+      expect(first[0]).toBe(first[1]);
+    } finally { globalThis.URL = Real; }
+  });
+});

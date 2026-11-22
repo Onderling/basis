@@ -18,7 +18,7 @@ import { SCREEN_PAIRING_TTL_MS } from './screenDoor.js';
 import { createSecureAgent, makeBrowserVault } from '@onderling/secure-agent';
 
 /** The client's version: the page can say which one it was built against. */
-export const SCREEN_CLIENT_VERSION = '0.2.1';   // 0.2.1 (L1179): a page opened again without the link resumes from the kept bot address
+export const SCREEN_CLIENT_VERSION = '0.2.2';   // 0.2.2: a page opened again without the link resumes from its kept grant (L1179), and runs without crypto.subtle, so over plain http in the home network (L1183)
 // 0.2.0 (L1113): the link's one-use ticket goes back in the offer
 
 /**

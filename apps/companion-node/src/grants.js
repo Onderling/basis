@@ -64,16 +64,28 @@ export function opsForFamilies(families) {
 export function createNodeGrants({ identity, agent, tokenRegistry, vault, onRevoked = null }) {
   const HELD = 'grant-held:';
   const heldKey = (to) => `${HELD}${to}`;
-  /** What an agent holds here: `{ids, families}` (empty when nothing). */
+  /**
+   * What an agent holds here: `{ids, families}` (empty when nothing), or `{unreadable: true}` when a record is there
+   * but cannot be read (damaged, or written by a newer build) — never "holds nothing", which would make a revoke a
+   * no-op that leaves the tokens live.
+   */
   const heldBy = async (to) => {
+    const raw = await vault.get(heldKey(to));
+    if (raw == null) return { ids: [], families: [] };
     try {
-      const v = JSON.parse((await vault.get(heldKey(to))) ?? 'null');
-      return { ids: Array.isArray(v?.ids) ? v.ids : [], families: Array.isArray(v?.families) ? v.families : [] };
-    } catch { return { ids: [], families: [] }; }
+      const v = JSON.parse(raw);
+      if (v === null) return { ids: [], families: [] };   // a revoked grant, on a vault without delete
+      if (typeof v !== 'object' || !Array.isArray(v.ids)) return { ids: [], families: [], unreadable: true };
+      return { ids: v.ids, families: Array.isArray(v.families) ? v.families : [] };
+    } catch { return { ids: [], families: [], unreadable: true }; }
   };
-  /** Revoke every token an agent holds here and forget its grant; how many were revoked. */
-  async function revokeAll(to) {
-    const { ids } = await heldBy(to);
+  /**
+   * Revoke every token an agent holds here and forget its grant; how many were revoked. When its record cannot be
+   * read, every token this node issued to that agent is revoked (fail closed).
+   */
+  async function revokeAll(to, { keep = [] } = {}) {
+    const held = await heldBy(to);
+    const ids = held.unreadable ? (await tokenRegistry.idsIssuedTo(to)).filter((id) => !keep.includes(id)) : held.ids;
     for (const id of ids) await tokenRegistry.revoke(id);
     if (typeof vault.delete === 'function') await vault.delete(heldKey(to));
     else await vault.set(heldKey(to), 'null');
@@ -109,7 +121,7 @@ export function createNodeGrants({ identity, agent, tokenRegistry, vault, onRevo
         tokens.push(token);
       }
       // one live grant per agent: what it held before stops working now
-      await revokeAll(to);
+      await revokeAll(to, { keep: tokens.map((t) => t.id) });
       const granted = [...new Set(families)].sort();
       await vault.set(heldKey(to), JSON.stringify({ ids: tokens.map((t) => t.id), families: granted }));
       return { ok: true, ops, delivery: await deliver(to, tokens) };
@@ -134,8 +146,10 @@ export function createNodeGrants({ identity, agent, tokenRegistry, vault, onRevo
       const out = [];
       for (const k of keys) {
         const to = k.slice(HELD.length);
-        const { ids, families } = await heldBy(to);
-        if (ids.length) out.push({ to, families });
+        const { ids, families, unreadable } = await heldBy(to);
+        // a record that cannot be read may still stand for live tokens: listed, so the owner can revoke it
+        if (unreadable) out.push({ to, families: [], unreadable: true });
+        else if (ids.length) out.push({ to, families });
       }
       return out.sort((a, b) => a.to.localeCompare(b.to));
     },

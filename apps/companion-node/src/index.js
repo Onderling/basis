@@ -905,6 +905,8 @@ export async function startCompanionNode(opts = {}) {
     management,
     /** The owner root's pubKey once claimed (null while unclaimed, or when management is off). */
     get managementOwnerRoot() { return management ? mgmtOwner() : null; },
+    /** An owner record is there but cannot be read: nothing is claimable or managed until the operator mends it. */
+    get managementOwnerUnreadable() { return Boolean(management && ownerClaim?.unreadable()); },
     /** The code to claim this node with, or null once it has an owner (or when management is off). */
     claimCode: () => ownerClaim?.code() ?? null,
     /** What the owner pastes into their app: `<code>@<node address>`, or null once owned. */

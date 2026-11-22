@@ -7,7 +7,7 @@
  * statement does not. The code works once, lasts ten minutes, and is burnt after a few wrong tries. Over a REAL relay.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Agent, AgentIdentity, Parts, Bootstrap, signDeviceRevocation } from '@onderling/core';
@@ -15,7 +15,7 @@ import { ownerDevice } from './support/ownerDevice.js';
 import { VaultMemory } from '@onderling/vault';
 import { RelayTransport } from '@onderling/transports';
 import { startCompanionNode } from '../src/index.js';
-import { createOwnerClaim, CLAIM_TTL_MS, CLAIM_MAX_TRIES } from '../src/ownerClaim.js';
+import { createOwnerClaim, ownerFile, CLAIM_TTL_MS, CLAIM_MAX_TRIES } from '../src/ownerClaim.js';
 
 const cleanups = [];
 afterEach(async () => { while (cleanups.length) { try { await cleanups.pop()(); } catch { /* best-effort */ } } });
@@ -155,6 +155,33 @@ describe('the claim code', () => {
     const fresh = createOwnerClaim({ load: () => null, save: () => {}, now: () => 0 });
     expect(fresh.claim({ code: fresh.code(), root: '' }).ok).toBe(false);
     expect(fresh.claim({ root: 'ann' }).ok).toBe(false);
+  });
+
+  it('an owner record that is there but cannot be read is NOT unclaimed: no code is minted, every claim is refused', () => {
+    for (const load of [() => { throw new Error('bad json'); }, () => ({ owner: 'from a newer build' }), () => 'garbage']) {
+      const saved = [];
+      const codes = [];
+      const claim = createOwnerClaim({ load, save: (o) => { saved.push(o); }, now: () => 0, onCode: (c) => codes.push(c) });
+      expect(claim.unreadable()).toBe(true);
+      expect(claim.owner()).toBeNull();
+      expect(claim.code()).toBeNull();
+      expect(claim.claim({ code: 'ANYC-ODE', root: 'eve' })).toEqual({ ok: false, error: 'owner-unreadable' });
+      expect(saved).toEqual([]);
+      expect(codes).toEqual([]);
+    }
+  });
+
+  it('over the file: a missing owner.json is unclaimed; a damaged one refuses the claim and is left as it was', async () => {
+    const dir = configDir();
+    expect(ownerFile(join(dir, 'owner.json')).load()).toBeNull();
+    writeFileSync(join(dir, 'owner.json'), '{"root": "ann", "revok');
+    const n = await node(dir);
+    expect(n.claimCode()).toBeNull();
+    expect(n.managementOwnerRoot).toBeNull();
+    expect(n.managementOwnerUnreadable).toBe(true);   // the boot banner says LOCKED, not "unclaimed"
+    const stranger = await device(n, eve, 'eve-phone');
+    expect((await stranger.ask('manage.claimOwner', { code: 'ANYC-ODE' })).res).toEqual({ ok: false, error: 'owner-unreadable' });
+    expect(readFileSync(join(dir, 'owner.json'), 'utf8')).toBe('{"root": "ann", "revok');
   });
 });
 

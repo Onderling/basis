@@ -137,11 +137,15 @@ export function backendSnapshotIo(backend, ref = REF) {
   // STORED AS TEXT, NOT AS BYTES (ledger L619): every backend keeps a string as it is (the sealing backend's string tag
   // round-trips it). Written as TextEncoder bytes, a segment was spelled out as base64 by the sealing backend and read
   // back through base64 and the phone's TextDecoder, a JavaScript polyfill: ~1.9 s of a cold start for a 2 MB log on
-  // the seeded Samsung. A row written as bytes before this still reads (the decode below) and is text from its next save.
+  // the seeded Samsung. A row written as bytes before this still reads (the decode below), and the next save writes it
+  // again as text even when its content did not change, so the cost is paid once.
+  const readAsBytes = new Set();
   const readText = async (key) => {
     const rec = await backend.get(key);
     if (!rec || rec.bytes == null) return null;
-    return typeof rec.bytes === 'string' ? rec.bytes : dec.decode(rec.bytes);
+    if (typeof rec.bytes === 'string') return rec.bytes;
+    readAsBytes.add(key);
+    return dec.decode(rec.bytes);
   };
   let known = null;   // the manifest as last written/read by THIS io: [{key, hash}] — the diff's left-hand side
   return {
@@ -158,7 +162,7 @@ export function backendSnapshotIo(backend, ref = REF) {
         try { out.push(...JSON.parse(t)); }
         catch (err) { console.warn(`[device-log] segment unreadable, skipped: ${seg.key} — ${err?.message ?? err}`); }
       }
-      known = parsed.segments.map((s) => ({ key: s.key, hash: s.hash }));
+      known = parsed.segments.map((s) => ({ key: s.key, hash: readAsBytes.has(s.key) ? null : s.hash }));   // a bytes row: rewritten as text
       out.reverse();   // the log's snapshot is newest-first
       return out;
     },

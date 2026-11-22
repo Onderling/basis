@@ -108,13 +108,12 @@ describe('the device log is stored as text', () => {
   it('a log written as bytes before this loads as it was, and its next save writes text', async () => {
     const be = memoryBackend();
     const enc = new TextEncoder();
-    const evs = events(5);
-    const seg = JSON.stringify([...evs].reverse());
-    be.rows.set('device-log/events.json/seg/0000', enc.encode(seg));
-    be.rows.set('device-log/events.json', enc.encode(JSON.stringify({ v: 1, segments: [{ key: 'device-log/events.json/seg/0000', hash: 'old' }], total: 5 })));
+    const evs = events(3000);
+    await backendSnapshotIo(be, 'device-log/events.json').save(evs);
+    for (const [k, v] of be.rows) be.rows.set(k, enc.encode(v));   // as an older build stored it: the same text, as bytes
     const io = backendSnapshotIo(be, 'device-log/events.json');
     expect(await io.load()).toEqual(evs);
-    await io.save(events(6));
-    for (const [, v] of be.rows) expect(typeof v).toBe('string');
+    await io.save(evs);   // the SAME log: an unchanged segment read as bytes is still written again, as text
+    for (const [k, v] of be.rows) expect(typeof v, k).toBe('string');
   });
 });

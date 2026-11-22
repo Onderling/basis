@@ -55,6 +55,24 @@ export class TokenRegistry {
     return typeof tokenId === 'string' && tokenId !== '' && this.#vault.has(`token:${tokenId}`);
   }
 
+  /**
+   * The ids of every token held here whose subject is `subject`, whatever their state. The issuer's way to end ALL of
+   * an agent's tokens when its own note of which ones it issued cannot be read.
+   * @returns {Promise<string[]>}
+   */
+  async idsIssuedTo(subject) {
+    const keys = (await this.#vault.list()).filter(k => k.startsWith('token:'));
+    const ids = [];
+    for (const k of keys) {
+      const raw = await this.#vault.get(k);
+      if (!raw) continue;
+      let t;
+      try { t = CapabilityToken.fromJSON(raw); } catch { continue; }
+      if (t.subject === subject) ids.push(t.id);
+    }
+    return ids;
+  }
+
   /** Mark a token as locally revoked. */
   async revoke(tokenId) {
     await this.#vault.set(`revoked:${tokenId}`, '1');

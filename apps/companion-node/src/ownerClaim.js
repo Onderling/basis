@@ -36,10 +36,16 @@ const norm = (c) => String(c ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
  */
 export function createOwnerClaim({ load, save, now = Date.now, onCode = null } = {}) {
   let record = null;
+  // An owner record that is THERE but cannot be read (damaged, or written by a newer build) is not "unclaimed": read
+  // that way, the node would mint a claim code and the first stranger to hand it back would own it. Such a node
+  // refuses every claim and every management op until its operator puts the record right (or removes it on purpose).
+  let unreadable = false;
   try {
     const r = load?.();
-    if (r && typeof r.root === 'string' && r.root) record = { root: r.root, claimedAt: r.claimedAt ?? 0, revoked: Array.isArray(r.revoked) ? [...r.revoked] : [] };
-  } catch { record = null; }
+    if (r == null) record = null;
+    else if (typeof r === 'object' && typeof r.root === 'string' && r.root) record = { root: r.root, claimedAt: r.claimedAt ?? 0, revoked: Array.isArray(r.revoked) ? [...r.revoked] : [] };
+    else unreadable = true;
+  } catch { unreadable = true; }
   let current = null;   // { code, at, tries }
 
   const fresh = () => {
@@ -52,17 +58,20 @@ export function createOwnerClaim({ load, save, now = Date.now, onCode = null } =
   return {
     /** The owner root's pubKey, or null while unclaimed. */
     owner: () => record?.root ?? null,
-    /** The code to claim with — a fresh one when the last expired or was burnt — or null once owned. */
+    /** Is an owner record there that could not be read? Then nothing is claimable and nothing is managed. */
+    unreadable: () => unreadable,
+    /** The code to claim with — a fresh one when the last expired or was burnt — or null once owned (or unreadable). */
     code() {
-      if (record) return null;
+      if (record || unreadable) return null;
       return live() ? current.code : fresh();
     },
     /**
      * Claim the node for an owner root (the root the claiming device's delegation was VERIFIED to be signed by).
-     * @returns {{ok: true} | {ok: false, error: 'already-owned'|'invalid-code'|'no-root'}}
+     * @returns {{ok: true} | {ok: false, error: 'already-owned'|'owner-unreadable'|'invalid-code'|'no-root'}}
      */
     claim({ code, root } = {}) {
       if (record) return { ok: false, error: 'already-owned' };
+      if (unreadable) return { ok: false, error: 'owner-unreadable' };
       if (typeof root !== 'string' || !root) return { ok: false, error: 'no-root' };
       if (!live()) { current = null; return { ok: false, error: 'invalid-code' }; }
       if (!code || norm(code) !== norm(current.code)) {
@@ -88,8 +97,11 @@ export function createOwnerClaim({ load, save, now = Date.now, onCode = null } =
 /** The owner's record as a file in the node's config dir. */
 export function ownerFile(path) {
   return {
+    /** null when there is no file; a file that cannot be read or parsed THROWS (it is not "no owner"). */
     load() {
-      try { return JSON.parse(readFileSync(path, 'utf8')); } catch { return null; }
+      let text;
+      try { text = readFileSync(path, 'utf8'); } catch (e) { if (e?.code === 'ENOENT') return null; throw e; }
+      return JSON.parse(text);
     },
     save(record) {
       mkdirSync(dirname(path), { recursive: true });

@@ -2805,7 +2805,7 @@ Vault-backed store for CapabilityTokens received from peers ("held" tokens). `ge
 returns the latest-expiring valid token matching an agent+skill; `revoke()` marks a
 token locally revoked; `cleanup()` deletes expired tokens from the vault.
 
-**Methods:** `store()` · `get()` · `holds()` · `revoke()` · `isRevoked()` · `cleanup()`
+**Methods:** `store()` · `get()` · `holds()` · `idsIssuedTo()` · `revoke()` · `isRevoked()` · `cleanup()`
 
 ## `src/permissions/TrustRegistry.js`
 

@@ -227,6 +227,11 @@ const YOUNG_ADDRESS_RETRY_MS = param({ key: 'secureAgent.youngAddressRetryMs', s
 /** How many stale envelopes one bucket (a circle) may hold while its sender check is refreshed; the oldest goes first. */
 /** How long this device remembers WHICH relays took a message the sweep sent on several (`relayGaveUp`): as long as a
  *  relay may hold it (the relay's queue TTL; queueRetentionMatchesTheApp pins the two together). */
+// MOST PEERS the outbox holds anything for; past it the least-recently-queued peer's whole queue goes. Sized for the alpha
+// with room (five circles of fifteen are ~75 addresses, one per circle): at 64 a start that held for every absent member
+// evicted queues and the boot re-fan held their lines again, ~1350 holds and ~90 evictions in a start's first 40 s on the
+// seeded phone, each a write of the outbox. A held queue is small (one entry per line, 50 at most).
+const HOLD_MAX_PEERS = param({ key: 'secureAgent.holdMaxPeers', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 256 });
 const SWEPT_COPIES_TTL_MS = param({ key: 'secureAgent.sweptCopiesTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 24 * 60 * 60 * 1000 });
 /** How many such messages it remembers at once; the oldest goes first (then a give-up for it is reported as before). */
 const SWEPT_COPIES_MAX = param({ key: 'secureAgent.sweptCopiesMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1024 });
@@ -960,7 +965,7 @@ export async function createSecureAgent(opts = {}) {
   /** Most messages held for ONE peer; the oldest is dropped past this. */
   const holdMaxPerPeer = Number.isFinite(opts.holdMaxPerPeer) ? opts.holdMaxPerPeer : 50;
   /** Most PEERS we hold anything for; the least-recently-queued peer's queue goes first. */
-  const holdMaxPeers = Number.isFinite(opts.holdMaxPeers) ? opts.holdMaxPeers : 64;
+  const holdMaxPeers = Number.isFinite(opts.holdMaxPeers) ? opts.holdMaxPeers : HOLD_MAX_PEERS;
   /** Consecutive failed delivery attempts to one address before we stop attempting (0 = never stop). */
   const holdMaxDeliveryFailures = Number.isFinite(opts.holdMaxDeliveryFailures)
     ? opts.holdMaxDeliveryFailures : 3;

@@ -18,7 +18,8 @@ import { SCREEN_PAIRING_TTL_MS } from './screenDoor.js';
 import { createSecureAgent, makeBrowserVault } from '@onderling/secure-agent';
 
 /** The client's version: the page can say which one it was built against. */
-export const SCREEN_CLIENT_VERSION = '0.2.0';   // 0.2.0 (L1113): the link's one-use ticket goes back in the offer
+export const SCREEN_CLIENT_VERSION = '0.2.1';   // 0.2.1 (L1179): a page opened again without the link resumes from the kept bot address
+// 0.2.0 (L1113): the link's one-use ticket goes back in the offer
 
 /**
  * Every refusal's code. `grant-expired` is ONE code for a grant that ran out AND one that was taken away (`/schermen los`,
@@ -92,18 +93,36 @@ function prefixed(storage, prefix) {
 export function createScreenClient({ toolbox, bot, label = null, storage = globalThis.localStorage, makeAgent = null, createView = createScreenView, now = () => Date.now() } = {}) {
   if (typeof toolbox !== 'string' || !toolbox.trim()) throw new TypeError('createScreenClient: toolbox (its name) required');
   const name = toolbox.trim();
-  const start = parseScreenStartLink(String(bot ?? ''));
+  const linked = parseScreenStartLink(String(bot ?? ''));
   // the page was opened from the bot's link: its one-use ticket leaves the address bar once read (L1113), so a copied
   // or bookmarked address carries none; done here so no page author can forget it
   try {
     const loc = globalThis.location;
-    if (start.ok && start.ticket && loc && typeof loc.href === 'string' && loc.href === String(bot) && globalThis.history?.replaceState) {
+    if (linked.ok && linked.ticket && loc && typeof loc.href === 'string' && loc.href === String(bot) && globalThis.history?.replaceState) {
       globalThis.history.replaceState(null, '', `${loc.pathname}${loc.search}`);
     }
   } catch { /* an address that cannot be rewritten keeps its fragment; the ticket is one use either way */ }
   const keyPrefix = `onderling.screen.${name}.`;
   const vaultPrefix = `onderling-screen:${name}:`;
   const store = prefixed(storage, keyPrefix);
+  // THE BOT, KEPT (L1179): the link's fragment is cleared at once (its ticket is one use), so a reload, a bookmark or a
+  // browser restart opens the page without it. A granted pairing keeps the bot's ADDRESS (public: address, relay,
+  // name), never the ticket, under this toolbox's own prefix; a page opened without the link resumes from it. A link,
+  // when there is one, always wins; pairing still needs the link (the ticket is its alone).
+  const KEPT_BOT = 'bot';
+  const keptBot = () => {
+    try {
+      const d = JSON.parse(store.getItem(KEPT_BOT) ?? 'null');
+      return d && typeof d.botAddress === 'string' && d.botAddress
+        ? { ok: true, botAddress: d.botAddress, relayUrl: typeof d.relayUrl === 'string' ? d.relayUrl : null, botName: typeof d.botName === 'string' ? d.botName : null, ticket: null, fromKept: true }
+        : null;
+    } catch { return null; }
+  };
+  const start = linked.ok ? linked : (keptBot() ?? linked);
+  const keepBot = () => {
+    try { store.setItem(KEPT_BOT, JSON.stringify({ botAddress: start.botAddress, ...(start.relayUrl ? { relayUrl: start.relayUrl } : {}), ...(start.botName ? { botName: start.botName } : {}) })); }
+    catch { /* a storage that refuses: the next visit pairs again, as before */ }
+  };
   // made when a pairing or a resume starts, never at import: the key lives under this toolbox's own name
   const agentFor = makeAgent ?? (async () => createSecureAgent({ vault: makeBrowserVault(vaultPrefix), transportMode: 'relay', warnOnInsecure: false }));
   const makeAgentNow = () => agentFor({ vaultPrefix });
@@ -158,6 +177,7 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
       try {
         const ok = await viewFor('resume').resume();
         if (!ok) { setState('not-paired'); return { ok: false, code: 'not-paired' }; }
+        if (!start.fromKept) keepBot();   // a page paired before this version keeps its bot at its next resume from the link
         setState('connected');
         return { ok: true };
       } catch (e) { setState('broken'); return { ok: false, code: screenClientCode(e) }; }
@@ -169,7 +189,7 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
      * when the ten minutes end.
      */
     async startPairing() {
-      if (!start.ok) throw Object.assign(new Error('createScreenClient: bot is not a screen start link'), { code: 'not-paired' });
+      if (!start.ok || start.fromKept) throw Object.assign(new Error('createScreenClient: bot is not a screen start link'), { code: 'not-paired' });
       view = null;
       // the ticket of the link `/scherm <toolbox>` sent (L1113): handed back in the offer; a link without one cannot pair
       const r = await viewFor('pair').connect({ label: label ?? name, toolbox: name, ...(start.ticket ? { ticket: start.ticket } : {}) });
@@ -184,7 +204,7 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
         view.granted().then(() => 'granted', (e) => (/refused/.test(String(e?.message)) ? 'refused' : 'expired')),
         aborted,
       ]);
-      if (outcome === 'granted') setState('connected');
+      if (outcome === 'granted') { keepBot(); setState('connected'); }
       return outcome;
     },
 

@@ -14,7 +14,7 @@ test('typing in the "+" offers lines it reads here; a tap puts one in the line',
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   const line = page.locator('.circle-vandaag-plus__line');
   // the pool is read once the sheet is open (the circles' offers are asynchronous): type once it has had a moment
   await page.waitForTimeout(1500);

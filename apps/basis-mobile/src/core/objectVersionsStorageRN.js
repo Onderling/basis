@@ -38,7 +38,7 @@ export const VERSIONS_AS_SCOPE = 'ccv';
 export function asyncStorageObjectVersions(storeName, storage, retention) {
   return createObjectVersionsAdapter({
     storeName,
-    backend: sealedLocalBackend(createAsBackend({ AsyncStorage: storage, scope: VERSIONS_AS_SCOPE })),
+    backend: sealedLocalBackend(createAsBackend({ AsyncStorage: storage, scope: VERSIONS_AS_SCOPE }), { scope: VERSIONS_AS_SCOPE }),
     retention,
   });
 }

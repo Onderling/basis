@@ -63,8 +63,7 @@ test('once seen, the introduction opens again from Settings (its door beside Hel
   await openOnboardingStrip(page);
   await introCard(page).locator('.circle-screen__onb-btn--ghost').click();   // "Begrepen": the card is gone for good
   await expect(introCard(page)).toHaveCount(0);
-  await page.locator('[data-tab="mij"]').first().click();
-  await page.locator('.cc-profile__gear').click();
+  await page.locator('.cc-persona-button__settings').click();
   await page.locator('.cc-settings__door-row--intro').click();
   await expect(page.locator('.circle-intro')).toHaveAttribute('data-card', 'welcome');
 });

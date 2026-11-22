@@ -24,9 +24,10 @@ import { contactIdFor } from '../core/handlers/threadedChat.js';
 export async function replyToPost({ callSkill, contactChannel = null, notePeer = null, identityOf = null, itemId, body } = {}) {
   if (typeof callSkill !== 'function') throw new Error('replyToPost: callSkill required');
   let r;
-  try { r = await callSkill('pinboard', 'respondToItem', { itemId, body }); }
+  // a person's reply is a tap: it names its door, so the circle's capability set is asked at the waist (L1042)
+  try { r = await callSkill('pinboard', 'respondToItem', { itemId, body }, { door: 'tap' }); }
   catch (err) { return { ok: false, error: err?.message ?? String(err) }; }
-  if (!r || r.error || r.ok === false) return { ok: false, error: r?.error ?? 'reply-failed' };
+  if (!r || r.error || r.ok === false) return { ok: false, error: r?.error ?? 'reply-failed', ...(r?.refusal ? { refusal: r.refusal } : {}) };
   const addr = typeof r.toPubKey === 'string' && r.toPubKey ? r.toPubKey : null;
   const toPubKey = addr ? contactIdFor(identityOf, addr) : null;
   // Answering a post makes the poster a KNOWN PEER — the same first-DM rule a received file follows.

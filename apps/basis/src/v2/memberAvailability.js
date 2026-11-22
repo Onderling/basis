@@ -7,6 +7,7 @@
  * the actual push-suppression into the notifier. Extends the existing
  * holiday-mode skill conceptually; here it's the v2 settings record.
  */
+import { sealedKeyValue } from './localStoreSeal.js';
 
 export const DEFAULT_AVAILABILITY = {
   holiday:    { active: false, until: null },           // until: ISO date string | null
@@ -101,15 +102,20 @@ export function createAvailabilityStore({ load, save } = {}) {
   };
 }
 
-/** localStorage-backed load/save for availability. Key: `cc.availability`. */
+/**
+ * load/save for availability, SEALED at rest (ledger L1083: the person's away windows), key `cc.availability`, over
+ * localStorage (web) or AsyncStorage (phone). A read before the content key WAITS for it: "no availability" read too
+ * early would let a match go to someone who is away.
+ */
 export function localStorageAvailabilityIo(storage = globalThis.localStorage) {
   const KEY = 'cc.availability';
+  const kv = sealedKeyValue(storage, { name: 'the availability', strict: true, waitForKey: true, said: true, resealAtStart: [KEY] });
   return {
     load: async () => {
-      try { const s = storage?.getItem(KEY); return s ? JSON.parse(s) : null; } catch { return null; }
+      try { const s = await kv.getItem(KEY); return s ? JSON.parse(s) : null; } catch { return null; }
     },
     save: async (a) => {
-      try { storage?.setItem(KEY, JSON.stringify(a)); } catch { /* ignore */ }
+      try { await kv.setItem(KEY, JSON.stringify(a)); } catch { /* ignore: quota, or no content key yet */ }
     },
   };
 }

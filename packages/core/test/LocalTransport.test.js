@@ -23,7 +23,7 @@ function startServer() {
   const wss     = new WebSocketServer({ port: 0 });
   const clients = new Map();
 
-  wss.on('connection', ws => {
+  wss.on('connection', (ws, req) => {
     let addr = null;
     const open = new Map();               // nonce → address, single use
     ws.on('message', raw => {
@@ -36,7 +36,7 @@ function startServer() {
         return;
       }
       if (msg.type === 'register-proof') {
-        if (open.get(msg.nonce) !== msg.address || !verifyAddressPossession(msg)) {
+        if (open.get(msg.nonce) !== msg.address || !verifyAddressPossession({ ...msg, isOwnRelayName: (n) => n === req?.headers?.host })) {
           ws.send(JSON.stringify({ type: 'error', message: 'PROOF_INVALID' }));
           return;
         }

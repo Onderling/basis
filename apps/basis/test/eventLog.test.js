@@ -523,3 +523,17 @@ describe('dropKind: the person wipes one kind of their own record', () => {
     expect(saved.at(-1), 'the shrunk log is persisted').toBe(2);
   });
 });
+
+describe('a settings change is a record inside the audit lane (the content line needs the whole settings history)', () => {
+  it('past the audit window a governance policy-update is KEPT; a vote on the same lane still compacts', () => {
+    let clock = 0;
+    const log = new EventLog({ now: () => clock, retention: { short: 500, chat: 1000, audit: 2000 } });
+    log.append(ev({ id: 'governance:p1', ts: 0, app: 'system', type: 'governance', circleId: 'c1', actor: 'anna', payload: { body: { kind: 'policy-update', hash: 'p1' } } }));
+    log.append(ev({ id: 'governance:v1', ts: 10, app: 'system', type: 'governance', circleId: 'c1', actor: 'bram', payload: { body: { kind: 'vote', hash: 'v1' } } }));
+    clock = 3000;
+    log.prune();
+    const ids = log.query().map((e) => e.id);
+    expect(ids).toContain('governance:p1');
+    expect(ids).not.toContain('governance:v1');
+  });
+});

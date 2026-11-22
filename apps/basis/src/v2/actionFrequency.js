@@ -41,6 +41,7 @@
  * @returns {ActionFrequencyStore}
  */
 import { featureActionLabelKey } from './circleTabs.js';
+import { sealedKeyValue } from './localStoreSeal.js';
 
 export function createActionFrequencyStore(initial = {}, { onChange } = {}) {
   /** @type {Map<string, Map<string, number>>} */
@@ -81,6 +82,23 @@ export function createActionFrequencyStore(initial = {}, { onChange } = {}) {
   }
 
   return {
+    /**
+     * Add a stored snapshot's counts WITHOUT persisting (ledger L1083: the snapshot is sealed, so it is read once the
+     * content key exists, after the store has started; adding what was read is not a change to write back).
+     */
+    merge(stored) {
+      if (!stored || typeof stored !== 'object') return;
+      let changed = false;
+      for (const [circleId, counts] of Object.entries(stored)) {
+        if (!circleId || !counts || typeof counts !== 'object') continue;
+        const inner = map.get(circleId) ?? new Map();
+        for (const [k, v] of Object.entries(counts)) {
+          if (typeof v === 'number' && Number.isFinite(v) && v > 0) { inner.set(k, (inner.get(k) ?? 0) + (v | 0)); changed = true; }
+        }
+        if (inner.size) map.set(circleId, inner);
+      }
+      if (changed) for (const fn of subs) { try { fn(snapshot()); } catch { /* swallow one bad listener */ } }
+    },
     /** Forget every count (My data's "clear"): the host persists the empty snapshot through `onChange`. */
     clear() {
       if (!map.size) return;
@@ -138,4 +156,20 @@ export function usageRows(snap, { names = {}, t = (k) => k, labelOf = null } = {
     if (items.length) rows.push({ circleId, name: names[circleId], items });
   }
   return rows;
+}
+
+/** Where the snapshot is kept on a device. */
+export const ACTION_FREQ_KEY = 'cc.actionFrequency';
+
+/**
+ * The action-frequency snapshot's io, SEALED at rest (ledger L1083: which ops the person uses), over localStorage (web)
+ * or AsyncStorage (phone). `load()` is "not readable yet" (null) before the content key; the shells read it once the
+ * key exists (`onShellContentSeal`) and `merge` it in, and `save` is refused until then.
+ */
+export function actionFrequencyIo(storage) {
+  const kv = sealedKeyValue(storage, { name: 'the action frequency', strict: true, resealAtStart: [ACTION_FREQ_KEY] });
+  return {
+    load: async () => { try { const s = await kv.getItem(ACTION_FREQ_KEY); return s ? JSON.parse(s) : null; } catch { return null; } },
+    save: async (snap) => { try { await kv.setItem(ACTION_FREQ_KEY, JSON.stringify(snap)); } catch { /* no content key yet */ } },
+  };
 }

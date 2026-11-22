@@ -24,7 +24,7 @@ function fakeEventLog() {
   const entries = []; const byId = new Set();
   return {
     entries,
-    query() { return entries.slice(); },
+    query() { return entries.slice().reverse(); },   // newest-first, as the device log reads
     appendSilentEntry({ circleId, kind, payload, id, ts }) {
       if (byId.has(id)) return entries.find((e) => e.id === id);
       byId.add(id);
@@ -290,6 +290,7 @@ describe('the items lane — snapshots on the device log, heads causally merged'
     const pull = makeFrontierReplay({
       rail: cato.rail, sendToPeer: () => {}, subtypes: ITEMS_CATCHUP_SUBTYPES,
     });
+    await pull.requestFrom('peer:ada', CIRCLE);                         // cato asks: what ada SERVES is taken only then
     await serve.onRequest('peer:cato', {
       subtype: ITEMS_CATCHUP_SUBTYPES.request, circleId: CIRCLE,
       frontier: pull.localFrontier(CIRCLE),                             // cato's (empty) head set

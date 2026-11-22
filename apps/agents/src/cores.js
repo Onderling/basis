@@ -747,6 +747,32 @@ export async function getPersonaView(store, args = {}) {
 }
 
 /**
+ * setPlusCeiling — how far the person's own "+" goes for a persona (0 hidden · 1 looks things up · 2 also the person's
+ * own things · 3 also a circle's after their yes on a card). Its own collaborator writes it: the key is the registry's
+ * (reserved), so the person-facing property op refuses it, and this op weighs as the person's control, which the "+"
+ * never offers.
+ */
+export async function setPlusCeiling(store, args = {}) {
+  const s = asStore(store);
+  const id = typeof args?.id === 'string' ? args.id.trim() : '';
+  const ceiling = args?.ceiling;
+  if (typeof s.profiles?.setPlusCeiling !== 'function' || !id) return { ok: false, reason: !id ? 'id-required' : 'profiles-unavailable' };
+  if (![0, 1, 2, 3].includes(ceiling)) return { ok: false, reason: 'invalid-ceiling', id };
+  const r = await s.profiles.setPlusCeiling({ profileId: id, ceiling });
+  if (r && r.ok === false) return { ok: false, reason: r.reason ?? 'refused', id };
+  return { ok: true, id, ceiling };
+}
+
+/** getPlusCeiling — the ceiling as it holds for a persona: its own, else the default persona's, else 3. */
+export async function getPlusCeiling(store, args = {}) {
+  const s = asStore(store);
+  const id = typeof args?.id === 'string' ? args.id.trim() : '';
+  if (typeof s.profiles?.plusCeilingOf !== 'function' || !id) return { ok: false, reason: !id ? 'id-required' : 'profiles-unavailable', ceiling: 3 };
+  const c = await s.profiles.plusCeilingOf({ profileId: id });
+  return { ok: true, id, ceiling: [0, 1, 2, 3].includes(c) ? c : 3 };
+}
+
+/**
  * getPersonaRelease — what this persona would SHARE in a context (circle): its disclosure over its effective
  * (own + inherited) properties → the coarse {key:value}. The join-with-persona flow releases exactly this.
  */
@@ -767,6 +793,8 @@ export const AGENT_CORES = Object.freeze({
   viewAgent,
   createProfile,
   setProfileProperty,
+  setPlusCeiling,
+  getPlusCeiling,
   getProfileProperties,
   setProfileDriver,
   getProfileDrivers,

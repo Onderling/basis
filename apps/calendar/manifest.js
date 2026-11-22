@@ -54,7 +54,7 @@ export const calendarManifest = {
     {
       id:    'addEvent', visibility: 'authenticated', group: 'compose',
       verb:  'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'calendar-event' },
       // v0.7.-followup 2026-05-23 (3rd pass): renamed startsAt →
       // 'when' for slash-arg ergonomics.  User-typed
@@ -131,7 +131,7 @@ export const calendarManifest = {
     {
       id:    'rsvpAccept', visibility: 'authenticated',
       verb:  'claim',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       // Receiver-only: appears on open events the viewer is invited to.
       appliesTo: { type: 'calendar-event', state: ['open'] },
       params: [
@@ -152,7 +152,7 @@ export const calendarManifest = {
     {
       id:    'rsvpDecline', visibility: 'authenticated',
       verb:  'reject',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'calendar-event', state: ['open'] },
       params: [
         { name: 'id', kind: 'string', required: true,
@@ -171,7 +171,7 @@ export const calendarManifest = {
     {
       id:    'rsvpTentative', visibility: 'authenticated',
       verb:  'submit',     // approximate; ItemStore.submit is the closest contract
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'calendar-event', state: ['open'] },
       params: [
         { name: 'id', kind: 'string', required: true,
@@ -191,7 +191,7 @@ export const calendarManifest = {
       id:    'cancelEvent', visibility: 'authenticated',
       scopes: ['circle', 'own'],
       verb:  'remove',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'calendar-event', state: ['open'] },
       params: [
         { name: 'id', kind: 'string', required: true,
@@ -215,7 +215,7 @@ export const calendarManifest = {
       id:    'updateEvent', visibility: 'authenticated',
       scopes: ['circle', 'own'],
       verb:  'edit',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       // a person's words and moment, like an entry's edited text: the newer change wins
       resolves: [{ field: 'title', policy: 'content' }, { field: 'startsAt', policy: 'content' }],
       appliesTo: { type: 'calendar-event', state: ['open'] },
@@ -236,7 +236,7 @@ export const calendarManifest = {
       id:    'shareEvent', visibility: 'authenticated',
       scopes: ['circle', 'own'],
       verb:  'share',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'calendar-event', state: ['open'] },
       params: [
         { name: 'id',   kind: 'string', required: true, pickerSource: { listOp: 'listEvents' } },

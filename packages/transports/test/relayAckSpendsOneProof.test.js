@@ -23,7 +23,7 @@ async function waitFor(pred, ms = 3_000) {
 function holdingRelay() {
   const wss = new WebSocketServer({ port: 0 });
   const state = { registers: [], proofs: [], held: [], ws: null, own: null };
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
     state.ws = ws;
     const open = new Map();
     ws.on('message', (raw) => {
@@ -36,7 +36,7 @@ function holdingRelay() {
       }
       if (msg.type === 'register-proof') {
         const address = open.get(msg.nonce); open.delete(msg.nonce);
-        if (address !== msg.address || !verifyAddressPossession(msg)) return;
+        if (address !== msg.address || !verifyAddressPossession({ ...msg, isOwnRelayName: (n) => n === req?.headers?.host })) return;
         state.proofs.push(address);
         if (!state.own) { state.own = address; ws.send(JSON.stringify({ type: 'registered', address })); return; }
         state.held.push(address);

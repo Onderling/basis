@@ -38,7 +38,7 @@ describe('share my contact — parity', () => {
     expect(webHost).toMatch(/contactCardFromLink\(window\.location\.hash\)/);
     expect(mobileClassifier).toMatch(/contactCardFromLink\(/);
   });
-  it('Mij offers it on both shells under the same key; both panels speak the same keys', () => {
+  it('the persona panel offers it on both shells under the same key; both panels speak the same keys', () => {
     // Both Me screens paint the DECLARED row (manifest `meActions`), so they agree by construction; what is pinned is
     // the agreement — both read the projection, and the row's key resolves in both languages.
     expect(webProfile).toMatch(/meActionsFor\(basisManifest\)/);
@@ -49,7 +49,7 @@ describe('share my contact — parity', () => {
     for (const key of ['title', 'hint', 'code_label', 'link_label', 'error']) {
       for (const src of [webPanel, mobileScreen]) expect(src, key).toMatch(new RegExp(`circle\\.shareContact\\.${key}`));
     }
-    // …and both go back with the one key every screen under Me uses
-    for (const src of [webPanel, mobileScreen]) expect(src).toMatch(/circle\.back_me/);
+    // …and both go back to the tab they were opened from, named by it
+    for (const src of [webPanel, mobileScreen]) expect(src).toMatch(/circle\.back_to/);
   });
 });

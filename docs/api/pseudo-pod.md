@@ -116,7 +116,7 @@ option for the chosen mode is missing or invalid. Per-option detail: the `@param
 **Kind:** function · **Import:** `createSealingBackend` from `'@onderling/pseudo-pod'`
 
 ```js
-createSealingBackend({ backend, getStrategy, onWarn = null } = {})
+createSealingBackend({ backend, getStrategy, onWarn = null, markScope = null, bindName = null } = {})
 ```
 
 Wrap a StorageBackend so everything written through it is sealed.
@@ -137,6 +137,8 @@ phrase. put/get are already async, so the first call is the natural moment to as
 - `a.backend` `object` — the real store underneath
 - `a.getStrategy` `() => ({seal:Function, open:Function}|null|Promise<{seal:Function, open:Function}|null>)` — resolves this device's content-seal strategy, or null while none is available (no identity yet).
 - `[a.onWarn]` `(msg: string, err?: unknown) => void` — where an unopenable value is reported.
+- `[a.markScope]` `string` — the storage's own name, so the refusal outlives a new wrapper over the same storage
+- `[a.bindName]` `string` — the name sealed into each row (default `markScope`): stable across a moved folder
 
 **Returns:** `object` — the same port, sealed
 

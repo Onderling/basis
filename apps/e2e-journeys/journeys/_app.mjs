@@ -105,7 +105,7 @@ const mediumFor = (label, pod, circleId) => (id) => (id === circleId
 const laneLog = (node) => node.deviceLog ?? node.chatEventLog;
 
 /** Register the receive halves a shell registers, so fanned lane statements actually land. */
-function wireLanes(node) {
+export function wireLanes(node) {
   const inner = node._routerRef.fn;
   // GOVERNANCE — the rail a fanned decision statement must verify at before it lands, plus the
   // pull-all catch-up. Built here rather than per journey because the shells build it once per boot.
@@ -202,14 +202,7 @@ function wireLanes(node) {
  * @returns {Promise<{people: object[], admin: object, outsiders: object[], circleId: string, pod: object|null, close: () => Promise<void>}>}
  */
 export async function bootAppCircle({ relayUrl, circleId, handles, pod = null, outsiders = [] }) {
-  const people = await Promise.all(
-    [...handles, ...outsiders].map((h) => bootRealAgentNode(h, {
-      itemsLane: true,                                              // composes the DEVICE LOG
-      ...(pod ? { agentOpts: { provisionCircleMedium: mediumFor(h, pod, circleId) } } : {}),
-    })),
-  );
-  await connectNodesOverRelay(people, { relayUrl });
-  for (const n of people) wireLanes(n);
+  const people = await bootPeople({ relayUrl, handles: [...handles, ...outsiders], pod, circleId });
 
   const guests = people.slice(handles.length);   // on the relay, deliberately not in the circle
   const members = people.slice(0, handles.length);
@@ -237,6 +230,34 @@ export async function bootAppCircle({ relayUrl, circleId, handles, pod = null, o
     people: members, admin, outsiders: guests, circleId, pod,
     close: () => teardown(...people),
   };
+}
+
+/**
+ * Boot people the way a shell composes a device (the device log on, the lane receivers a shell registers), on one
+ * relay. `bootAppCircle` builds its circle on these; a script that makes several circles out of the same people
+ * (`seed-alpha-size.mjs`) starts here too.
+ * @param {{relayUrl: string, handles: string[], pod?: object|null, circleId?: string, onUndelivered?: (handle: string, info: object) => void}} a
+ */
+export async function bootPeople({ relayUrl, handles, pod = null, circleId = null, onUndelivered = null, agentOptsFor = null }) {
+  const people = await Promise.all(
+    handles.map((h) => {
+      // a shell hands its give-up consumers to the secure agent (`makeGiveUpConsumers`); a script that counts what the
+      // relay gave up on hears it here, per sender. `agentOptsFor(handle)`: what a shell keeps on its disk for one person
+      // (the vaults, the stores, the device log), so a test can restart that person on the same disk
+      const agentOpts = {
+        ...(typeof agentOptsFor === 'function' ? (agentOptsFor(h) ?? {}) : {}),
+        ...(pod ? { provisionCircleMedium: mediumFor(h, pod, circleId) } : {}),
+        ...(typeof onUndelivered === 'function' ? { secureAgentOpts: { onUndelivered: (info) => onUndelivered(h, info) } } : {}),
+      };
+      return bootRealAgentNode(h, {
+        itemsLane: true,                                              // composes the DEVICE LOG
+        ...(Object.keys(agentOpts).length ? { agentOpts } : {}),
+      });
+    }),
+  );
+  await connectNodesOverRelay(people, { relayUrl });
+  for (const n of people) wireLanes(n);
+  return people;
 }
 
 /** Send a circle chat message the way a shell does: append the signed render entry AND fan the

@@ -200,11 +200,12 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
       const { screenNonce: _n, ...rest } = rowOf(id);
       return save(nonce ? { ...rest, screenNonce: { hash: nonce.hash, until: nonce.until } } : rest);
     },
-    /** A screen's offer waiting for this person's yes: `{viewPubKey, nonce, label, until}`, or null. */
+    /** A screen's offer waiting for this person's yes: `{viewPubKey, nonce, label, toolbox?, until}`, or null. */
     screenOfferOf: (id) => rows.get(id)?.screenOffer ?? null,
     setScreenOffer(id, offer) {
       const { screenOffer: _o, ...rest } = rowOf(id);
-      return save(offer ? { ...rest, screenOffer: { viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label ?? null, until: offer.until } } : rest);
+      // a toolbox's page names its toolbox: kept with the offer so the grant is for that toolbox only (L1049)
+      return save(offer ? { ...rest, screenOffer: { viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label ?? null, ...(offer.toolbox ? { toolbox: String(offer.toolbox) } : {}), until: offer.until } } : rest);
     },
     /** The key of the person's screen opened inside Telegram (one per person: a new launch replaces it), or null. */
     telegramScreenOf: (id) => rows.get(id)?.telegramScreen ?? null,

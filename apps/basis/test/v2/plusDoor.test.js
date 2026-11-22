@@ -25,6 +25,9 @@ const door = (over = {}) => {
   const d = createPlusDoor({
     llm: { invoke: async () => null }, interpret: async () => null, threads: threadsOf(), threadId: 'own:me', t, lang: 'nl',
     circles: async () => [], ownListsOf: async () => [], callSkill, ...over,
+    // the shell's own read of the "+"'s ceiling answers as the real op does when nothing is said (3); the reads these
+    // tests fake are the person's own things. A failed ceiling read is pinned in plusCeiling.test.js
+    ...(over.readAs && !over.ceilingOf ? { ceilingOf: async () => 3 } : {}),
   });
   return { d, callSkill };
 };
@@ -88,6 +91,15 @@ it('a circle act the plain reading runs at once answers with what the run said, 
   expect(runInCircle).toHaveBeenCalledTimes(1);
   expect(r).toEqual({ done: 'melk staat op Boodschappen' });
   expect(threads.memory.recent('own:me').at(-1)).toContain('melk staat op Boodschappen');
+});
+
+it('a line with a pairing offer or a screen start link is remembered with their bodies cut, never as typed', async () => {
+  const threads = threadsOf();
+  const { d } = door({ threads });
+  await d.read('koppel onderling-connect://SECRETticket123 en #scherm-nieuw=SECRETstart456');
+  const kept = threads.memory.recent('own:me').join(' ');
+  expect(kept).toContain('onderling-connect://…');
+  expect(kept).not.toMatch(/SECRETticket123|SECRETstart456/);
 });
 
 describe('a model\'s proposal never widens the "+"', () => {

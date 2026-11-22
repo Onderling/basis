@@ -21,7 +21,7 @@ import { makeSiblingCarry } from './siblingCarry.js';
 import { mergeProfileFacts } from '@onderling/agent-registry';
 
 export const PROFILE_FACTS_CARRY = 'device-profile-facts';
-export const PROFILE_FACTS_CATCHUP_SUBTYPES = Object.freeze({ request: 'device-profile-facts-request' });
+export const PROFILE_FACTS_CATCHUP_SUBTYPES = Object.freeze({ request: 'device-profile-facts-catchup-request' });
 
 const validFacts = (p) => p && typeof p === 'object' && Number.isFinite(p.factsAt)
   && p.properties && typeof p.properties === 'object' && !Array.isArray(p.properties)

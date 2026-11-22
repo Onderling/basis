@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 81
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 85
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -21,6 +21,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `branch-hygiene` | — | the trunk and the release branch move by MERGE, not by commits typed on them |
 | `browser-specs-assert` | — | every spec in apps/basis/test-browser/ asserts something |
 | `callskill-literals` | — | a literal `callSkill('group', 'op')` must name an op some manifest declares |
+| `capability-rows` | — | every op is gated by a capability row (ledger L1040 / L1042) |
 | `carrying` | — | the carrying index held to the code (`carrying.mjs`): every server route and store is declared with |
 | `catalogue-ops` | — | every op in every app manifest is named on exactly ONE page of the functionality catalogue |
 | `chat-hints-localised` | — | every op the household assistant can be asked for has a Dutch hint |
@@ -58,8 +59,10 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `no-relay-literal` | — | the public relay's domain appears nowhere in the tree |
 | `no-relay-word` | — | THE WORD "RELAY" IS NOT SHOWN TO A PERSON |
 | `one-scan-loop` | — | a scanned text is classified by ONE first-match loop (`packages/qr`, `classifyQrPayload`) |
+| `one-secretbox` | — | every secretbox (XSalsa20-Poly1305) seal and open this code makes goes through ONE port |
 | `one-sibling-carry` | — | a person's own devices are reached by ONE carry (`apps/basis/src/v2/siblingCarry.js`) |
 | `one-signature-check` | — | every Ed25519 signature check in shipped code goes through ONE function, |
+| `one-signing` | — | every Ed25519 signature this code MAKES, and every key pair it derives from a seed, goes through |
 | `one-store-per-circle` | — | a circle owns ONE store, so a type cannot reach a peer some other way |
 | `op-descriptions` | — | every op, and every op parameter, is described in words a PERSON reads, in both languages, in |
 | `op-owners` | — | one owner per op. The op ids two or more composed manifests BOTH declare are a baseline that only |
@@ -74,6 +77,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `screen-pairing-door` | — | a shell reaches a screen's grant only through the shared pairing, never by itself |
 | `screen-sections` | — | a hand-painted screen whose sections are DECLARED (`apps/basis/src/v2/screenSections.js`) is |
 | `sealed-at-rest` | — | every local store a shell builds is sealed on the way to disk |
+| `sealed-key-value` | — | the KEY-VALUE writes of the shells, the sibling of lint-sealed-at-rest (ledger L1081) |
 | `searchable-sources` | — | every source file must be findable by search |
 | `sheet-cap` | — | A PHONE SHEET IS CAPPED IN WINDOW PIXELS, NEVER A PERCENTAGE. A card capped with `maxHeight: '85%'` did not… |
 | `shell-reaches-waist` | — | a shell may COMPOSE the substrate, never CALL it |
@@ -93,7 +97,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `untrusted-json` | — | JSON that someone else wrote is parsed with `parseUntrustedJson` (@onderling/core) |
 | `web-buttons` | — | no bare <button> in the web shell |
 
-## Named design guards (`G-*`, in fitness tests) · 18
+## Named design guards (`G-*`, in fitness tests) · 30
 
 *From an explicit `@guard [<id>] — <claim>` tag in a fitness test (preferred), or a `G-*` id in a
 `describe(...)` block (fallback). Tag a fitness test with `@guard` to add it here — an id is optional.*
@@ -103,13 +107,25 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | — | a circle owns ONE store: a list entry is an item in the circle's `CircleItemStore`, so it rides | `apps/basis/test/appListFanTwoDevice.test.js` |
 | — | an entry added on A arrives on B | `apps/basis/test/appListFanTwoDevice.test.js` |
 | — | sa.audit and the agent trail read their AUDIT retention window from ONE shared table | `apps/basis/test/auditRetentionAgreement.test.js` |
+| — | what leaves for a toolbox is exactly the tool and its input; a toolbox that is not on is refused before the call; eve… | `apps/basis/test/egressToolbox.test.js` |
 | — | an entry added with a ref and a quantity on A arrives on B with both (the item travels whole) | `apps/basis/test/entryRefQuantity.test.js` |
 | — | a second add of the same thing raises the quantity, never a second entry; the reply says so | `apps/basis/test/entryRefQuantity.test.js` |
 | — | list never learns what the thing is: nothing branches on the reference's type | `apps/basis/test/entryRefQuantity.test.js` |
+| — | every call, in either shell, of an op the circle's capability check would gate names a person door, or is on the decl… | `apps/basis/test/fitness/tapsNameTheirDoor.test.js` |
 | — | a param declared `form: false` (a thing's reference, filled by a toolbox's choice) is not a field of any form built f… | `apps/basis/test/forms/buildFormSpecProgramOnly.test.js` |
 | — | one item of EVERY canonical type, written to a circle store on one device, arrives in the | `apps/basis/test/perTypeSyncMatrix.test.js` |
+| — | a write a circle switched off is refused when tapped, the same refusal as the typed line; a door-less call (plumbing,… | `apps/basis/test/tapAsksTheCircle.test.js` |
+| — | on the booted box, a toolbox's list of things comes with a button each, and tapping one puts that thing on the househ… | `apps/basis/test/toolboxButtons.box.test.js` |
 | — | every op is gated by exactly one capability row, and every row gates at least one op | `apps/basis/test/v2/lendCapabilityRows.test.js` |
 | — | confirming a claim, editing and sharing an appointment pass the capability gate in a circle that did not switch them off | `apps/basis/test/v2/threeActsRows.test.js` |
+| — | a toolbox's list of things gets one /kies button per thing, and the tap adds THAT thing (its reference, quantity 1) t… | `apps/basis/test/v2/toolboxChoices.test.js` |
+| — | a tool call speaks the recorded wire (card, SendMessage, A2A-Version 1.0, bearer) and every failure ends in ONE code,… | `apps/basis/test/v2/toolboxClient.test.js` |
+| — | a toolbox is switched on only after the admin's yes in their own private chat, never from a group chat, and no line o… | `apps/basis/test/v2/toolboxDoor.test.js` |
+| — | Telegram door and a screen's kernel skill both reach tools.useTool through the gated call, so both write the tool-cal… | `apps/basis/test/v2/toolboxEveryRoute.test.js` |
+| — | toolbox wire is crossed for real: a socket, an HTTP server, the client's own fetch | `apps/basis/test/v2/toolboxOverHttp.test.js` |
+| — | a toolbox word's slot phrase is taken off the line only as whole words at its start or end (longest first, any case),… | `apps/basis/test/v2/toolboxSlots.test.js` |
+| — | a toolbox's key never appears in a reply, a refusal, a log line or the list of tools, and a toolbox with no key on th… | `apps/basis/test/v2/toolboxes.test.js` |
+| — | a placed toolbox is off until the admin's yes; one that is off is refused before any call leaves, and its words reach… | `apps/basis/test/v2/toolboxes.test.js` |
 | — | framed by another page, the web app's main shell refuses to start and a screen address starts (its entry asks before … | `apps/basis/test/web/ownWindow.test.js` |
 | — | web app's page loads no script, stylesheet or frame from another origin, and the NKN library it runs is the installed… | `apps/basis/test/webOwnOrigin.test.js` |
 | — | subtask-spawn gate bites — only an authorized actor can spawn under a parent | `packages/item-store/test/spawnSubtask.test.js` |

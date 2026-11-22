@@ -53,9 +53,17 @@ export function onboardingStripLine(count, t) {
 /**
  * The block's content: the cards left for this person on this device.
  * @param {{id: string}} block
- * @param {{callSkill: Function, circles?: Array<{id: string}>, allCircles?: Array<{id: string}>, introSeen?: () => Promise<boolean>, keyPending?: () => Promise<boolean>}} hostOps
+ * @param {{callSkill: Function, circles?: Array<{id: string}>, allCircles?: Array<{id: string}>, introSeen?: () => Promise<boolean>, keyPending?: () => Promise<boolean>, circlesKnown?: () => boolean}} hostOps
  */
-export async function materializeOnboarding(block, { callSkill, circles = [], allCircles = null, introSeen = async () => false, keyPending = async () => false, relayKnown = null } = {}) {
+export async function materializeOnboarding(block, { callSkill, circles = [], allCircles = null, introSeen = async () => false, keyPending = async () => false, relayKnown = null, circlesKnown = null } = {}) {
+  // A host that does not know the person's circles YET (the phone's first seconds, before its circle list is read) says
+  // nothing here: an empty list then is not "in no circle", and the strip would tell a member they are in none (L1051).
+  // A host that passes no `circlesKnown` (the web: it paints after its circles are read) is as before.
+  if (typeof circlesKnown === 'function') {
+    let known = false;
+    try { known = !!(await circlesKnown()); } catch { known = false; }
+    if (!known) return { blockId: block.id, type: 'onboarding', status: 'empty', content: { cards: [], noCircle: false } };
+  }
   let handle = null;
   let name = null;   // the display name already on the profile: the card shows it, so a person sees the name the avatar uses
   try {

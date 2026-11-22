@@ -109,7 +109,7 @@ test('v0.1.18 on the live build: a leave travels, a leave follows, and a disclos
     const pressShare = async () => {
       await closePanel(A.page);
       await gotoCircles(A.page);
-      await A.page.locator('[data-tab="mij"]').first().click();
+      await A.page.locator('.cc-persona-button__button').click();
       await A.page.waitForTimeout(1500);
       await A.page.locator('.circle-screen__identity-edit').first().click();
       await A.page.waitForTimeout(2500);

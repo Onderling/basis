@@ -642,6 +642,68 @@ package barrel as `b64decode`.
 
 **Returns:** `Uint8Array` — decoded bytes
 
+## `src/crypto/ed25519Sign.js`
+
+### `ed25519KeyPairFromSeed`
+
+**Kind:** function · **Import:** `ed25519KeyPairFromSeed` from `'@onderling/core'`
+
+```js
+ed25519KeyPairFromSeed(seed)
+```
+
+The Ed25519 key pair of a 32-byte seed.
+
+**Parameters**
+
+- `seed` `Uint8Array`
+
+**Returns:** `{publicKey: Uint8Array, secretKey: Uint8Array}` — secretKey is the 64-byte seed‖public form
+
+### `ed25519Sign`
+
+**Kind:** function · **Import:** `ed25519Sign` from `'@onderling/core'`
+
+```js
+ed25519Sign(msg, secretKey)
+```
+
+A detached Ed25519 signature.
+
+**Parameters**
+
+- `msg` `Uint8Array`
+- `secretKey` `Uint8Array` — 64 bytes, as `ed25519KeyPairFromSeed` gives it
+
+**Returns:** `Uint8Array` — 64 bytes
+
+### `signingEquationName`
+
+**Kind:** function · **Import:** `signingEquationName` from `'@onderling/core'`
+
+```js
+signingEquationName()
+```
+
+Which implementation answers now ('tweetnacl' until a shell installs one). For diagnostics.
+
+### `useSigningEquation`
+
+**Kind:** function · **Import:** `useSigningEquation` from `'@onderling/core'`
+
+```js
+useSigningEquation(eq)
+```
+
+A FASTER IMPLEMENTATION, installed once by the shell. Taken only if it agrees with tweetnacl byte for byte on the
+fixed vectors; otherwise the current one stays and the answer says why. `null` goes back to tweetnacl.
+
+**Parameters**
+
+- `eq` `{name: string, keyPairFromSeed: (seed: Uint8Array) => {publicKey: Uint8Array, secretKey: Uint8Array}, sign: (msg: Uint8Array, secretKey: Uint8Array) => Uint8Array}|null`
+
+**Returns:** `{ok: boolean, name: string, reason?: string}`
+
 ## `src/crypto/ed25519Strict.js`
 
 ### `strictSignatureShapeOk`
@@ -686,11 +748,13 @@ async useSignatureEquation(eq)
 
 A FASTER EQUATION, installed once by the shell (node:crypto on the box, WebCrypto's batch on the web; a native module
 on the phone later), BEHIND the byte rule. Taken only if, with the rule in front, it gives the platform's answer on
-the twelve edge-case vectors, accepts an honest signature and refuses that signature tampered; otherwise the current
-equation stays and the answer says why. `null` goes back to tweetnacl. The rule itself is never replaceable. An
-equation that brings only `verifyBatch` (an async check) keeps tweetnacl for the synchronous path. A `verifyBatch`
-is vetted HERE too, through the batch itself (the vectors with the rule in front, an honest and a tampered
-signature): the one place the rule "nothing faster without agreeing" lives, for every shell. Async for that reason.
+the twelve edge-case vectors, accepts the fixed honest signature and refuses the three fixed negative ones; otherwise
+the current equation stays and the answer says why. `null` goes back to tweetnacl. The rule itself is never
+replaceable. An equation that brings only `verifyBatch` (an async check) keeps tweetnacl for the synchronous path —
+which is the reference and is not vetted against itself. A `verifyBatch` is vetted HERE too, through the batch itself
+(the vectors with the rule in front, the honest and the negative signatures): the one place the rule "nothing faster
+without agreeing" lives, for every shell. Async for that reason. No tweetnacl runs at an install: every expected
+answer is fixed bytes.
 
 **Parameters**
 
@@ -717,6 +781,85 @@ signatureEquationName()
 ```
 
 Which equation answers now ('tweetnacl' until a shell installs one). For diagnostics.
+
+## `src/crypto/secretbox.js`
+
+### `secretboxSeal`
+
+**Kind:** function · **Import:** `secretboxSeal` from `'@onderling/core'`
+
+```js
+secretboxSeal(msg, nonce, key)
+```
+
+Seal `msg` under `key` with `nonce` (NaCl secretbox: authenticator ‖ ciphertext).
+
+**Parameters**
+
+- `msg` `Uint8Array`
+- `nonce` `Uint8Array` — 24 bytes, chosen by the caller
+- `key` `Uint8Array` — 32 bytes
+
+**Returns:** `Uint8Array`
+
+### `secretboxOpen`
+
+**Kind:** function · **Import:** `secretboxOpen` from `'@onderling/core'`
+
+```js
+secretboxOpen(box, nonce, key)
+```
+
+Open a secretbox; `null` when it does not authenticate under `key` and `nonce` (whichever implementation ran).
+An installed implementation that refuses (by `null` or by throwing, as libsodium does) is asked of tweetnacl again:
+a box that really does not open stays `null`, and one tweetnacl opens is the installed implementation failing — said
+once. So a failed open costs one tweetnacl open more; an opened one costs nothing more.
+
+**Parameters**
+
+- `box` `Uint8Array`
+- `nonce` `Uint8Array`
+- `key` `Uint8Array`
+
+**Returns:** `Uint8Array|null`
+
+### `secretboxName`
+
+**Kind:** function · **Import:** `secretboxName` from `'@onderling/core'`
+
+```js
+secretboxName()
+```
+
+Which implementation answers now ('tweetnacl' until a shell installs one). For diagnostics.
+
+### `SECRETBOX_VECTORS`
+
+**Kind:** constant · **Import:** `SECRETBOX_VECTORS` from `'@onderling/core'`
+
+The fixed vectors: one key and nonce, three messages (empty, short, 300 bytes: past a Salsa20 block and a Poly1305
+chunk), with tweetnacl's boxes written down as BYTES, so vetting an implementation at a start runs no tweetnacl at
+all. A test pins that tweetnacl still gives exactly these.
+
+### `useSecretbox`
+
+**Kind:** function · **Import:** `useSecretbox` from `'@onderling/core'`
+
+```js
+useSecretbox(eq)
+```
+
+A FASTER IMPLEMENTATION, installed once by the shell. Taken only if, on the fixed vectors, it seals to tweetnacl's
+exact bytes, opens each back to its message, and refuses a box with one ciphertext byte flipped, one with the
+authenticator flipped, and the right box under a wrong key — and does the same for one LARGE message (768 KiB,
+`SECRETBOX_LARGE`); otherwise the current one stays and the answer says why.
+`null` goes back to tweetnacl.
+
+**Parameters**
+
+- `eq` `{name: string, seal: (msg: Uint8Array, nonce: Uint8Array, key: Uint8Array) => Uint8Array, open: (box: Uint8Array, nonce: Uint8Array, key: Uint8Array) => (Uint8Array|null)}|null`
+
+**Returns:** `{ok: boolean, name: string, reason?: string}`
 
 ## `src/discovery/GossipProtocol.js`
 
@@ -896,7 +1039,7 @@ carries `stableId` (rotation-surviving user id) and `deviceId` (per-install id),
 persisted in the vault. Construct via the static factories (`generate`, `restore`,
 `fromMnemonic`, `fromSeed`, …) so seed persistence and id init happen.
 
-**Methods:** `getMnemonic()` · `sign()` · `box()` · `unbox()` · `deriveSessionKey()` · `sharedCopyOpener()`
+**Methods:** `forgetPeerKeys()` · `getMnemonic()` · `sign()` · `box()` · `unbox()` · `deriveSessionKey()` · `sharedCopyOpener()`
 
 ## `src/identity/Bootstrap.js`
 
@@ -1076,25 +1219,72 @@ A fresh, single-use challenge nonce (base64url). Verifier-side; never generated 
 **Kind:** function · **Import:** `addressPossessionMessage` from `'@onderling/core'`
 
 ```js
-addressPossessionMessage(address, nonce)
+addressPossessionMessage(address, nonce, relay)
 ```
 
-The canonical message a holder signs. Binds the ADDRESS being claimed to THIS nonce, so a proof
-cannot be lifted onto a different address or replayed against a different challenge.
+The canonical message a holder signs. Binds the ADDRESS being claimed to THIS nonce AND to the RELAY the device
+dialled (the host of its ws(s) address, which TLS proves to the device), so a proof cannot be lifted onto a different
+address, replayed against a different challenge, or carried by a hostile relay to an honest one: a relay passing on
+an honest relay's challenge gets an answer naming ITSELF, which the honest relay refuses (the independent read,
+2026-11-20).
 
 **Parameters**
 
 - `address` `string`
 - `nonce` `string`
+- `relay` `string` — the relay's name as the device dialled it (`relayNameOf(url)`)
 
 **Returns:** `string`
+
+### `relayNameOf`
+
+**Kind:** function · **Import:** `relayNameOf` from `'@onderling/core'`
+
+```js
+relayNameOf(url)
+```
+
+A relay's name as a device dials it: the host (with its port) of the ws(s) address; `localhost` for a local socket.
+
+### `isPrivateRelayName`
+
+**Kind:** function · **Import:** `isPrivateRelayName` from `'@onderling/core'`
+
+```js
+isPrivateRelayName(name)
+```
+
+A name that cannot be a relay on the public internet: `localhost` or another single-label name (a compose service
+such as `relay`), or a loopback, private-range, link-local or
+shared-range (100.64/10: carrier NAT, Tailscale) address literal, with any port. Only such a name may be taken from
+the Host a connection came in on; a public name must be configured by the relay's operator.
+
+### `relayOwnNames`
+
+**Kind:** function · **Import:** `relayOwnNames` from `'@onderling/core'`
+
+```js
+relayOwnNames({ names = [] } = {})
+```
+
+Which names a relay answers to. Its names are its OPERATOR's (`names`, RELAY_NAMES), never the caller's: the Host
+header is written by whoever dials, so a hostile relay dialling an honest one would choose it. When names are
+configured, only they count. Without them the Host is used only for a private name (`isPrivateRelayName`), which keeps
+the dev relay, the tests and a home-network box working with no setting; a public name that is not configured is
+refused.
+
+**Parameters**
+
+- `[o]` `{names?: string[]}`
+
+**Returns:** `(name: string, host?: string) => boolean` — is `name` (from a proof) one of this relay's, on a connection that came in under `host`
 
 ### `signAddressPossession`
 
 **Kind:** function · **Import:** `signAddressPossession` from `'@onderling/core'`
 
 ```js
-signAddressPossession(identity, address, nonce)
+signAddressPossession(identity, address, nonce, relay)
 ```
 
 Sign the challenge with an `AgentIdentity` whose `pubKey` IS the address.
@@ -1135,7 +1325,7 @@ the address belongs to, which is the one thing only the caller knows.
 **Kind:** function · **Import:** `signAddressPossessionFromSeed` from `'@onderling/core'`
 
 ```js
-signAddressPossessionFromSeed(derivationSeed, circleId, address, nonce)
+signAddressPossessionFromSeed(derivationSeed, circleId, address, nonce, relay)
 ```
 
 The same thing at the protocol's own level: sign THIS challenge for THIS per-circle address.
@@ -1155,15 +1345,16 @@ For callers that hold a nonce rather than a transport (another wire implementati
 **Kind:** function · **Import:** `verifyAddressPossession` from `'@onderling/core'`
 
 ```js
-verifyAddressPossession({ address, nonce, proof } = {})
+verifyAddressPossession({ address, nonce, proof, relay, isOwnRelayName } = {})
 ```
 
 Verify a presented proof against the address itself — deny-by-default: anything missing,
-malformed or unparseable is `false`, never a throw the caller might treat as "unknown".
+malformed or unparseable is `false`, never a throw the caller might treat as "unknown". The relay the proof names
+must be one this verifier answers to (`isOwnRelayName`), or the proof is refused whatever its signature.
 
 **Parameters**
 
-- `a` `{address?: string, nonce?: string, proof?: string}`
+- `a` `{address?: string, nonce?: string, proof?: string, relay?: string, isOwnRelayName?: (name: string) => boolean}`
 
 **Returns:** `boolean`
 
@@ -3469,6 +3660,26 @@ parentsOf(e)
 The parents of an event over the deps-DAG: its author's own previous head (`parentHash`) UNION the
 cross-author frontier (`deps`). This is the edge set reachability + causal depth walk. Domain-independent.
 
+### `causalOrder`
+
+**Kind:** function · **Import:** `causalOrder` from `'@onderling/core'`
+
+```js
+causalOrder(events)
+```
+
+The events in CAUSAL order: every event after the events it names as parents (`parentsOf`), events with no order
+between them (concurrent) by hash. The same answer on every device for the same set, whatever order a log reads in
+(the device log reads newest-first, a test's fake oldest-first): a reader that wants "the earlier first" or "the
+last one wins" takes this, never the reading order. A parent not in the set is ignored; an event without a hash keeps
+no place and comes last, in the order given.
+
+**Parameters**
+
+- `events` `object[]`
+
+**Returns:** `object[]`
+
 ### `frontier`
 
 **Kind:** function · **Import:** `frontier` from `'@onderling/core'`
@@ -5454,6 +5665,25 @@ second sighting, each row keeping the sources it was seen on.
 - `[deps.now]` `() => number`
 
 **Returns:** `{subscribe, list, rebind, forget, close}`
+
+## `src/transport/sendClass.js`
+
+### `isBackgroundSend`
+
+**Kind:** function · **Import:** `isBackgroundSend` from `'@onderling/core'`
+
+```js
+isBackgroundSend(payload)
+```
+
+A send nobody waits on: a lane's catch-up (`*-catchup-request|batch|offer`, the naming every lane uses) or the
+per-boot address re-announce. Everything else is foreground, so nothing a person does gets slower by accident.
+
+**Parameters**
+
+- `payload` `object`
+
+**Returns:** `boolean`
 
 ## `src/transport/senderBinding.js`
 

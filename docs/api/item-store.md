@@ -79,7 +79,7 @@ circle policy. The register never persists; it declares + routes.
 
 ```js
 class CircleItemStore
-new CircleItemStore({ dataSource, rootContainer, registry, resolution, originOf } = {})
+new CircleItemStore({ dataSource, rootContainer, registry, resolution, originOf, makerRef } = {})
 ```
 
 Generic, per-circle, type-indexed item store over an injected `core.DataSource`: typed
@@ -593,7 +593,7 @@ back to last-received-wins so pre-metadata peers still ingest. See `causalMerge.
 **Kind:** function · **Import:** `createCircleStores` from `'@onderling/item-store'`
 
 ```js
-createCircleStores({ dataSource, registry, resolution, rootPrefix = 'mem://circles/', onStore, dataSourceFor, originOf } = {})
+createCircleStores({ dataSource, registry, resolution, rootPrefix = 'mem://circles/', onStore, dataSourceFor, originOf, makerFor } = {})
 ```
 
 Lazy per-circle registry of `CircleItemStore`s over ONE shared `dataSource`: `getStore(circleId)`
@@ -1099,6 +1099,27 @@ retentionOf(kind)
 ```
 
 Retention class for a kind.
+
+### `RECORD_STATEMENTS`
+
+**Kind:** constant · **Import:** `RECORD_STATEMENTS` from `'@onderling/item-store'`
+
+Statement kinds kept as RECORD inside a lane whose entries are otherwise audit-class: the lane's own row says how its
+entries age, and this table names the statements in it that never drop. A circle's settings changes
+(`policy-update`) are the settings HISTORY: a content statement is judged by the settings in force when it was made
+(the content line), so a change that compacted away would leave "which settings applied" unknowable. They are rare and
+small (settings, version, author, proposal id, the content lanes' tips; no content). Rules changes and votes keep
+compacting.
+
+### `retentionOfEntry`
+
+**Kind:** function · **Import:** `retentionOfEntry` from `'@onderling/item-store'`
+
+```js
+retentionOfEntry(entry)
+```
+
+Retention class for one log ENTRY: its kind's row, unless the statement it carries is named in `RECORD_STATEMENTS`.
 
 ### `RETENTION_DEFAULTS`
 

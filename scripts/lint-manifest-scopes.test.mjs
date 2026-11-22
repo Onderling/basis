@@ -5,7 +5,7 @@
  * it cannot go blind silently.
  */
 import { describe, it, expect } from 'vitest';
-import { auditManifest, loadManifests } from './lint-manifest-scopes.mjs';
+import { auditManifest, loadManifests, auditPlacedAgreement, auditWhat, judgeWhat, shrunkWhatBaseline } from './lint-manifest-scopes.mjs';
 import { verbKind } from '../packages/app-manifest/src/atoms.js';
 
 const ok = (ops) => ({ app: 'x', hosts: [], operations: ops });
@@ -88,5 +88,58 @@ describe('lint-manifest-scopes', () => {
     // Declared outside `apps/*/manifest.js`: the parameter register and the device-log lanes.
     for (const a of ['params', 'governance', 'membership', 'keys', 'grants', 'items-lane', 'chat-lane']) expect(apps).toContain(a);
     for (const m of loaded) expect(Array.isArray(m.manifest?.operations), m.app).toBe(true);
+  });
+});
+
+
+describe("the reserved host word '@placed' (L1035)", () => {
+  const base = { app: 'x', itemTypes: [], operations: [] };
+  it("is accepted as a host; any other '@' word is not", () => {
+    expect(auditManifest({ ...base, hosts: ['@placed'] })).toEqual([]);
+    expect(auditManifest({ ...base, hosts: ['@anything'] }).map((p) => p.message).join()).toMatch(/only reserved word is '@placed'/);
+  });
+  it('the apps that declare it and the egress gate\'s list must agree, either way', () => {
+    const ms = [{ ...base, app: 'tools', hosts: ['@placed'] }, { ...base, app: 'lists', hosts: [] }];
+    expect(auditPlacedAgreement(ms, new Set(['tools']))).toEqual([]);
+    expect(auditPlacedAgreement(ms, new Set([])).join()).toMatch(/tools declares '@placed' but the egress gate/);
+    expect(auditPlacedAgreement(ms, new Set(['tools', 'lists'])).join()).toMatch(/treats lists as reaching outside but its manifest/);
+  });
+});
+
+describe('lint-manifest-scopes: what an op writes, and what a device read hands out (L977)', () => {
+  it('a writing op without `writes.what` owes it; a known word is green', () => {
+    const owed = auditWhat(ok([
+      { id: 'addTask', verb: 'add', writes: { scope: 'circle' } },
+      { id: 'addNote', verb: 'add', writes: { scope: 'person', what: 'content' } },
+      { id: 'listTasks', verb: 'list' },
+    ]));
+    expect(owed).toEqual([{ opId: 'addTask', kind: 'what', message: expect.stringMatching(/writes\.what/) }]);
+  });
+
+  it('an unknown `what` or `reveals` word is red at once, never baselined', () => {
+    const owed = auditWhat(ok([
+      { id: 'a', verb: 'add', writes: { scope: 'circle', what: 'settings' } },
+      { id: 'b', verb: 'list', reveals: 'some' },
+    ]));
+    expect(owed.map((p) => [p.opId, p.kind])).toEqual([['a', 'bad'], ['b', 'bad']]);
+  });
+
+  it('a read in the device group says what it hands out: `reveals: keys` or `none`', () => {
+    const owed = auditWhat(ok([
+      { id: 'buildEnrollOffer', verb: 'get', group: 'device' },
+      { id: 'listDevices', verb: 'list', group: 'device', reveals: 'none' },
+      { id: 'offer', verb: 'get', group: 'device', reveals: 'keys' },
+      { id: 'listOther', verb: 'list', group: 'admin' },
+    ]));
+    expect(owed.map((p) => [p.opId, p.kind])).toEqual([['buildEnrollOffer', 'reveals']]);
+  });
+
+  it('the baseline holds what is owed today: it may only shrink', () => {
+    const owed = [{ app: 'x', opId: 'a', kind: 'what' }, { app: 'x', opId: 'b', kind: 'reveals' }, { app: 'x', opId: 'c', kind: 'bad' }];
+    const baseline = { what: ['x.a', 'x.gone'], reveals: [] };
+    const red = judgeWhat({ owed, baseline });
+    // owed and baselined: quiet; owed and not baselined: red; a bad word: red; a baseline entry no longer owed: red
+    expect(red.map((r) => r.split(':')[0]).sort()).toEqual(['baseline x.gone', 'x.b', 'x.c']);
+    expect(shrunkWhatBaseline({ owed, baseline })).toEqual({ what: ['x.a'], reveals: [] });
   });
 });

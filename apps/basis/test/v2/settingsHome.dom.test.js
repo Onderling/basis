@@ -21,14 +21,15 @@ const allSettingsProps = () => ({
   onSetTheme: vi.fn(), themePref: 'system',
   onSetAppLang: vi.fn(), appLang: 'nl',
   startScreen: { value: 'vandaag', choices: [{ value: 'vandaag', labelKey: 'x' }] }, onSetStartScreen: vi.fn(),
+  plusMiddle: { value: 'chat', choices: [{ value: 'chat', labelKey: 'x' }] }, onSetPlusMiddle: vi.fn(),
   onSetSurfacePref: vi.fn(), surfacePref: 'inline',
   weekOverview: { on: true, onToggle: vi.fn() },
   notifications: { supported: true, subscribed: false }, onToggleNotifications: vi.fn(),
   onSaveUserLlm: vi.fn(), userLlm: {}, validateUserLlm: () => null,
-  doors: { availability: vi.fn(), points: vi.fn(), logReport: vi.fn() },
+  doors: { points: vi.fn() },
   delivery: { sendReceipts: true, allowFallback: false }, onSetDelivery: vi.fn(),
   shareNknAddress: true, onSetShareAddress: vi.fn(),
-  dataLocation: { relayUrl: 'wss://relay.example' }, onOpenRelayPanel: vi.fn(), relayUrl: 'wss://relay.example',
+  dataLocation: { relayUrl: 'wss://relay.example' }, onSaveRelay: vi.fn(), relayUrl: 'wss://relay.example',
   syncSelection: { silos: { chat: true, tasks: true, contacts: true }, fileBytes: 'full', kringenOff: new Set(), kringen: [] }, onSetSync: vi.fn(),
   historyMirror: { enabled: false, status: null }, onToggleHistoryMirror: vi.fn(), onExportHistory: vi.fn(),
   onPurgeMessages: vi.fn(async () => 0),
@@ -36,20 +37,18 @@ const allSettingsProps = () => ({
   metrics: { opens: 3 },
   frequent: [], onClearFrequent: vi.fn(),
   ownActions: { on: true, count: 3, onToggle: vi.fn(), onExport: vi.fn(), onWipe: vi.fn(async () => 3) },
-  podStatus: { signedIn: false }, onExportRecovery: vi.fn(),
+  podStatus: { signedIn: false }, onExportRecovery: vi.fn(), onImportRecovery: vi.fn(),
+  onEnroll: vi.fn(), onReplaceDevice: vi.fn(), onMakePrimary: vi.fn(), onClaimCompanion: vi.fn(), onLinkBot: vi.fn(),
+  onViewMnemonic: vi.fn(), onRestore: vi.fn(), onReceivePersonas: vi.fn(),
   devices: [{ deviceId: 'dev-1', label: 'telefoon', revoked: false }], onRevokeDevice: vi.fn(),
   companions: [{ node: 'N'.repeat(43), short: 'NNNNNNNN…' }], onOpenCompanionGrant: vi.fn(), onGrantCompanion: vi.fn(),
   connections: [{ viewPubKey: 'v1', short: 'v1…', label: 'scherm', sees: null, opCount: 1 }], onUnpairConnection: vi.fn(),
   connectionChoices: { ops: [], sections: [] }, screenPairing: { offer: async () => ({ ok: false, reason: 'unreadable' }), pick: async () => ({ ok: false }), grant: async () => ({ ok: false }), cancel: () => {}, picked: false }, onPaired: vi.fn(),
 });
 
-describe('settings behind the gear (web)', () => {
-  it('the gear on Mij opens the settings', () => {
-    const onSettings = vi.fn();
-    const el = renderCircleProfile(div(), { t, onSettings });
-    el.querySelector('.cc-profile__gear').click();
-    expect(onSettings).toHaveBeenCalled();
-    expect(renderCircleProfile(div(), { t }).querySelector('.cc-profile__gear')).toBeNull();
+describe('settings behind the settings button (web)', () => {
+  it('the persona panel\'s short view carries no gear: the settings button sits beside the persona button', () => {
+    expect(renderCircleProfile(div(), { t, onSettings: vi.fn() }).querySelector('.cc-profile__gear')).toBeNull();
   });
 
   it('the home lists the declared groups, then Per kring, each a door', () => {
@@ -91,5 +90,22 @@ describe('settings behind the gear (web)', () => {
     const onOld = titlesOf(renderCircleMyData(div(), allSettingsProps()));
     expect(onGroups.length).toBeGreaterThan(0);
     expect(onOld.filter((x) => onGroups.includes(x))).toEqual([]);
+  });
+});
+
+describe('the settings home behind the settings button (no Mij)', () => {
+  it('its back names the tab it returns to; Advanced sits at its foot only behind the developer switch', async () => {
+    const { renderSettingsHome: home } = await import('../../web/v2/circleSettingsHome.js');
+    const onBack = vi.fn(); const onAdvanced = vi.fn();
+    const tt = (k, v) => (v ? `${k}:${JSON.stringify(v)}` : k);
+    const el = home(document.createElement('div'), { t: tt, onBack, backLabel: tt('circle.back_to', { place: 'Contacten' }), onOpenGroup: vi.fn(), onAdvanced });
+    const back = el.querySelector('.cc-mydata__back');
+    expect(back.textContent).toBe('circle.back_to:{"place":"Contacten"}');
+    back.click();
+    expect(onBack).toHaveBeenCalled();
+    const adv = el.querySelector('.cc-settings__advanced');
+    adv.click();
+    expect(onAdvanced).toHaveBeenCalled();
+    expect(home(document.createElement('div'), { t: tt, onBack }).querySelector('.cc-settings__advanced')).toBeNull();
   });
 });

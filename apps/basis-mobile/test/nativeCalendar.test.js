@@ -4,7 +4,12 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { diffEvents, applyDiff, _internal } from '../src/core/nativeCalendar.js';
+import { groupKeyStrategy } from '@onderling/pod-client';
+import { setShellContentSeal, openStoredValue } from '../../basis/src/v2/localStoreSeal.js';
+// the id map seals at rest (ledger L1083): a content key is published, as after a boot
+const SEAL = groupKeyStrategy({ groupKey: Buffer.from(new Uint8Array(32).fill(7)).toString('base64url') });
+setShellContentSeal(SEAL);
+import { diffEvents, applyDiff, loadEventIdMap, _internal } from '../src/core/nativeCalendar.js';
 
 const MS_2026_06_01_09 = Date.UTC(2026, 5, 1, 9, 0);
 const MS_2026_06_02_09 = Date.UTC(2026, 5, 2, 9, 0);
@@ -82,8 +87,11 @@ describe('applyDiff — calendar API + storage map', () => {
     });
     expect(Calendar.createEventAsync).toHaveBeenCalledOnce();
     expect(next.A).toBe('evt-A1');
-    const persisted = JSON.parse(stored.get(_internal.STORAGE_KEY));
+    // sealed at rest: the stored value is not readable, and it opens with the key (and through loadEventIdMap)
+    expect(stored.get(_internal.STORAGE_KEY)).not.toContain('evt-A1');
+    const persisted = JSON.parse(openStoredValue(SEAL, _internal.STORAGE_KEY, stored.get(_internal.STORAGE_KEY)));
     expect(persisted.A).toBe('evt-A1');
+    expect((await loadEventIdMap({ storage })).A).toBe('evt-A1');
   });
 
   it('drops eventIds from the map when removing', async () => {

@@ -21,6 +21,7 @@
  * shell decides WHAT is forgotten, only HOW its storage is reached.
  */
 import { renamedFrom } from '@onderling-app/pinboard/lib/moveRenamedStore';
+import { circleStorageName } from './localStoreSeal.js';   // the circle storage names, one rule with the stores themselves
 
 /**
  * The stores and keys a former self wrote, and the ones that are this device's own.
@@ -112,6 +113,7 @@ export const THROWAWAY_CONTENT = Object.freeze({
     'cc.circleRecipe.',
     'cc.circleRecipePending.',
     'cc.screenBlocksCache.',
+    'basis.keptCircles',           // the kept picture of the circles list (keptPicture.js): what the last start showed
     'cc.circleOverride.',
     'basis.nearby-asked:',      // the Nearby first-use question, asked per self on this device — the former selves'
     'cc.nearby-asked:',
@@ -140,7 +142,7 @@ export const THROWAWAY_CONTENT = Object.freeze({
   ]),
 
   /** The per-circle stores for one circle id. Resolved from the registry before the registry is dropped. */
-  perCircleStores: (circleId) => [`cc-circle-${circleId}`, `cc-circle-cache-${circleId}`],
+  perCircleStores: (circleId) => [circleStorageName.store(circleId), circleStorageName.cache(circleId)],
 });
 
 /**

@@ -53,6 +53,10 @@ export const agentsManifest = {
   // RECOVERY (`data-version`, app-local like `agent`): `list`
   // (listDataVersions) + `update` (restoreDataVersion — writes a prior
   // state back to the live resource).
+  // the one verb that is no atom: reading the ceiling of the "+" for a persona (an atom `get` on `agent` would need a
+  // capability row the gate keys circles on; this read is the person's own, never a circle's)
+  domainVerbs: { 'read-plus-ceiling': 'read' },
+
   nouns: {
     // INSTALL adds `add` (installAgent — adds a catalogue/override card
     // to your agents, default-deny).
@@ -108,7 +112,7 @@ export const agentsManifest = {
     {
       id:        'setAgentSkillExposure', visibility: 'authenticated', group: 'admin',
       verb:      'update',
-      writes: { scope: 'person' },   // the exposure lives on the agent's registry entry, the owner's own; a circle admin's narrowing is stored there too
+      writes: { scope: 'person', what: 'control' },   // the exposure lives on the agent's registry entry, the owner's own; a circle admin's narrowing is stored there too
       appliesTo: { type: 'agent' },
       params: [
         { name: 'agentId',  kind: 'string',  required: true, schema: { minLength: 1 } },
@@ -154,7 +158,7 @@ export const agentsManifest = {
     {
       id:        'createProfile', visibility: 'trusted',
       verb:      'add',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'keys' },
       appliesTo: { type: 'agent' },
       params: [
         // The display name a person typed — a property, free to change.
@@ -186,7 +190,7 @@ export const agentsManifest = {
     {
       id:        'setProfileProperty', visibility: 'authenticated', group: 'compose',
       verb:      'update',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'content' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'id',    kind: 'string', required: true, schema: { minLength: 1 } },
@@ -206,6 +210,31 @@ export const agentsManifest = {
       ],
       surfaces: { chat: { reply: 'record', hint: 'Read a profile\'s properties (own/inherit).' } },
     },
+    /* How far the person's own "+" goes for a persona (`_plus.ceiling`, @onderling/agent-registry plusCeiling.js):
+     * 0 hidden, 1 looks things up, 2 also the person's own things, 3 also a circle's after their yes on a card. Set on the
+     * persona screen only: no chat surface, and it weighs as the person's control (4), so the "+" never offers it (it
+     * never changes its own reach). The read gives the ceiling as it holds (own, else the default persona's, else 3). */
+    {
+      id:        'setPlusCeiling', visibility: 'authenticated', group: 'compose',
+      verb:      'update',
+      writes: { scope: 'person', what: 'control' },
+      resolves:  [{ field: '_plus.ceiling', policy: 'content' }],   // the newer word wins between the person's devices
+      appliesTo: { type: 'agent' },
+      params: [
+        { name: 'id',      kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'ceiling', kind: 'number', required: true, schema: { enum: [0, 1, 2, 3] } },
+      ],
+      surfaces: {},
+    },
+    {
+      id:        'getPlusCeiling', visibility: 'authenticated', group: 'data',
+      verb:      'read-plus-ceiling',
+      appliesTo: { type: 'agent' },
+      params: [
+        { name: 'id', kind: 'string', required: true, schema: { minLength: 1 } },
+      ],
+      surfaces: {},
+    },
 
     /* Drivers (#3) — an OPEN personal-driver property { kind, text, tags[] } (goals/hobbies/…), not a coarse
      * string, so it has its own set/get. Curated once, governed by the same per-persona disclosure; the
@@ -213,7 +242,7 @@ export const agentsManifest = {
     {
       id:        'setProfileDriver', visibility: 'authenticated', group: 'compose',
       verb:      'update',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'content' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'id',   kind: 'string', required: true, schema: { minLength: 1 } },
@@ -228,7 +257,7 @@ export const agentsManifest = {
       // Taking a driver off again (an offering, an interest, a goal): only a driver key; any other property is refused.
       id:        'removeProfileDriver', visibility: 'authenticated', group: 'compose',
       verb:      'remove',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'content' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'id',  kind: 'string', required: true, schema: { minLength: 1 } },
@@ -251,7 +280,7 @@ export const agentsManifest = {
     {
       id:        'setProfileCircleMembership', visibility: 'authenticated', group: 'compose',
       verb:      'update',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'keys' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'id',       kind: 'string', required: true, schema: { minLength: 1 } },
@@ -268,7 +297,7 @@ export const agentsManifest = {
     {
       id:        'removeProfileCircleMembership', visibility: 'authenticated', group: 'compose',
       verb:      'update',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'keys' },
       appliesTo: { type: 'agent' },
       // The record is a device's own restore-data (never merged with anyone's): the last write to the profile wins,
       // and a leave is a write like the join that made the record.
@@ -285,7 +314,7 @@ export const agentsManifest = {
     {
       id:        'setProfileDisclosure', visibility: 'authenticated', group: 'compose',
       verb:      'update',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'id',        kind: 'string',  required: true, schema: { minLength: 1 } },
@@ -334,7 +363,7 @@ export const agentsManifest = {
     {
       id:        'revokeAgent', visibility: 'trusted',
       verb:      'revoke',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'agentId', kind: 'string', required: true, schema: { minLength: 1 } },
@@ -362,7 +391,7 @@ export const agentsManifest = {
     {
       id:        'grantAgent', visibility: 'trusted', group: 'admin',
       verb:      'update',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'agentId',       kind: 'string', required: true, schema: { minLength: 1 } },
@@ -408,7 +437,7 @@ export const agentsManifest = {
     {
       id:        'grantRole', visibility: 'authenticated', group: 'admin',
       verb:      'update',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       appliesTo: { type: 'agent' },
       params: [
         // The circle/group the role is held IN.
@@ -429,7 +458,7 @@ export const agentsManifest = {
     {
       id:        'revokeGrant', visibility: 'trusted', group: 'admin',
       verb:      'revoke',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'agentId', kind: 'string', required: true, schema: { minLength: 1 } },
@@ -448,7 +477,7 @@ export const agentsManifest = {
     {
       id:        'purgeAgent', visibility: 'trusted',
       verb:      'remove',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'keys' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'agentId', kind: 'string', required: true, schema: { minLength: 1 } },
@@ -500,7 +529,7 @@ export const agentsManifest = {
     {
       id:        'installAgent', visibility: 'trusted',
       verb:      'add',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'agent' },
       params: [
         // CURATED path — the id of a catalogue entry (from listCatalogue).
@@ -565,7 +594,7 @@ export const agentsManifest = {
     {
       id:        'restoreDataVersion', visibility: 'trusted',
       verb:      'update',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'data-version' },
       params: [
         { name: 'circleId', kind: 'string', required: true, schema: { minLength: 1 } },

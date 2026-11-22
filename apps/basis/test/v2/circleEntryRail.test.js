@@ -1,3 +1,4 @@
+import { causalOrder } from '@onderling/core';
 import { describe, it, expect, vi } from 'vitest';
 import { AgentIdentity, signSpine, createSignatureMemo } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
@@ -17,7 +18,7 @@ function fakeEventLog() {
   const byId = new Set();
   return {
     entries,
-    query() { return entries.slice(); },
+    query() { return entries.slice().reverse(); },   // newest-first, as the device log reads
     appendSilentEntry({ circleId, kind, payload, id }) {
       if (byId.has(id)) return entries.find((e) => e.id === id);   // first-write-wins (audit semantics)
       byId.add(id);
@@ -403,6 +404,10 @@ describe('the rail — a statement checked on one read is not checked again on t
     // a statement damaged after it landed is a different statement: checked again, refused
     log.entries[1].payload = { ...log.entries[1].payload, body: { ...log.entries[1].payload.body, subject: 'v-x' } };
     const { bodies } = await reader.readVerifiedBodies(CIRCLE);
-    expect(bodies.map((b) => b.subject)).toEqual(['v-0', 'v-2']);
+    expect(bodies.map((b) => b.subject).sort(), 'the damaged statement is refused, the other two stand').toEqual(['v-0', 'v-2']);
+    // with v-1 gone, v-0 and v-2 have no order between them (v-2's parent is not in the set), so `causalOrder` places them
+    // by hash: the same on every device whatever order the log reads in. Not the log's order: the hashes differ per run,
+    // so asserting v-0 first failed about one run in two.
+    expect(causalOrder([...bodies].reverse()).map((b) => b.hash), 'the order depends on the reading order').toEqual(causalOrder(bodies).map((b) => b.hash));
   });
 });

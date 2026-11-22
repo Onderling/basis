@@ -12,7 +12,7 @@ import { Image, View, Text, Pressable, ScrollView, StyleSheet, Alert } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { presendFloorFor } from '../../../../basis/src/v2/presendFloor.js';
 import { contactSendRoute } from '../../../../basis/src/v2/contactsSource.js';
-import { HEADER_AVATAR_SIDE_CLEARANCE } from './fab.js';
+import { PERSONA_BUTTON_SIDE_CLEARANCE } from './fab.js';
 import { contactSealMark } from '../../../../basis/src/v2/contactSealMark.js';
 import { earlierRoomMessages } from '../../../../basis/src/v2/nearbyKept.js';
 import { createComposerCommands } from '../../../../basis/src/v2/composerCommands.js';
@@ -501,7 +501,7 @@ function replyTextFromResult(res) {
 const makeStyles = (theme, insets) => StyleSheet.create({
   wrap: { flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper },
   // the frame's avatar sits top-right on every tab: the header row keeps its room, so the ⋯ is never under it
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4, paddingRight: HEADER_AVATAR_SIDE_CLEARANCE },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4, paddingRight: PERSONA_BUTTON_SIDE_CLEARANCE },
   actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 4, rowGap: 2, marginBottom: 8 },
   floor: { fontSize: 12, color: theme.color.inkSoft, paddingHorizontal: 12, paddingVertical: 4 },
   sealed: { fontSize: 12, color: theme.color.inkSoft },

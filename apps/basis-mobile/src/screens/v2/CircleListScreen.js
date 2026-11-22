@@ -14,13 +14,13 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
-import { buildScreenModel } from '../../../../basis/src/v2/screenModel.js';
+import { buildScreenModel, audienceScopeLine } from '../../../../basis/src/v2/screenModel.js';
 import { t } from '../../core/localisation.js';
 import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function CircleListScreen({
   items = [], categoryField, searchFields, labelField, defaultAudience, manifestsByOrigin, appOrigin, capabilityMatrix = [],
-  title, onRowAction, onRowOpen, onClose,
+  title, onRowAction, onRowOpen, onClose, circleNameOf = null,
 }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -39,6 +39,8 @@ export default function CircleListScreen({
   const model = useMemo(() => buildScreenModel({ ...shared, query, activeCategories }),
     [items, categoryField, labelField, defaultAudience, appOrigin, capabilityMatrix, query, activeCategories]);
   const allCats = useMemo(() => buildScreenModel(shared).categories, [items, categoryField, labelField, appOrigin, capabilityMatrix]);
+  // which circle the list is shared with, by name where the launcher knows it (the shared line, web alike; ledger L747)
+  const scopeLine = audienceScopeLine(model.audienceScope, { nameOf: circleNameOf, t });
 
   const toggleCat = (id, checked) => {
     const base = activeCategories == null ? allCats.map((c) => c.id) : activeCategories;
@@ -60,7 +62,7 @@ export default function CircleListScreen({
       </View>
 
       {/* a list scoped to an audience says so, non-dismissible (a visibility scope, not a filter) — as web's caption */}
-      {model.audienceScope != null ? <Text style={styles.muted} testID="list-screen-scope-caption">{t('circle.screen.audience_scope')}</Text> : null}
+      {scopeLine != null ? <Text style={styles.muted} testID="list-screen-scope-caption">{scopeLine}</Text> : null}
 
       <ThemedTextInput
         style={styles.search}

@@ -86,3 +86,17 @@ describe('the memory is bounded per circle', () => {
     expect(told.at(-1)).toBe('h349');
   });
 });
+
+describe('a re-tell goes to the late members alone, never to the whole circle again', () => {
+  it('each remembered statement is told to the members whose address is new to it, and only them', async () => {
+    // the founder's per-join cost: a join told every remembered statement to EVERY member, so the fan grew with the square
+    // of the circle and ran the founder's socket over the relay's rate (12 members: 503 frames refused; narrowed: 0)
+    const told = [];
+    const r = makeLateRecipientRetell({ retell: async (circleId, statement, opts) => { told.push({ hash: statement.body.hash, only: opts?.only ?? null }); }, windowMs: 60_000 });
+    r.fanned('c1', st('s1'), ['a-addr', 'b-addr']);
+    r.fanned('c1', st('s2'), ['a-addr']);
+    const webidOf = { 'a-addr': 'a', 'b-addr': 'b', 'n-addr': 'n' };
+    await r.rosterAddresses('c1', ['a-addr', 'b-addr', 'n-addr'], { webidsOf: (fresh) => fresh.map((x) => webidOf[x]) });
+    expect(told).toEqual([{ hash: 's1', only: ['n'] }, { hash: 's2', only: ['b', 'n'] }]);
+  });
+});

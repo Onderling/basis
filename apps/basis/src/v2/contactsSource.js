@@ -14,6 +14,7 @@
  */
 import { isPairCircleId } from './pairCircleId.js';
 import { personLabel, isKeyLike } from './personLabel.js';
+import { sealedKeyValue } from './localStoreSeal.js';
 
 /** A peer is a bot/agent when it's an A2A/hybrid agent or exposes skills. */
 function isBot(peer) {
@@ -534,3 +535,12 @@ export function makeContactNameStore(io) {
   };
 }
 
+
+/**
+ * The contact-name store, SEALED at rest (ledger L1083: contacts' names), over localStorage (web) or AsyncStorage
+ * (phone). A read before the content key WAITS for it: a name not known yet is not "no name", which would mark every
+ * contact as renamed for a moment.
+ */
+export function sealedContactNameStore(storage) {
+  return makeContactNameStore(sealedKeyValue(storage, { name: 'contact names', strict: true, waitForKey: true, said: true, resealAtStart: [CONTACT_NAMES_KEY] }));
+}

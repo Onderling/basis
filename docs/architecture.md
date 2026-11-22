@@ -1,6 +1,6 @@
 # Architecture
 
-> **Last updated: 2026-11-18** — checked against the code on `development` that day. Every change to this file
+> **Last updated: 2026-11-22** — checked against the code on `development` that day. Every change to this file
 > moves this date (`scripts/lint-architecture-date.mjs` is red otherwise), so the date says how fresh the whole
 > file is, not one paragraph.
 
@@ -544,6 +544,22 @@ layers a surface asks before the model sees any tool (tier, map, availability) a
 the model is SHOWN; the rest run at the waist on the one call. A fitness test pins the code's layer list to the
 line above, so the two cannot drift.
 
+**How heavy an act is, and how far each door goes** (2026-11-19). Every op that writes declares what it writes
+(`writes: {scope, what}`; [`conventions/manifest-standard.md`](conventions/manifest-standard.md)), and its weight, 1
+to 6, follows from that (`opWeight`, `packages/app-manifest/src/atoms.js`): a read 1, the person's own content 2, a
+circle's content 3, the person's control 4, a circle's control 5, keys 6. A door reads the weight instead of keeping
+its own list of what is too much, and an op with no weight is not offered. The person's own "+" offers nothing above
+its ceiling (`withinWeight`, `src/assistant/plusDoor.js`): 3 by default (a circle's things, after a yes on the card),
+set per persona in the persona's editor (behind the persona button) to 0 (no model; the "+" stays), 1 (reads) or 2 (own things), kept on the persona as `_plus.ceiling` and inherited
+from the general persona. A turn with several selves ticked holds to the strictest, and the ceiling cuts both what
+the model is handed and every other way in (a slash line, a phrase, a form). In the own place an op whose widest
+scope is a circle weighs as the person's own (`ownPlaceWeight`), since its write lands in the person's store. The
+household bot's role columns agree with the weight (an observer 1 and 2, a member up to 3, an admin up to 3 and 5)
+except for a closed list of ops, each naming its reason on its own manifest row (`botException`: the person's own
+screens, the identity link, the household in their own app). None of them has a chat surface, so the bot's model is
+never handed an op above 3, and their effect and any secret stay in the person's private chat. A test pins the
+columns to the weight (`botTableByWeight.test.js`).
+
 *Found the hard way (2026-08-28): the composer's attach menu did the structural layer and skipped the
 contextual one entirely — projected once at module load, offered whole, while dispatch resolved through
 a per-circle catalogue. Tapping an entry threw, and the shell answered "I couldn't turn that into an
@@ -631,6 +647,13 @@ circle), and a message to one named peer takes the **addressed** point-to-point 
 mirror. Resolution — how a receiver merges concurrent writes to the same item — is the consistency layer's
 concern (§4 · Consistency & governance).
 
+**A start writes no items.** Demo data (the household's three demo items, demo members, tasks and noticeboard posts)
+is written only on a boot that asks for it (`seedDemoData: true`; `apps/basis/src/core/agent/demoHouseholdSeed.js`).
+The web and the phone used to write the three household items at every start, so a kept store grew by three each
+time; a real start now removes those copies once per device (only items whose author is the demo author and whose
+text is a demo text, deleted without a fan, since they never left the device), and a mark on the device's marker
+vault (`demo-seed-swept`) says it has run.
+
 #### Where the runtime does NOT match this yet
 
 Written down on 2026-08-03 because all four were live, and because prose that flatters the code is worse than
@@ -650,6 +673,7 @@ the honest tail is named below the table rather than dropped.
 | The **inbound handler map** (which subtype goes to which handler) is one shared composition (`src/v2/inboundWiring.js`) | ◐ MOBILE ONLY — the phone composes it; web (`circleApp.js`) and the box still build their own through `makePeerRouter`. That they route the same subtypes is pinned by `shellsRouteTheSameSubtypes`, not by construction |
 | Every peer send leaves through the one send gate | ◐ ONE DECLARED EXCEPTION — the screen view (a granted screen on another device) runs its own secure agent and sends outside `peerSend`; `oneSendGate.test.js` names it as the only exception |
 | A member removed from a circle stops being that circle's address at once | ◐ LAGS ONE READ — the gate's circle-address index (`createCircleAddressIndex`) drops a removed member's address at that circle's next non-empty roster read, not at the removal |
+| Everything a shell writes to the device is **sealed with the content key** (`localStoreSeal.js`) | ✅ ENFORCED (2026-11-20) — the stores and the small key-value stores of a person's content are sealed on every shell; what stays readable is named with its reason in `lint-sealed-key-value`'s baseline, none of it as debt (the Agent home lists it) |
 | The circle engine (`apps/pinboard`) keeps a **second physical store**, one pile for every circle tagged by circle id | ◐ PARTLY — noticeboard POSTS live in their circle's own store and ride its lane: pinboard is handed the host's circles (`hostCircles`) and writes and reads posts there (`apps/pinboard/src/lib/routedStore.js`); the copy into the circle store and the bridge back are gone. Who answered a post is the poster's own and stays on the poster's device. The pile still holds the circle engine's other rows (membership codes and redemptions, rules and their acceptances, the circle-chat mirror, reports), each tagged by circle id — the shared pile this section forbids, for those rows |
 
 **The honest tail, so the table is not read as "finished":** the mirror OBJECT and the peer-roster machinery
@@ -780,7 +804,7 @@ written in plaintext (invariant #7).
   feed stays for a reader that is no node.
 - **The receiver — "shared with me".** A silent copy is pushed over the relay straight to the recipient's peer;
   their device receives it into a per-user, *tiered* store (local, mirrored to the pod when signed in) surfaced
-  on the **Mij** screen. Opening it needs the device's own sealing key — derived from its network secret, which
+  behind Vandaag's "Wacht op jou" chip. Opening it needs the device's own sealing key — derived from its network secret, which
   stays **encapsulated** in the agent identity: the kernel exposes only an opener *closure* (`sharedCopyOpener`
   hands the secret to an injected builder internally and returns just the closure), and the pod-client adapter
   supplies the derivation. The secret never leaves the identity.
@@ -933,7 +957,44 @@ Anything that arrives from outside as behaviour — a downloaded extension (a ma
 declared flows) — passes ONE verifier before install and again at boot: its composites compile to flows and are
 checked with the flow verifier (the secrets rule), every step must name an op the catalogue has, a step naming a
 never-delegable op is withheld, and a step outside an installer-named scope is refused; the consent card names
-each refusal (`apps/basis/src/mappings.js`). The confidential LLM route for a Node process (the bots, the Telegram shell) is
+each refusal (`apps/basis/src/mappings.js`).
+
+**A circle reaches an outside toolbox through its household bot, never from a person's device** (decided
+2026-11-18; detail in [`catalogue/tools.md`](catalogue/tools.md)). One op reaches every tool (`tools.useTool
+{toolbox, tool, input}`, `src/v2/toolsManifest.js`), mounted on the box's waist; the call leaves from the box over
+current A2A (1.0: the card at `/.well-known/agent-card.json`, JSON-RPC `SendMessage`, a bearer key the box's operator
+placed; `src/v2/toolboxClient.js`), not over core's older native A2A path. An egress gate at the box's waist
+(`wrapCallSkillWithEgressGate`, `src/core/agent/egressGate.js`) lets exactly the tool and its input leave, refuses a
+toolbox that is not switched on before any call, and records each call on the box (`tool-call`: who, which toolbox,
+which tool, how it ended; never the words). An outside answer is read under caps: at most 24 rows (`tools.rowsMax`),
+a name, detail and seller cut at 120, 160 and 60 characters. The box fetches a thing's picture itself, only from the
+toolbox's own host, only jpeg, png or webp by its first bytes, at most 15 kB each and 10 a reply, and only for a door
+that shows pictures; the picture travels on as bytes and its URL never does, so no door contacts a shop. The things
+are shown under a head per shop; a person chooses one with a button or by its number in words. The list shown is
+kept per thread (`choiceThreadOf`), "meer" (`tools.moreThings`) pages the rest of a shop from that kept list without
+a new call, and "which list?" names the list by id. A toolbox's own page is a paired **screen** of the person: it
+calls `useTool` through the bot, as that person, over the relay. A screen's grant may hold an op that the
+management screen paints no button for (`SCREEN_NO_BUTTON`), which is a different list from what a screen can never
+call (`BOT_SCREEN_NEVER`). The pairing offer names its toolbox and the grant records it: a call for another toolbox
+is refused (`toolbox-not-yours`), and a screen paired without one is not granted `useTool`. Every answer a screen
+asks for is measured before it is sealed, and one too large for a single relay envelope is refused as
+`answer-too-large`, never cut.
+
+**A toolbox's page is a screen through one file, the screen client** (`src/v2/screenClient.js`, built into one ESM
+file with its types and version by `apps/basis/scripts/build-screen-client.mjs`). It is the web app's own screen
+composition (`createScreenView` over a browser agent) without the paint, so no screen logic is copied; nothing runs
+at import. Given the toolbox's name and the bot's screen start link once, it pairs by the paste route (`startPairing`
+gives the line the person pastes into their own chat with the bot and the code the page shows; `waitForGrant` answers
+granted, refused or expired) and later resumes from what the browser kept. It keeps everything under a prefix per
+toolbox (`onderling.screen.<toolbox>.`, `onderling-screen:<toolbox>:`), and sign-out removes exactly those keys. A
+call never throws: it answers the op's answer or `{ok: false, code}`, the code from one table (`screenClientCode`,
+`SCREEN_CLIENT_CODES`). A grant that ran out and a grant that was taken away (`/schermen los`, a pairing elsewhere)
+are ONE code, `grant-expired`, because the page does the same for both: pair again; the screen is then not paired.
+A toolbox's own failures fold into `toolbox-unreachable`. Each call has an abort signal and a time-out (30 s by
+default), and the client's state (not paired, connected, busy, broken after a call found no connection) can be read,
+heard and awaited. A screen holds no content key, so what it keeps in the browser is a bearer credential by design.
+
+The confidential LLM route for a Node process (the bots, the Telegram shell) is
 `@onderling/llm-client/providers/privatemode`: the Ollama provider's wire and parser with Privatemode's SDK as the
 transport, which attests the enclave and encrypts end-to-end on the caller's machine — no proxy; the key comes from the
 environment or a key file, never from code. The assistant a door talks to is one composition
@@ -1067,6 +1128,24 @@ silently**. Re-sending such sends blindly is not safe — not every receiver dro
 delivery receipt that would let a send stay held until confirmed exists only for chat messages, and only while the
 person keeps receipts on. Closing it needs an acknowledgement that every kind of send carries.
 
+**The relay has two limits, and a sender learns something different from each.** The first is a rate per
+connection: a token bucket per socket (`relay.msgRatePerSec` 30, `relay.msgRateBurst` 60). A frame over it is
+refused at once with `OVER_RATE`, written only to the socket it came in on and naming only that frame's envelope id,
+so it says nothing about the receiver. `RelayTransport` keeps each frame it wrote for a short while
+(`transports.overRateKeepMs`, 10 s) and re-sends a refused one after a second, one at a time at 10 a second, at most
+five sends in all; after that, or when the frame was no longer kept, or the transport is stopped with it queued, it
+tells the give-up path (`onUndelivered`, reason `over-rate`), and the bubble says failed. A waiting frame is also given
+up and said when it is too old to be taken (`transports.overRateMaxAgeMs`, 5 min from its signed `_ts`, under the
+receivers' 10 min replay window; checked while the socket is down too: reason `over-rate-too-old`) or when the queue
+is full (`transports.overRateQueueMax`, 1000: `over-rate-queue-full`). A frame written in the last two seconds before
+its socket closed (`transports.unansweredAtCloseMs`) may have lost its refusal with the socket: it is sent once more on
+the next socket, never twice for a close; a receiver drops a copy it already holds by its id. Order is kept among re-sent
+frames, not between a re-sent frame and a newer one. A relay that names no frame in `OVER_RATE` gets no re-send. The
+second limit is the hold for a receiver that is not connected: the relay keeps the frame for up to 24 h
+(`relay.queueTtlMs`, capped in count per address) and, when it gives up, sends the sender an `undelivered` frame with
+the envelope id if that sender is still connected. It reports only that give-up, never "queued" or "delivered" now:
+that answer on demand would tell anyone whether an address is online.
+
 **A circle address this device cannot place yet is parked, not dropped** (2026-11-10/11). A receiver that has not
 read a circle's roster, or has read it but does not find the sender on it, used to drop the envelope — the old rule
 was "refuse only where a roster is known", so the first messages from a member who had just joined were lost. The
@@ -1144,6 +1223,36 @@ up exactly as they catch up the roster, and a device keeps the winning statement
 audit window — so a policy is the same on every member's device, not a per-device setting that only a settings save
 ever broadcast.
 
+**A circle's switches bind on every member's device, not only in the sender's app** (2026-11-21). The settings say
+which apps, features and acts are on; the sender's gate asks them, and so does every receiving device. Each settings
+change names the content lanes' tips as the admin's device held them (`contentUpTo`); a content statement is judged by
+the settings after the newest change it is not behind, and one behind every change by the creation settings. Only an
+admin's signed line puts a statement "before" a change, so nothing a sender writes can backdate it, and the verdict is
+the same on every device in any arrival order (`contentLine.js`). On the items lane the rail judges every statement
+before it reaches the store, whatever brought it (the live fan, a catch-up, the re-apply when a store opens):
+refused, it stays on the log and is not applied; where its place is unknown and the readings differ, it waits; a later
+settings change that refuses one already applied takes it back by rebuilding the row from its statements still
+allowed, on the author's device too (`itemsRail.js`, `contentJudge.js`). What a device proved about a statement's
+place, which act the statement was when it arrived, and, only where a take-back needs it, the row as it was, it keeps
+on its own log as a silent kind (`content-judged`) that no door accepts and nothing carries. A head SERVED at catch-up
+(a row whose statements aged out) is not an act: it carries `served` inside its signed body, is taken only in answer to
+this device's own ask, is judged only by its app being on, and goes through the store's causal merge. Chat binds by
+the circle's conversation kinds, a view filter every reader asks (`showsInConversation`: the thread, the tile's count,
+Today's news, the notification rows, the assistant's recent turns): a line of a kind the circle has off is kept on the
+log and is not shown, counted or notified on any member's device, the sender's own included; switched back on, it
+shows (`chatKindsSwitchThreeDevice.test.js`). What this does not bind is named in
+[enforceability.md](conventions/enforceability.md).
+
+**Whose item it is binds on every member's device too** (2026-11-21). Each item type declares who may change and remove
+a row (`changedBy` on its schema, `packages/item-types/src/canonical.js`): `author` (the member who added it, and any
+admin: a post, a note, an ask, a message) or `circle` (any member: a list and its entries, a task, an appointment); a
+type with none counts as `author`, and a test is red for a canonical type without one. The maker of record is `madeBy`:
+the verified author of the statement that added the row (the circle-scoped ref the items lane checked), stamped by the
+store on a local new row with the lane's own signing ref and set by every receiver from that statement; `createdBy`
+stays the writer's own id, for display. On arrival a change must keep the held `madeBy`, and for an `author` type a
+change or a removal is taken only from the maker or an admin (`itemsRail.js`, `whoseRefusal`). A served catch-up head
+is not an act; a row whose maker is not known here takes any member's change (`docs/conventions/enforceability.md`).
+
 Anything that must be *agreed* is computed identically everywhere (the tally, the caretaker), never decided
 locally — the same discipline the hash-chain enforces. Full record: [decisions.md](decisions.md) (2026-07-25).
 
@@ -1220,7 +1329,10 @@ below) and revocable on its own.
   full devices. The ceremony is authorised by the owner root itself — a member's roster row carries a per-circle
   *commitment* to the root, and a revocation carries the root's public key and its signature over exactly that
   circle, subject and member. The root exists only inside a ceremony, reconstructed from the phrase, so no device —
-  stolen or not — holds anything that can revoke a sibling.
+  stolen or not — holds anything that can revoke a sibling. A persona's runtime computes its commitment once per
+  circle and keeps it in memory (bounded, never written down), and the membership lane asks for it only when a stored
+  address-revoke statement names the author it is checking; those statements come from an index rebuilt per log
+  version.
 - **Older devices.** A delegated device from before the circle root keeps its own device-derived circle addresses
   until a phrase ceremony hands it the root. No such devices are in use; the fallback is due to be removed.
 
@@ -1369,6 +1481,56 @@ person's seeds, tokens, or mute lists — entries sealed to the old root are und
 by construction. Trust levels and the audit log stay deliberately plain: sealing them buys no secrecy
 and widens the blast radius of an unlock problem.
 
+**What a shell keeps on the device is sealed with the device's content key** (decided 2026-11-19: everything, unless
+it must be read before a key exists). The agent mints that key at boot and publishes it to the shell
+(`src/v2/localStoreSeal.js`, `setShellContentSeal`); a reader that may run earlier, such as a screen's first frame,
+reads again when it arrives (`onShellContentSeal`). A store wraps its backend once (`sealedLocalBackend`, over
+`sealedPersist` in `@onderling/local-store`). It seals only the rows that changed since the last save, so a save of an
+unchanged store writes nothing; a row it cannot open (sealed under another key) is kept and written back byte for
+byte, never handed on as content, until the caller writes that key itself. A small key-value store goes through
+`sealedKeyValue` (values sealed, keys legible, a write before the key refused rather than stored in the clear) or,
+for one JSON value per key, `sealedJsonIo`, which also answers a read before the key as "nothing kept" without
+overwriting anything and reseals an old plain value at its first read. A value nothing reads in a start would stay
+plain, so a strict store can name the keys it owns (`resealAtStart`): once the content key is there they are listed and
+read once, which reseals a plain one and writes nothing for a sealed one (the policy heads, on web, phone and box, and
+the availability do; the other strict stores are a follow-up). The seal is bound to its key and to the device's
+history: the storage key is sealed inside every value, so a value copied under another key does not open there; and a
+content key minted from now on is stored with a form mark (`kv1:`), on which device a plain or unbound value was
+planted and is refused ("not readable", kept). A bare key is an older one, whose plain and unbound values are the
+upgrade's, read once and rewritten sealed and bound (`localStoreSeal.js`, `openStoredValue` for a tool that reads raw
+storage). The sealed ROW stores (a circle's item store, the search index, the device-log snapshot) bind the same way:
+the store's name and the row's id are sealed inside each row (`SealingBackend.js`). A store of a person's content uses the strict
+mode: a read before the key, or of a value that will not open with this key, answers "not readable yet" and writes
+nothing over it; where an empty answer would be read as "nothing there" (the page book, a contact's name, the
+person's availability, the pins, the contact seen-marks) the read waits for the key instead.
+
+Sealed this way, on every shell that keeps them: the page blocks cache (appointment titles, task texts, the last chat
+line), the person's own model setting with its API key, the policy head, the pending recipe and rules, member
+overrides, availability, shared-with-me, the page book and its versions, contact names, the shared disclosure memo,
+which ops the person used, the offering draft, the agent request queue, the ask-match skips, the peer graph, the circle
+and contact seen-marks, the pins, the circle policy, recipe and rules, the fallback offer, and on the phone the
+calendar id map and the connection points; the box seals its key-value files. What stays readable, and why: what is
+read before a key exists (on the web the connection points and the chosen relay, both read at module load; on the
+phone the chosen relay and the extension mappings, which the boot loads before the agent publishes the key; the web's
+mappings are sealed), the enrol offer (stashed under the throwaway self's key and read after the enrol, across the key
+change; its personas and devices parts are sealed by the phrase), what a paired screen keeps in its own browser (its
+grant, and the screen client's storage), because a screen holds no content key, and device flags, settings and view
+state that are not a person's content (the theme, the language, the last tab, first-run flags, delivery-receipt
+preferences, the Nearby switches). `lint-sealed-key-value` holds this: every raw `.setItem(` in the shells and the shared
+v2 code is counted per file against a hand-edited baseline (`scripts/sealed-key-value-baseline.json`) whose every note
+starts with `sealed by its caller:`, `not content:`, `not sealable:` (the reader named) or `debt:`; a new file, a
+grown count or a note without a head is red. Writes through `sealedKeyValue` are not counted. No file is on the
+baseline as debt today.
+
+**Seen-marks are "not known" until they are loaded** (`src/v2/circleSeenMarks.js`, one holder for both shells). The
+circle marks are sealed, so a shell loads them once the content key exists. Until then `current()` is `null`, and the
+unread projections (the tiles, Today's circles-with-news block, the contact badge) count nothing and say no "nothing
+new" line: `null` is "not known", `{}` is known and empty. An open before the load is remembered and applied to the
+loaded map, so no write ever starts from an empty map over the stored marks; the load writes only when an open was
+pending. A read that failed (the storage threw, or no key yet) is not "nothing stored": the marks stay `null`, the
+early opens are kept, nothing is written, and the load can run again. The contact marks and the pins follow the same
+rule.
+
 **Two records of what happened, one retention vocabulary.** The agent keeps two append-only records with
 different readers: the **security audit** (a signed hash chain of key ceremonies and crypto events — its
 `verify()` walks every signature and link) and the **agent trail** (the record that an agent *acted*:
@@ -1413,6 +1575,27 @@ honest signature and refuses it tampered. The box hands `node:crypto`, the web W
 self-test; without Ed25519 in the browser tweetnacl stays), the phone libsodium's C over JSI
 (`react-native-libsodium`, pinned). On the phone that took one check from about 60 ms to about 0.1 ms; a
 `lint-one-signature-check` guard keeps any other check from appearing.
+
+**Signing, key derivation and secretbox stand behind ports of the same shape** (`crypto/ed25519Sign.js`,
+`crypto/secretbox.js`). tweetnacl answers until a shell installs a faster implementation, and the kernel takes it
+only if it gives exactly the expected bytes on fixed vectors (decided 2026-11-19). For secretbox that is one key and
+nonce over messages of 0, 29 and 300 bytes and one of 768 KiB built from a byte formula, because a native bridge
+that is right for small inputs and wrong for a device-log segment would otherwise pass; it must also refuse a
+flipped ciphertext byte, a flipped authenticator and a wrong key. The signature check's honest and tampered cases
+are fixed bytes in the source (`SIGNATURE_VECTORS`), and so are signing's: three seeds by three messages (empty,
+short, 1 KB), each with its public key and signatures written down (`SIGNING_VECTORS`), which a candidate must give
+byte for byte for the key pair and every signature. Installing any of the three runs no tweetnacl; a test pins that
+tweetnacl still gives exactly the written bytes. An installed implementation that
+throws after its vetting answers that call by tweetnacl, said once in the log; a secretbox open it refuses is asked
+of tweetnacl again, so a box that does not open is `null` to every caller whichever ran. The port never chooses a
+nonce: the caller does, as before. Which shell installs what: the phone libsodium over JSI for all three; the box
+`node:crypto` for the check and for signing, and tweetnacl for secretbox (`node:crypto` has no XSalsa20-Poly1305);
+the web WebCrypto for the check only, because its Ed25519 is asynchronous while every signing path is synchronous,
+and it has no XSalsa20-Poly1305. `lint-one-signing` and `lint-one-secretbox` keep other call sites from appearing;
+the vault's two secretbox calls are that guard's baseline, since `@onderling/vault` cannot import the kernel
+without a cycle. Per peer, the Curve25519 image of its key and the shared box key are remembered for the session
+(`AgentIdentity`), in memory only and bounded, the shared key per identity and keyed by the peer's full key; neither
+is written down.
 
 **The lanes.** Four kinds of circle state ride the same rail with per-lane semantics: **membership**
 (catch-up is pull-everything, because completeness is the point of a roster), **governance** (proposals
@@ -1560,6 +1743,15 @@ error is never treated as a mismatch. When both sides hold different values, the
 *Everything a person (or model) touches compiles to the same `{opId, args}` — the manifest is the
 contract, and every surface is a projection of it.*
 
+**The frame.** The tab bar is Vandaag · Kringen · **+** · Contacten · In de buurt, declared in the manifest's `tabs`
+with the "+"'s place and buttons in `plus` (`src/v2/plusDial.js`). Top right on every tab sit the **persona button**,
+which opens the persona panel over the tab (the declared `meActions` and `meBlocks`, one tab per persona when there
+are several; `src/v2/personaPanel.js`), and beside it the **settings button**, which opens the settings home from
+anywhere and returns to the tab it came from. What Me said about now moved: "Wacht op jou" is first on Vandaag's top
+(`todayBlocks`), titled by the kinds in it now ("Stemmen en uitnodigingen", `awaitingTitle`), hidden when empty; the person's presence is a coloured ring around the persona button (`availabilityRing`: away > quiet > available and
+connected > available but not connected, the connection being the relay fact `connectedAtRelay`; existing theme tokens;
+the button's label names the state) and one row in the persona panel, the state in words and a tap to change it.
+
 **One declaration, six projections.** An app's manifest declares its operations once; pure projectors
 turn that declaration into the chat tool, the slash command, the deterministic gate verbs, the attach
 menu, the ops another agent may invoke, and the web/mobile screens. Neither AI nor GUI is privileged —
@@ -1578,7 +1770,7 @@ the screen in a frame). Held by
 `apps/basis/test-browser/web-own-window.spec.js`. The decision: `docs/decisions.md` 2026-11-18.
 
 **Every op has a default place, by construction.** An op with no bespoke screen is still visible and
-reachable: the **advanced surface** (Mij → Geavanceerd, both platforms) lists exactly the
+reachable: the **advanced surface** (the settings home → Geavanceerd, behind the developer switch, both platforms) lists exactly the
 coverage-matrix's complement — a no-argument op runs straight through the waist from there; an
 argument-taking op shows its chat form, because the chat route is the argument-taking executor every op
 already has. The same surface exposes the parameter register: every user-tunable value, editable

@@ -56,6 +56,10 @@ export {
   // The circle an op is about, read from its args by the names the manifests give it (`circleId`, `groupId`).
   CIRCLE_ARG_NAMES,
   circleArg,
+  // How heavy an op is (L977): what it writes beside where, what a read hands out, and the 1-6 that follows.
+  WRITE_WHATS,
+  REVEALS,
+  opWeight,
 } from './atoms.js';
 
 // B · (ruling) — read helpers over manifest.settings (the wizard/form layer).
@@ -82,7 +86,7 @@ export {
 } from './capabilities.js';
 // §1b — the synthetic op-id codec for GENERIC (op-less) capabilities (catalogue synth ⇄ dispatch decode).
 export { encodeGenericOpId, isGenericOpId, decodeGenericOpId } from './genericOp.js';
-export { checkExtensionManifest, extensionVerbsFor, nounWordOf } from './extensionCompose.js';
+export { checkExtensionManifest, extensionVerbsFor, nounWordOf, firstPartyFirstWords } from './extensionCompose.js';
 
 // B · (ruling) — the admin freedom template + the narrowed effective set the gate reads.
 export {

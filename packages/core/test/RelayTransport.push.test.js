@@ -18,7 +18,7 @@ function startPushFixture({ rejectRegister = false, dropAcks = false } = {}) {
   const tokens  = new Map();   // address → {token, platform}
   const events  = [];          // observed control frames
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
     let address = null;
     const open = new Map();               // nonce → address, single use
     ws.on('message', (raw) => {
@@ -33,7 +33,7 @@ function startPushFixture({ rejectRegister = false, dropAcks = false } = {}) {
         return;
       }
       if (msg.type === 'register-proof') {
-        if (open.get(msg.nonce) !== msg.address || !verifyAddressPossession(msg)) {
+        if (open.get(msg.nonce) !== msg.address || !verifyAddressPossession({ ...msg, isOwnRelayName: (n) => n === req?.headers?.host })) {
           ws.send(JSON.stringify({ type: 'error', message: 'PROOF_INVALID' }));
           return;
         }

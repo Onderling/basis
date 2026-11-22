@@ -27,17 +27,21 @@ export function createLocalStoragePeerBackend({ prefix = 'cc-peers:', storage } 
   const keyFor = (key) => `${prefix}${key}`;
 
   return {
+    // awaited: both shells hand a SEALED storage (ledger L1083), which answers async; the phone's is AsyncStorage
     async get(key) {
-      const raw = store.getItem(keyFor(key));
+      const raw = await store.getItem(keyFor(key));
       return raw == null ? null : raw;
     },
     async set(key, value) {
-      store.setItem(keyFor(key), value);
+      await store.setItem(keyFor(key), value);
     },
     async delete(key) {
-      store.removeItem(keyFor(key));
+      await store.removeItem(keyFor(key));
     },
     async list() {
+      if (typeof store.getAllKeys === 'function') {   // AsyncStorage lists this way
+        return ((await store.getAllKeys()) ?? []).filter((k) => typeof k === 'string' && k.startsWith(prefix)).map((k) => k.slice(prefix.length));
+      }
       const out = [];
       for (let i = 0; i < store.length; i += 1) {
         const k = store.key(i);

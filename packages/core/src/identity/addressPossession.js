@@ -23,24 +23,26 @@
 //
 // ── WHAT THE SIGNER IS ASKED TO SIGN ────────────────────────────────────────────────────────────
 // The relay supplies a NONCE, never a message. The client builds the message itself out of the
-// nonce and the address it is registering, so a hostile relay cannot use registration as a signing
+// nonce, the address it is registering and the relay it dialled, so a hostile relay cannot use registration as a signing
 // oracle for content of its choosing. The prefix is domain-separated so a signature made here can
 // never be mistaken for one made anywhere else in the system.
 //
-// ── WHAT THIS DOES NOT COVER, STATED RATHER THAN IMPLIED ────────────────────────────────────────
+// ── WHICH RELAY: THE PROOF NAMES THE ONE THE DEVICE DIALLED ─────────────────────────────────────
 // The nonce defeats CAPTURE-AND-REPLAY: a proof is useless at another relay (which issued a
-// different nonce) and at another time (single-use, short-lived). It does NOT defeat a LIVE PROXY:
-// a hostile relay a client is connected to can fetch a challenge from a third relay, hand it to the
-// client as its own, and forward the answer — registering the client's address there. Closing that
-// needs the signed message to name WHICH relay it is for, which needs a relay to have a verifiable
-// identity of its own (a key, or a url it can prove). We do not have one yet; when we do, add an
-// audience field here. Recorded in `plans/DECISIONS-FOR-REVIEW.md` (2026-07-31) rather than left
-// for someone to discover.
+// different nonce) and at another time (single-use, short-lived). Until 2026-11-21 it did NOT defeat
+// a LIVE PROXY: a hostile relay a client is connected to could fetch a challenge from a third relay,
+// hand it to the client as its own, and forward the answer — registering the client's address there.
+// The message now names the relay the device DIALLED (the host of its ws(s) address: TLS proves that
+// name to the device, so no relay key is needed), and a relay accepts a proof only when that name is
+// one of its own — the Host the connection came in on, or a name its operator configured for a proxy
+// that rewrites Host. A passed-on challenge gets an answer naming the hostile relay; the honest relay
+// refuses it. (`relay/test/proofNamesItsRelay.test.js`.)
 import nacl from 'tweetnacl';
 import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
 import { AgentIdentity } from './AgentIdentity.js';
 import { deriveCircleSeed } from './circleAddress.js';
 import { encode as b64encode } from '../crypto/b64.js';
+import { ed25519KeyPairFromSeed, ed25519Sign } from '../crypto/ed25519Sign.js';   // signing + derivation behind the port a shell may speed up (L619)
 
 /** Bytes of entropy in a registration nonce. 32 = the same order as a key; guessing is not a path. */
 export const ADDRESS_NONCE_BYTES = 32;
@@ -58,14 +60,83 @@ export function newAddressChallenge() {
 }
 
 /**
- * The canonical message a holder signs. Binds the ADDRESS being claimed to THIS nonce, so a proof
- * cannot be lifted onto a different address or replayed against a different challenge.
+ * The canonical message a holder signs. Binds the ADDRESS being claimed to THIS nonce AND to the RELAY the device
+ * dialled (the host of its ws(s) address, which TLS proves to the device), so a proof cannot be lifted onto a different
+ * address, replayed against a different challenge, or carried by a hostile relay to an honest one: a relay passing on
+ * an honest relay's challenge gets an answer naming ITSELF, which the honest relay refuses (the independent read,
+ * 2026-11-20).
  * @param {string} address
  * @param {string} nonce
+ * @param {string} relay  the relay's name as the device dialled it (`relayNameOf(url)`)
  * @returns {string}
  */
-export function addressPossessionMessage(address, nonce) {
-  return `onderling-address-possession-v1|${String(address)}|${String(nonce)}`;
+export function addressPossessionMessage(address, nonce, relay) {
+  return `onderling-address-possession-v2|${String(relay ?? '')}|${String(address)}|${String(nonce)}`;
+}
+
+/** A relay's name as a device dials it: the host (with its port) of the ws(s) address; `localhost` for a local socket. */
+export function relayNameOf(url) {
+  try { return new URL(String(url)).host || 'localhost'; } catch { return 'localhost'; }
+}
+
+/** The host part of a relay name (`host[:port]`, `[v6]:port`), lower-cased; '' when there is none. */
+function hostPart(name) {
+  const s = String(name ?? '').trim().toLowerCase();
+  if (!s) return '';
+  if (s.startsWith('[')) { const end = s.indexOf(']'); return end > 0 ? s.slice(1, end) : ''; }
+  const colons = s.split(':').length - 1;
+  if (colons === 1) return s.slice(0, s.indexOf(':'));
+  return s;   // no port, or a bare v6 literal
+}
+
+/**
+ * A name that cannot be a relay on the public internet: `localhost` or another single-label name (a compose service
+ * such as `relay`), or a loopback, private-range, link-local or
+ * shared-range (100.64/10: carrier NAT, Tailscale) address literal, with any port. Only such a name may be taken from
+ * the Host a connection came in on; a public name must be configured by the relay's operator.
+ */
+export function isPrivateRelayName(name) {
+  const h = hostPart(name);
+  if (!h) return false;
+  if (h === 'localhost') return true;
+  if (/^[a-z0-9-]+$/.test(h) && !/^\d+$/.test(h)) return true;   // a single-label name (a compose service, `relay`): no public relay
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    if ([a, b, Number(v4[3]), Number(v4[4])].some((n) => n > 255)) return false;
+    return a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
+      || (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127);
+  }
+  if (h.includes(':')) {
+    if (h === '::1') return true;
+    if (/^f[cd][0-9a-f]{0,2}:/.test(h)) return true;           // fc00::/7, unique local
+    if (/^fe[89ab][0-9a-f]?:/.test(h)) return true;            // fe80::/10, link-local
+    const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(h);
+    return mapped ? isPrivateRelayName(mapped[1]) : false;
+  }
+  return false;
+}
+
+/**
+ * Which names a relay answers to. Its names are its OPERATOR's (`names`, RELAY_NAMES), never the caller's: the Host
+ * header is written by whoever dials, so a hostile relay dialling an honest one would choose it. When names are
+ * configured, only they count. Without them the Host is used only for a private name (`isPrivateRelayName`), which keeps
+ * the dev relay, the tests and a home-network box working with no setting; a public name that is not configured is
+ * refused.
+ * @param {{names?: string[]}} [o]
+ * @returns {(name: string, host?: string) => boolean}  is `name` (from a proof) one of this relay's, on a connection
+ *   that came in under `host`
+ */
+export function relayOwnNames({ names = [] } = {}) {
+  const own = new Set((Array.isArray(names) ? names : []).filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim().toLowerCase()));
+  return (name, host) => {
+    if (typeof name !== 'string' || !name) return false;
+    const n = name.trim().toLowerCase();
+    if (own.has(n)) return true;
+    if (own.size) return false;   // configured: those names only (the box's LAN or compose name goes in the list too)
+    const h = typeof host === 'string' && host ? host.trim().toLowerCase() : 'localhost';
+    return n === h && isPrivateRelayName(n);
+  };
 }
 
 /**
@@ -75,8 +146,8 @@ export function addressPossessionMessage(address, nonce) {
  * @param {string} nonce
  * @returns {string} base64url Ed25519 signature
  */
-export function signAddressPossession(identity, address, nonce) {
-  return b64encode(identity.sign(addressPossessionMessage(address, nonce)));
+export function signAddressPossession(identity, address, nonce, relay) {
+  return b64encode(identity.sign(addressPossessionMessage(address, nonce, relay)));
 }
 
 /**
@@ -93,8 +164,8 @@ export function signAddressPossession(identity, address, nonce) {
  * @returns {(message: string) => string} sign(message) → base64url Ed25519 signature
  */
 export function circleAddressSigner(derivationSeed, circleId) {
-  const kp = nacl.sign.keyPair.fromSeed(deriveCircleSeed(derivationSeed, circleId));
-  return (message) => b64encode(nacl.sign.detached(new TextEncoder().encode(message), kp.secretKey));
+  const kp = ed25519KeyPairFromSeed(deriveCircleSeed(derivationSeed, circleId));
+  return (message) => b64encode(ed25519Sign(new TextEncoder().encode(message), kp.secretKey));
 }
 
 /**
@@ -106,20 +177,24 @@ export function circleAddressSigner(derivationSeed, circleId) {
  * @param {string} nonce
  * @returns {string} base64url Ed25519 signature
  */
-export function signAddressPossessionFromSeed(derivationSeed, circleId, address, nonce) {
-  return circleAddressSigner(derivationSeed, circleId)(addressPossessionMessage(address, nonce));
+export function signAddressPossessionFromSeed(derivationSeed, circleId, address, nonce, relay) {
+  return circleAddressSigner(derivationSeed, circleId)(addressPossessionMessage(address, nonce, relay));
 }
 
 /**
  * Verify a presented proof against the address itself — deny-by-default: anything missing,
- * malformed or unparseable is `false`, never a throw the caller might treat as "unknown".
- * @param {{address?: string, nonce?: string, proof?: string}} a
+ * malformed or unparseable is `false`, never a throw the caller might treat as "unknown". The relay the proof names
+ * must be one this verifier answers to (`isOwnRelayName`), or the proof is refused whatever its signature.
+ * @param {{address?: string, nonce?: string, proof?: string, relay?: string, isOwnRelayName?: (name: string) => boolean}} a
  * @returns {boolean}
  */
-export function verifyAddressPossession({ address, nonce, proof } = {}) {
+export function verifyAddressPossession({ address, nonce, proof, relay, isOwnRelayName } = {}) {
   if (typeof address !== 'string' || !address) return false;
   if (typeof nonce   !== 'string' || !nonce)   return false;
   if (typeof proof   !== 'string' || !proof)   return false;
-  try { return AgentIdentity.verify(addressPossessionMessage(address, nonce), proof, address); }
+  if (typeof relay   !== 'string' || !relay)   return false;
+  if (typeof isOwnRelayName !== 'function') return false;
+  try { if (isOwnRelayName(relay) !== true) return false; } catch { return false; }
+  try { return AgentIdentity.verify(addressPossessionMessage(address, nonce, relay), proof, address); }
   catch { return false; }
 }

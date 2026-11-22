@@ -34,6 +34,7 @@ import { MEMBERSHIP_CATCHUP_SUBTYPES } from './membershipRail.js';
 import { GOV_CATCHUP_REQUEST } from './governanceCatchUp.js';
 import { KEY_CATCHUP_SUBTYPES } from './keyRail.js';
 import nacl from 'tweetnacl';
+import { secretboxSeal, secretboxOpen } from '@onderling/core';   // secretbox behind the port a shell may speed up (L619)
 import { parseUntrustedJson, Bootstrap, verifyDeviceDelegation, authorityPubKeyB64Of } from '@onderling/core';
 import { RECOVERY_SEAL_LABEL } from '../core/agent/personaVault.js';
 
@@ -241,7 +242,7 @@ export function sealOfferPersonas(root, personas = []) {
   const plain = JSON.stringify(list);
   const padded = plain + ' '.repeat((SEALED_STEP - (new TextEncoder().encode(plain).length % SEALED_STEP)) % SEALED_STEP);
   const nonce = nacl.randomBytes(24);
-  const box = nacl.secretbox(new TextEncoder().encode(padded), nonce, personasKey(root));
+  const box = secretboxSeal(new TextEncoder().encode(padded), nonce, personasKey(root));
   const out = new Uint8Array(nonce.length + box.length);
   out.set(nonce); out.set(box, nonce.length);
   return bytesB64(out);
@@ -280,7 +281,7 @@ export function sealOfferDevices(sealSeed, records = {}, epochs = {}) {
   const plain = JSON.stringify({ r: records && typeof records === 'object' ? records : {}, e: epochs && typeof epochs === 'object' ? epochs : {} });
   const padded = plain + ' '.repeat((SEALED_STEP - (new TextEncoder().encode(plain).length % SEALED_STEP)) % SEALED_STEP);
   const nonce = nacl.randomBytes(24);
-  const box = nacl.secretbox(new TextEncoder().encode(padded), nonce, devicesKey(sealSeed));
+  const box = secretboxSeal(new TextEncoder().encode(padded), nonce, devicesKey(sealSeed));
   const out = new Uint8Array(nonce.length + box.length);
   out.set(nonce); out.set(box, nonce.length);
   return bytesB64(out);
@@ -300,7 +301,7 @@ function openOfferDevicesSealed(uri, mnemonic) {
   try {
     const root = Bootstrap.fromMnemonic(String(mnemonic ?? '').trim());
     const raw = bytesFrom(parsed.devicesSealed);
-    const opened = nacl.secretbox.open(raw.slice(24), raw.slice(0, 24), devicesKey(root.deriveAgentSeed(RECOVERY_SEAL_LABEL)));
+    const opened = secretboxOpen(raw.slice(24), raw.slice(0, 24), devicesKey(root.deriveAgentSeed(RECOVERY_SEAL_LABEL)));
     if (!opened) return null;
     const both = parseUntrustedJson(new TextDecoder().decode(opened));
     return both && typeof both === 'object' && !Array.isArray(both) ? both : null;
@@ -364,7 +365,7 @@ export function openOfferPersonas(uri, mnemonic) {
   try {
     const root = Bootstrap.fromMnemonic(String(mnemonic ?? '').trim());
     const raw = bytesFrom(parsed.personasSealed);
-    const opened = nacl.secretbox.open(raw.slice(24), raw.slice(0, 24), personasKey(root));
+    const opened = secretboxOpen(raw.slice(24), raw.slice(0, 24), personasKey(root));
     if (!opened) return [];
     const list = parseUntrustedJson(new TextDecoder().decode(opened));
     return (Array.isArray(list) ? list : []).filter((p) => p && typeof p.id === 'string' && PERSONA_ID.test(p.id)).map((p) => ({

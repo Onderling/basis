@@ -87,3 +87,24 @@ describe('createScreenBlocksCache', () => {
     expect(await store.get('s2')).toEqual(blocks);
   });
 });
+
+// A START THAT CHANGES NOTHING WRITES NOTHING (ledger L1103 part 2, counted on the seeded Samsung): Today's landing wrote
+// its blocks back at every start, sealed, though they were the blocks it had just read. The cache writes a screen only
+// when what it holds for it changed.
+describe('the blocks cache writes only a change', () => {
+  it('the same blocks after a read, or twice in a row: one write at most; a change is written', async () => {
+    const { vi } = await import('vitest');
+    const kept = new Map([['s1', [{ id: 'b', n: 1 }]]]);
+    const save = vi.fn(async (id, blocks) => { kept.set(id, blocks); });
+    const cache = createScreenBlocksCache({ load: async (id) => kept.get(id) ?? null, save, remove: async () => {} });
+    await cache.get('s1');
+    await cache.set('s1', [{ id: 'b', n: 1 }]);
+    expect(save).toHaveBeenCalledTimes(0);
+    await cache.set('s1', [{ id: 'b', n: 2 }]);
+    await cache.set('s1', [{ id: 'b', n: 2 }]);
+    expect(save).toHaveBeenCalledTimes(1);
+    await cache.clear('s1');
+    await cache.set('s1', [{ id: 'b', n: 2 }]);
+    expect(save).toHaveBeenCalledTimes(2);
+  });
+});

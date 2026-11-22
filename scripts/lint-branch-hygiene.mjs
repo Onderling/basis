@@ -7,38 +7,54 @@
  * a PROTECTED branch carries local commits that are not on its remote, which is exactly what "I committed
  * straight onto the trunk" looks like.
  *
- * Deliberately quiet everywhere else: a feature branch is never checked, and in CI the branch is checked out
- * at the remote's head, so there are no local-only commits and this passes.
+ * Deliberately quiet everywhere else: a feature branch is never checked. ONE skip in CI (2026-11-19, Fable): when the
+ * checkout IS the trunk's own push or the merge queue's group commit for it, the commit is by design not on the remote
+ * yet (the queue tests it before it lands); the guard read that as typed onto the trunk (run 44578744227). Everywhere
+ * else it is as it was.
  */
 import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
-const PROTECTED = new Set(['development', 'live', 'master', 'main']);
-const sh = (cmd) => { try { return execSync(cmd, { encoding: 'utf8' }).trim(); } catch { return ''; } };
+export const PROTECTED = new Set(['development', 'live', 'master', 'main']);
 
-const branch = sh('git rev-parse --abbrev-ref HEAD');
-if (!branch || !PROTECTED.has(branch)) {
-  console.log(`✓ branch-hygiene: on '${branch || '(detached)'}' — a feature branch is nobody's business but yours.`);
-  process.exit(0);
+/**
+ * Is this CI's own checkout of `branch` (its push, or the merge queue's group commit for it)?
+ * @param {string} branch @param {Record<string, string|undefined>} env
+ */
+function ciOwnTrunkCheckout(branch, env) {
+  if (env.GITHUB_ACTIONS !== 'true') return false;
+  const ref = String(env.GITHUB_REF ?? '');
+  if (env.GITHUB_EVENT_NAME === 'push') return ref === `refs/heads/${branch}`;
+  if (env.GITHUB_EVENT_NAME === 'merge_group') return ref.startsWith(`refs/heads/gh-readonly-queue/${branch}/`);
+  return false;
 }
 
-const upstream = sh(`git rev-parse --abbrev-ref ${branch}@{upstream}`);
-if (!upstream) {
-  console.log(`✓ branch-hygiene: '${branch}' has no upstream to compare against — nothing to check.`);
-  process.exit(0);
+/**
+ * The guard's verdict, pure.
+ * @param {{branch: string, upstream: string, ahead: number, env?: Record<string, string|undefined>}} a
+ * @returns {{ok: boolean, skipped?: string, message: string}}
+ */
+export function hygieneVerdict({ branch, upstream, ahead, env = {} }) {
+  if (!branch || !PROTECTED.has(branch)) return { ok: true, message: `✓ branch-hygiene: on '${branch || '(detached)'}' — a feature branch is nobody's business but yours.` };
+  if (!upstream) return { ok: true, message: `✓ branch-hygiene: '${branch}' has no upstream to compare against — nothing to check.` };
+  if (!ahead) return { ok: true, message: `✓ branch-hygiene: '${branch}' matches ${upstream} — the trunk moves by merge.` };
+  if (ciOwnTrunkCheckout(branch, env)) return { ok: true, skipped: 'ci-trunk', message: `✓ branch-hygiene: CI's own checkout of '${branch}' (${env.GITHUB_EVENT_NAME}) — its commit is not on the remote yet by design.` };
+  return { ok: false, message: `✖ branch-hygiene: '${branch}' carries ${ahead} local commit(s) not on ${upstream}:` };
 }
 
-const ahead = sh(`git rev-list --count ${upstream}..${branch}`);
-const n = Number(ahead || '0');
-if (n === 0) {
-  console.log(`✓ branch-hygiene: '${branch}' matches ${upstream} — the trunk moves by merge.`);
-  process.exit(0);
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  const sh = (cmd) => { try { return execSync(cmd, { encoding: 'utf8' }).trim(); } catch { return ''; } };
+  const branch = sh('git rev-parse --abbrev-ref HEAD');
+  const upstream = PROTECTED.has(branch) ? sh(`git rev-parse --abbrev-ref ${branch}@{upstream}`) : '';
+  const ahead = upstream ? Number(sh(`git rev-list --count ${upstream}..${branch}`) || '0') : 0;
+  const v = hygieneVerdict({ branch, upstream, ahead, env: process.env });
+  if (v.ok) { console.log(v.message); process.exit(0); }
+  console.error(v.message);
+  for (const s of sh(`git log --oneline ${upstream}..${branch}`).split('\n').filter(Boolean).slice(0, 5)) console.error(`    ${s}`);
+  console.error('');
+  console.error('  The trunk and the release branch move by MERGE. If these are a feature, move them:');
+  console.error(`    git switch -c feat/<name> && git branch -f ${branch} ${upstream}`);
+  console.error('  If this IS the merge (a feature landing), push it and this passes.');
+  process.exit(1);
 }
-
-const subjects = sh(`git log --oneline ${upstream}..${branch}`).split('\n').filter(Boolean).slice(0, 5);
-console.error(`✖ branch-hygiene: '${branch}' carries ${n} local commit(s) not on ${upstream}:`);
-for (const s of subjects) console.error(`    ${s}`);
-console.error('');
-console.error('  The trunk and the release branch move by MERGE. If these are a feature, move them:');
-console.error(`    git switch -c feat/<name> && git branch -f ${branch} ${upstream}`);
-console.error('  If this IS the merge (a feature landing), push it and this passes.');
-process.exit(1);

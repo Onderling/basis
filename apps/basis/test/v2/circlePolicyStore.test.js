@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { groupKeyStrategy } from '@onderling/pod-client';
+import { setShellContentSeal } from '../../src/v2/localStoreSeal.js';
 import {
   createCirclePolicyStore, localStoragePolicyIo,
   createMemberOverrideStore, localStorageOverrideIo,
@@ -67,7 +69,8 @@ describe('createMemberOverrideStore', () => {
     expect(mem.c1).toEqual(after);
   });
 
-  it('localStorageOverrideIo round-trips under its own key', async () => {
+  it('localStorageOverrideIo round-trips under its own key (sealed: a content key is published, as after a boot)', async () => {
+    setShellContentSeal(groupKeyStrategy({ groupKey: Buffer.from(new Uint8Array(32).fill(7)).toString('base64url') }));
     const map = new Map();
     const storage = { getItem: (k) => (map.has(k) ? map.get(k) : null), setItem: (k, v) => map.set(k, v) };
     const io = localStorageOverrideIo(storage);

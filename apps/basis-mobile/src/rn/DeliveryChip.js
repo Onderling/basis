@@ -12,11 +12,11 @@ import { deliveryPresentation } from '../../../basis/src/v2/deliverySettings.js'
 import { t } from '../core/localisation.js';
 import { useTheme } from '../screens/v2/themeContext.js';
 
-export default function DeliveryChip({ state, reason = null, rowId, onRetry = null, testIDPrefix = 'circle-delivery' }) {
+export default function DeliveryChip({ state, reason = null, waiting = null, rowId, onRetry = null, testIDPrefix = 'circle-delivery' }) {
   const theme = useTheme();
-  const p = deliveryPresentation(state, { reason });
+  const p = deliveryPresentation(state, { reason, waiting });
   if (!p) return null;
-  const label = t(p.labelKey);
+  const label = t(p.labelKey, p.labelVars);
   const line = `${p.glyph} ${label}`;
   const styles = stylesFor(theme);
   return p.retryable ? (

@@ -45,7 +45,7 @@ test('a stranger\'s first five minutes: onboarding, a handle, a note, their card
     log('STEP2 a handle', 'PASS', 'Sam');
 
     // STEP 3 — a note with the "+"
-    await page.locator('.cc-fab').click();
+    await page.locator('.cc-fab').dblclick();
     await page.locator('.circle-vandaag-plus__act[data-act="household.note"]').click();
     await page.locator('.circle-vandaag-plus__body').fill('melk halen');
     await page.locator('.circle-vandaag-plus__save').click();
@@ -53,7 +53,7 @@ test('a stranger\'s first five minutes: onboarding, a handle, a note, their card
     log('STEP3 a note with the +', 'PASS', 'on Vandaag');
 
     // STEP 4 — share my contact: the card appears
-    await page.locator('[data-tab="mij"]').first().click();
+    await page.locator('.cc-persona-button__button').click();
     await page.locator('.cc-profile__share-contact').first().click();
     await expect(page.locator('.cc-share'), 'the card screen').toBeVisible({ timeout: 15_000 });
     await expect(page.locator('.cc-share__error'), 'no error instead of a card').toHaveCount(0);

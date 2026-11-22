@@ -39,8 +39,8 @@ export const KNOWN_PEERS_BROADCAST = 'device-known-peers';
 
 /** The catch-up pair: a sibling asks; a sibling answers with everything it knows. */
 export const KNOWN_PEERS_CATCHUP_SUBTYPES = Object.freeze({
-  request: 'device-known-peers-request',
-  batch:   'device-known-peers-batch',
+  request: 'device-known-peers-catchup-request',
+  batch:   'device-known-peers-catchup-batch',
 });
 
 function bindingToWire(b) {

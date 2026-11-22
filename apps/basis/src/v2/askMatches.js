@@ -12,6 +12,7 @@ import { findOfferingMatches } from '@onderling/kring-host/findOfferingMatches';
 import { noticeboardIntentOf } from '@onderling/item-types';
 import { memberLabelFor } from './circleStream.js';
 import { contactIdFor } from '../core/handlers/threadedChat.js';
+import { sealedKeyValue } from './localStoreSeal.js';
 
 /** The key a Skip is kept under: one match under one ask. */
 export const askMatchSkipKey = (postId, webid) => `${postId}|${webid}`;
@@ -74,18 +75,21 @@ export function createAskMatchSkips({ load, save } = {}) {
 
 const STORAGE_KEY = 'cc.askMatchSkips';
 
-/** localStorage-backed IO (web). */
-export function localStorageAskMatchSkipsIo(storage = globalThis.localStorage) {
+/**
+ * The Skips' io, SEALED at rest (ledger L1083: which ask posts the person skipped for whom), over localStorage (web) or
+ * AsyncStorage (phone). Its first readers are the noticeboard's match rows (both shells, inside an opened circle, after
+ * the agent's boot); before the key a read is "nothing kept" and a write is refused.
+ */
+export function sealedAskMatchSkipsIo(storage) {
+  const kv = sealedKeyValue(storage, { name: 'the ask-match skips', strict: true, resealAtStart: [STORAGE_KEY] });
   return {
-    load: () => { try { const s = storage?.getItem(STORAGE_KEY); return s ? JSON.parse(s) : null; } catch { return null; } },
-    save: (v) => { try { storage?.setItem(STORAGE_KEY, JSON.stringify(v)); } catch { /* private window */ } },
+    load: async () => { try { const s = await kv.getItem(STORAGE_KEY); return s ? JSON.parse(s) : null; } catch { return null; } },
+    save: async (v) => { try { await kv.setItem(STORAGE_KEY, JSON.stringify(v)); } catch { /* private window / no content key yet */ } },
   };
 }
 
-/** AsyncStorage-backed IO (mobile). */
-export function asyncStorageAskMatchSkipsIo(AsyncStorage) {
-  return {
-    load: async () => { const s = await AsyncStorage?.getItem(STORAGE_KEY); return s ? JSON.parse(s) : null; },
-    save: (v) => AsyncStorage?.setItem(STORAGE_KEY, JSON.stringify(v)),
-  };
-}
+/** The web's io (localStorage). */
+export function localStorageAskMatchSkipsIo(storage = globalThis.localStorage) { return sealedAskMatchSkipsIo(storage); }
+
+/** The phone's io (AsyncStorage). */
+export function asyncStorageAskMatchSkipsIo(AsyncStorage) { return sealedAskMatchSkipsIo(AsyncStorage); }

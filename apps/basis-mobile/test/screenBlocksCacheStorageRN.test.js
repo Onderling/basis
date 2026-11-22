@@ -6,7 +6,9 @@
  * the wire-level key shape (`cc.screenBlocksCache.<screenId>`) is
  * identical on both surfaces.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { groupKeyStrategy } from '@onderling/pod-client';
+import { setShellContentSeal, openStoredValue } from '../../basis/src/v2/localStoreSeal.js';
 import {
   asyncStorageScreenBlocksCacheIo,
   makeScreenBlocksCacheRN,
@@ -24,13 +26,16 @@ function mockAsyncStorage() {
 
 describe('δ.1 — screenBlocksCacheStorageRN', () => {
   let storage;
-  beforeEach(() => { storage = mockAsyncStorage(); });
+  // the cache seals its values (ledger L1081): these tests run with a content key published, as after a boot
+  const seal = groupKeyStrategy({ groupKey: Buffer.from(new Uint8Array(32).fill(8)).toString('base64url') });
+  beforeEach(() => { storage = mockAsyncStorage(); setShellContentSeal(seal); });
+  afterEach(() => setShellContentSeal(null));
 
   it('round-trips blocks through save / load', async () => {
     const io = asyncStorageScreenBlocksCacheIo(storage);
     const blocks = [{ blockId: 'b1', type: 'noticeboard', status: 'ok' }];
     await io.save('s1', blocks);
-    expect(storage.map.get('cc.screenBlocksCache.s1')).toBe(JSON.stringify(blocks));
+    expect(openStoredValue(seal, 'cc.screenBlocksCache.s1', storage.map.get('cc.screenBlocksCache.s1'))).toBe(JSON.stringify(blocks));
     expect(await io.load('s1')).toEqual(blocks);
   });
 

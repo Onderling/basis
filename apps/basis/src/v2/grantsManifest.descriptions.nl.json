@@ -1,0 +1,14 @@
+{
+  "grants.grant": {
+    "what": "Leg vast dat een scherm namens je mag handelen.",
+    "params": {}
+  },
+  "grants.revoke": {
+    "what": "Leg vast dat een scherm is ontkoppeld.",
+    "params": {}
+  },
+  "grants.revoke-tokens": {
+    "what": "Trek losse rechten in.",
+    "params": {}
+  }
+}

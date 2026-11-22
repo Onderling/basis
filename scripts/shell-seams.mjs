@@ -28,6 +28,10 @@ export const SEAMS = Object.freeze([
   // queue in shared code, the circle on screen first and one step at a time. Each shell had its own dozen timers, all
   // firing at once over every circle, in the window where the person first taps (the cold-start freeze on a phone).
   { id: 'start-queue', pattern: /runStartQueue\(/, why: 'a start must pull in one order, one step at a time, the circle on screen first — never a burst of timers over every circle' },
+  // THE SETTINGS LANE IS HANDED ITS RAIL AT BOOT: the items rail judges every arrived statement by the settings changes
+  // the lane kept, and asks the lane when they are not known yet; a lane never handed its rail answers nothing at a quiet
+  // start, and the circle switches go unjudged on that device (the box lacked it until 2026-11-21).
+  { id: 'settings-lane-knows-its-rail', pattern: /circlePolicyLane\??\.useRail\(/, why: 'without its rail at boot the settings lane cannot tell the content rails what a circle\'s switches were, and they are not judged on arrival' },
   // PRESENCE ONLY WHERE THE PERSON STILL IS: every shell registers its per-circle addresses on the relay from a union
   // of lists (the substrate's, a cached one, a just-joined circle); a circle the fold says was left or removed is taken
   // out by one shared filter. Web and mobile kept a cached list that put a left circle back on the next socket.
@@ -58,6 +62,23 @@ export const SEAMS = Object.freeze([
   // then opens that thread or circle another way, the shell asks the driver to recheck, or the banner lies over the
   // opened screen's header (found walking the phone, 2026-11-14: a tap on the thread's ⋯ landed on it). The box paints no
   // banner, so the seam is web and mobile only.
+  // THE CIRCLES LIST HEARS A LINE THAT LANDS while it is on screen (subscribeTileChanges, circleTilePreviews.js): a
+  // shell paints its list from it. Neither shell did on 2026-11-20 (the upgrade walk; a two-app browser walk).
+  // A START THAT COULD NOT READ THE CONTENT KEY (L1115) is said in words with "try again" (web, phone) or named in the
+  // log before a restart (the box): one decision, `bootFailureNotice`. A shell that paints the raw reason instead tells
+  // the person nothing they can act on, and one that carries on as if empty invites a restore that was not needed.
+  { id: 'start-failure-words', pattern: /bootFailureNotice\(/, why: 'a start that could not read the content key must say so in words and offer to try again, never look like an empty account' },
+  // A SAVE REFUSED because the value it would replace could not be opened is SAID (L1115): the stores swallow the throw.
+  // THE WAY OUT (L1115): the start-failure notice's second door, "start this device over from your phrase", and a boot
+  // that finds a start-over cut short before anything reads (`readStartOverMark`) and asks the phrase again. The box has no phrase prompt: it
+  // says it in its log and on the bot's admin line and stops restarting.
+  { id: 'start-over-door', pattern: /readStartOverMark\(/, shells: ['web', 'mobile'], why: 'a device whose key can never be read must have a way out that does not loop: start over from the phrase, finished even after a crash, never a clear without the phrase' },
+  { id: 'stored-value-refusal-said', pattern: /onStoredValueRefused\(/, shells: ['web', 'mobile'], why: 'a change the person made that was not saved (the stored value could not be opened) must be said, not silently dropped' },
+  // A KEPT PICTURE STAYS UNTIL THE LIVE STATE IS CAUGHT UP (keptPicture.js): Today's kept day and the circles list's
+  // kept picture are painted until the circles were read, and only a caught-up state is kept. The phone replaced its
+  // kept day with an early empty read for ten seconds (2026-11-22) and wrote that read back as the next picture.
+  { id: 'kept-picture', pattern: /keptPictureView\(/, shells: ['web', 'mobile'], why: 'an early read made before the circles are known paints "nothing" over the kept picture and is kept as the next start\'s picture' },
+  { id: 'circles-list-hears-new-lines', pattern: /subscribeTileChanges\(/, shells: ['web', 'mobile'], why: 'a line that lands while the circles list is on screen stays off its tile (old preview, old count) until the person leaves and comes back' },
   { id: 'banner-recheck-on-open', pattern: /\.recheck\(\)/, shells: ['web', 'mobile'], why: 'a banner raised before its thread or circle was opened stays over the header of that screen and takes the taps meant for it' },
   // THE SCREEN DOOR in the app: a pasted or scanned screen offer reaches the grant only through the shared pairing (three
   // codes, one pick). The box has no pairing UI: its door is the household bot's (`botScreens`), which composes the same
@@ -169,6 +190,9 @@ export const SEAMS = Object.freeze([
   // A hosted bot keeps its household's export file (the one format kept readable across versions) on its own disk,
   // one a night, so a snapshot carries it off and /import can read it back. A person's device keeps no such shelf.
   { id: 'household-export-shelf', pattern: /createExportShelf\(/, shells: ['box'], why: 'a hosted bot\'s household survives a wipe, a lost disk and a new version' },
+  // THE EGRESS GATE (L1035): what leaves for a toolbox passes one gate at the box's waist. Web and phone hold no
+  // toolboxes (the tools app is a door manifest of the box): a screen reaches a tool through the box's door.
+  { id: 'egress-gate', pattern: /wrapCallSkillWithEgressGate\(/, shells: ['box'], why: 'exactly a toolbox\'s tool and its input leave, an off toolbox is refused before the call, and every call is recorded' },
   { id: 'bot-inbox-door', pattern: /createInboxDoor\(/, shells: ['box'], why: 'a function profile\'s contact inbox is answered by its assistant; a person\'s never is' },
   // A household bot WRITES FIRST (reminders of what people dated): only a shell that hosts a bot runs the tick. Web and
   // mobile are a person's devices and write first to nobody.
@@ -292,6 +316,9 @@ export const SEAMS = Object.freeze([
   // line any other way is how the sheet would come to act in a circle.
   // (the shared "+" door, `createPlusDoor`, reads the line through `plusLineOutcome` itself: a shell composes the door)
   { id: 'plus-line-outcome', pattern: /createPlusDoor\(/, shells: ['web', 'mobile'], why: 'the "+" line makes an own act or refers to a circle, and never acts in one' },
+  // HOW FAR THE "+" GOES PER PERSONA (`plusCeilingRow`, built into each persona by `buildMijViewModel`): the row on the
+  // persona's card in Mij, whose tap writes what the row says (`row.write`: `agents.setPlusCeiling`)
+  { id: 'plus-ceiling-row', pattern: /p\.plusCeiling/, shells: ['web', 'mobile'], why: 'a person sets per persona how far their own "+" goes, on both shells' },
   // THE BOX AND THE "+": every `plus-*` seam names web and the phone only. The box (the always-on household device) does
   // not compose the person's own "+": a declared exception until after the alpha (docs/catalogue/assistant.md,
   // "Decided, not built"); its Telegram door runs the same engine over the household's things.
@@ -324,6 +351,12 @@ export const SEAMS = Object.freeze([
   { id: 'plus-opening', pattern: /\.opening\(\{/, shells: ['web', 'mobile'], why: 'the "+" says what it is the first time, and once what is new, on every shell' },
   { id: 'plus-help-route', pattern: /createPlusDoor\(\{[^}]*routeLine:/, shells: ['web', 'mobile'], why: '"help" in the "+" ends with the model route that answers, never "no model" while one is set' },
   { id: 'plus-told-log', pattern: /createPlusDoor\(\{[^}]*toldLog:/, shells: ['web', 'mobile'], why: 'what the "+" told a person is kept on their device, so it is said once' },
+  // A PERSON'S WRITE IN A CIRCLE ASKS THAT CIRCLE (L1042): the agent decides at the outer waist; a shell hands in only
+  // the stores it alone has. The box hands none until the box row (L1050): one circle's rule at every door is Frits's call.
+  { id: 'circle-capability-inputs', pattern: /circleCapabilityInputs:/, shells: ['web', 'mobile'], why: 'a write a circle switched off must be refused when tapped, as when typed: the waist reads the circle\'s policy through this reader' },
+  // A SHARE'S OWN COPY INTO ITS SOURCE CIRCLE asks that circle first (`agent.mayWriteInto`): the shells call the share
+  // functions directly, so each hands the agent's gate in. The box shares nothing.
+  { id: 'share-asks-source', pattern: /\.mayWriteInto\b/, shells: ['web', 'mobile'], why: 'a share whose copy the source circle refuses is refused on the sender in words, not shown there and refused on every other device' },
   { id: 'plus-own-lists', pattern: /createPlusDoor\(\{[^}]*ownListsOf:/, shells: ['web', 'mobile'], why: 'the "+" reads the ticked self\'s own lists first, read as that self' },
   // THE PERSON'S OWN RECORD (ownActions.js, ledger L203): what no op shows (a proposal declined, a line placed nowhere)
   // is noted by the "+" door through the agent's `noteOwnAct`; a shell that does not hand it records only what ran
@@ -366,6 +399,15 @@ export const SEAMS = Object.freeze([
   // option through (`enrolDeviceName: opts.enrolDeviceName`), and a pass-through would satisfy a name-only pattern
   // while no shell supplied a value. The precedent for any seam a bundle forwards.
   { id: 'enrol-names-the-device', pattern: /enrolDeviceName:\s*\(\)\s*=>/, shells: ['web', 'mobile'], why: 'an enrolled device with no typed name reads "another device" on every one of the person\'s other devices' },
+  // THE FIRST FRAME (ledger L1051): before the agent is there a shell paints the default start (`firstFrameTab`, Vandaag),
+  // so a person on the default never sees the app jump to it seconds later. The phone only: the web paints nothing
+  // until its agent is there and opens straight on the start (circleApp's startTabFor); the box has no screen.
+  { id: 'first-frame-tab', pattern: /firstFrameTab\(/, shells: ['mobile'], why: 'the app opens on the circles list and jumps to Vandaag seconds later, under the person\'s finger' },
+  // THE "+" DOCKED IN THE TAB BAR: what a press on it or on one of its round buttons does is the shared `plusPress`
+  // (src/v2/plusDial.js); the host keeps only whether it is open and runs the target handed back. A host that decides
+  // for itself drifts from the other (a second tap that closes on one shell and opens the chat on the other). The box
+  // has no tab bar.
+  { id: 'plus-dial-press', pattern: /plusPress\(/, shells: ['web', 'mobile'], why: 'the "+" behaves differently per shell: the middle spot, the double tap into the chat, or the close' },
   // Today's reach card: a device with no relay says so and what works already. The host hands the strip the relay
   // question's own predicate; a shell that does not shows no card, and its person sends into nothing unwarned.
   { id: 'today-knows-no-relay', pattern: /relayKnown:\s*\(\)\s*=>/, shells: ['web', 'mobile'], why: 'a device with no connection point sends into nothing and nothing on Today says so' },
@@ -376,6 +418,13 @@ export const SEAMS = Object.freeze([
   // `useSignatureEquation`): node:crypto on the box, WebCrypto's batch on the web. A shell that does not checks every
   // signature in pure JS (~10 ms on a laptop, ~61 ms on a mid-range phone, against ~0.15 ms).
   { id: 'signature-equation', pattern: /install\w*SignatureEquation\(/, why: 'a shell that installs no fast equation checks every signature in pure JS: seconds of a start on a phone' },
+  // …and SIGNING + key derivation (core `useSigningEquation`, L619): libsodium over JSI on the phone, node:crypto on the
+  // box, taken only on tweetnacl's exact bytes. NOT the web: WebCrypto's Ed25519 is asynchronous and every signing path
+  // is synchronous, so the web signs with tweetnacl (a laptop signs fast enough; the phone is where it cost seconds).
+  { id: 'signing-equation', pattern: /install\w*Signing\(/, shells: ['mobile', 'box'], why: 'a phone that signs and derives keys in pure JS spends part of its start on it (its identities, circle addresses and every greeting it signs)' },
+  // …and SECRETBOX (core `useSecretbox`, L619): libsodium over JSI on the phone, taken only on tweetnacl's exact bytes.
+  // The phone only: node:crypto and WebCrypto offer no XSalsa20-Poly1305, so the box and the web keep tweetnacl.
+  { id: 'secretbox', pattern: /install\w*Secretbox\(/, shells: ['mobile'], why: 'a phone that opens its sealed stores in pure JS spends about a second of its start on it' },
   // NEARBY'S CONVERSATION STREAM AND TAB COUNTS: what the Conversation tab holds in what order (chat lines, question and
   // circle cards by arrival) and how much is new on each tab are decided by shared functions; a painter that sorts or
   // counts by itself drifts from the other shell. Both are painted by Nearby's painter, so the web set includes it.
@@ -393,8 +442,8 @@ export const SEAMS = Object.freeze([
 
 /** A shell is a file SET: the files that together compose the substrate for that surface. */
 export const SHELLS = Object.freeze([
-  { name: 'web',    files: ['apps/basis/web/v2/circleApp.js', 'apps/basis/web/v2/circleNearby.js'] },
-  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/core/phoneInboundWiring.js', 'apps/basis-mobile/src/core/phoneAppOps.js', 'apps/basis-mobile/src/core/phonePodReadBack.js', 'apps/basis-mobile/src/core/phonePodSession.js', 'apps/basis-mobile/src/core/circleMedia.js', 'apps/basis-mobile/src/core/circlePods.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/src/screens/v2/CircleAdminPanelScreen.js', 'apps/basis-mobile/App.js'] },
+  { name: 'web',    files: ['apps/basis/web/v2/circleApp.js', 'apps/basis/web/v2/circleNearby.js', 'apps/basis/web/v2/circleMij.js', 'apps/basis/web/v2/circleLauncher.js'] },
+  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/core/phoneInboundWiring.js', 'apps/basis-mobile/src/core/phoneAppOps.js', 'apps/basis-mobile/src/core/phonePodReadBack.js', 'apps/basis-mobile/src/core/phonePodSession.js', 'apps/basis-mobile/src/core/circleMedia.js', 'apps/basis-mobile/src/core/circlePods.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/src/screens/v2/CircleAdminPanelScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMijScreen.js', 'apps/basis-mobile/App.js'] },
   { name: 'box',    files: ['apps/basis/bin/device-runner.mjs', 'apps/basis/src/telegram/runner.js'] },   // the runner is the box's Telegram door
 ]);
 

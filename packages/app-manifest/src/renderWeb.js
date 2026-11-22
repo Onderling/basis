@@ -613,6 +613,12 @@ export function renderWeb(manifest) {
   if (tabs.length > 0) nav.tabs = tabs;
   if (actions.length > 0) nav.actions = actions;
   if (meActions.length > 0) nav.meActions = meActions;
+  // (g) Nav-chrome "+" — where it sits in the bar, the round buttons it opens into, which sits on its own spot.
+  //     Projected from `manifest.plus` (dial items in the tab NavItem shape). Kept OUT when absent.
+  const plus = manifest.plus;
+  if (plus && typeof plus === 'object' && !Array.isArray(plus)) {
+    nav.plus = { place: plus.place, middle: plus.middle ?? null, dial: navRows(plus.dial) };
+  }
   return nav;
 }
 

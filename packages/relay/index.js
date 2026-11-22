@@ -9,7 +9,7 @@
 
 export { WsServerTransport }    from './src/WsServerTransport.js';
 export { RelayAgent }           from './src/RelayAgent.js';
-export { startRelay, getLanIp } from './src/server.js';
+export { startRelay, getLanIp, RELAY_MSG_RATE } from './src/server.js';
 export { ForwardQueue }         from './src/ForwardQueue.js';
 export { GroupAuthVerifier }    from './src/GroupAuthVerifier.js';
 export { MultiRecipientQueue }  from './src/MultiRecipientQueue.js';

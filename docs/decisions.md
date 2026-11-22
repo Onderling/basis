@@ -2028,3 +2028,284 @@ until the item-type validator's checks are compiled ahead of time. A frame rule 
 app's host (the static host sends no headers today). Whether the web app keeps its address beside the public site
 (`onderling.org/basis`, the site's origin) or moves to one of its own is Frits's to decide. When a toolbox's record
 names a page, switching it on is refused if that page's origin is the web app's. Ledger: L1041.
+## 2026-11-18 — A circle uses an outside toolbox: one op for every tool, placed by the operator, switched on by the admin (Frits decided; Fable ruled the shapes)
+
+**Status:** decided; the door half built (the tool call from the box, `/toolbox`, the words); choices and a screen's
+call built 2026-11-19 (the entries of that date below); the screen client a toolbox's own page imports, one file,
+built 2026-11-19 (its entry below). A link from Basis to a toolbox's own page is not built.
+
+**Context:** Frits's grocery app (a toolbox) should be usable from the household bot. Nothing in the repo called an
+outside agent from the box: `contactSkills.js` turns a contact's skill cards into commands at runtime (web and phone,
+the native dialect), and `remoteHandlers.js` binds an op to a remote agent by key on the native path; neither reaches a
+bearer-key HTTP endpoint from the box.
+
+**Decision:** the words: a TOOL is one callable function; a TOOLBOX is the program that offers them (it answers when
+asked, keeps nothing of the circle, acts for nobody); a DOOR is an input route (Basis, Telegram, a screen); a NODE is a
+machine that is on, which doors end at and tools are called from; the household bot is the circle's COMPANION. Tools
+never call tools: a person's act calls a tool, and the person's choice becomes an ordinary op. One op reaches every
+tool (`tools.useTool {toolbox, tool, input}`), so the bot's closed op map stays closed; the word that reaches a tool is
+data of the toolbox. No capability row and no feature per toolbox: switching a toolbox on is the switch. The box's
+operator PLACES a toolbox (one file with its name, address and words, beside its key); no chat line carries an
+address, a tool id or a key; a placed toolbox is off until the admin's yes in their own private chat. The wire is
+current A2A (1.0, JSON-RPC `SendMessage`) through one small client with no dependency: Basis turns to current A2A,
+and core's older transport (`packages/core/src/a2a`, an earlier REST draft) keeps its name. A tool's answer that is a list
+of things is a schema.org `ItemList` of Things; a list entry made from one refers to it as `{type: its @type, ref: its
+identifier}`, as given, with the toolbox beside it as `source` (never identity, so the toolbox's own page and the chat
+land on the same entry). The answer borrows the property vocabulary's TERMS (schema.org), not its disclosure policy. A
+price shows on a choice's detail line, a total only as the answer to "what does this list cost", and is never stored in
+an entry.
+
+**Consequences:** `docs/catalogue/tools.md`. The help phrases for new ops are an op's description until the frozen
+phrases move into the descriptions. A key handed over from a person's own app is later work.
+
+---
+
+## 2026-11-19 — An op's weight follows from what it writes, and a door offers by weight; an exception is named on its op (Fable ruled)
+
+**Status:** settled and built for the person's own "+" and the household bot's table.
+
+**Context:** the "+" kept a hand-written fence (an `adminLike` test and four named exceptions), and the household
+bot's role columns were a list of op ids with nothing tying them to what an op does. A new op was safe at a door only
+if someone remembered to list it.
+
+**Decision:** every op that writes declares `writes: {scope, what}`, and its weight (1 to 6) follows from that and from
+`reveals` (`opWeight`); it is never declared by itself. A door offers up to a ceiling: the own "+" up to 3 by default,
+set per persona to 0, 1, 2 or 3 and kept on the persona (`_plus.ceiling`, inherited from the general persona, the
+strictest of a turn's selves holding); the bot's columns are observer 1 and 2, member up to 3, admin up to 3 and 5. An
+op a door offers beyond its column is an exception from a closed list, each named with its reason on its own manifest
+row (`botException`), without a chat surface, and with its effect kept in the person's private chat. An op with no
+weight is not offered. A toolbox's ops are a circle's control (5): a toolbox decides where the circle's questions go,
+and scope is the widest place an op affects, not where its record is kept.
+
+**Alternatives / why:** *a weight declared per op* would be one more value to keep honest beside `writes`; derived, it
+cannot disagree. *Lists per door* (the old fence, the old columns) let a new op through by default and kept the reason
+in a reviewer's head. *No exceptions at the bot* would take away a person's own screens and identity link at the door
+they use.
+
+**Consequences:** the convention is in `docs/conventions/manifest-standard.md`; tests pin the "+" fence
+(`plusModelFence.test.js`) and the bot's columns (`botTableByWeight.test.js`). Code: `packages/app-manifest/src/atoms.js`,
+`apps/basis/src/assistant/plusDoor.js`, `apps/basis/src/v2/assistantOps.js`.
+
+---
+
+## 2026-11-19 — A faster crypto implementation is vetted against fixed bytes in the source, never against tweetnacl at start; tweetnacl answers until then and on any refusal (Fable ruled)
+
+**Status:** settled and built for all three: the signature check, secretbox, and signing (2026-11-19: three seeds by
+three messages, the key pairs and signatures written as bytes, `SIGNING_VECTORS`), so no install runs tweetnacl.
+
+**Context:** the signature check, signing and key derivation, and secretbox each stand behind a port a shell may fill
+with a native implementation (libsodium on the phone, `node:crypto` on the box). The check used to mint a random key
+pair and signature with tweetnacl at every install, which is the slow work the port exists to avoid, and on the web it
+vetted tweetnacl against itself.
+
+**Decision:** an implementation is taken only if it gives the expected answers on vectors written in the source as
+bytes: the twelve Ed25519 edge cases, one honest signature and three refusals for the check; fixed boxes for three
+small messages, three forgeries and one 768 KiB message (built from a byte formula, its parts pinned) for secretbox.
+Otherwise tweetnacl stays and the answer says why. After the vetting, a call that throws (or a secretbox open the
+implementation refuses) is answered by tweetnacl and said once in the log, so a broken native module never breaks a
+start or a send. A shell with no implementation that gives the same bytes keeps tweetnacl: the box for secretbox, the
+web for signing and secretbox.
+
+**Alternatives / why:** *compare with tweetnacl at start* costs the start what the port saves, and a reference computed
+at run time is only as fixed as the library that computes it. *Trust a well-known library without vetting* fails on
+the point that made the check strict: Ed25519 libraries disagree on crafted signatures, and a device that answers
+differently forks the circle's view. *Small vectors only* would pass a bridge that is wrong for a device-log segment.
+
+**Consequences:** `packages/core/src/crypto/` (`ed25519Strict.js`, `ed25519Sign.js`, `secretbox.js`); guards
+`lint-one-signing` and `lint-one-secretbox`. Amends nothing in 2026-11-12's one-rule entry; it says how a faster
+equation is admitted.
+
+---
+
+## 2026-11-19 — A toolbox's pictures reach a door only as bytes the box fetched from the toolbox's own host (Frits asked; Fable ruled)
+
+**Status:** settled and built (`fetchThumbs`, `apps/basis/src/v2/toolboxClient.js`).
+
+**Context:** a toolbox's answer names a picture per thing, usually on a shop's own site. A door that loads that URL tells
+the shop the person's address and when they looked.
+
+**Decision:** the box fetches the picture, only from the toolbox's own placed host (the origin of its endpoint, with its
+key), only jpeg, png or webp by the first bytes, within a size, count and time cap, and only for a door that shows
+pictures. It travels on as bytes; the URL never does. Anything else is left out and the thing is shown in words.
+
+**Alternatives / why:** *let the door load the URL* leaks the person to the shop. *Let the box fetch from any host*
+widens the box's egress from one host per toolbox to the whole web. *No pictures* was the fallback; a door that shows
+them is how people choose groceries.
+
+---
+
+## 2026-11-19 — A toolbox's page is a screen bound to its own toolbox (Fable ruled)
+
+**Status:** settled and built (`apps/basis/src/v2/screenActing.js`, `botScreens.js`).
+
+**Context:** a toolbox's own page calls `tools.useTool` through the household bot as a paired screen of the person. One
+list, `BOT_SCREEN_NEVER`, both kept an op off a screen's buttons and made it uncallable by any screen, and a screen's
+grant did not say which toolbox it was for.
+
+**Decision:** two lists: what a screen holds without a button (`SCREEN_NO_BUTTON`, where `useTool` is) and what a
+screen can never call (`BOT_SCREEN_NEVER`). The pairing offer names its toolbox, an offer for a toolbox that is not on
+is refused before anything is asked, and the grant records the toolbox: a call for another toolbox is refused
+(`toolbox-not-yours`), and a screen paired without a toolbox gets no `useTool`. An answer too large for one relay
+envelope is refused as `answer-too-large`, never cut.
+
+**Alternatives / why:** *one list for both* either gives every screen a button for a raw tool call or takes the call away
+from the page that needs it. *An unbound grant* lets one toolbox's page drive another toolbox as the person. *Cutting a
+large answer* hands the page a list that looks complete and is not.
+
+---
+
+## 2026-11-19 — A toolbox's page lives on an origin of its own, never beside the Basis web app (Fable ruled)
+
+**Status:** decided; not built. Basis hosts no toolbox page today; where and how one is hosted is Frits's.
+
+**Context:** a toolbox's page keeps its screen key in the browser, and browser storage is per host, not per path.
+
+**Decision:** a toolbox's page is served from an origin of its own (one per toolbox), never from the host of the Basis
+web app.
+
+**Alternatives / why:** *a path beside the web app* would let the page's code read the web app's own storage, where a
+person's Basis keeps its keys.
+
+---
+
+## 2026-11-19 — Everything a shell writes to the device is sealed, unless it must be read before a key exists (Frits)
+
+**Status:** decided and built (2026-11-20). The stores and the small key-value stores of a person's content are
+sealed on every shell; `lint-sealed-key-value` counts every raw key-value write against a baseline in which each
+remaining one is named with its reason (sealed by its caller, not content, or not sealable), none as debt. What stays
+readable is listed in `docs/architecture.md`, the Agent home.
+
+**Context:** the agent's vaults and the shells' stores were sealed, but small key-value values the shells write
+(settings, caches, marks) were decided one by one, and one of them held the person's own model endpoint with its API
+key in plain text.
+
+**Decision:** sealed is the default for whatever a shell writes to the device, with the device's content key
+(`apps/basis/src/v2/localStoreSeal.js`). The exception is a value that must be read before that key exists, and what a
+paired screen keeps, since a screen holds no content key. A write before the key is refused rather than stored plain;
+a read before it says "nothing kept" or waits for the key; an old plain value is resealed once.
+
+**Alternatives / why:** *decide per value* is how a key ended up in plain text: nothing failed when a value was left
+out. *Seal only what looks sensitive* asks each writer to judge, and contact ids, circle ids and usage are sensitive
+together even where each is not.
+
+**Consequences:** the remaining plain stores are listed in `docs/architecture.md` under "Where the runtime does NOT
+match this yet" until the guard holds them.
+
+---
+
+## 2026-11-19 — A toolbox's page is a screen through one client file; a grant that ran out and one taken away are one refusal
+
+**Status:** settled and built (`apps/basis/src/v2/screenClient.js`, built by `apps/basis/scripts/build-screen-client.mjs`).
+
+**Context:** a toolbox's own page, possibly opened from disk, has to pair with the household bot, call `tools.useTool`
+as the person and handle every way that can fail. The web app's screen shell already held all of a screen's logic
+(`createScreenView`), but only inside the app.
+
+**Decision:** the page imports one ESM file (with its types and version), which is the web app's screen composition
+without the paint; no screen logic is copied. Every refusal carries a fixed code from one table (`screenClientCode`),
+and a call never throws. A grant that ran out and a grant that was taken away are ONE code, `grant-expired`, since the
+page does the same for both: pair again. A toolbox's own failures fold into `toolbox-unreachable`. The client keeps
+its storage under a prefix per toolbox, and sign-out removes exactly that.
+
+**Alternatives / why:** *a client written apart from the app* would be a second screen implementation to keep in step.
+*Separate codes for expired and revoked* would ask every page to tell apart two cases it handles the same way.
+*Throwing on a refusal* leaves each page to catch errors whose
+shape it cannot know.
+
+**Consequences:** `docs/catalogue/tools.md`. A screen holds no content key, so what it keeps in the browser is a bearer
+credential; that is why a toolbox's page lives on an origin of its own (the entry above).
+
+---
+
+## 2026-11-20 — A toolbox's page may be served from the box itself: localhost only, entered with a one-use entry from the bot's link (Frits decided the reach; Fable ruled the shape)
+
+**Status:** decided; the page server and the entry built (`apps/basis/src/v2/toolboxPages.js`); the https server in
+front, its certificate and the address on the home network are the operator's and not built.
+
+**Context:** a toolbox's page needs https (its client uses the browser's `crypto.subtle`) and should be reachable on the
+home network only, by the people of the household only. Until now the box opened no port at all.
+
+**Decision:** the box serves a placed toolbox's page from `<data-dir>/toolboxes/<name>/page/`, on 127.0.0.1 only and
+only while that toolbox is on; an https server in front, run by the operator, is what the home network reaches. The
+link `/scherm <toolbox>` sends carries an ENTRY in its query beside the pairing ticket in its fragment, made together and
+equally short-lived, but only when the box serves that page itself. The page server spends the entry once into a cookie
+for that toolbox's path (`HttpOnly; Secure; SameSite=Strict`, 30 days) and asks on every request whether the person is
+still in the household and their role may use the toolbox. Entries and cookies are rows in a sealed store of the box,
+removed when the person is revoked or the toolbox switched off. They decide only who may load the page's files; the
+page's data still comes only through its paired grant.
+
+**Alternatives / why:** *serving on the home network directly* needs a certificate in the box's own process and opens a
+port before anything checks it. *The ticket alone* would put the pairing secret in the server's request line and logs;
+the fragment keeps it in the browser. *A cookie without a server-side row* could not be ended when a person leaves.
+*An entry for every placed page* would hand a working secret to a host that is not this box.
+
+**Consequences:** `docs/catalogue/tools.md`. One origin per toolbox (the entry of 2026-11-19) is the front server's to
+give (one name or one port per toolbox); the box's page server routes by path and cannot enforce it.
+
+---
+
+## 2026-11-20 — A toolbox's cards: an album per shop with one message under it; slot words in the operator's file (Frits said yes to all three; Fable shaped them)
+
+**Status:** settled and built (`thingCards.js`, `fetchThumbs`, `takeSlots` in `apps/basis/src/v2/`).
+
+**Context:** Frits's first look in Telegram: few pictures, the photos drawn huge (a lone photo is drawn at the chat's
+width), and `zoek hagelslag bij Albert Heijn` found a gift card because the whole line went on as the query.
+
+**Decision:** the box fetches pictures for the rows shown as cards first (3 per shop), within the existing caps. Per
+shop a door that shows pictures sends ONE group of pictures (Telegram: an album) and ONE message with the numbered
+lines and the buttons, since an album carries no buttons; fewer than two pictures send no group. The shared model
+(`thingCardGroups`) decides; a door only sends. Phrases that fill a tool parameter are SLOTS on a word in the
+operator's placed file (`slots: [{param, list?, values: {value: [phrases]}}]`), taken off the line only as whole words
+at its start or end, longest first; Basis knows no shop.
+
+**Alternatives / why:** *one photo per card* is what came out huge. *One picture alone* when a shop has one is drawn
+huge too; the words carry it. *The slots on the toolbox's card* would let the toolbox decide what the door hears; the
+words are the operator's, so their slots are too. *A phrase anywhere in the line* takes 'bij ah' out of 'koekjes bij ah
+bonus'.
+
+## 2026-11-20 — A circle's settings changes are kept for good; the rest of the governance lane still compacts (Fable ruled, on Opus's finding)
+
+**Decision:** a `policy-update` statement on the governance lane is RECORD class: it never expires, while rules changes,
+proposals and votes on the same lane keep their audit window and compact into the summary. The exception is one declared
+table (`RECORD_STATEMENTS` in `@onderling/item-store`'s `entryKinds.js`), read by the event log's prune through
+`retentionOfEntry`; the governance catch-up serves those statements first, so a joiner or a long-away device gets the
+whole settings history, never a head alone.
+
+**Why:** a circle's switches bind on every member's device by judging a content statement under the settings in force
+when it was made (the content line: each settings change names the content lanes' tips). With the changes compacted
+after 14 days, "which settings applied" became unknowable for anything older, and the circle's creation settings (the
+first change) lived nowhere durable. A settings change holds no content: the settings, the version, its author, the
+proposal that decided it, and the lanes' tips. They are rare and small.
+
+**Alternatives:** *keep the head only* (as before) cannot place a line. *Make the whole governance lane record* keeps
+every vote forever for no reader. **Not migrated:** circles whose older changes already compacted keep what they hold
+(fresh circles before the alpha); a device holding only a head treats everything older as unknown.
+
+## 2026-11-21 — The items lane judges what it applies; each device keeps its own proofs; a served head is taken only when asked (Fable ruled)
+
+**Status:** settled and built (`contentJudge.js`, `contentJudgments.js`, `keptPolicyChanges.js`, `itemsRail.js`,
+`frontierReplay.js` in `apps/basis/src/v2/`).
+
+**Decision:** every items statement is judged before it reaches the store, by the settings at its place on the content
+line, on every path that applies from the log (the live fan, a catch-up, the re-apply when a store opens). Refused: kept
+on the log, not applied. A later settings change that refuses an applied one takes it back locally, never by a
+corrective publish: the row is rebuilt from its statements still allowed, in the store's own merge order, so a later
+allowed change survives; only where no allowed statement of the row is left does a kept copy of the row as it was come
+back. The author's own device takes back too. What a device proved ("behind change k" / "not behind"), which act a
+statement was when it arrived (an add of a row not held, a change of a held one), and that kept copy are a SILENT entry
+kind on the device's own log (`content-judged`), not a store: never carried (not even to the person's other devices),
+accepted from no peer, not mirrored or exported, never counted or a wake; it ages out with the items statements, and a
+lost entry only means judging again. The kept settings changes are noted per device, and at a start the rail asks the
+settings lane for them. A head a member SERVES at catch-up carries `served: true` inside its signed body; the catch-up
+remembers which circles this device asked of which peer (until the last batch, or a window) and hands the rail
+`{asked: true}` only then; a served head is taken only when asked, judged only by "the type's app is on", and goes
+through the store's causal merge; in a live fan or an unasked batch it is refused.
+
+**Why:** the sender's gate binds only the sender's app. A served head is signed by the server, not the writer: judged
+as an add behind no line it was refused wherever adding was off, so a joiner missed the existing rows old members keep.
+The act is kept because a later judging cannot read it from the log (the row's making ages out, and a sender picks its
+own links).
+
+**Alternatives:** *a sealed store per circle* for the proofs (proposed first): a second place beside the log, named in
+every forget list. *Restore the kept copy always*: a take-back of one change would wipe a later allowed one. *Judge a
+served head as an act*: the joiner case above. **Residuals** are in `docs/conventions/enforceability.md`.

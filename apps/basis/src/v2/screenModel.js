@@ -137,3 +137,22 @@ export function buildScreenModel({
 
   return { rows, categories, audienceScope };
 }
+
+/**
+ * The caption over an audience-scoped list (ledger L747): WHICH circle it is shared with when the host can name it
+ * (`nameOf(circleId)` from the circles it holds), else the general line. A union names each circle it can; a scope
+ * it cannot name at all keeps the general line. Null when the list is not scoped (no caption). Shared, so web and the
+ * phone say the same.
+ * @param {object|null} scope  `buildScreenModel(...).audienceScope`
+ * @param {{nameOf?: (circleId: string) => string|null, t: Function}} o
+ * @returns {string|null}
+ */
+export function audienceScopeLine(scope, { nameOf = null, t }) {
+  if (scope == null) return null;
+  const refs = scope?.kind === 'union' && Array.isArray(scope.of) ? scope.of : [scope];
+  const names = typeof nameOf === 'function'
+    ? refs.map((r) => (r?.kind === 'circle-ref' && r.id ? nameOf(r.id) : null)).filter((n) => typeof n === 'string' && n.trim())
+    : [];
+  return names.length === refs.length && names.length ? t('circle.screen.audience_scope_named', { name: names.join(', ') }) : t('circle.screen.audience_scope');
+}
+

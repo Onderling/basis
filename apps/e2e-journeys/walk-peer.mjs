@@ -47,6 +47,7 @@ import { startRelay } from '@onderling/relay';
 import { bootRealAgentNode, sendCircleChat } from '../basis/test/support/pairRealAgents.js';
 import { makeCircleReachable } from '../basis/src/v2/householdRosterPairing.js';
 import { buildCircleInviteUri, joinCircleFromInvite } from '../basis/src/v2/circleInvite.js';
+import { wireLanes } from './journeys/_app.mjs';
 import { quickCreateCircle } from '../basis/src/v2/circleCreate.js';
 // The two halves of what a shell does on connect and after every join (`registerCirclePresence` in
 // web/v2/circleApp.js): prime each circle's security state, then register its address on the relay.
@@ -86,6 +87,9 @@ async function main() {
 
   const me = await bootRealAgentNode(`walk-peer:${HANDLE}`, {
     redeemTimeoutMs: 45_000,
+    // COMPOSED AS A SHELL COMPOSES A DEVICE: the device log on (the membership rider, the chat and items lanes ride
+    // it). Without it nothing fanned, and two 'product defects' were diagnosed against this harness (2026-08-27).
+    itemsLane: true,
     // The per-user address-fallback setting, threaded into the production factory. With it ON every
     // send also works when per-circle addressing is broken — so a run that means to prove addressing
     // must be able to turn it off.
@@ -100,6 +104,8 @@ async function main() {
         // call site in `pairRealAgents.js` already passed `(env)`; only the walk harness diverged.
         onPeerMessage: (env) => me._routerRef.fn?.(env),
   });
+  // …and the lane receivers a shell registers (chat replay, items, keys, governance, membership), as bootPeople does
+  wireLanes(me);
   console.log(`[walk-peer] connected to ${relayUrl}`);
   console.log(`[walk-peer] handle: ${HANDLE}  address-fallback: ${ADDRESS_FALLBACK ? 'on' : 'OFF'}`);
   console.log(`[walk-peer] my pubKey: ${me.pubKey}`);

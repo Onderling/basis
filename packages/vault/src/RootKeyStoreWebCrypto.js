@@ -41,6 +41,9 @@ export class RootKeyStoreWebCrypto extends RootKeyStore {
       req.onsuccess = (e) => resolve(e.target.result);
       req.onerror   = (e) => reject(e.target.error);
     });
+    // Close when a delete (or upgrade) of this database asks: holding on would BLOCK it — a start-over from the phrase
+    // deletes the key door in the same tab that read it (basis startOver.js). The next call opens it again.
+    this.#db.onversionchange = () => { try { this.#db?.close(); } catch { /* already closed */ } this.#db = null; };
   }
 
   #tx(mode, fn) {

@@ -21,6 +21,7 @@
  */
 
 import { releaseUnchanged, changedReleaseKeys } from '@onderling/agent-registry';
+import { sealedJsonIo } from '../../v2/localStoreSeal.js';
 
 /**
  * The member-side "what did I last share with this circle?" memo — the diff-gate's left-hand side.
@@ -59,14 +60,11 @@ export function createDisclosureShareMemo(io = {}) {
 /** localStorage io for `createDisclosureShareMemo` (web; mobile passes an AsyncStorage-backed one). */
 export function localStorageDisclosureShareIo(storage = globalThis.localStorage) {
   const KEY_PREFIX = 'cc.sharedDisclosure.';
+  // SEALED at rest (ledger L1083: what the person last shared of themselves with each circle)
+  const io = sealedJsonIo(storage);
   return {
-    get(key) {
-      try { const raw = storage?.getItem?.(KEY_PREFIX + key); return raw ? JSON.parse(raw) : null; }
-      catch { return null; }
-    },
-    set(key, value) {
-      try { storage?.setItem?.(KEY_PREFIX + key, JSON.stringify(value ?? {})); } catch { /* quota/private mode */ }
-    },
+    async get(key) { return io.load(KEY_PREFIX + key); },
+    async set(key, value) { try { await io.save(KEY_PREFIX + key, value ?? {}); } catch { /* quota / private mode / no content key yet */ } },
   };
 }
 /**

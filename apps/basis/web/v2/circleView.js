@@ -114,6 +114,9 @@ export function renderCircleView(container, {
   deliveryStateFor = null,
   // `deliveryReasonFor(msgId)` — why a failed send failed, when known (the delivery map's `reasonOf`); words only
   deliveryReasonFor = null,
+  // `deliveryWaitingFor(msgId)` — `{ sent, of }` while a circle line still waits for members without an address (the
+  // delivery map's `waitingOf`): the chip says how many it was sent to, in place of the rung's words
+  deliveryWaitingFor = null,
   localActor = null,
   onRetryDelivery = null,
   // Mandate ("entrust" / toevertrouwen) — the viewer's identity signals decide
@@ -409,7 +412,7 @@ export function renderCircleView(container, {
       }
       body.appendChild(renderBubble(row, {
         tr, onAction,
-        deliveryStateFor, deliveryReasonFor, localActor, onRetryDelivery,
+        deliveryStateFor, deliveryReasonFor, deliveryWaitingFor, localActor, onRetryDelivery,
         onEmbedButton, onEmbedOpen,
         media,
         viewerWebid, viewerIsAdmin, availability,
@@ -872,10 +875,10 @@ function renderLedenTab(body, { members = null, unreachable = null, selfWebid = 
  * Exported since the contact thread's own bubbles carry the same state (the two-phone walk's rows 9 and 11): one
  * builder, one set of classes, so a DM and a circle message can never word or shape the same fact differently.
  */
-export function buildDeliveryChip(state, { tr, onRetryDelivery = null, rowId = null, reason = null } = {}) {
-  const p = deliveryPresentation(state, { reason });
+export function buildDeliveryChip(state, { tr, onRetryDelivery = null, rowId = null, reason = null, waiting = null } = {}) {
+  const p = deliveryPresentation(state, { reason, waiting });
   if (!p) return null;
-  const label = tr(p.labelKey);
+  const label = tr(p.labelKey, p.labelVars);
   const el = document.createElement(p.retryable ? 'button' : 'span');
   el.className = `circle-view__bubble-delivery circle-view__bubble-delivery--${p.state}`;
   el.dataset.deliveryState = p.state;
@@ -915,7 +918,7 @@ export function buildDeliveryChip(state, { tr, onRetryDelivery = null, rowId = n
  * @returns {boolean} whether a chip was found or placed
  */
 export function paintDeliveryChip(root, rowId, state, {
-  tr, onRetryDelivery = null, reason = null,
+  tr, onRetryDelivery = null, reason = null, waiting = null,
   // the contact thread's bubbles carry the same chip under their own class names (`cc-cthread__*`)
   bubbleClass = 'circle-view__bubble', metaClass = 'circle-view__bubble-meta',
 } = {}) {
@@ -923,7 +926,7 @@ export function paintDeliveryChip(root, rowId, state, {
   const bubble = root.querySelector(`.${bubbleClass}[data-row-id="${CSS.escape(String(rowId))}"]`);
   if (!bubble) return false;
   const existing = bubble.querySelector('.circle-view__bubble-delivery');
-  const next = buildDeliveryChip(state, { tr, onRetryDelivery, rowId, reason });
+  const next = buildDeliveryChip(state, { tr, onRetryDelivery, rowId, reason, waiting });
   if (!next) { existing?.remove(); return true; }   // a state that shows nothing must CLEAR the old chip
   if (existing) existing.replaceWith(next);
   else {
@@ -938,7 +941,7 @@ export function paintDeliveryChip(root, rowId, state, {
 function renderBubble(row, {
   tr, onAction,
   // δ.2 — delivery-icon plumbing; all three are optional.
-  deliveryStateFor = null, deliveryReasonFor = null, localActor = null, onRetryDelivery = null,
+  deliveryStateFor = null, deliveryReasonFor = null, deliveryWaitingFor = null, localActor = null, onRetryDelivery = null,
   // S6.A — manifest-driven inline buttons carried on the bot event (payload.buttons).
   onEmbedButton = null,
   // tap a "See also" embed chip → open the referenced item's screen.
@@ -1198,6 +1201,7 @@ function renderBubble(row, {
     deliveryEl = buildDeliveryChip(deliveryStateFor(row.id), {
       tr, onRetryDelivery, rowId: row.id,
       reason: typeof deliveryReasonFor === 'function' ? deliveryReasonFor(row.id) : null,
+      waiting: typeof deliveryWaitingFor === 'function' ? deliveryWaitingFor(row.id) : null,
     });
   }
 

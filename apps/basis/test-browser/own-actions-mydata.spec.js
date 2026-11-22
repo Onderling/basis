@@ -9,8 +9,7 @@ import { test, expect } from '@playwright/test';
 test.setTimeout(120_000);
 
 const openMyData = async (page) => {
-  await page.locator('[data-tab="mij"]').first().click();
-  await page.locator('.cc-profile__gear').click();
+  await page.locator('.cc-persona-button__settings').click();
   await page.locator('.cc-settings__group--my-data').click();
 };
 const rows = (page) => page.evaluate(() => window.onderlingOwnActions?.() ?? null);
@@ -22,7 +21,7 @@ test('the row says what it keeps, exports a file with no words, wipes this kind 
   await page.waitForFunction(() => typeof window.onderlingCall === 'function', null, { timeout: 60_000 });
   // an act the person took, so there is something kept: a list made in the "+" (a call no door names is background)
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await page.locator('.circle-vandaag-plus__line').fill('nieuwe lijst klusjes');
   await page.locator('.circle-vandaag-plus__line').press('Enter');
   await expect.poll(async () => ((await rows(page)) ?? []).length, { timeout: 15_000 }).toBeGreaterThan(0);

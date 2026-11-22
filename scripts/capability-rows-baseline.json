@@ -1,0 +1,10 @@
+{
+  "noRow": [
+    "agents.getPersonaRelease",
+    "agents.getPersonaView",
+    "agents.getProfileDisclosure",
+    "agents.getProfileDrivers",
+    "agents.getProfileProperties",
+    "tasks.getTaskSnapshot"
+  ]
+}

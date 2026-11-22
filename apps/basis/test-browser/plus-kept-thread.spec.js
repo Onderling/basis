@@ -16,7 +16,7 @@ test('the "+" opens on the conversation so far, also after a reload; Forget empt
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
 
   // a line nothing reads (no model set): the person's turn and its answer (no model is set, and where) are both kept
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await expect(page.locator('.circle-vandaag-plus__thread'), 'a fresh person has no conversation yet').toHaveCount(0);
   await page.locator('.circle-vandaag-plus__line').fill('blauwe olifanten dansen');
   await page.locator('.circle-vandaag-plus__line').press('Enter');
@@ -27,7 +27,7 @@ test('the "+" opens on the conversation so far, also after a reload; Forget empt
 
   // closed and opened again: the same conversation
   await page.locator('.circle-vandaag-plus__close').click();
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await expect(turns.first()).toHaveText('blauwe olifanten dansen');
 
   // a reload keeps it (the device's log is kept)
@@ -35,7 +35,7 @@ test('the "+" opens on the conversation so far, also after a reload; Forget empt
   await page.waitForTimeout(1500);
   await page.reload();
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await expect(page.locator('.circle-vandaag-plus__turn').first(), 'kept across a reload').toHaveText('blauwe olifanten dansen', { timeout: 15_000 });
 
   // Forget empties it
@@ -51,7 +51,7 @@ test('a long conversation: the "+" opens with the line in view, and keeps it the
   await page.setViewportSize({ width: 390, height: 700 });
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   const line = page.locator('.circle-vandaag-plus__line');
   const turns = page.locator('.circle-vandaag-plus__turn');
   for (let i = 1; i <= 8; i += 1) {
@@ -61,7 +61,7 @@ test('a long conversation: the "+" opens with the line in view, and keeps it the
     await expect(line, `after turn ${i} the line is in view`).toBeInViewport();
   }
   await page.locator('.circle-vandaag-plus__close').click();
-  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag__plus').dblclick();
   await expect(turns).toHaveCount(16);
   await expect(line, 'opened again on a long conversation, the line is in view').toBeInViewport();
   expect(errs).toEqual([]);

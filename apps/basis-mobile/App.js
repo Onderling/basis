@@ -15,7 +15,7 @@
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as sodium from 'react-native-libsodium';
-import { installPhoneSignatureEquation } from '../basis/src/v2/signatureEquations.js';
+import { installPhoneSignatureEquation, installPhoneSigning, installPhoneSecretbox } from '../basis/src/v2/signatureEquations.js';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, Pressable, Text, StyleSheet, BackHandler, AppState } from 'react-native';
 import { flushPendingSaves } from '@onderling/local-store';
@@ -37,6 +37,14 @@ import ActStateBar from './src/rn/ActStateBar.js';
 // peer-router (inbound receipts) and CircleLauncherScreen's bubbles (rendering) share an instance.
 // Two maps would mean receipts advancing a state no bubble reads.
 import { createAppDeliveryMap } from '../basis/src/v2/deliveryState.js';
+import { onStoredValueRefused } from '../basis/src/v2/localStoreSeal.js';
+import { checkPhraseForThisDevice, startDeviceOver, readStartOverMark, cancelStartOver, cancelStartOverAsks } from '../basis/src/v2/startOver.js';
+import * as FileSystem from 'expo-file-system';
+import { makeSecureStoreRootKeyStore } from './src/core/secureStoreRootKeyStore.js';
+import { wipePhone as wipePhoneWith, confirmStartOver, confirmCancelCleared } from './src/core/startOverPhone.js';
+
+/** This phone's wipe for a start-over (L1115). */
+const wipePhone = () => wipePhoneWith({ AsyncStorage, SecureStore, FileSystem });
 import { makeGiveUpConsumers } from '../basis/src/v2/deliveryGiveUp.js';
 import {
   makeReceiptSender, asyncStorageDeliveryIo, createDeliverySettingsStore,
@@ -71,7 +79,7 @@ import { circlePodWriterFor } from './src/core/phonePodSession.js';
 // One store per app; shared between ChatScreen (receiver) and
 // CircleLauncherScreen (editor pull + send-side clear).
 import { makeCircleRecipePendingStoreRN } from './src/core/circleRecipePendingStorageRN.js';
-import { initCirclePods, circleControlAgentRouter, setCirclePodSession, setCircleKeyEventWiring, provisionCircleMedium, circleSendDataMove, circlePodWrite, getCirclePodFetch, getActiveRealPodRouting, getCirclePodWebId } from './src/core/circlePods.js';
+import { initCirclePods, circleControlAgentRouter, setCirclePodSession, setCircleKeyEventWiring, setCircleWriteGate, provisionCircleMedium, circleSendDataMove, circlePodWrite, getCirclePodFetch, getActiveRealPodRouting, getCirclePodWebId } from './src/core/circlePods.js';
 // γ-next.rules — per-circle pending-rules cache (AsyncStorage-backed).
 // Mirrors the recipe wire: ChatScreen writes via the receiver,
 // CircleLauncherScreen reads on rules-screen open + clears after the
@@ -83,7 +91,7 @@ import { makeCircleRulesPendingStoreRN } from './src/core/circleRulesPendingStor
 // the γ.4 resolver applies / discards.
 import { makeCirclePolicyStoreRN } from './src/core/circleStoresRN.js';
 import { forgetCircleSealStrategyFor } from './src/core/circlePods.js';
-import { makeCirclePolicyLane, makePolicyHeadStore, membersOfViaSkill } from '../basis/src/v2/policyUpdateLane.js';
+import { makeCirclePolicyLane, sealedPolicyHeadStore, membersOfViaSkill } from '../basis/src/v2/policyUpdateLane.js';
 import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../basis/src/v2/circleMembrane.js';
 import { makeMemberOverrideStoreRN } from './src/core/circleStoresRN.js';
 import { runPendingForget, markerVaultOver } from '../basis/src/v2/enrolForgets.js';
@@ -94,6 +102,10 @@ import Constants from 'expo-constants';
 installPhoneSignatureEquation(sodium)
   .then((eq) => console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`))
   .catch(() => { /* tweetnacl stays */ });
+// …and SIGNING + key derivation through the same module (L619): taken only on tweetnacl's exact bytes.
+{ const s = installPhoneSigning(sodium); console.info(`[security] signing: ${s.ok ? s.name : `tweetnacl (${s.reason})`}`); }
+// …and SECRETBOX (every sealed store's rows, the tunnel seal) through the same module (L619): the same exact-bytes rule.
+{ const s = installPhoneSecretbox(sodium); console.info(`[security] secretbox: ${s.ok ? s.name : `tweetnacl (${s.reason})`}`); }
 
 export default function App() {
   const [localeReady, setLocaleReady] = useState(false);
@@ -136,6 +148,16 @@ export default function App() {
   // A phrase ceremony ran on this device and the restore-finish flow has not asked yet (web parity).
   const [restoreFinishPending, setRestoreFinishPending] = useState(false);
   const [bootError, setBootError] = useState(null);
+  // the boot's error itself (the launcher reads its kind: `bootFailureNotice`), a counter "try again" bumps to run the
+  // boot once more, and a save refused because the value it would replace could not be opened (L1115)
+  const [bootFailure, setBootFailure] = useState(null);
+  const [bootAttempt, setBootAttempt] = useState(0);
+  const retryBoot = useCallback(() => { setBootError(null); setBootFailure(null); setBootAttempt((n) => n + 1); }, []);
+  // said once a session: dismissed, it does not come back
+  const [storedRefusal, setStoredRefusal] = useState(false);
+  const storedRefusalSaid = useRef(false);
+  useEffect(() => onStoredValueRefused(() => { if (!storedRefusalSaid.current) setStoredRefusal(true); }), []);
+  const dismissStoredRefusal = useCallback(() => { storedRefusalSaid.current = true; setStoredRefusal(false); }, []);
 
   // Shared EventLog: boot-time agent events + ChatScreen's inbound peer
   // events land in one log so /logs shows everything.
@@ -190,7 +212,7 @@ export default function App() {
   if (!fallbackOfferRef.current) {
     fallbackOfferRef.current = createFallbackOffer({
       // Its memory across restarts: a declined offer stays declined for its cooldown, not until the next boot.
-      io: fallbackOfferStateIo(sealedKeyValue(AsyncStorage, { name: 'the fallback offer' })),
+      io: fallbackOfferStateIo(sealedKeyValue(AsyncStorage, { name: 'the fallback offer', overwritable: true })),   // a remembered 'no': lost, the offer is simply made again (L1115)
       onOffer: (payload) => {
         const sink = circleBotSinkRef.current;
         if (sink) { sink(payload); fallbackOfferRef.current.decline(); }
@@ -285,7 +307,7 @@ export default function App() {
     const policyStore = makeCirclePolicyStoreRN(AsyncStorage);
     circlePolicyLaneRef.current = makeCirclePolicyLane({
       emitter: () => bundleRef.current?.agent?.emitPolicyUpdate ?? null,
-      headStore: makePolicyHeadStore(AsyncStorage),
+      headStore: sealedPolicyHeadStore(AsyncStorage),   // sealed at rest: it keeps the policy's original statement
       readPolicy: (cid) => policyStore.get(cid),
       // a policy that arrives may change the circle's storage posture — drop the strategy composed from the old one
       writePolicy: async (cid, policy) => { const r = await policyStore.update(cid, policy, { seen: true }); forgetCircleSealStrategyFor(cid); return r; },
@@ -347,8 +369,12 @@ export default function App() {
   // open as "show welcome" — better to greet an extra time than to
   // silently skip on a real first run.
   useEffect(() => {
-    shouldShowFirstRunWelcome(AsyncStorage)
-      .then((show) => { bootMark('firstrun.checked', { welcome: !!show }); setFirstRun(show ? 'show' : 'dismissed'); })
+    // FIRST: a start-over cut short (L1115) opens its phrase page again before anything reads. The mark clears nothing
+    // by itself: the phrase is asked again, checked against the mark's fingerprint
+    readStartOverMark(markerVaultOver(AsyncStorage))
+      .catch(() => null)
+      .then((mark) => { if (mark) { setStartOverMark(mark); return 'startover'; } return shouldShowFirstRunWelcome(AsyncStorage); })
+      .then((show) => { bootMark('firstrun.checked', { welcome: !!show }); setFirstRun(show === 'startover' ? 'startover' : (show ? 'show' : 'dismissed')); })
       .catch(() => setFirstRun('show'));
   }, []);
 
@@ -366,6 +392,36 @@ export default function App() {
   // restore succeeds (→ 'dismissed', seeded vault) or the user cancels
   // back to 'show'.
   const startRestore = useCallback(() => setFirstRun('restore'), []);
+  // START THIS DEVICE OVER FROM YOUR PHRASE (L1115), from the start-failure notice: the phrase first and checked, the
+  // confirm in words, then the shared order (startOver.js): mark, wipe, the ordinary restore, unmark; then the boot
+  const [startOverMark, setStartOverMark] = useState(null);   // a start-over cut short, found at boot
+  const startOver = useCallback(() => setFirstRun('startover'), []);
+  const submitStartOver = useCallback(async (phrase) => {
+    const checked = await checkPhraseForThisDevice(phrase, { rootKeyStore: makeSecureStoreRootKeyStore(SecureStore), markerVault: markerVaultOver(AsyncStorage), markFingerprint: startOverMark?.fingerprint ?? null });
+    if (!checked.ok) return checked;
+    const yes = await confirmStartOver(t, { known: checked.known });
+    if (!yes) return { ok: false, code: 'not-confirmed' };
+    const r = await startDeviceOver({
+      phrase: checked.phrase, fingerprint: checked.fingerprint, markerVault: markerVaultOver(AsyncStorage), wipe: wipePhone,
+      restore: (p) => restoreFromMnemonic({ mnemonic: p, asyncStorage: AsyncStorage, secureStore: SecureStore }),
+    }).catch(() => ({ ok: false, code: 'storage' }));
+    if (!r.ok) return r;
+    try { await markWelcomeDismissed(AsyncStorage); } catch { /* non-fatal */ }
+    setBootError(null); setBootFailure(null); setStartOverMark(null);
+    setFirstRun('dismissed');   // the boot runs again, on the restored device
+    return r;
+  }, [startOverMark]);
+  // Cancel. No start-over under way: back to the app, nothing changed. One cut short (any mark: a stop inside the clear
+  // leaves no sure sign how far it got): it says first that this device may already be cleared and may start as a NEW
+  // identity; on yes the mark goes, nothing more is cleared. What Cancel asks is `cancelStartOverAsks`'s.
+  const cancelStartOverPage = useCallback(async () => {
+    if (!cancelStartOverAsks(startOverMark)) { setFirstRun('dismissed'); return; }
+    if (!(await confirmCancelCleared(t))) return;
+    try { await cancelStartOver(markerVaultOver(AsyncStorage)); } catch { /* the next start asks again */ }
+    const cleared = startOverMark.stage === 'cleared';
+    setStartOverMark(null);
+    setFirstRun(cleared ? 'show' : 'dismissed');
+  }, [startOverMark]);
   const cancelRestore = useCallback(() => setFirstRun('show'), []);
 
   // 5.9b-followup — invoked from MnemonicEntryScreen with the raw text.
@@ -452,7 +508,7 @@ export default function App() {
         } catch { /* a clear that cannot run never blocks a launch */ }
 
         const deviceLogIo = backendSnapshotIo(
-          sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-device-log' })),
+          sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-device-log' }), { scope: 'cc-device-log' }),
         );
         const SEED_FLAG = 'cc.firstBootSeeded.v1';
         const alreadySeeded = await AsyncStorage.getItem(SEED_FLAG).catch(() => null) === '1';
@@ -551,6 +607,7 @@ export default function App() {
           // G11 — the no-pod key-event fan's transport (a REMOVE → rotation fans the new key to the
           // remaining members). The bundle injects its peer sender + skill dispatch at boot.
           setKeyEventWiring: setCircleKeyEventWiring,
+          setWriteGate: setCircleWriteGate,
           // Extension mappings (feedback-extension) — load installed extensions from AsyncStorage at boot,
           // verify them against the base catalogue, and merge the accepted ones into the dispatch catalogue.
           mappingsStore:    asyncStorageMappingsStore(AsyncStorage),
@@ -631,11 +688,11 @@ export default function App() {
         }
       } catch (err) {
         dlog.warn('boot failed (App)', err?.message ?? err);
-        if (!cancelled) setBootError(err?.message ?? String(err));
+        if (!cancelled) { setBootError(err?.message ?? String(err)); setBootFailure(err ?? null); }
       }
     })();
     return () => { cancelled = true; };
-  }, [firstRun]);
+  }, [firstRun, bootAttempt]);
 
   if (!localeReady) return null;
   if (firstRun === 'checking') return null;   // probe still in-flight
@@ -644,6 +701,14 @@ export default function App() {
       <SafeAreaProvider>
         <StatusBar style="auto" />
         <FirstRunWelcomeScreen onDoor={dismissFirstRun} onRestore={startRestore} />
+      </SafeAreaProvider>
+    );
+  }
+  if (firstRun === 'startover') {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="auto" />
+        <MnemonicEntryScreen onSubmit={submitStartOver} onCancel={cancelStartOverPage} />
       </SafeAreaProvider>
     );
   }
@@ -695,6 +760,11 @@ export default function App() {
         <CircleLauncherScreen
           bundle={bundle}
           bootError={bootError}
+          bootFailure={bootFailure}
+          onRetryBoot={retryBoot}
+          onStartOver={startOver}
+          storedRefusal={storedRefusal}
+          onDismissStoredRefusal={dismissStoredRefusal}
           deliveryStateMap={deliveryStateMapRef.current}
           registerCircleBotSink={registerCircleBotSink}
           onAcceptFallback={acceptFallbackOffer}

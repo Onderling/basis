@@ -34,7 +34,7 @@ import { b64encode, b64decode, verifyCeremonyReveal, ceremonyCommitment, personK
 export const PERSON_KEY_CARRY = 'device-person-key';
 /** The kind a self reveal signs — distinct from the circle reveal's, so neither can stand in for the other. */
 export const PERSON_KEY_SELF_REVEAL = 'device-person-key-self';
-export const PERSON_KEY_CATCHUP_SUBTYPES = Object.freeze({ request: 'device-person-key-request' });
+export const PERSON_KEY_CATCHUP_SUBTYPES = Object.freeze({ request: 'device-person-key-catchup-request' });
 
 /**
  * @param {object} a

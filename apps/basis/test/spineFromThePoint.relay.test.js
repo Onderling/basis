@@ -237,6 +237,12 @@ describe('spine statements only from the point', () => {
     await send({ op: 'ban', circleId: GROUP, address: A.agent.circleAddressFor(GROUP) });   // the persona's own
     await send({ op: 'ban', circleId: GROUP, address: B.agent.circleAddressFor(GROUP) });   // another member's
     expect(bans, 'the point banned the persona\'s own address or another member\'s').toEqual([]);
+    // the grant of the point's own address fails: the ban must not rotate without the point (the act waits, unacked)
+    const origGrant = ctl.grantRecipient?.bind(ctl);
+    ctl.grantRecipient = async () => { throw new Error('grant refused in this test'); };
+    await send({ op: 'ban', circleId: GROUP, address: old.circleAddress });
+    ctl.grantRecipient = origGrant;
+    expect(bans, 'a ban rotated after the point\'s own grant failed: the point is left out of the next key').toEqual([]);
     await send({ op: 'ban', circleId: GROUP, address: old.circleAddress });
     ctl.revokeRecipient = orig;
     expect(bans.length, 'the old address on the person\'s own row is banned').toBe(1);

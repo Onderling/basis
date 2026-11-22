@@ -163,12 +163,14 @@ describe('replyLines — one line per family in a turn', () => {
 
 describe('the families cover what the bot reaches', () => {
   it('every op on the bot\'s map that acts has a family; the reads are painted as lists', () => {
-    const reads = new Set(['listLists', 'listEntries', '__generic__:household:list:note', 'shopVisit', 'listMine', 'listEvents', 'weekOverview', 'sendWeekOverview']);
+    const reads = new Set(['listLists', 'listEntries', '__generic__:household:list:note', 'shopVisit', 'listMine', 'listEvents', 'weekOverview', 'sendWeekOverview', 'useTool', 'listTools', 'moreThings']);
     // the people reads are worded too (who does it · whose · a day)
     expect(isReadFamily('listOpen') && isReadFamily('listMine') && isReadFamily('weekOverview')).toBe(true);
     expect(isReadFamily('addToList')).toBe(false);
     // the door's own ops answer in their own words (a reminder set or taken away; one said by the runner)
-    const own = (id) => id.startsWith('assistant-') || ['remindMe', 'cancelReminder', 'sayReminder'].includes(id);
+    // …and a toolbox's switch answers through /toolbox's own words (L1035)
+    // …and a tapped toolbox thing says its own sentence: put on which list, the quantity raised, or which list? (L1035)
+    const own = (id) => id.startsWith('assistant-') || ['remindMe', 'cancelReminder', 'sayReminder', 'addToolbox', 'removeToolbox', 'pickThing'].includes(id);
     const acts = [...new Set([...BOT_OP_MAP.member, ...BOT_OP_MAP.admin].map((q) => q.slice(q.indexOf('.') + 1)))].filter((id) => !reads.has(id) && !own(id));
     expect(acts.filter((id) => !REPLY_FAMILY[id])).toEqual([]);
   });

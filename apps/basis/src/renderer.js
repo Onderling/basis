@@ -122,14 +122,21 @@ export function renderReply(reply, opts = {}) {
   const shape = reply.shape ?? 'text';
 
   if (shape === 'list') {
-    const items = renderListItems(reply.payload, opts, t);
+    // a list whose op declares a field to group by (`surfaces.chat.groupBy`): each row says its group, and the groups
+    // in the order they first come, so every door paints a head where the group changes
+    const groupBy = opts.opId ? (opts.manifestsByOrigin?.[opts.appOrigin]?.operations ?? []).find((o) => o?.id === opts.opId)?.surfaces?.chat?.groupBy ?? null : null;
+    const items = renderListItems(reply.payload, { ...opts, groupBy }, t);
+    const groups = groupBy ? [...new Set(items.map((i) => i.group).filter((g) => g != null))] : null;
     return {
       kind: 'list',
       messageId, threadId,
       lifecycleState: 'live',     // A2 hybrid — flips 'disabled' on next user msg
       items,
+      ...(groups ? { groups } : {}),
       // the list's own name, when the op gives one (a lists read): the surface shows it above the entries
       ...(typeof reply.payload?.title === 'string' && reply.payload.title ? { title: reply.payload.title } : {}),
+      // a page of a kept list (`page: {tag, group, from}`): where a door's "meer" goes on from
+      ...(reply.payload?.page && typeof reply.payload.page === 'object' ? { page: { ...reply.payload.page } } : {}),
       // v0.6 — list-level _sync from the reply itself (vs per-row
       // _lastSync extracted inside renderListItems).
       syncHint: formatSyncHints(reply.payload?._sync, t),
@@ -455,6 +462,12 @@ function renderListItems(payload, opts, t) {
     const out = { id, label, buttons };
     if (staleHint) out.staleHint = staleHint;
     if (embed)     out.embed     = embed;
+    // a picture the BOX fetched for the row (`thumb`: {mime, data} base64): a door that can show one does; the row stays
+    if (item && typeof item === 'object' && item.thumb && typeof item.thumb.data === 'string' && /^image\/(jpeg|png|webp)$/.test(item.thumb.mime ?? '')) out.thumb = { mime: item.thumb.mime, data: item.thumb.data };
+    // the row's group, when the op declares one (`groupBy`): a door paints a head where it changes
+    if (opts?.groupBy && item && typeof item === 'object' && item[opts.groupBy] != null && item[opts.groupBy] !== '') out.group = String(item[opts.groupBy]);
+    // the number the row shows, when the reply gives one (a page of a kept list keeps each thing's own number)
+    if (item && typeof item === 'object' && Number.isInteger(item.n) && item.n > 0) out.n = item.n;
     // 2026-05-27 — contact rows carry the peer's peer address as
     // `peerAddr` so the [DM] button can target it directly (see
     // realAgent.js listContacts mapper).  Pure pass-through.

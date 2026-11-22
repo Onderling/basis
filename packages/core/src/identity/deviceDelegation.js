@@ -20,12 +20,12 @@
 // never DEPEND on the record: every address still proves itself with its own circle-link proof
 // at the roster (deny-by-default at the fold). The record exists so enrollment is auditable and
 // revocation has a durable subject to act on.
-import nacl from 'tweetnacl';
 import { processSignatureMemo } from '../security/signatureMemo.js';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { AgentIdentity } from './AgentIdentity.js';
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
+import { ed25519KeyPairFromSeed, ed25519Sign } from '../crypto/ed25519Sign.js';   // signing + derivation behind the port a shell may speed up (L619)
 
 // HKDF domain-separation inputs — mirror circleAddress.js. The salt is PERMANENT: changing it
 // re-derives every enrolled device's keys (a mass re-enroll), never do that.
@@ -99,14 +99,14 @@ export function signDeviceDelegation(authoritySecret, { profileId, deviceId, pub
   if (!profileId || !deviceId || !pubKey) {
     throw new Error('signDeviceDelegation: profileId, deviceId and pubKey are required');
   }
-  const kp = nacl.sign.keyPair.fromSeed(authoritySecret);
+  const kp = ed25519KeyPairFromSeed(authoritySecret);
   const msg = new TextEncoder().encode(deviceDelegationMessage(profileId, deviceId, pubKey));
   return {
     profileId: String(profileId),
     deviceId:  String(deviceId),
     pubKey:    String(pubKey),
     by:        b64encode(kp.publicKey),
-    sig:       b64encode(nacl.sign.detached(msg, kp.secretKey)),
+    sig:       b64encode(ed25519Sign(msg, kp.secretKey)),
   };
 }
 
@@ -183,13 +183,13 @@ export function signDeviceRevocation(authoritySecret, { profileId, deviceId } = 
     throw new Error('signDeviceRevocation: authoritySecret must be a 32-byte Uint8Array');
   }
   if (!profileId || !deviceId) throw new Error('signDeviceRevocation: profileId and deviceId are required');
-  const kp = nacl.sign.keyPair.fromSeed(authoritySecret);
+  const kp = ed25519KeyPairFromSeed(authoritySecret);
   const msg = new TextEncoder().encode(deviceRevocationMessage(profileId, deviceId));
   return {
     profileId: String(profileId),
     deviceId:  String(deviceId),
     by:        b64encode(kp.publicKey),
-    sig:       b64encode(nacl.sign.detached(msg, kp.secretKey)),
+    sig:       b64encode(ed25519Sign(msg, kp.secretKey)),
   };
 }
 

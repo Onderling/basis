@@ -21,7 +21,7 @@ test.skip(!R1, 'needs PEER_TEST_RELAY');
 const call = (page, app, op, args = {}) => page.evaluate(([a, o, x]) => window.onderlingCall(a, o, x), [app, op, args]);
 const bookRow = async (page, webid) => ((await call(page, 'pinboard', 'listContacts', {}))?.contacts ?? []).find((c) => c.webid === webid) ?? null;
 async function nameMe(page, name) {
-  await page.locator('[data-tab="mij"]').first().click(); await page.waitForTimeout(1200);
+  await page.locator('.cc-persona-button__button').click(); await page.waitForTimeout(1200);
   await page.locator('.circle-screen__identity-edit').click(); await page.locator('.cc-profile__display').fill(name); await page.locator('.cc-profile__save').click(); await page.waitForTimeout(1500); await page.locator('.cc-screen-panel__close').click();
 }
 async function openThread(page, contactId) {
@@ -93,7 +93,7 @@ test('persona on create · opbergen · the add sheet · the lens on the thread �
     log('STEP2 opbergen', 'PASS', 'folded, and back');
 
     // ── L125: the add sheet ──────────────────────────────────────────────────────────────────────────
-    await A.page.locator('[data-tab="mij"]').first().click(); await A.page.waitForTimeout(1200);
+    await A.page.locator('.cc-persona-button__button').click(); await A.page.waitForTimeout(1200);
     await A.page.locator('.cc-profile__share-contact').click();
     const link = await A.page.locator('.cc-share__link input').inputValue();
     await gotoCircles(A.page);

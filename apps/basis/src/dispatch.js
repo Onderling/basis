@@ -68,19 +68,24 @@ export async function runDispatch(ready, callSkill, ctx) {
     // rendering the failure as the declared replyShape (which led to
     // a broken '? (unnamed)' embed-card in v0.5.0 when a skill was
     // missing on the real agent — user-reported 2026-05-23).
-    if (payload && typeof payload === 'object'
-        && payload.ok === false
-        && typeof payload.error === 'string') {
+    // …and the same for an error that is an object WITH words (`{code, message}`, how a door's refusals say themselves):
+    // painted as the op's shape it read as an empty list (the "meer" of a list that is gone, a toolbox that is off)
+    const words = payload && typeof payload === 'object' && payload.ok === false
+      ? (typeof payload.error === 'string' ? payload.error : (typeof payload.error?.message === 'string' && payload.error.message ? payload.error.message : null))
+      : null;
+    if (words !== null) {
+      const reason = (typeof payload.code === 'string' && payload.code) ? payload.code
+        : (typeof payload.error?.code === 'string' && payload.error.code ? payload.error.code : null);
       return {
         payload:  null,
         shape:    'text',
         threadId: threadId ?? null,
         error: {
           code:    'skill-error',
-          message: payload.error,
+          message: words,
           // the op's own reason, when it gave one ("not-found": the words named nothing) — read by a rule that may
           // fall back to the model
-          ...(typeof payload.code === 'string' && payload.code ? { reason: payload.code } : {}),
+          ...(reason ? { reason } : {}),
         },
       };
     }

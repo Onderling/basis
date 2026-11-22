@@ -134,6 +134,11 @@ export const ENTRY_KINDS = Object.freeze({
   // author), never its words. The store keeps no landing time, so this is what makes a late arrival news. Written by
   // this device about itself, never carried; the item's own row is the durable head.
   'item-landed':     K(LANE.SYSTEM, false, RETAIN.CHAT, false, LOCAL_BINDING, true),
+  // What this device PROVED about an items statement's place on a settings line ("behind change k" / "not behind"),
+  // and, only where a take-back needs it, the row as it was. A cache of fixed answers, each device its own (its links
+  // differ): never carried, never accepted from a peer, not mirrored, never news, never a wake. Ages out with the items
+  // statements it judges (the same class); a lost entry is judged again.
+  'content-judged':  K(LANE.SYSTEM, false, RETAIN.CHAT, false, LOCAL_BINDING, false),
   // A planned occurrence that RAN (pending work): written once per occurrence id by the host that ran it — first
   // write wins, so a second host or a repeat never records a second run. Short: the row's own `lastRunAt` is the
   // durable head; the mark only has to outlive the occurrence's window.
@@ -148,6 +153,9 @@ export const ENTRY_KINDS = Object.freeze({
   // The OWNER's own acts (the agent trail above skips them on purpose: an agent's card must not show its owner). Written
   // at the waist, one per act; never carried to another device or a circle (local), mirrored to the person's own storage.
   'own-action':      K(LANE.SYSTEM, false, RETAIN.OWN, false, LOCAL_BINDING, true),
+  // a call to a toolbox's tool, on the box that made it (L1035): who, which toolbox, which tool, how it ended; never the
+  // words. Kept like the own record; the box's alone (a Telegram person has no record of their own: the box's is theirs)
+  'tool-call':       K(LANE.SYSTEM, false, RETAIN.OWN, false, LOCAL_BINDING, false),
   // What the person's "+" last told them it can reach (the circles), one entry per self, the newest carrying the whole
   // set: kept while the self exists (record: past a window everything would be "new" again), never fans, not mirrored.
   'plus-told':       K(LANE.SYSTEM, false, RETAIN.RECORD, false, LOCAL_BINDING, false),
@@ -208,6 +216,23 @@ export function isAuditKind(kind) { return entryKind(kind).audit === true; }
 
 /** Retention class for a kind. */
 export function retentionOf(kind) { return entryKind(kind).retain; }
+
+/**
+ * Statement kinds kept as RECORD inside a lane whose entries are otherwise audit-class: the lane's own row says how its
+ * entries age, and this table names the statements in it that never drop. A circle's settings changes
+ * (`policy-update`) are the settings HISTORY: a content statement is judged by the settings in force when it was made
+ * (the content line), so a change that compacted away would leave "which settings applied" unknowable. They are rare and
+ * small (settings, version, author, proposal id, the content lanes' tips; no content). Rules changes and votes keep
+ * compacting.
+ */
+export const RECORD_STATEMENTS = Object.freeze({ governance: Object.freeze(['policy-update']) });
+
+/** Retention class for one log ENTRY: its kind's row, unless the statement it carries is named in `RECORD_STATEMENTS`. */
+export function retentionOfEntry(entry) {
+  const kept = RECORD_STATEMENTS[entry?.type];
+  if (kept && kept.includes(entry?.payload?.body?.kind)) return RETAIN.RECORD;
+  return retentionOf(entry?.type);
+}
 
 /**
  * The retention window PER class, as a DURATION in ms — the ONE table both audit records read: `sa.audit`

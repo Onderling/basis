@@ -181,7 +181,7 @@ export {
   REFRESHABLE_VERBS, panelMatchesItemRef, itemRefFromReply, collectStalePanels,
 } from './panelRefresh.js';
 // D1 (§5A) — per-circle action-frequency counter behind the quickActions block.
-export { createActionFrequencyStore } from './v2/actionFrequency.js';
+export { createActionFrequencyStore, actionFrequencyIo } from './v2/actionFrequency.js';
 // C9 — the ONE circle data-policy: `policy.pod` is the single vocabulary,
 // mapped once to the send-path dataMove branch + the PseudoPod store mode +
 // the catch-up strategy, so no consumer re-derives the pod posture itself.
@@ -233,7 +233,7 @@ export {
   localStorageScreenBlocksCacheIo,
 } from './v2/screenBlocksCacheStorage.js';
 // per-circle activity preview + unread count for launcher tiles.
-export { buildTilePreviews, renderSubtitle, bumpSeenAt, countsAsUnread, seenOnLeave } from './v2/circleTilePreviews.js';
+export { buildTilePreviews, renderSubtitle, bumpSeenAt, countsAsUnread, seenOnLeave, subscribeTileChanges } from './v2/circleTilePreviews.js';
 // claim router: mirror claimed tasks into the personal circle
 // when the per-circle override has flowThrough.tasksToPersonal.
 export { routeClaim, makeAfterClaimHook } from './v2/claimRouter.js';
@@ -315,7 +315,7 @@ export {
 } from './v2/deliverySettings.js';
 export {
   defaultConversationKinds, availableConversationKinds, TEMPLATE_CONVERSATION_KINDS,
-  resolveConversationKinds, setConversationKind,
+  resolveConversationKinds, setConversationKind, conversationKindsOf,
   // The kind a chat line IS — named once so a surface that has to recognise one (e.g. a shell deciding
   // whether an inbound entry should refresh its conversation) cannot hardcode a second copy of the string.
   CHAT_KIND,
@@ -422,3 +422,6 @@ export {
 export { sharedCircleLocale, sharedConsequenceLocale, sharedRoleLocale, sharedHostLocale, sharedNounLocale, sharedLocale, mergeShared } from './locales/index.js';
 export { fieldAfterLoad } from './v2/fieldAfterLoad.js';
 export { itemKindChip } from './v2/embedChips.js';
+
+// an admin's settings save: stated to the circle, written here only when that went out (web and phone)
+export { statingPolicyStore, saveCircleSettings } from './v2/policyUpdateLane.js';

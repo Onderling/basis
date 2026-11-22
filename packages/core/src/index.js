@@ -60,7 +60,7 @@ export {
 // NOT circleLink: the verifier supplies a fresh nonce — see the header of addressPossession.js.
 export {
   ADDRESS_NONCE_BYTES, ADDRESS_CHALLENGE_TTL_MS, newAddressChallenge,
-  addressPossessionMessage, signAddressPossession, signAddressPossessionFromSeed,
+  addressPossessionMessage, relayNameOf, relayOwnNames, isPrivateRelayName, signAddressPossession, signAddressPossessionFromSeed,
   circleAddressSigner, verifyAddressPossession,
 } from './identity/addressPossession.js';
 export { hashHex, hmacBase64Url } from './hashHex.js';
@@ -68,7 +68,7 @@ export { hashHex, hmacBase64Url } from './hashHex.js';
 // their own body-serialization rather than each reimplementing the chaining/fork detection.
 export {
   createAuthorChain, isChained, authorHead, makeForkProof,
-  parentsOf, frontier, reachability,
+  parentsOf, frontier, causalOrder, reachability,
 } from './security/authorChain.js';
 // NOTE: IdentityPodStore, IdentitySync and migrateVaultToPod were extracted OUT
 // of core into `@onderling/pod-client` — they store/migrate/sync identity ON a pod
@@ -153,6 +153,7 @@ export {
 // adapter implements (extend it, override `_put`). See docs/conventions/ports.md
 // and test/conformance/transportConformance.js.
 export { Transport }                      from './transport/Transport.js';
+export { isBackgroundSend }               from './transport/sendClass.js';
 export { MAX_ENVELOPE_BYTES, EnvelopeTooLargeError, envelopeExceedsLimit, envelopeByteLength }
   from './transport/envelopeSize.js';
 export {
@@ -199,6 +200,8 @@ export {
 } from './identity/ceremonyCommitment.js';
 export { createSignatureMemo, processSignatureMemo, createVerdictMemo, processVerdictMemo, exactVerdictKey } from './security/signatureMemo.js';   // verify-on-read checks each distinct signature once   // who may retire a device address: the owner root, at a ceremony
 export { ED25519_EDGE_VECTORS, ED25519_ACCEPTED, ed25519Disagreements } from './conformance/ed25519Conformance.js';   // the edge-case vectors a fast equation must agree on (shipped: the box and the web self-test with them)
+export { ed25519KeyPairFromSeed, ed25519Sign, useSigningEquation, signingEquationName } from './crypto/ed25519Sign.js';   // signing + key derivation behind one port; the phone installs libsodium (L619)
+export { secretboxSeal, secretboxOpen, useSecretbox, secretboxName, SECRETBOX_VECTORS } from './crypto/secretbox.js';   // secretbox behind one port; the phone installs libsodium (L619)
 export { useSignatureEquation, signatureEquationName, verifyEd25519StrictBatch, strictSignatureShapeOk, signatureEquationBatches } from './crypto/ed25519Strict.js';   // a faster equation behind the one strict rule (the box: node:crypto; the web: WebCrypto's batch)
 export { createTimeSlice, TIME_SLICE_MS } from './timeSlice.js';   // long work gives the thread back   // verify-on-read checks each distinct signature once   // who may retire a device address: the owner root, at a ceremony
 export { CEREMONY_KINDS, ADDRESS_REVOKE_KIND, isCeremonyKind, ceremonyRevealFacts } from './security/ceremonyKinds.js';   // the kinds only the root may make, and what each reveal covers

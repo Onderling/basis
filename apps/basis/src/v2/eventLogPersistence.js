@@ -132,13 +132,20 @@ function segment(oldestFirst) {
  * writes it as segments and replaces the array with the manifest. No flag, no second key.
  */
 export function backendSnapshotIo(backend, ref = REF) {
-  const enc = new TextEncoder();
   const dec = new TextDecoder();
   const segKey = (i) => `${ref}/seg/${String(i).padStart(4, '0')}`;
+  // STORED AS TEXT, NOT AS BYTES (ledger L619): every backend keeps a string as it is (the sealing backend's string tag
+  // round-trips it). Written as TextEncoder bytes, a segment was spelled out as base64 by the sealing backend and read
+  // back through base64 and the phone's TextDecoder, a JavaScript polyfill: ~1.9 s of a cold start for a 2 MB log on
+  // the seeded Samsung. A row written as bytes before this still reads (the decode below), and the next save writes it
+  // again as text even when its content did not change, so the cost is paid once.
+  const readAsBytes = new Set();
   const readText = async (key) => {
     const rec = await backend.get(key);
     if (!rec || rec.bytes == null) return null;
-    return typeof rec.bytes === 'string' ? rec.bytes : dec.decode(rec.bytes);
+    if (typeof rec.bytes === 'string') return rec.bytes;
+    readAsBytes.add(key);
+    return dec.decode(rec.bytes);
   };
   let known = null;   // the manifest as last written/read by THIS io: [{key, hash}] — the diff's left-hand side
   return {
@@ -155,7 +162,7 @@ export function backendSnapshotIo(backend, ref = REF) {
         try { out.push(...JSON.parse(t)); }
         catch (err) { console.warn(`[device-log] segment unreadable, skipped: ${seg.key} — ${err?.message ?? err}`); }
       }
-      known = parsed.segments.map((s) => ({ key: s.key, hash: s.hash }));
+      known = parsed.segments.map((s) => ({ key: s.key, hash: readAsBytes.has(s.key) ? null : s.hash }));   // a bytes row: rewritten as text
       out.reverse();   // the log's snapshot is newest-first
       return out;
     },
@@ -166,10 +173,10 @@ export function backendSnapshotIo(backend, ref = REF) {
       for (let i = 0; i < texts.length; i += 1) {
         const prev = known?.[i];
         if (prev && prev.key === next[i].key && prev.hash === next[i].hash) continue;
-        await backend.put(next[i].key, enc.encode(texts[i]));
+        await backend.put(next[i].key, texts[i]);   // as TEXT: see the note above `readText`
       }
       // the manifest last — the switch
-      await backend.put(ref, enc.encode(JSON.stringify({ v: 1, segments: next, total: events.length })));
+      await backend.put(ref, JSON.stringify({ v: 1, segments: next, total: events.length }));
       // then the rows no manifest names any more (a shrunk log after retention pruned it)
       const stale = (known ?? []).slice(texts.length);
       for (const s of stale) { try { await backend.delete?.(s.key); } catch { /* best-effort */ } }
@@ -227,6 +234,8 @@ export function fileKeyValueStorage(filePath) {
     getItem: (key) => onePerFile(filePath, async () => (await read())[key] ?? null),
     setItem: (key, value) => onePerFile(filePath, async () => { const m = await read(); m[key] = String(value); await write(m); }),
     removeItem: (key) => onePerFile(filePath, async () => { const m = await read(); delete m[key]; await write(m); }),
+    // listed like AsyncStorage, so a store that reseals its own keys at the start can find them
+    getAllKeys: () => onePerFile(filePath, async () => Object.keys(await read())),
   };
 }
 

@@ -57,7 +57,7 @@ export const basisManifest = {
       id:    'help-with', visibility: 'authenticated',
       group: 'help',
       verb:  'add',
-      writes: { scope: 'device' },   // a thread on this device; the post itself is not touched
+      writes: { scope: 'device', what: 'content' },   // a thread on this device; the post itself is not touched
       params: [
         { name: 'postId', kind: 'string', required: true },
       ],
@@ -121,7 +121,7 @@ export const basisManifest = {
     {
       id:    'embed', visibility: 'authenticated',
       verb:  'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       params: [
         { name: 'itemId', kind: 'string',  required: true,
           // bare `/embed` → list household chores (default app);
@@ -172,7 +172,7 @@ export const basisManifest = {
     {
       id:    'embed-file', visibility: 'authenticated',
       verb:  'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       params: [
         { name: 'path',  kind: 'string',  required: false },
         { name: 'pick',  kind: 'boolean', required: false },
@@ -216,7 +216,7 @@ export const basisManifest = {
     {
       id:    'embed-time', visibility: 'authenticated',
       verb:  'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       params: [
         { name: 'title',    kind: 'string', required: true  },
         { name: 'when',     kind: 'date',   required: true  },
@@ -293,6 +293,7 @@ export const basisManifest = {
 
     {
       id:    'scanQr', visibility: 'authenticated',
+      reveals: 'none',
       group: 'device',
       verb:  'list',
       params: [],
@@ -355,7 +356,7 @@ export const basisManifest = {
       id:    'signin', visibility: 'private',
       group: 'identity',
       verb:  'add',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [
         { name: 'issuer', kind: 'string', required: false },
       ],
@@ -446,7 +447,7 @@ export const basisManifest = {
       scopes: ['circle', 'contact'],
       group: 'connectivity',
       verb:  'add',
-      writes: { scope: 'circle' },   // delivered to another person: it leaves this person, the widest reach of the three
+      writes: { scope: 'circle', what: 'content' },   // delivered to another person: it leaves this person, the widest reach of the three
       params: [
         { name: 'peer', kind: 'string', required: true },
       ],
@@ -490,7 +491,7 @@ export const basisManifest = {
       id:    'publish-peer', visibility: 'authenticated',
       group: 'connectivity',
       verb:  'add',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       params: [],
       surfaces: {
         slash: { command: '/publish-peer' },
@@ -529,7 +530,7 @@ export const basisManifest = {
       id:    'set-relay', visibility: 'private',
       group: 'device',
       verb:  'submit',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [
         { name: 'url',   kind: 'string',  required: false },
         { name: 'clear', kind: 'boolean', required: false },
@@ -555,7 +556,7 @@ export const basisManifest = {
       id:    'transport-mode', visibility: 'private',
       group: 'device',
       verb:  'submit',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [
         { name: 'mode', kind: 'enum', of: ['nkn', 'relay', 'both'], required: true },
       ],
@@ -571,6 +572,7 @@ export const basisManifest = {
      */
     {
       id:    'transports', visibility: 'private',
+      reveals: 'none',
       group: 'device',
       verb:  'list',
       params: [],
@@ -589,6 +591,7 @@ export const basisManifest = {
      */
     {
       id:    'settings', visibility: 'private',
+      reveals: 'none',
       group: 'device',
       verb:  'list',
       params: [
@@ -698,7 +701,7 @@ export const basisManifest = {
       id:    'mute', visibility: 'authenticated',
       group: 'people',
       verb:  'add',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [
         { name: 'peer', kind: 'string', required: true },
         // the name the person saw (a post's author): kept with the block so the blocked list names them, never matched on
@@ -718,7 +721,7 @@ export const basisManifest = {
       id:    'unmute', visibility: 'authenticated',
       group: 'people',
       verb:  'add',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [
         { name: 'peer', kind: 'string', required: true },
       ],
@@ -791,7 +794,7 @@ export const basisManifest = {
       id:    'peer-connect', visibility: 'private',
       group: 'connectivity',
       verb:  'add',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [],
       surfaces: {
         slash: { command: '/peer-connect' },
@@ -809,7 +812,7 @@ export const basisManifest = {
       id:    'test-peer', visibility: 'private',
       group: 'connectivity',
       verb:  'add',
-      writes: { scope: 'circle' },   // delivered to another person: it leaves this person, the widest reach of the three
+      writes: { scope: 'circle', what: 'content' },   // delivered to another person: it leaves this person, the widest reach of the three
       params: [
         // 2026-05-27 slash audit close-out — param renamed
         // `address` → `addr` to match the user-facing locale
@@ -830,7 +833,7 @@ export const basisManifest = {
       id:    'signout', visibility: 'private',
       group: 'identity',
       verb:  'remove',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [],
       surfaces: {
         // No CHAT surface — see `signin`. Ending a session is the person's act.
@@ -847,7 +850,7 @@ export const basisManifest = {
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'add',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'name', kind: 'string' },
         { name: 'circleIds', kind: 'object' },
@@ -866,7 +869,7 @@ export const basisManifest = {
       id:    'screen-remove-page', visibility: 'private',
       group: 'device',
       verb:  'remove',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'pageId', kind: 'string', required: true },
       
@@ -886,7 +889,7 @@ export const basisManifest = {
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'update',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'pageId', kind: 'string', required: true },
         { name: 'name', kind: 'string', required: true },
@@ -907,7 +910,7 @@ export const basisManifest = {
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'update',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'pageId', kind: 'string', required: true },
       
@@ -928,7 +931,7 @@ export const basisManifest = {
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'update',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'ids', kind: 'object' },
       ],
@@ -946,7 +949,7 @@ export const basisManifest = {
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'update',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'pageId', kind: 'string', required: true },
         { name: 'circleIds', kind: 'object' },
@@ -969,7 +972,7 @@ export const basisManifest = {
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'add',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'kind', kind: 'string', required: true },
         { name: 'actId', kind: 'string' },
@@ -990,7 +993,7 @@ export const basisManifest = {
       group: 'device',
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'remove',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'key', kind: 'string', required: true },
       ],
@@ -1008,7 +1011,7 @@ export const basisManifest = {
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'add',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'pageId', kind: 'string', required: true },
         { name: 'type', kind: 'string', required: true },
@@ -1028,7 +1031,7 @@ export const basisManifest = {
       id:    'screen-remove-block', visibility: 'private',
       group: 'device',
       verb:  'remove',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'pageId', kind: 'string', required: true },
         { name: 'blockId', kind: 'string', required: true },
@@ -1047,7 +1050,7 @@ export const basisManifest = {
       id:    'screen-move-block', visibility: 'private',
       group: 'device',
       verb:  'move',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'pageId', kind: 'string', required: true },
         { name: 'blockId', kind: 'string', required: true },
@@ -1069,7 +1072,7 @@ export const basisManifest = {
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'update',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'pageId', kind: 'string', required: true },
         { name: 'blockId', kind: 'string', required: true },
@@ -1089,7 +1092,7 @@ export const basisManifest = {
       id:    'screen-undo', visibility: 'private',
       group: 'device',
       verb:  'undo',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
       ],
       surfaces: {
@@ -1113,21 +1116,12 @@ export const basisManifest = {
                //   threads are managed via the chat UI, not a section
 
   /**
-   * Nav-chrome (D / Surface 1) — the top-level TAB BAR.  These four tabs
-   * (screens · circles · contacten · mij) WERE hardcoded IDENTICALLY in
-   * both shells (web `web/v2/circleTabBar.js` + mobile
-   * `src/screens/v2/CircleTabBar.js`) — invariant #3 violated by
-   * construction (same ids + same locale keys in two files).  Declared
-   * ONCE here, the shells project the bar from `renderWeb(manifest).tabs`
-   * (via `src/v2/tabProjection.js`) so web ≡ mobile by construction.
-   *
-   *   screens · circles · contacten — app-nav roots that map to NO op
-   *     (the shell owns the surface): `target: {kind:'nav', to}`.
-   *   mij — the existing `me` op (its `surfaces.page` already backs the
-   *     "Mij" profile screen): `target: {kind:'op', opId:'me'}`.
-   *
-   * Ids + locale keys preserved EXACTLY (screens/circles/contacten/mij ·
-   * circle.tab.*), so behaviour is unchanged.
+   * Nav-chrome (D / Surface 1) — the top-level TAB BAR.  The tabs WERE hardcoded IDENTICALLY in both shells (web
+   * `web/v2/circleTabBar.js` + mobile `src/screens/v2/CircleTabBar.js`) — invariant #3 violated by construction.
+   * Declared ONCE here, the shells project the bar from `renderWeb(manifest).tabs` (via `src/v2/plusDial.js`
+   * `barSlots`, with the "+" from `plus` below) so web ≡ mobile by construction. Every tab is an app-nav root that
+   * maps to NO op (the shell owns the surface): `target: {kind:'nav', to}`. The `me` op's page is the persona panel,
+   * reached by the persona button, not a tab.
    */
   // THE RULE for every nav-chrome row (tabs · actions · meActions): `nav` is for a VIEW no op backs (a screen, a list,
   // back); an act an op performs targets the OP — never a nav row with the same meaning. That is what makes a button, a
@@ -1136,11 +1130,13 @@ export const basisManifest = {
     // Vandaag — the person's own pages (the screen book), the home: first, so the bar reads Vandaag · Kringen · Contacten · Mij
     { id: 'screens',   labelKey: 'circle.tab.vandaag',   target: { kind: 'nav', to: 'screens' } },
     { id: 'circles',   labelKey: 'circle.tab.circles',   target: { kind: 'nav', to: 'circles' } },
-    // Nearby — the room this device is in (mDNS / BLE). The screen existed on both shells with no door
-    // (found 2026-08-30, story 8); a tab for now, declared here so both shells get it from one line.
-    { id: 'nearby',    labelKey: 'circle.tab.nearby',    target: { kind: 'nav', to: 'nearby' } },
     { id: 'contacten', labelKey: 'circle.tab.contacten', target: { kind: 'nav', to: 'contacten' } },
-    { id: 'mij',       labelKey: 'circle.tab.mij',       target: { kind: 'op',  opId: 'me' } },
+    // Nearby — the room this device is in (mDNS / BLE). The screen existed on both shells with no door
+    // (found 2026-08-30, story 8); a tab for now, declared here so both shells get it from one line. After Contacten
+    // (Frits 2026-11-19): Vandaag · Kringen · + · Contacten · In de buurt.
+    { id: 'nearby',    labelKey: 'circle.tab.nearby',    target: { kind: 'nav', to: 'nearby' } },
+    // NO Mij tab (Frits 2026-11-20): the `me` view is the persona panel behind the persona button, top right on every
+    // tab (`src/v2/personaPanel.js`); what Me said about now is on Vandaag (`todayBlocks` below).
   ],
 
   /**
@@ -1153,14 +1149,34 @@ export const basisManifest = {
    */
   meActions: [
     { id: 'share-contact', labelKey: 'circle.profile.share_contact', target: { kind: 'nav', to: 'shareContact' } },
-    // Scan IS the scanQr op — one door with `/scan-qr` (its openQrScanner seam: mobile the camera, web the paste prompt).
-    { id: 'scan',          labelKey: 'circle.profile.scan',          target: { kind: 'op',  opId: 'scanQr' } },
+    // NOT Scan: it is in the "+" only (`plus.dial`), the scanQr op — one door with `/scan-qr`.
     // NOT the assistant: the "+" button is the one way into the person's conversation (Frits 2026-11-16: a second door
     // from Me confused more than it helped)
   ],
 
   /**
-   * The person's settings, behind the gear on Mij ("Instellingen"): groups of sections, then the circles' own settings.
+   * THE "+" — docked IN the tab bar (Frits 2026-11-19), so it never floats over a Save button or a composer. One tap
+   * opens it into round buttons; the button on the "+"'s own spot (`middle`) is what a second tap runs, so a double
+   * tap lands in the person's own conversation. Declared here, once, so moving the "+" or changing its buttons is a
+   * data change both shells follow (`src/v2/plusDial.js`); where exactly a button lands is the shell's drawing.
+   *   place  — 'bar-middle' (between the tabs; with an even count, as many on each side) · 'bar-end'
+   *   dial   — the buttons, in order. Scan and My QR are the SAME targets as Me's actions above (one door each).
+   *   middle — the default for the middle spot; a person may choose another, or none, per device (`plus.middle`).
+   */
+  plus: {
+    place: 'bar-middle',
+    middle: 'chat',
+    dial: [
+      // the person's own conversation (the "+" thread): a view no op backs
+      { id: 'chat',  labelKey: 'circle.plus.chat',  target: { kind: 'nav', to: 'plusThread' } },
+      { id: 'scan',  labelKey: 'circle.plus.scan',  target: { kind: 'op',  opId: 'scanQr' } },
+      { id: 'share', labelKey: 'circle.plus.my_qr', target: { kind: 'nav', to: 'shareContact' } },
+    ],
+  },
+
+  /**
+   * The person's settings, behind the settings button beside the persona button ("Instellingen"): groups of sections,
+   * then the doors at the foot (the circles' own settings, help, the introduction, feedback, the copy-log report).
    * Both shells paint the home and each group from this declaration (`settingsHomeFor`), one painter per section id;
    * no shell lists a section by hand. A section lives in exactly one place: once declared here it is gone from the old
    * My data page. Kinds say how a row behaves, so it looks like what it is:
@@ -1168,41 +1184,68 @@ export const basisManifest = {
    *   control — a picker or a small form (theme, language)  fact    — plain text, nothing to do
    * `custody: true` marks a section of the owner's keys, devices or sign-in: its painter reaches only `private` ops, and
    * only through the waist (the fitness test reads both shells). A step-up before it paints is a later design.
-   * The last row is a door to a chooser of the person's circles; each opens that circle's own settings.
    */
   settingsGroups: [
+    // how the app looks and where it opens
     {
       id: 'appearance', labelKey: 'circle.settings_home.appearance',
       sections: [
         { id: 'theme',         kind: 'control' },
         { id: 'language',      kind: 'control' },
         { id: 'start-screen',  kind: 'control' },
-        { id: 'bot-actions',   kind: 'control' },
-        { id: 'week-overview', kind: 'switch'  },
-        { id: 'notifications', kind: 'switch'  },
-        { id: 'assistant',     kind: 'control' },
+        // which round button sits on the "+"'s own spot (or none: a second tap closes it) — the `plus.middle` setting
+        { id: 'plus-middle',   kind: 'control' },
       ],
     },
+    // what the app tells me, and when
+    {
+      id: 'notifications', labelKey: 'circle.settings_home.notifications',
+      sections: [
+        { id: 'notifications', kind: 'switch'  },
+        { id: 'week-overview', kind: 'switch'  },
+      ],
+    },
+    // the assistant: my own model endpoint, and how the bot shows actions
+    {
+      id: 'assistant', labelKey: 'circle.settings_home.assistant',
+      sections: [
+        { id: 'assistant',     kind: 'control' },
+        { id: 'bot-actions',   kind: 'control' },
+      ],
+    },
+    // how this device reaches the others (availability is on Vandaag: its screen opens from that block)
     {
       id: 'connection', labelKey: 'circle.settings_home.connection',
       sections: [
-        { id: 'availability',      kind: 'door', target: { kind: 'nav', to: 'availability' } },
         { id: 'connection-points', kind: 'door', target: { kind: 'nav', to: 'points' } },
-        { id: 'delivery',          kind: 'control' },
-        { id: 'address-sharing',   kind: 'switch'  },
         { id: 'relay',             kind: 'control' },
-        { id: 'device-keeps',      kind: 'control' },
+        { id: 'address-sharing',   kind: 'switch'  },
+        { id: 'delivery',          kind: 'control' },
       ],
     },
+    // my devices, screens, agents and bots
     {
-      id: 'devices-keys', labelKey: 'circle.settings_home.devices_keys',
+      id: 'devices', labelKey: 'circle.settings_home.devices',
       sections: [
-        { id: 'devices',        kind: 'control', custody: true },
-        { id: 'agents',         kind: 'control' },
-        { id: 'connections',    kind: 'control' },
-        { id: 'connection-add', kind: 'control' },
-        { id: 'keys',           kind: 'control', custody: true },
-        { id: 'storage',        kind: 'control', custody: true },
+        { id: 'devices',         kind: 'control', custody: true },
+        { id: 'device-add',      kind: 'control', custody: true },
+        { id: 'device-replace',  kind: 'control', custody: true },
+        { id: 'device-primary',  kind: 'control', custody: true },
+        { id: 'connections',     kind: 'control' },
+        { id: 'connection-add',  kind: 'control' },
+        { id: 'agents',          kind: 'control' },
+        { id: 'companion-claim', kind: 'control', custody: true },
+        { id: 'bot-link',        kind: 'control', custody: true },
+      ],
+    },
+    // the way back: what a person looks for in a panic, in a group of its own
+    {
+      id: 'recovery', labelKey: 'circle.settings_home.recovery',
+      sections: [
+        { id: 'recovery-phrase',  kind: 'control', custody: true },
+        { id: 'restore',          kind: 'control', custody: true },
+        { id: 'recovery-file',    kind: 'control', custody: true },
+        { id: 'personas-receive', kind: 'control', custody: true },
       ],
     },
     {
@@ -1215,7 +1258,10 @@ export const basisManifest = {
         { id: 'frequent',        kind: 'control' },
         // the person's own record of what they do in the app (ownActions.js): its switch, how much is kept, export, wipe
         { id: 'own-actions',     kind: 'control' },
-        { id: 'log-report',      kind: 'door', target: { kind: 'nav', to: 'logReport' } },
+        // what this device keeps of what the person's devices sync
+        { id: 'device-keeps',    kind: 'control' },
+        // where the data lives: the pod (status, sign in, disconnect)
+        { id: 'storage',         kind: 'control', custody: true },
       ],
     },
     { id: 'per-circle', kind: 'door', labelKey: 'circle.settings_home.per_circle', target: { kind: 'nav', to: 'circleSettingsChooser' } },
@@ -1225,20 +1271,35 @@ export const basisManifest = {
     { id: 'intro', kind: 'door', labelKey: 'circle.introDeck.reopen', target: { kind: 'nav', to: 'intro' } },
     // feedback about the app: the feedback op (its thread to Onderling, prefilled), the same act /feedback and the "+" run
     { id: 'feedback', kind: 'door', labelKey: 'circle.feedback.plus', target: { kind: 'op', opId: 'feedback' } },
+    // …and beside it "Meld een probleem": this device's log to copy (codes and numbers only; nothing is sent from it)
+    { id: 'log-report', kind: 'door', labelKey: 'circle.profile.logReport', target: { kind: 'nav', to: 'logReport' } },
   ],
 
   /**
-   * Me is ONE declared screen: below the actions above, these blocks, in order — filled by the one screen materializer
-   * (`mijScreenBlocks`) and painted by each shell's block painter. No shell lists a section of Me by hand.
-   *   identityLine — the person's name, and the readings named here (each answers one thing about now)
-   *   awaiting     — what is waiting for the person: a vote open to them, an appointment to answer, a device offer —
-   *                  each a chip that opens where it lives (computed from the tabs' own reads; nothing acts here)
-   *   agents       — this person's devices, companions and linked bots, one row each (read-only; a tap opens My data)
+   * Me — the PERSONA PANEL behind the persona button (top right on every tab): ONE declared short view. Below the
+   * actions above, these blocks, in order — filled by the one screen materializer (`mijScreenBlocks`) and painted by
+   * each shell's block painter. No shell lists a section of the panel by hand.
+   *   identityLine — the person's (or the persona's) name with "Aanpassen" (the editor)
+   *   agents       — this person's devices, companions and linked bots, one row each (read-only; a tap opens the
+   *                  devices settings group)
    */
   meBlocks: [
-    { type: 'identityLine', config: { readings: ['availability', 'online', 'unread', 'open', 'next'] } },
-    { type: 'awaiting',     config: {} },
+    // the name and "Aanpassen" only: the readings went (the availability to Vandaag; the counts were dropped)
+    { type: 'identityLine', config: {} },
     { type: 'agents',       config: {} },
+  ],
+
+  /**
+   * Vandaag's top, above "Nieuw voor jou" (Frits 2026-11-20). Materialized by the same screen materializer and painted
+   * by each shell's block painter; not blocks of the stored page (a person does not place or remove them), and a block
+   * with nothing to say is not shown. The availability is no block: one quiet line under the page title
+   * (`availabilityLine`), a tap opens the availability screen.
+   *   awaiting     — "Wacht op jou", first: a vote open to the person (its chip opens the circle's open votes), an
+   *                  appointment to answer, a device offer, what was shared with them — each a chip that opens where it
+   *                  lives
+   */
+  todayBlocks: [
+    { type: 'awaiting', config: {} },
   ],
 
   /**

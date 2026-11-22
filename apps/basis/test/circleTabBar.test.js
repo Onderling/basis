@@ -8,16 +8,24 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { renderCircleTabBar } from '../web/v2/circleTabBar.js';
-import { circleTabs } from '../src/v2/tabProjection.js';
+import { circleTabs, circleTabsMobile } from '../src/v2/tabProjection.js';
 import { basisManifest } from '../src/index.js';
 
 const t = (k) => k;
 
+describe('the tab order with Nearby (Frits, ledger L1051)', () => {
+  it('Today · Circles · Contacts · Nearby (Mij left the bar: the persona panel), the same on both shells', () => {
+    const order = ['screens', 'circles', 'contacten', 'nearby'];
+    expect(circleTabs(basisManifest, undefined, { hasMesh: true }).map((tab) => tab.id)).toEqual(order);
+    expect(circleTabsMobile(basisManifest, { hasMesh: true }).map((tab) => tab.id)).toEqual(order);
+  });
+});
+
 describe('renderCircleTabBar', () => {
-  it('renders the alpha tabs in order — Circles, Contacten, Mij (Schermen and Nearby are hidden, not removed)', () => {
+  it('renders the alpha tabs in order — Vandaag, Kringen, Contacten (Nearby only with a mesh)', () => {
     const el = renderCircleTabBar(document.createElement('nav'), { active: 'circles', t });
     const tabs = [...el.querySelectorAll('.circle-tabbar__tab')].map((b) => b.dataset.tab);
-    expect(tabs).toEqual(['screens', 'circles', 'contacten', 'mij']);
+    expect(tabs).toEqual(['screens', 'circles', 'contacten']);
     expect(el.querySelector('[data-tab="circles"]').classList.contains('is-active')).toBe(true);
   });
 
@@ -34,8 +42,8 @@ describe('renderCircleTabBar', () => {
   it('is a genuine projection consumer: the DOM tabs match manifest.tabs (ids + labels)', () => {
     const projected = circleTabs(basisManifest);
     // The manifest is the single source of the roster (no per-shell literal).
-    expect(projected.map((tab) => tab.id)).toEqual(['screens', 'circles', 'contacten', 'mij']);
-    const el = renderCircleTabBar(document.createElement('nav'), { active: 'mij', t });
+    expect(projected.map((tab) => tab.id)).toEqual(['screens', 'circles', 'contacten']);
+    const el = renderCircleTabBar(document.createElement('nav'), { active: 'screens', t });
     const btns = [...el.querySelectorAll('.circle-tabbar__tab')];
     expect(btns.map((b) => b.dataset.tab)).toEqual(projected.map((tab) => tab.id));
     // Each button's label is the projected labelKey resolved via t().

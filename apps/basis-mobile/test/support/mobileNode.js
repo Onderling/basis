@@ -195,6 +195,7 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     pinboardPodWrite: pods.circlePodWrite,
     podWebId: pods.getCirclePodWebId,
     setKeyEventWiring: pods.setCircleKeyEventWiring,
+    setWriteGate: pods.setCircleWriteGate,
     mappingsStore: asyncStorageMappingsStore(AsyncStorage),
     mappingsDeviceId: MAPPINGS_DEVICE,
     // a first launch: the demo seed runs, as on a fresh install

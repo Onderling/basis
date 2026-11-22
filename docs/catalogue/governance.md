@@ -14,6 +14,8 @@ kernel's roster fold; every shell composes the same binding).
   removal, a role or the rules is cast, the only place an admin sees a report, and the only place the changes made
   without the vote are listed). A member hears of an open decision as a line in the circle's conversation ("A decision
   opened: … your vote may be needed"), rendered from the proposal statement; the line itself is not a way in yet.
+  A second door: Vandaag's "Wacht op jou" chip ("N stemming(en) voor jou open") opens this screen for that circle,
+  where the vote is cast in one tap (web and phone, 2026-11-20; it opened the circle's settings before).
 - As an admin, set WHO DECIDES each governed action: one admin (`any-admin`), the admins together (`admin-quorum`, a
   majority of the admins; a single admin is the quorum), the whole circle (`member-vote`, a majority of all members),
   or, after the alpha, a few drawn members (`random-sample`, built and held back, see below). Who decides is itself a
@@ -26,6 +28,9 @@ kernel's roster fold; every shell composes the same binding).
   removal, under the removal class).
 - See a change someone made WITHOUT the vote the circle requires: it is listed on the Decisions screen ("X changed the
   rules without the vote this circle requires. The change is not applied.") and no device applies it.
+- Switch an app, a feature or an act off for the circle and have it hold on every member's device, not only in each
+  sender's app: a task added after "add task" was turned off is not shown on any other member's device, and is taken
+  back on the sender's own; what was made while it was on stays. A member who joins later still gets the existing rows.
 - When the last admin leaves, the circle passes to a caretaker computed from the log (every device names the same
   person; nobody is asked).
 - Found a circle by answering the conflict question: "an admin decides" (the default) or "the circle votes"; the
@@ -72,6 +77,19 @@ kernel's roster fold; every shell composes the same binding).
   (member vote, then the admins together, then any one admin): `denyWinsMerge`'s governance order.
   Accepted with it: a voted LOOSENING that arrives beside another admin's unrelated change at the same version (which
   carries the old, stricter class) loses until a later version states it again.
+- **The switches on arrival (the items lane):** `contentLine.js` (which settings a content statement is judged by: the
+  newest change it is not behind; `settingsForContent`), `contentJudge.js` (`judgeItemStatement`: apply · refuse ·
+  wait), `itemsRail.js` (every statement judged before it reaches the store, whatever brought it; `rejudge` takes back
+  by rebuilding a row from its statements still allowed), `keptPolicyChanges.js` (the settings changes the settings
+  lane kept, per device, asked of the lane at a quiet start), `contentJudgments.js` (what a device proved, the act a
+  statement arrived as, and the row as it was where a take-back needs it: the silent `content-judged` kind on its own
+  log). A head served at catch-up carries `served` in its signed body and is taken only when this device asked
+  (`frontierReplay.js` hands the rail `{asked: true}`). The settings lane is handed its rail at boot in every shell
+  (`scripts/shell-seams.mjs`). The chat lane binds by the conversation kinds, a filter every reader asks
+  (`conversationKinds.js`). A write into ANOTHER circle than the one the door asked (an appointment's copy into a
+  pair circle) asks that circle as its receivers will (`writeIntoRefusal` in `circleActGate.js`, with this device's
+  kept settings changes) and is refused in words where they would refuse; where this device does not know the kept
+  changes yet, it is not refused and the receivers decide.
 - **The roster and the caretaker:** `packages/core/src/security/rosterFold.js` (`foldRoster`, `caretakerOrder`),
   folded by pinboard's `deriveRoster`.
 - **Screens:** web `apps/basis/web/v2/circleGovernancePanel.js`; phone `CircleGovernanceScreen.js`; the doors' callers
@@ -101,6 +119,15 @@ pinboard: removeMember setMemberRole editGroupRules recordGroupRulesUpdate getGr
   removal and promotion, proposed and voted yes by both admins, take effect on both devices (red with the gate off);
   where the members decide, a plain member's yes approves the removal, and it lands on both devices once an admin's
   device enacts it (the admin's act; by default nothing enacts on its own).
+- The switches on arrival: `itemsLaneSwitchesThreeDevice.test.js` (three real agents and a joiner: a changed sender
+  that skips its own gate; a row made before the switch-off stays; one racing it is refused on the others and taken
+  back on the sender's; a backdated one is refused everywhere; all three end equal; the joiner gets the existing rows,
+  served in answer to its ask, with adding off), `v2/itemsLaneSwitchesBind.test.js`, `v2/contentJudge.test.js`,
+  `v2/contentLine.test.js`, `v2/contentJudgments.test.js` (the kind's four conditions), `v2/itemsServedHeads.test.js`,
+  `v2/itemsLaneQuietStart.test.js`. The chat lane: `chatKindsSwitchThreeDevice.test.js` (three real agents; a changed
+  app sends a chat line where the circle allows asks only: kept on the log, not shown, counted or notified on any
+  device, the sender's own included; back on, it shows), `v2/conversationKindsBind.test.js`. A write into another
+  circle: `shareIntoSwitchedOffPair.relay.test.js`, `v2/writeIntoRefusal.test.js`.
 - The door on both shells' menus: `alphaSurface.test.js` and the phone's `circleDetailActionsProjection.test.js`.
 - The caretaker over a real relay: `test/v2/caretakerHandover.relay.test.js`; a removed member refused on every
   member's device: `removedMemberRefusedEverywhere.relay.test.js`; the classes and tallies:

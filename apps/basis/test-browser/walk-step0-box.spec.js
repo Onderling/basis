@@ -112,17 +112,15 @@ test('step 0: link, claim the companion, give the bot the agenda files, the link
       .find((c) => c.webid === boxAddress && c.linkedRow) ?? null, { timeout: 60_000, step: 500 });
     expect(contact, 'the bot is a contact in the app').toMatchObject({ webid: boxAddress, linkedRow: `telegram:${ADMIN}` });
 
-    // ── 2 · Claim the companion: the claim line from the log, pasted under Instellingen → Apparaten & sleutels → "Companion claimen" ──
+    // ── 2 · Claim the companion: the claim line from the log, pasted under Instellingen → Apparaten → "Companion claimen" ──
     const claimLine = /Claim:\s+(\S+@\S+)/g;
     let claim = null;
     for (const m of logsOf('companion', env).matchAll(claimLine)) claim = m[1];   // `| tail -1`
     expect(claim, 'the companion prints a claim line').toBeTruthy();
     await page.goto(appUrl);
     await expect.poll(() => page.evaluate(() => typeof window.onderlingCall === 'function'), { timeout: 120_000 }).toBe(true);
-    await page.locator('[data-tab="mij"]').first().click();
-    // Instellingen → Apparaten & sleutels: where devices, agents and the claim live
-    await page.locator('.cc-profile__gear').click();
-    await page.locator('.cc-settings__group--devices-keys').click();
+    await page.locator('.cc-persona-button__settings').click();
+    await page.locator('.cc-settings__group--devices').click();
     await page.locator('.cc-mydata__claim-companion').first().click();
     // the claim sheet: its field (placeholder 'ABCD-EFGH@…') and its 'Claimen' button
     await page.getByPlaceholder('ABCD-EFGH@…').fill(claim);

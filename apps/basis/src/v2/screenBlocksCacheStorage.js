@@ -30,7 +30,8 @@ export function sealedScreenBlocksCacheIo(storage) {
       } catch { return null; }   // not openable yet (no key), corrupt, or not JSON: no cache
     },
     save: async (screenId, blocks) => {
-      try { await kv.setItem(KEY_PREFIX + screenId, JSON.stringify(blocks)); } catch { /* quota / disabled / no content key yet */ }
+      // false when refused, so the cache does not count it as written (it would skip the same blocks once the key is there)
+      try { await kv.setItem(KEY_PREFIX + screenId, JSON.stringify(blocks)); return true; } catch { return false; /* quota / disabled / no content key yet */ }
     },
     remove: async (screenId) => {
       try { await kv.removeItem(KEY_PREFIX + screenId); } catch { /* ignore */ }

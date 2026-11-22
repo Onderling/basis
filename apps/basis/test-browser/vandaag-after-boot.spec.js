@@ -19,9 +19,14 @@ test('an appointment already on the device shows on Today after a reload', async
   expect(made?.ok, JSON.stringify(made)).toBe(true);
   await expect.poll(() => itemsText(page), { timeout: 20_000, message: 'shown while the page is open' }).toContain('tandarts');
   // the boot: the appointment is already on the device
+  const t0 = Date.now();
   await page.reload();
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  const head = Date.now() - t0;
   await expect.poll(() => itemsText(page), { timeout: 20_000, message: 'shown on the first landing after the boot' }).toContain('tandarts');
+  // THE WEB BOOT NUMBER (the kept-picture ruling): from the reload to Today's head and to its first item already on the
+  // device. Above ~4 s, the web paints its kept picture before the agent is whole (an early paint, after the alpha).
+  console.log(`[web-boot] reload to Today's head ${head} ms, to its first item ${Date.now() - t0} ms`);
 });
 
 test('a task in a circle, already on the device, shows on Today after a reload', async ({ page }) => {

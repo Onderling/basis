@@ -6050,8 +6050,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   const retiredTasksVault = opts.tasksIdentityVault ?? pickVault('cc-tasks-id:');
   let retiredBotIssuer = null;
   try {
-    const sealed = await sealedVault(retiredTasksVault);
-    if (await sealed.has('agent-privkey')) retiredBotIssuer = (await AgentIdentity.restore(sealed)).pubKey;
+    // an EMPTY prefix holds no key to read: not sealed, so not written (its sentinel was set and removed again at every
+    // start, two writes for nothing; the start-writes count on the phone)
+    const retiredKeys = await retiredTasksVault.list();
+    const sealed = retiredKeys.length ? await sealedVault(retiredTasksVault) : null;
+    if (sealed && await sealed.has('agent-privkey')) retiredBotIssuer = (await AgentIdentity.restore(sealed)).pubKey;
   } catch (e) { console.warn('[realAgent] the retired tasks key could not be read — its bot bindings will be dropped, not re-signed:', e?.message ?? e); }
   // the task grants' durable store: the host's, one record per circle inside it
   const hostGrantsVault = await sealedVault(opts.hostGrantsVault ?? pickVault('cc-host-grants:'));

@@ -227,6 +227,11 @@ const YOUNG_ADDRESS_RETRY_MS = param({ key: 'secureAgent.youngAddressRetryMs', s
 /** How many stale envelopes one bucket (a circle) may hold while its sender check is refreshed; the oldest goes first. */
 /** How long this device remembers WHICH relays took a message the sweep sent on several (`relayGaveUp`): as long as a
  *  relay may hold it (the relay's queue TTL; queueRetentionMatchesTheApp pins the two together). */
+// MOST PEERS the outbox holds anything for; past it the least-recently-queued peer's whole queue goes. Sized for the alpha
+// with room (five circles of fifteen are ~75 addresses, one per circle): at 64 a start that held for every absent member
+// evicted queues and the boot re-fan held their lines again, ~1350 holds and ~90 evictions in a start's first 40 s on the
+// seeded phone, each a write of the outbox. A held queue is small (one entry per line, 50 at most).
+const HOLD_MAX_PEERS = param({ key: 'secureAgent.holdMaxPeers', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 256 });
 const SWEPT_COPIES_TTL_MS = param({ key: 'secureAgent.sweptCopiesTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 24 * 60 * 60 * 1000 });
 /** How many such messages it remembers at once; the oldest goes first (then a give-up for it is reported as before). */
 const SWEPT_COPIES_MAX = param({ key: 'secureAgent.sweptCopiesMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1024 });
@@ -879,12 +884,29 @@ export async function createSecureAgent(opts = {}) {
   let   outboxRestored = Promise.resolve(0);
 
   /** Serialise the queue. `opts` is JSON round-tripped, so anything unserialisable (a callback) is
-   *  dropped rather than throwing — a resend must not depend on a closure the restart cannot restore. */
+   *  dropped rather than throwing — a resend must not depend on a closure the restart cannot restore.
+   *
+   *  ONE WRITE PER BURST (ledger L619): the queue is serialised when its write RUNS, not when it is asked for, and a
+   *  write that is still waiting serves every call made meanwhile. Before, each hold serialised the whole outbox (on a
+   *  seeded phone ~200 kB, hundreds of holds in a start's first seconds) and queued a write of it. The promise is the
+   *  same: once the returned promise (or `outboxFlushed()`) resolves, the durable copy holds this call's change. */
+  let holdPersistWaiting = false;
   function persistHolds() {
     if (!holdStore) return holdPersist;
-    let snapshot;
+    if (holdPersistWaiting) return holdPersist;   // the waiting write reads the queue when it runs: this change included
+    holdPersistWaiting = true;
+    holdPersist = holdPersist.then(async () => {
+      holdPersistWaiting = false;                 // from here on a change needs a write of its own
+      const snapshot = serialiseHolds();
+      if (snapshot == null) return;               // a queue we cannot serialise stays in memory
+      try { await holdStore.write(holdStoreUri, snapshot); }
+      catch (err) { if (typeof console !== 'undefined') console.warn('[secure-agent] outbox persist failed', err?.message ?? err); }
+    });
+    return holdPersist;
+  }
+  function serialiseHolds() {
     try {
-      snapshot = JSON.stringify({
+      return JSON.stringify({
         v: 1,
         peers: [...pendingHold].map(([addr, q]) => [addr, [...q].map(([k, e]) => [k, {
           payload: e.payload, opts: e.opts ?? null, ts: e.ts ?? Date.now(),
@@ -895,12 +917,7 @@ export async function createSecureAgent(opts = {}) {
         dead: [...deliveryFailures].map(([addr, f]) => [addr, { n: f.n, at: f.at }]),
         alive: [...seenAlive],
       });
-    } catch { return holdPersist; }          // a queue we cannot serialise stays in memory
-    holdPersist = holdPersist.then(async () => {
-      try { await holdStore.write(holdStoreUri, snapshot); }
-      catch (err) { if (typeof console !== 'undefined') console.warn('[secure-agent] outbox persist failed', err?.message ?? err); }
-    });
-    return holdPersist;
+    } catch { return null; }
   }
 
   /** Load the queue written by a previous run. Entries past the TTL are dropped on the way in and
@@ -948,7 +965,7 @@ export async function createSecureAgent(opts = {}) {
   /** Most messages held for ONE peer; the oldest is dropped past this. */
   const holdMaxPerPeer = Number.isFinite(opts.holdMaxPerPeer) ? opts.holdMaxPerPeer : 50;
   /** Most PEERS we hold anything for; the least-recently-queued peer's queue goes first. */
-  const holdMaxPeers = Number.isFinite(opts.holdMaxPeers) ? opts.holdMaxPeers : 64;
+  const holdMaxPeers = Number.isFinite(opts.holdMaxPeers) ? opts.holdMaxPeers : HOLD_MAX_PEERS;
   /** Consecutive failed delivery attempts to one address before we stop attempting (0 = never stop). */
   const holdMaxDeliveryFailures = Number.isFinite(opts.holdMaxDeliveryFailures)
     ? opts.holdMaxDeliveryFailures : 3;
@@ -1135,20 +1152,31 @@ export async function createSecureAgent(opts = {}) {
    * Bounded (see the note on `pendingHold`): expired entries are swept first, then the per-peer and
    * across-peers caps are enforced by dropping the OLDEST — reported, never silently.
    */
+  /** Two JSON-shaped values equal as stored (the outbox round-trips them through JSON); unserialisable: never equal. */
+  function sameJson(a, b) {
+    try { return JSON.stringify(a ?? null) === JSON.stringify(b ?? null); } catch { return false; }
+  }
   function enqueueHold(addr, payload, sendOpts, reason = 'unreachable') {
     const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
     sweepExpiredHolds();
     let q = pendingHold.get(addr);
     if (!q) { q = new Map(); pendingHold.set(addr, q); }
     const key = holdKeyFor(payload, sendOpts);
+    // a held entry keeps the send's terms, not its caller's callback (the send that asked for it has already answered)
+    const { onRouteTaken: _cb, ...heldOpts } = sendOpts ?? {};   // eslint-disable-line no-unused-vars
     if (q.has(key)) {
       if (!key.startsWith('key:')) {
         return { held: true, delivered: false, deduped: true, msgId, pending: q.size, reason };
       }
+      // A SLOT THAT CHANGES NOTHING WRITES NOTHING (the start-writes count on the phone): every start sends the boot
+      // catch-up requests again, and for a member who is not there each one is held under its slot. The same payload
+      // under the same terms is the same hold: kept as it is (its age too), the outbox not written again.
+      const held = q.get(key);
+      if (sameJson(held?.payload, payload) && sameJson(held?.opts ?? null, heldOpts)) {
+        return { held: true, delivered: false, deduped: true, msgId, pending: q.size, reason };
+      }
       q.delete(key);   // a slot: the newest supersedes (re-set below keeps it at the young end)
     }
-    // a held entry keeps the send's terms, not its caller's callback (the send that asked for it has already answered)
-    const { onRouteTaken: _cb, ...heldOpts } = sendOpts ?? {};   // eslint-disable-line no-unused-vars
     q.set(key, { payload, opts: heldOpts, ts: Date.now() });
     // Per-peer cap — a Map iterates in insertion order, so the first key IS the oldest.
     while (holdMaxPerPeer > 0 && q.size > holdMaxPerPeer) {

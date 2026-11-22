@@ -17,6 +17,20 @@
 export function pointKey(url) {
   const s = typeof url === 'string' ? url.trim() : '';
   if (!s) return '';
+  // ONE PARSE PER SPELLING (ledger L619): every send's route decision and its explained log line call this per
+  // candidate transport, and on the phone `URL` is a JavaScript polyfill (~17% of the JS thread 8-12 s after a cold
+  // start). The key is a pure function of the string; a device meets a handful of relay spellings, the cap is a guard.
+  const known = memo.get(s);
+  if (known !== undefined) return known;
+  const key = parseKey(s);
+  if (memo.size >= MEMO_MAX) memo.clear();
+  memo.set(s, key);
+  return key;
+}
+const MEMO_MAX = 256;
+const memo = new Map();
+
+function parseKey(s) {
   let u;
   try { u = new URL(s); } catch { return s; }
   const scheme = u.protocol === 'https:' ? 'wss:' : u.protocol === 'http:' ? 'ws:' : u.protocol;

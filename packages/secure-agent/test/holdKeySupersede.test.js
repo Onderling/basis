@@ -58,3 +58,44 @@ describe('hold queue — slot keys', () => {
     await a.shutdown();
   });
 });
+
+/**
+ * A SLOT HOLD THAT CHANGES NOTHING WRITES NOTHING (ledger L1103, counted on the seeded Samsung 2026-11-22): every start
+ * sends the boot catch-up requests again, one slot per lane, circle and member; a member who is not there gets each one
+ * held, and each superseded its own identical slot and rewrote the whole outbox. The same payload under the same slot is
+ * now the same hold: kept as it is (its age too), nothing written. A different payload still supersedes.
+ */
+describe('hold queue — an unchanged slot', () => {
+  const countingStore = () => {
+    const s = { map: new Map(), writes: 0 };
+    s.read = async (u) => (s.map.has(u) ? s.map.get(u) : null);
+    s.write = async (u, b) => { s.writes += 1; s.map.set(u, String(b)); };
+    return s;
+  };
+  it('the same payload under the same slot: deduped, no write, also after a restart', async () => {
+    const store = countingStore();
+    const a = await agent({ holdStore: store, holdStoreUri: 'mem://t/outbox.json' });
+    await a.outboxRestored();
+    await a.peer.sendTo(DEAD, { subtype: 'x-request', frontier: 7 }, { ...HOLD, holdKey: 'x:c1' });
+    await a.outboxFlushed();
+    const after1 = store.writes;
+    const again = await a.peer.sendTo(DEAD, { subtype: 'x-request', frontier: 7 }, { ...HOLD, holdKey: 'x:c1' });
+    await a.outboxFlushed();
+    expect(again).toMatchObject({ held: true, deduped: true });
+    expect(store.writes).toBe(after1);
+    await a.shutdown();
+    // THE NEXT START: the outbox restored, the boot sends the same request again
+    const b = await agent({ holdStore: store, holdStoreUri: 'mem://t/outbox.json' });
+    await b.outboxRestored();
+    const before = store.writes;
+    await b.peer.sendTo(DEAD, { subtype: 'x-request', frontier: 7 }, { ...HOLD, holdKey: 'x:c1' });
+    await b.outboxFlushed();
+    expect(b.heldFor(DEAD)).toBe(1);
+    expect(store.writes, 'an unchanged slot at the next start wrote the outbox').toBe(before);
+    // a CHANGED payload still supersedes, and is written
+    await b.peer.sendTo(DEAD, { subtype: 'x-request', frontier: 8 }, { ...HOLD, holdKey: 'x:c1' });
+    await b.outboxFlushed();
+    expect(store.writes).toBeGreaterThan(before);
+    await b.shutdown();
+  }, 30_000);
+});

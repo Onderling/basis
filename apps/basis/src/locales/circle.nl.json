@@ -6294,6 +6294,14 @@
       "text": "Hij krijgt de woorden van een vraag, en niets over wie het vraagt.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
+    "toolbox_page_over_http": {
+      "text": "Let op: de pagina op {{page}} komt over gewoon http binnen het thuisnetwerk. Wat pagina en bot elkaar zeggen blijft versleuteld, maar iemand op hetzelfde netwerk kan de pagina zelf veranderen terwijl ze laadt en dan met de rechten van deze pagina je lijsten lezen en wijzigen. Zet dit alleen aan op een eigen, beveiligd wifi-netwerk.",
+      "doc": "The /toolbox card when the placed page is on plain http in the home network (the operator's pageOverHttp choice): the risk, said before the yes. {{page}}: the page address."
+    },
+    "toolbox_page_app_origin": {
+      "text": "Ik zet {{name}} niet aan: zijn pagina staat op hetzelfde adres als de Basis-web-app, en kon dan alles lezen wat Basis in die browser bewaart. Zet de pagina op een eigen adres (een ander domein of een andere poort).",
+      "doc": "The /toolbox door refuses to switch on a toolbox whose placed page has the web app's own origin (L1041 b). {{name}}: the toolbox."
+    },
     "toolbox_receives_list": {
       "text": "Hij krijgt de woorden van een vraag, en bij een vraag naar de prijs de kenmerken van de dingen op een lijst; niets over wie het vraagt.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."

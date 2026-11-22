@@ -32,20 +32,27 @@
  * @returns {{ get: Function, set: Function, clear: Function }}
  */
 export function createScreenBlocksCache({ load, save, remove } = {}) {
+  // WRITES ONLY A CHANGE (the start-writes count on the phone): what this cache last read or wrote per screen, as text;
+  // a landing that brings the same blocks back writes nothing (the value is sealed, so every write is a seal at start)
+  const known = new Map();
+  const textOf = (v) => { try { return JSON.stringify(v ?? null); } catch { return null; } };
   return {
     async get(screenId) {
       if (typeof screenId !== 'string' || !screenId) return null;
       if (typeof load !== 'function') return null;
-      try { return (await load(screenId)) ?? null; }
+      try { const v = (await load(screenId)) ?? null; if (v != null) known.set(screenId, textOf(v)); return v; }
       catch { return null; }
     },
     async set(screenId, blocks) {
       if (typeof screenId !== 'string' || !screenId) return;
       if (typeof save !== 'function') return;
-      try { await save(screenId, blocks); } catch { /* ignore */ }
+      const text = textOf(blocks);
+      if (text != null && known.get(screenId) === text) return;
+      try { if ((await save(screenId, blocks)) !== false) known.set(screenId, text); } catch { /* ignore */ }
     },
     async clear(screenId) {
       if (typeof screenId !== 'string' || !screenId) return;
+      known.delete(screenId);
       if (typeof remove !== 'function') return;
       try { await remove(screenId); } catch { /* ignore */ }
     },

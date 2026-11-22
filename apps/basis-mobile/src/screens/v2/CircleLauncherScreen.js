@@ -55,6 +55,7 @@ import { FAB_CLEARANCE, PERSONA_BUTTON, SETTINGS_BUTTON_GAP } from './fab.js';
 // header bar at the very top of `styles.page`, so the inset belongs to that style — see `makeStyles`.
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createKeptCircles, keptCircleRow, keptPictureView, mayKeepPicture } from '../../../../basis/src/v2/keptPicture.js';   // the kept picture: shown until the live state is caught up
 // Network-change sources for the Nearby re-announce. AppState is always available; netinfo is an OPTIONAL
 // peer, so it is loaded defensively — a shell without it keeps foreground-return detection and simply loses
 // the in-foreground Wi-Fi-switch case.
@@ -230,7 +231,7 @@ import { feedHouseholdRoster } from '../../../../basis/src/v2/householdRosterPai
 import { recentCircleTurns } from '../../../../basis/src/v2/circleMemory.js';
 import { createMemoryBackend } from '@onderling/pseudo-pod';
 import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
-import { sealedLocalBackend, onShellContentSeal } from '../../../../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
+import { sealedLocalBackend, onShellContentSeal, sealedKeyValue } from '../../../../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { buildCircleEmbedProviders } from '../../../../basis/src/v2/circleEmbedProviders.js';
 import { resolveCircleEmbedder } from '../../../../basis/src/v2/embedPicker.js';
 // Telling someone the circle became theirs. The decision (WHO is told, and whether they have
@@ -590,6 +591,17 @@ export default function CircleLauncherScreen({
   const [launcherSettled, setLauncherSettled] = useState(false);
   const launcherSettledRef = useRef(false);
   launcherSettledRef.current = launcherSettled;
+  // THE KEPT CIRCLES LIST (`keptPicture.js`): the last caught-up list, sealed, read once the content key is there, painted
+  // instead of the loading line until the list is read. A tap on a kept tile is remembered and opens the circle once
+  // the live list holds it.
+  const keptCirclesStore = useMemo(() => createKeptCircles(sealedKeyValue(AsyncStorage, { name: 'the kept circles list', strict: true, waitForKey: true })), []);
+  const [keptCircles, setKeptCircles] = useState(null);
+  const keptOpenRef = useRef(null);
+  useEffect(() => {
+    let alive = true;
+    keptCirclesStore.read().then((rows) => { if (alive && rows?.length) setKeptCircles(rows); }).catch(() => {});
+    return () => { alive = false; };
+  }, [keptCirclesStore]);
   // The developer switch (`app.developer`, a register param, off by default in every build): the Advanced screen — raw
   // parameter keys and values, a developer tool — is offered only when it is on. Read each time Me opens.
   const [developerOn, setDeveloperOn] = useState(false);
@@ -1225,6 +1237,11 @@ export default function CircleLauncherScreen({
   }, [bundle, refreshSights]);
   const kringOn = useCallback((id) => makeSyncSelection({ getParamValue: (k) => bundle?.agent?.getParamValue?.(k) }).kringOn(id), [bundle]);
   const bySight = useMemo(() => splitBySight(tileCircles(circlesShown), { sights, kringOn }), [circlesShown, sights, kringOn]);
+  // only a caught-up list becomes the next start's picture (an early empty read would be its lie)
+  useEffect(() => {
+    if (!mayKeepPicture({ caughtUp: launcherSettled })) return;
+    keptCirclesStore.keep(bySight.shown.map((c) => keptCircleRow(c, previews?.[c.id], { pinned: !!pinnedMap[c.id] })).filter(Boolean), { caughtUp: launcherSettled }).catch(() => {});
+  }, [launcherSettled, bySight, previews, pinnedMap, keptCirclesStore]);   // eslint-disable-line react-hooks/exhaustive-deps -- previews is declared further up
   const [menuCircle, setMenuCircle] = useState(null);
   useEffect(() => {
     let alive = true;
@@ -1439,6 +1456,7 @@ export default function CircleLauncherScreen({
   // VANDAAG'S HEAD (`screenHead.js`, web parity): the blocks as last read for the landing's key, kept current by the
   // circles' item changes and the event log — a tab landing on a fresh head reads nothing
   const vandaagHead = useRef(null);
+  const vandaagKeptRef = useRef(null);   // Today's kept blocks while they stand in for a live read (`keptPicture.js`)
   const viewNow = useRef(view);
   viewNow.current = view;
   useEffect(() => {
@@ -1455,8 +1473,10 @@ export default function CircleLauncherScreen({
     });
     const off = head.onUpdate((blocks) => {
       if (viewNow.current !== 'screens') return;
-      setScreenViewBlocks(blocks);
-      setScreenViewRefreshing(false);
+      const v = keptPictureView({ kept: vandaagKeptRef.current, live: blocks, caughtUp: launcherSettledRef.current });
+      if (v.source === 'live') vandaagKeptRef.current = null;
+      setScreenViewBlocks(v.value);
+      setScreenViewRefreshing(v.refreshing);
     });
     vandaagHead.current = head;
     return () => { off(); head.dispose(); if (vandaagHead.current === head) vandaagHead.current = null; };
@@ -1541,6 +1561,7 @@ export default function CircleLauncherScreen({
       let cached = null;
       if (cacheKey) { try { cached = await screenBlocksCache.get(cacheKey); } catch { /* ignore */ } }
       if (!alive) return;
+      vandaagKeptRef.current = Array.isArray(cached) ? cached : null;
       if (Array.isArray(cached)) {
         setScreenViewBlocks(cached);
         setScreenViewRefreshing(true);
@@ -1551,11 +1572,16 @@ export default function CircleLauncherScreen({
       try {
         const blocks = head ? await head.land(vandaagKey) : await materializeVandaagNow();
         if (!alive) return;
-        setScreenViewBlocks(blocks);
-        setScreenViewRefreshing(false);
-        // Best-effort: write the fresh blocks back so the next open is
-        // also instant.  Quota / serialisation failures are silent.
-        if (cacheKey) screenBlocksCache.set(cacheKey, blocks).catch(() => { /* ignore */ });
+        // THE KEPT PICTURE STAYS UNTIL CAUGHT UP (`keptPicture.js`): a read made before the circles were known is not
+        // an answer (it said "nothing planned" over the kept day for ten seconds); the landing key holds circlesKnown, so
+        // this effect runs again once they are, and that read replaces the picture and becomes the next one
+        const caughtUp = launcherSettledRef.current;
+        const v = keptPictureView({ kept: vandaagKeptRef.current, live: blocks, caughtUp });
+        if (v.source === 'live') vandaagKeptRef.current = null;
+        setScreenViewBlocks(v.value);
+        setScreenViewRefreshing(v.refreshing);
+        // Best-effort: write the fresh blocks back so the next open is also instant, only a caught-up read.
+        if (cacheKey && mayKeepPicture({ caughtUp })) screenBlocksCache.set(cacheKey, blocks).catch(() => { /* ignore */ });
       } catch (err) {
         console.warn('[screens] materialize failed:', err?.message ?? err);
         if (!alive) return;
@@ -1764,6 +1790,14 @@ export default function CircleLauncherScreen({
   const openProposals = useCallback((c) => { setSelected(c); setView('settings'); }, []);
   // the vote chip on Vandaag: straight to the circle's open votes, cast in one tap (Frits 2026-11-20; web: showGovernance)
   const openVotes = useCallback((c) => { setSelected(c); setView('governance'); }, []);
+  useEffect(() => {
+    const id = keptOpenRef.current;
+    if (!id || !launcherSettled) return;
+    const c = circles.find((x) => x?.id === id);
+    keptOpenRef.current = null;
+    if (c) openCircleRef.current?.(c);
+  }, [launcherSettled, circles]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const openCircleRef = useRef(null);
   const openCircle = useCallback(async (c) => {
     setActiveCircle(c.id);
     // bump the seenAt marker so the unread badge clears on the next launcher render (sealed; an open before the marks
@@ -1785,6 +1819,7 @@ export default function CircleLauncherScreen({
       setSelected((cur) => { if (cur && cur.id === c.id) setItems(got); return cur; });
     } catch { /* keep empty */ }
   }, [resolveSkill, bundle]);
+  openCircleRef.current = openCircle;
 
   // THE HELP DOOR (Settings' Help, the intro's "more"): the Help circle, or the line that says it is not here (shared, web twin)
   const openHelpDoor = () => {
@@ -3069,7 +3104,7 @@ export default function CircleLauncherScreen({
     );
   }
 
-  const listPaint = launcherListPaint({ loading, settled: launcherSettled, count: circles.length, bootError });
+  const listPaint = launcherListPaint({ loading, settled: launcherSettled, count: circles.length, bootError, keptCount: keptCircles?.length ?? 0 });
   const bootNotice = bootFailureNotice(bootFailure ?? bootError);
   return (
     <WithTabBar avatar={personaButtonRinged} onAvatar={openPersonaPanel} onSettings={openSettings} plus={plusBar} plusSheet={plusSheet} overlay={screenOverlay} active="circles" onSelect={onTabTap} badges={tabBadges} hasMesh={HAS_MESH}>
@@ -3086,6 +3121,15 @@ export default function CircleLauncherScreen({
             So the placeholder is for an EMPTY list only — a refresh now repaints in place. */}
         {listPaint === 'loading' ? (
           <Text style={styles.muted}>{t('circle.loading')}</Text>
+        ) : listPaint === 'kept' ? (
+          <ScrollView contentContainerStyle={[styles.list, { paddingBottom: FAB_CLEARANCE }]} keyboardShouldPersistTaps="handled" testID="circle-launcher-kept">
+            <Text style={styles.muted} accessibilityLabel={t('circle.screen.refreshing')}>{`⟳ ${t('circle.screen.refreshing')}`}</Text>
+            {renderLauncherGroups(keptCircles.map((r) => ({ id: r.id, name: r.name, kind: r.kind, memberCount: r.memberCount })), {
+              previews: Object.fromEntries(keptCircles.map((r) => [r.id, { subtitle: r.subtitle, unread: r.unread ?? 0, ts: r.ts ?? 0 }])),
+              proposalCounts: {}, pinnedMap: Object.fromEntries(keptCircles.filter((r) => r.pinned).map((r) => [r.id, true])), mutedMap: {},
+              openCircle: (c) => { keptOpenRef.current = c.id; },
+            }, styles)}
+          </ScrollView>
         ) : (
           <ScrollView
             contentContainerStyle={[styles.list, { paddingBottom: FAB_CLEARANCE }]}

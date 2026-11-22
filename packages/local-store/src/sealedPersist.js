@@ -116,6 +116,29 @@ export function sealedPersist(persist, strategy, onWarn = null) {
     return out;
   };
 
+  /**
+   * SEALED WHEN WRITTEN, NOT WHEN SCHEDULED (ledger L619). The adapters debounce: `scheduleSave(map)` keeps the map and
+   * writes it when their timer fires, so a burst of changes is one write. Sealing at every `scheduleSave` call threw
+   * nearly all of that work away: on the seeded Samsung a one-row store of ~170 kB changed 418 times in a start's first
+   * 40 s and was sealed 418 times, a third of the JS thread. So a scheduled save hands the adapter a map that seals
+   * itself at its FIRST read (the adapter's write) and is the sealed map from then on; a save the adapter drops
+   * (a newer one replaced it, or `cancel`) is never sealed. `save` and `flush` seal at once, as before.
+   */
+  const sealedAtFirstRead = (map) => {
+    const target = new Map();
+    let sealed = false;
+    const ensure = () => { if (!sealed) { sealed = true; for (const [k, v] of sealMap(map)) target.set(k, v); } };
+    return new Proxy(target, {
+      get(t, prop) {
+        ensure();
+        const v = Reflect.get(t, prop, t);   // `size` is a getter on the Map itself, never on the proxy
+        return typeof v === 'function' ? v.bind(t) : v;
+      },
+      has(t, prop) { ensure(); return Reflect.has(t, prop); },
+      ownKeys(t) { ensure(); return Reflect.ownKeys(t); },
+    });
+  };
+
   const passthrough = (name) => (typeof persist[name] === 'function'
     ? { [name]: (...a) => persist[name](...a) }
     : {});
@@ -123,7 +146,7 @@ export function sealedPersist(persist, strategy, onWarn = null) {
   return {
     async load() { return openMap(await persist.load()); },
     ...(typeof persist.save         === 'function' ? { save:         (m) => persist.save(sealMap(m)) }         : {}),
-    ...(typeof persist.scheduleSave === 'function' ? { scheduleSave: (m) => persist.scheduleSave(sealMap(m)) } : {}),
+    ...(typeof persist.scheduleSave === 'function' ? { scheduleSave: (m) => persist.scheduleSave(sealedAtFirstRead(m)) } : {}),
     ...(typeof persist.flush        === 'function' ? { flush:        (m) => persist.flush(sealMap(m)) }        : {}),
     ...passthrough('cancel'),
     ...passthrough('close'),

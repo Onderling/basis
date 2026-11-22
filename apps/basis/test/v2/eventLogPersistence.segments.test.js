@@ -89,3 +89,32 @@ describe('the device log in segments', () => {
     expect(await io.load()).toEqual([]);
   });
 });
+
+/**
+ * THE LOG IS STORED AS TEXT, NOT AS BYTES (ledger L619, the seeded Samsung 2026-11-22). A segment went to the backend
+ * as `TextEncoder` bytes: the sealing backend then spelled the bytes out as base64 one character at a time, and a start
+ * read them back through base64 and the phone's `TextDecoder`, a JavaScript polyfill: ~1.9 s of a cold start for a
+ * 2 MB log. Every backend stores a string as it is (the sealing backend's `s` tag round-trips it), so the segments and
+ * the manifest are written as strings. A row written as bytes before this still loads.
+ */
+describe('the device log is stored as text', () => {
+  it('every segment and the manifest are written as strings, never as bytes', async () => {
+    const be = memoryBackend(); const io = backendSnapshotIo(be, 'device-log/events.json');
+    await io.save(events(3000));
+    expect(be.rows.size).toBeGreaterThan(2);
+    for (const [k, v] of be.rows) expect(typeof v, `${k} was written as ${v?.constructor?.name}`).toBe('string');
+  });
+
+  it('a log written as bytes before this loads as it was, and its next save writes text', async () => {
+    const be = memoryBackend();
+    const enc = new TextEncoder();
+    const evs = events(5);
+    const seg = JSON.stringify([...evs].reverse());
+    be.rows.set('device-log/events.json/seg/0000', enc.encode(seg));
+    be.rows.set('device-log/events.json', enc.encode(JSON.stringify({ v: 1, segments: [{ key: 'device-log/events.json/seg/0000', hash: 'old' }], total: 5 })));
+    const io = backendSnapshotIo(be, 'device-log/events.json');
+    expect(await io.load()).toEqual(evs);
+    await io.save(events(6));
+    for (const [, v] of be.rows) expect(typeof v).toBe('string');
+  });
+});

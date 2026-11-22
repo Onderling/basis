@@ -132,9 +132,12 @@ function segment(oldestFirst) {
  * writes it as segments and replaces the array with the manifest. No flag, no second key.
  */
 export function backendSnapshotIo(backend, ref = REF) {
-  const enc = new TextEncoder();
   const dec = new TextDecoder();
   const segKey = (i) => `${ref}/seg/${String(i).padStart(4, '0')}`;
+  // STORED AS TEXT, NOT AS BYTES (ledger L619): every backend keeps a string as it is (the sealing backend's string tag
+  // round-trips it). Written as TextEncoder bytes, a segment was spelled out as base64 by the sealing backend and read
+  // back through base64 and the phone's TextDecoder, a JavaScript polyfill: ~1.9 s of a cold start for a 2 MB log on
+  // the seeded Samsung. A row written as bytes before this still reads (the decode below) and is text from its next save.
   const readText = async (key) => {
     const rec = await backend.get(key);
     if (!rec || rec.bytes == null) return null;
@@ -166,10 +169,10 @@ export function backendSnapshotIo(backend, ref = REF) {
       for (let i = 0; i < texts.length; i += 1) {
         const prev = known?.[i];
         if (prev && prev.key === next[i].key && prev.hash === next[i].hash) continue;
-        await backend.put(next[i].key, enc.encode(texts[i]));
+        await backend.put(next[i].key, texts[i]);   // as TEXT: see the note above `readText`
       }
       // the manifest last — the switch
-      await backend.put(ref, enc.encode(JSON.stringify({ v: 1, segments: next, total: events.length })));
+      await backend.put(ref, JSON.stringify({ v: 1, segments: next, total: events.length }));
       // then the rows no manifest names any more (a shrunk log after retention pruned it)
       const stale = (known ?? []).slice(texts.length);
       for (const s of stale) { try { await backend.delete?.(s.key); } catch { /* best-effort */ } }

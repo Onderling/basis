@@ -44,4 +44,16 @@ describe('the export key over the box\'s files', () => {
     k.lock();
     expect(f.read(UNLOCKED_KEY_FILE)).toBeNull();
   });
+
+  it('a key file that is there but cannot be read is never taken for "no key": unlock says so, set says it replaces one', async () => {
+    const f = files();
+    const k = createExportKeyFile({ files: f, argonOpts: fast });
+    f.write(EXPORT_KEY_FILE, '{"publicKey": "trunc');   // a key written by a newer build, or cut off on disk
+    expect(k.exists()).toBe(true);
+    expect(k.unreadable()).toBe(true);
+    expect(await k.unlock('een lange passphrase')).toEqual({ ok: false, reason: 'key-unreadable' });
+    expect(f.read(EXPORT_KEY_FILE)).toBe('{"publicKey": "trunc');      // nothing written over it by an unlock
+    expect(await k.set('een lange passphrase')).toEqual({ ok: true, replaced: true });   // the person chose a new key
+    expect(k.unreadable()).toBe(false);
+  });
 });

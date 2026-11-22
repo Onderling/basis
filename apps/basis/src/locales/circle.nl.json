@@ -6181,6 +6181,8 @@
     "secret_check_limit": "Let op: de aanbieder van het taalmodel weigert: limiet of saldo (status {{status}}). Vrije vragen krijgen geen antwoord tot dat is opgelost; opdrachten en knoppen werken.",
     "secret_check_refused": "Let op: de aanbieder van het taalmodel weigert (status {{status}}). Vrije vragen krijgen geen antwoord tot dat is opgelost; opdrachten en knoppen werken.",
     "stepup_export_key_replaces": "Er is al een sleutel: bestanden die daarmee zijn verzegeld, gaan alleen open met het oude wachtwoord.",
+    "stepup_export_key_replaces_unreadable": "De sleutel op de box is niet te lezen (gemaakt door een nieuwere versie, of beschadigd): een nieuwe sleutel vervangt hem. Bestanden die met de oude sleutel zijn verzegeld, gaan nog open met hun eigen wachtwoord.",
+    "export_key_unreadable": "De sleutel op de box is niet te lezen (gemaakt door een nieuwere versie, of beschadigd). Er is niets veranderd: stel een nieuwe sleutel in, of open de sleutel die een bestand meedraagt.",
     "export_key_too_short": "Het wachtwoord moet minstens {{n}} tekens hebben. Niets gevraagd, niets veranderd.",
     "export_key_none": "Er staat nog geen exportsleutel op de box.",
     "export_key_set": "De exportsleutel staat erop: elke nacht wordt de export ermee verzegeld. Bewaar het wachtwoord buiten de box.",

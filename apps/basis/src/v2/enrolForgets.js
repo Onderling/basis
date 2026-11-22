@@ -113,7 +113,7 @@ export const THROWAWAY_CONTENT = Object.freeze({
     'cc.circleRecipe.',
     'cc.circleRecipePending.',
     'cc.screenBlocksCache.',
-    'cc.keptCircles',           // the kept picture of the circles list (keptPicture.js): what the last start showed
+    'basis.keptCircles',           // the kept picture of the circles list (keptPicture.js): what the last start showed
     'cc.circleOverride.',
     'basis.nearby-asked:',      // the Nearby first-use question, asked per self on this device — the former selves'
     'cc.nearby-asked:',

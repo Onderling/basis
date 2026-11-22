@@ -48,7 +48,7 @@ export function keptCircleRow(circle, preview = null, { pinned = false } = {}) {
   };
 }
 
-export const KEPT_CIRCLES_KEY = 'cc.keptCircles';
+export const KEPT_CIRCLES_KEY = 'basis.keptCircles';
 
 /**
  * The kept circles list over a sealed key-value store (`sealedKeyValue(storage, { strict: true, waitForKey: true })`):

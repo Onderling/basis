@@ -1240,8 +1240,8 @@ export default function CircleLauncherScreen({
   // only a caught-up list becomes the next start's picture (an early empty read would be its lie)
   useEffect(() => {
     if (!mayKeepPicture({ caughtUp: launcherSettled })) return;
-    keptCirclesStore.keep(bySight.shown.map((c) => keptCircleRow(c, previews?.[c.id])).filter(Boolean), { caughtUp: launcherSettled }).catch(() => {});
-  }, [launcherSettled, bySight, previews, keptCirclesStore]);   // eslint-disable-line react-hooks/exhaustive-deps -- previews is declared further up
+    keptCirclesStore.keep(bySight.shown.map((c) => keptCircleRow(c, previews?.[c.id], { pinned: !!pinnedMap[c.id] })).filter(Boolean), { caughtUp: launcherSettled }).catch(() => {});
+  }, [launcherSettled, bySight, previews, pinnedMap, keptCirclesStore]);   // eslint-disable-line react-hooks/exhaustive-deps -- previews is declared further up
   const [menuCircle, setMenuCircle] = useState(null);
   useEffect(() => {
     let alive = true;
@@ -3124,11 +3124,11 @@ export default function CircleLauncherScreen({
         ) : listPaint === 'kept' ? (
           <ScrollView contentContainerStyle={[styles.list, { paddingBottom: FAB_CLEARANCE }]} keyboardShouldPersistTaps="handled" testID="circle-launcher-kept">
             <Text style={styles.muted} accessibilityLabel={t('circle.screen.refreshing')}>{`⟳ ${t('circle.screen.refreshing')}`}</Text>
-            {keptCircles.map((r) => (
-              <LauncherTile key={`kept-${r.id}`} circle={{ id: r.id, name: r.name, memberCount: r.memberCount }}
-                preview={{ subtitle: r.subtitle, unread: r.unread ?? 0 }} pending={0}
-                onOpen={() => { keptOpenRef.current = r.id; }} />
-            ))}
+            {renderLauncherGroups(keptCircles.map((r) => ({ id: r.id, name: r.name, kind: r.kind, memberCount: r.memberCount })), {
+              previews: Object.fromEntries(keptCircles.map((r) => [r.id, { subtitle: r.subtitle, unread: r.unread ?? 0, ts: r.ts ?? 0 }])),
+              proposalCounts: {}, pinnedMap: Object.fromEntries(keptCircles.filter((r) => r.pinned).map((r) => [r.id, true])), mutedMap: {},
+              openCircle: (c) => { keptOpenRef.current = c.id; },
+            }, styles)}
           </ScrollView>
         ) : (
           <ScrollView

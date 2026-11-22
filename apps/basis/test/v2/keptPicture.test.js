@@ -29,8 +29,8 @@ describe('which picture is painted', () => {
 
 describe('a kept circles row holds what a tile paints, nothing more', () => {
   it('id, name, member count, the preview line and the unread count', () => {
-    const row = keptCircleRow({ id: 'c1', name: 'Huis', memberCount: 3, roster: ['x'], key: 'secret' }, { subtitle: 'An: hoi', unread: 2, raw: {} });
-    expect(row).toEqual({ id: 'c1', name: 'Huis', memberCount: 3, subtitle: 'An: hoi', unread: 2 });
+    const row = keptCircleRow({ id: 'c1', name: 'Huis', kind: 'household', memberCount: 3, roster: ['x'], key: 'secret' }, { subtitle: 'An: hoi', unread: 2, ts: 5, raw: {} }, { pinned: true });
+    expect(row).toEqual({ id: 'c1', name: 'Huis', kind: 'household', ts: 5, pinned: true, memberCount: 3, subtitle: 'An: hoi', unread: 2 });
   });
   it('no id, no row', () => { expect(keptCircleRow({ name: 'x' })).toBe(null); });
 });

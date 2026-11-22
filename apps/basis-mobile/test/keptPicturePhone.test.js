@@ -30,13 +30,15 @@ describe('the circles list paints its kept picture until it is read', () => {
     expect(src).toMatch(/launcherListPaint\(\{[^}]*keptCount: keptCircles\?\.length \?\? 0 \}\)/);
     expect(src).toMatch(/listPaint === 'kept' \?/);
     expect(src).toMatch(/testID="circle-launcher-kept"/);
+    // painted through the live list's own grouping: one order rule, so the live list replaces it in place
+    expect(src).toMatch(/\{renderLauncherGroups\(keptCircles\.map\(/);
   });
   it('the kept list is sealed, read once the key is there, and only a caught-up list is kept', () => {
     expect(src).toMatch(/createKeptCircles\(sealedKeyValue\(AsyncStorage, \{[^}]*strict: true, waitForKey: true \}\)\)/);
     expect(src).toMatch(/keptCirclesStore\.keep\([^;]*\{ caughtUp: launcherSettled \}\)/);
   });
   it('a tap on a kept tile is remembered and opens the circle once the live list holds it', () => {
-    expect(src).toMatch(/onOpen=\{\(\) => \{ keptOpenRef\.current = r\.id; \}\}/);
+    expect(src).toMatch(/openCircle: \(c\) => \{ keptOpenRef\.current = c\.id; \}/);
     expect(src).toMatch(/if \(!id \|\| !launcherSettled\) return;/);
   });
 });

@@ -33,11 +33,15 @@ export function mayKeepPicture({ caughtUp = false } = {}) {
 }
 
 /** One row of the kept circles list: exactly what a tile paints, nothing a tap acts on. */
-export function keptCircleRow(circle, preview = null) {
+export function keptCircleRow(circle, preview = null, { pinned = false } = {}) {
   if (!circle || typeof circle.id !== 'string') return null;
   return {
     id: circle.id,
     name: typeof circle.name === 'string' ? circle.name : '',
+    // what the live list orders by, so the kept list paints in the same order and is replaced in place
+    ...(typeof circle.kind === 'string' && circle.kind ? { kind: circle.kind } : {}),
+    ...(Number.isFinite(preview?.ts) ? { ts: preview.ts } : {}),
+    ...(pinned ? { pinned: true } : {}),
     ...(Number.isFinite(circle.memberCount) ? { memberCount: circle.memberCount } : {}),
     ...(typeof preview?.subtitle === 'string' && preview.subtitle ? { subtitle: preview.subtitle } : {}),
     ...(Number(preview?.unread) > 0 ? { unread: Number(preview.unread) } : {}),

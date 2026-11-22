@@ -105,24 +105,23 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
   const keyPrefix = `onderling.screen.${name}.`;
   const vaultPrefix = `onderling-screen:${name}:`;
   const store = prefixed(storage, keyPrefix);
-  // THE BOT, KEPT (L1179): the link's fragment is cleared at once (its ticket is one use), so a reload, a bookmark or a
-  // browser restart opens the page without it. A granted pairing keeps the bot's ADDRESS (public: address, relay,
-  // name), never the ticket, under this toolbox's own prefix; a page opened without the link resumes from it. A link,
-  // when there is one, always wins; pairing still needs the link (the ticket is its alone).
-  const KEPT_BOT = 'bot';
+  // THE BOT, FROM THE KEPT GRANT (L1179): the link's fragment is cleared at once (its ticket is one use), so a reload, a
+  // bookmark or a browser restart opens the page without it. The grant a pairing kept is stored under the bot's ADDRESS
+  // (`onderling.screen.<botAddress>`, this toolbox's prefix), and resuming needs only that address: a page without the
+  // link reads it back from the key's name. Nothing new is written; the ticket is never kept. A link, when there is one,
+  // always wins; pairing still needs the link (the ticket is its alone). Kept grants for two bots: none is guessed.
+  const GRANT_HEAD = `${keyPrefix}onderling.screen.`;
   const keptBot = () => {
     try {
-      const d = JSON.parse(store.getItem(KEPT_BOT) ?? 'null');
-      return d && typeof d.botAddress === 'string' && d.botAddress
-        ? { ok: true, botAddress: d.botAddress, relayUrl: typeof d.relayUrl === 'string' ? d.relayUrl : null, botName: typeof d.botName === 'string' ? d.botName : null, ticket: null, fromKept: true }
-        : null;
+      const found = [];
+      for (let i = 0; i < (storage?.length ?? 0); i += 1) {
+        const k = storage.key(i);
+        if (k && k.startsWith(GRANT_HEAD) && k.length > GRANT_HEAD.length) found.push(k.slice(GRANT_HEAD.length));
+      }
+      return found.length === 1 ? { ok: true, botAddress: found[0], relayUrl: null, botName: null, ticket: null, fromKept: true } : null;
     } catch { return null; }
   };
   const start = linked.ok ? linked : (keptBot() ?? linked);
-  const keepBot = () => {
-    try { store.setItem(KEPT_BOT, JSON.stringify({ botAddress: start.botAddress, ...(start.relayUrl ? { relayUrl: start.relayUrl } : {}), ...(start.botName ? { botName: start.botName } : {}) })); }
-    catch { /* a storage that refuses: the next visit pairs again, as before */ }
-  };
   // made when a pairing or a resume starts, never at import: the key lives under this toolbox's own name
   const agentFor = makeAgent ?? (async () => createSecureAgent({ vault: makeBrowserVault(vaultPrefix), transportMode: 'relay', warnOnInsecure: false }));
   const makeAgentNow = () => agentFor({ vaultPrefix });
@@ -177,7 +176,6 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
       try {
         const ok = await viewFor('resume').resume();
         if (!ok) { setState('not-paired'); return { ok: false, code: 'not-paired' }; }
-        if (!start.fromKept) keepBot();   // a page paired before this version keeps its bot at its next resume from the link
         setState('connected');
         return { ok: true };
       } catch (e) { setState('broken'); return { ok: false, code: screenClientCode(e) }; }
@@ -204,7 +202,7 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
         view.granted().then(() => 'granted', (e) => (/refused/.test(String(e?.message)) ? 'refused' : 'expired')),
         aborted,
       ]);
-      if (outcome === 'granted') { keepBot(); setState('connected'); }
+      if (outcome === 'granted') setState('connected');
       return outcome;
     },
 

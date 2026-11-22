@@ -178,17 +178,22 @@ describe('a page opened again without the link', () => {
     expect(again.made[0].link).toContain('BOTKEY');
   });
 
-  it('keeps the address, relay and name, never the ticket, and only under this toolbox', async () => {
+  it('writes nothing new for it: no ticket and no second key, only the grant under this toolbox', async () => {
     const storage = memoryStorage();
     const withTicket = encodeScreenStartLink('https://basis.example/app', { botAddress: 'BOTKEY', relayUrl: 'wss://relay.example', ticket: 'ONE-USE' });
     const { createView } = fakeViews();
     const c = createScreenClient({ toolbox: 'boodschappen', bot: withTicket, storage, createView });
     await c.startPairing(); await c.waitForGrant();
-    const all = [...storage.map].map(([k, v]) => `${k}=${v}`).join('\n');
-    expect(all).not.toMatch(/ONE-USE/);
-    const keptKeys = [...storage.map.keys()].filter((k) => /BOTKEY/.test(storage.map.get(k)) && !k.endsWith('onderling.screen.BOTKEY'));
-    expect(keptKeys.length).toBeGreaterThan(0);
-    for (const k of keptKeys) expect(k.startsWith('onderling.screen.boodschappen.')).toBe(true);
+    expect([...storage.map].map(([k, v]) => `${k}=${v}`).join('\n')).not.toMatch(/ONE-USE/);
+    expect([...storage.map.keys()]).toEqual(['onderling.screen.boodschappen.onderling.screen.BOTKEY']);
+  });
+
+  it('grants kept for two bots: none is guessed', async () => {
+    const storage = memoryStorage();
+    storage.setItem('onderling.screen.boodschappen.onderling.screen.BOT-A', '{}');
+    storage.setItem('onderling.screen.boodschappen.onderling.screen.BOT-B', '{}');
+    const c = createScreenClient({ toolbox: 'boodschappen', bot: 'https://basis.example/app', storage, createView: fakeViews().createView });
+    expect((await c.resume()).ok).toBe(false);
   });
 
   it('another toolbox on the same page address does not resume from it; sign-out forgets it', async () => {

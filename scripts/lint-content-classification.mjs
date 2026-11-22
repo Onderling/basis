@@ -40,7 +40,7 @@ const SITES = [
 const NOT_A_STORE = new Set(['all', 'self', 'circle', 'items', 'outbox']);
 
 // The classification is the storage register's `forget` column: a row ruled `throwaway` or `keep` is said; an
-// `undecided` row is not, so a shell that builds one is red here until it is ruled.
+// unruled name is not, so a shell that builds a store the register lacks is red here.
 const { STORAGE } = await import(path.join(ROOT, 'apps/basis/src/v2/storageRegister.js'));
 const classified = new Set(Object.values(STORAGE).filter((r) => r.forget !== 'undecided').map((r) => r.name));
 

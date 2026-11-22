@@ -14,8 +14,8 @@
  *             the device's identity and keys) · `file` (the box only);
  *  - `shells` which shells open it;
  *  - `forget` what a device that has just been enrolled does with it: `throwaway` (the throwaway self wrote it,
- *             it goes), `keep` (the device's own or the ceremony's, it stays), `undecided` (not on either list
- *             today; each is named in the test until it is ruled).
+ *             it goes), `keep` (the device's own or the ceremony's, it stays). Every row is ruled; a new name is
+ *             ruled in the PR that adds it.
  *
  * The names keep today's spelling. The move to one prefix (`basis.`) lands in the alpha build, together with the
  * choice between a fresh start and a one-time rewrite: renaming without a migration would empty a live device's
@@ -46,7 +46,7 @@ export const STORAGE = Object.freeze({
   householdWeb:           row('cc-household-state', 'store', [W], 'throwaway'),
   householdPhone:         row('cc-household-cache', 'store', [M], 'throwaway'),
   tasksPhone:             row('cc-tasks-cache', 'store', [M], 'throwaway'),
-  tasksWeb:               row('cc-tasks-state', 'store', [W], 'undecided'),
+  tasksWeb:               row('cc-tasks-state', 'store', [W], 'throwaway'),
   circleLists:            row('cc-circle-lists-state', 'store', [M], 'throwaway'),
   circleRag:              row('cc-circle-rag', 'store', [W, M], 'throwaway'),
   // The help circle's own stores, named explicitly. Its id is the literal `cc-help`, so the throwaway self and the
@@ -54,14 +54,14 @@ export const STORAGE = Object.freeze({
   // throwaway self that never provisioned it is not in the registry either, so the per-circle route would skip it.
   helpCircleStore:        row('cc-circle-cc-help', 'store', [W, M], 'throwaway'),
   helpCircleCache:        row('cc-circle-cache-cc-help', 'store', [W, M], 'throwaway'),
-  attachmentBlobs:        row('cc-attachment-blobs', 'store', [W], 'undecided'),
-  circlePodVault:         row('cc-circle-pod', 'store', [W], 'undecided'),
-  peerGraph:              row('cc-peers:', 'prefix', [W, M], 'undecided'),
-  basisDb:                row('basis', 'store', [W], 'undecided'),
+  attachmentBlobs:        row('cc-attachment-blobs', 'store', [W], 'throwaway'),
+  circlePodVault:         row('cc-circle-pod', 'store', [W], 'keep'),
+  peerGraph:              row('cc-peers:', 'prefix', [W, M], 'throwaway'),
+  basisDb:                row('basis', 'store', [W], 'throwaway'),
   vaultDb:                row('dwag-vault', 'store', [W], 'keep'),
   rootKeyDb:              row('onderling-root-key', 'store', [W], 'keep'),
-  pseudoPodDb:            row('onderling-pseudo-pod', 'store', [W], 'undecided'),
-  podClientDb:            row('onderling-pod-client', 'store', [W], 'undecided'),
+  pseudoPodDb:            row('onderling-pseudo-pod', 'store', [W], 'throwaway'),
+  podClientDb:            row('onderling-pod-client', 'store', [W], 'throwaway'),
 
   // ── key families (the suffix is a circle, a persona or a screen) ──
   // what was last shared with a circle, keyed `<persona>::<circle>` with no identity in it: on `cc-help` the two
@@ -69,7 +69,7 @@ export const STORAGE = Object.freeze({
   sharedDisclosure:       row('cc.sharedDisclosure.', 'prefix', [W, M], 'throwaway'),
   circlePolicy:           row('cc.circlePolicy.', 'prefix', [W, M], 'throwaway'),
   circlePolicyHead:       row('cc.circlePolicyHead.', 'prefix', [W, M], 'throwaway'),
-  circlePolicyPending:    row('cc.circlePolicyPending.', 'prefix', [W, M], 'undecided'),
+  circlePolicyPending:    row('cc.circlePolicyPending.', 'prefix', [W, M], 'throwaway'),
   circleRules:            row('cc.circleRules.', 'prefix', [W, M], 'throwaway'),
   circleRulesPending:     row('cc.circleRulesPending.', 'prefix', [W, M], 'throwaway'),
   circleRecipe:           row('cc.circleRecipe.', 'prefix', [W, M], 'throwaway'),
@@ -79,8 +79,8 @@ export const STORAGE = Object.freeze({
   keptCircles:            row('basis.keptCircles', 'prefix', [W, M], 'throwaway'),
   nearbyAskedWeb:         row('basis.nearby-asked:', 'prefix', [W], 'throwaway'),
   nearbyAskedPhone:       row('cc.nearby-asked:', 'prefix', [M], 'throwaway'),
-  screenClient:           row('onderling.screen.', 'prefix', [W], 'undecided'),
-  mappings:               row('onderling.mappings:', 'prefix', [M], 'undecided'),
+  screenClient:           row('onderling.screen.', 'prefix', [W], 'keep'),
+  mappings:               row('onderling.mappings:', 'prefix', [M], 'throwaway'),
 
   // ── single keys ──
   // The help circle's two flags go TOGETHER: clear one and keep the other and the enrolled person gets a help
@@ -112,18 +112,18 @@ export const STORAGE = Object.freeze({
   nearbyAllowsPhone:      row('cc.nearbyAllows', 'key', [M], 'throwaway'),
   nearbyMineSeenWeb:      row('basis.nearbyMineSeen', 'key', [W], 'throwaway'),
   nearbyMineSeenPhone:    row('cc.nearbyMineSeen', 'key', [M], 'throwaway'),
-  nearbySelfWeb:          row('basis.nearbySelf', 'key', [W], 'undecided'),
-  nearbySelfPhone:        row('cc.nearbySelf', 'key', [M], 'undecided'),
-  nearbyRadio:            row('cc.nearbyRadio', 'key', [M], 'undecided'),
-  askMatchSkips:          row('cc.askMatchSkips', 'key', [W, M], 'undecided'),
-  fallbackOffer:          row('cc.fallbackOffer', 'key', [W, M], 'undecided'),
-  firstOpenSeen:          row('cc.firstOpenSeen', 'key', [W, M], 'undecided'),
-  introCardSeen:          row('cc.introCardSeen', 'key', [W, M], 'undecided'),
-  lastTab:                row('cc.lastTab', 'key', [W, M], 'undecided'),
-  nativeCalendarIds:      row('cc.nativeCalendar.eventIdMap', 'key', [M], 'undecided'),
-  inFlightFlows:          row('cc-in-flight-flows', 'key', [W, M], 'undecided'),
-  wakeNudges:             row('cc-wake-nudges', 'key', [M], 'undecided'),
-  startOverPage:          row('basis.startOverPage', 'key', [W], 'undecided'),
+  nearbySelfWeb:          row('basis.nearbySelf', 'key', [W], 'throwaway'),
+  nearbySelfPhone:        row('cc.nearbySelf', 'key', [M], 'throwaway'),
+  nearbyRadio:            row('cc.nearbyRadio', 'key', [M], 'keep'),
+  askMatchSkips:          row('cc.askMatchSkips', 'key', [W, M], 'throwaway'),
+  fallbackOffer:          row('cc.fallbackOffer', 'key', [W, M], 'keep'),
+  firstOpenSeen:          row('cc.firstOpenSeen', 'key', [W, M], 'keep'),
+  introCardSeen:          row('cc.introCardSeen', 'key', [W, M], 'keep'),
+  lastTab:                row('cc.lastTab', 'key', [W, M], 'keep'),
+  nativeCalendarIds:      row('cc.nativeCalendar.eventIdMap', 'key', [M], 'throwaway'),
+  inFlightFlows:          row('cc-in-flight-flows', 'key', [W, M], 'throwaway'),
+  wakeNudges:             row('cc-wake-nudges', 'key', [M], 'throwaway'),
+  startOverPage:          row('basis.startOverPage', 'key', [W], 'keep'),
   // the offer stash: the next start joins the circles it names; a device that forgets it comes back enrolled and
   // in no circle (the box keeps it explicitly)
   enrollOffer:            row('onderling.enrollOffer', 'key', [W, M, B], 'keep'),

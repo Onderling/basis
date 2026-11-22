@@ -43,13 +43,7 @@ describe('the storage register', () => {
     expect(BASIS_DB_NAMES.filter((n) => !stores.has(n))).toEqual([]);
   });
 
-  it('says which names are not yet ruled for a freshly enrolled device, and the list only shrinks', () => {
-    expect(sorted(storageNames((r) => r.forget === 'undecided'))).toEqual(sorted([
-      'cc-tasks-state', 'cc-attachment-blobs', 'cc-circle-pod', 'cc-peers:', 'basis', 'onderling-pseudo-pod',
-      'onderling-pod-client', 'cc.circlePolicyPending.', 'onderling.screen.', 'onderling.mappings:',
-      'basis.nearbySelf', 'cc.nearbySelf', 'cc.nearbyRadio', 'cc.askMatchSkips', 'cc.fallbackOffer',
-      'cc.firstOpenSeen', 'cc.introCardSeen', 'cc.lastTab', 'cc.nativeCalendar.eventIdMap', 'cc-in-flight-flows',
-      'cc-wake-nudges', 'basis.startOverPage',
-    ]));
+  it('rules every name: a freshly enrolled device forgets it or keeps it', () => {
+    expect(Object.values(STORAGE).filter((r) => !['throwaway', 'keep'].includes(r.forget)).map((r) => r.name)).toEqual([]);
   });
 });

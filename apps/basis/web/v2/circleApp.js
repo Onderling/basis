@@ -428,6 +428,7 @@ import { createCircleRulesPendingStoreLocal } from '../../src/v2/circleRulesPend
 // γ-next.policy — receiver + pending-cache substrate for the policy broadcast.
 // δ.1 — per-screen materialized-blocks cache (cache-first render + bg refresh).
 import { createScreenBlocksCacheLocal } from '../../src/v2/screenBlocksCacheStorage.js';
+import { createKeptCircles, keptCircleRow, keptPictureView, mayKeepPicture } from '../../src/v2/keptPicture.js';   // the kept picture: shown until the live state is caught up (phone parity)
 import {
   createCircleRecipeStore, localStorageRecipeIo, localCircleRecipeStore, getActiveRecipe,
   addRecipe, renameRecipe, removeRecipe, setActiveRecipe,
@@ -1239,6 +1240,9 @@ const circleRulesPendingStore = createCircleRulesPendingStoreLocal();
 // re-saves.  Survives reboots so cold-boot users see the previous
 // state immediately instead of a Loading… flash.
 const screenBlocksCache = createScreenBlocksCacheLocal();
+// THE KEPT CIRCLES LIST (keptPicture.js, phone parity): the last caught-up list, sealed; kept here so the web has the
+// same picture as the phone. Painting it before the agent is whole is a later step (this boot paints after the read).
+const keptCirclesStore = createKeptCircles(sealedKeyValue(globalThis.localStorage, { name: 'the kept circles list', strict: true, waitForKey: true }));
 // α.3 — per-user screens store.  One book per user (not per-circle); the
 // active screen drives the new Screens tab.
 const userScreenStore = localUserScreenStore();
@@ -1438,6 +1442,8 @@ const applyIncomingReceipt = makeReceiptReceiver({
 let rootEl = null;
 let tabBarEl = null;
 let circlesCache = [];
+// the circles were read once (the boot's first loadLauncherCircles answered): the live state is caught up (keptPicture.js)
+let _circlesKnown = false;
 // the circles an admin removed this person from: the launcher's marked, read-only tiles only — no other reader
 let removedCirclesCache = [];
 /** Both launcher lists, read together: the circles the person is in, and the removed ones kept until closed. */
@@ -4018,6 +4024,10 @@ function paintLauncher() {
     // read on another of my devices: not news here either
     readIds: readMarks.ids(),
   });
+  // only a caught-up list becomes the kept picture (phone parity)
+  if (mayKeepPicture({ caughtUp: _circlesKnown })) {
+    keptCirclesStore.keep(tileCircles(circlesShown()).map((c) => keptCircleRow(c, previews?.[c.id], { pinned: !!launcherPinnedMap?.[c.id] })).filter(Boolean), { caughtUp: _circlesKnown }).catch(() => {});
+  }
   // β.5 — per-tile context menu handlers (pin / mute / settings / leave).
   renderCircleLauncher(rootEl, {
     // the circles of the selves ticked in the header; the help circle's door is in Contacten. A circle being left is
@@ -4676,9 +4686,12 @@ async function _showVandaag({ landing = false } = {}) {
   try { blocks = (screenHead ? await screenHead.land(key) : await materializeVandaag()) ?? []; }
   catch (err) { console.warn('[vandaag] materializeScreen failed', err); }
   if (token !== _showActiveScreenToken) return;
-  _screenViewBlocks = blocks;
-  renderCircleScreen(body, { blocks, t, refreshing: false, onAction: onScreenAction, onMore });
-  if (cacheKey) screenBlocksCache.set(cacheKey, blocks).catch(() => { /* ignore */ });
+  // THE KEPT PICTURE STAYS UNTIL CAUGHT UP (keptPicture.js, phone parity): this boot lands Today after the circles were
+  // read, so the live read normally replaces it at once; a landing before that keeps the kept day and is not kept
+  const view = keptPictureView({ kept: Array.isArray(cached) ? cached : null, live: blocks, caughtUp: _circlesKnown });
+  _screenViewBlocks = view.value ?? [];
+  renderCircleScreen(body, { blocks: _screenViewBlocks, t, refreshing: view.refreshing, onAction: onScreenAction, onMore });
+  if (cacheKey && mayKeepPicture({ caughtUp: _circlesKnown })) screenBlocksCache.set(cacheKey, blocks).catch(() => { /* ignore */ });
 }
 
 /** Vandaag read from the stores, as the page stands now (the head's one read). */
@@ -10528,6 +10541,7 @@ async function boot() {
 
   try {
     circlesCache = await loadLauncherCircles();
+    _circlesKnown = true;
     registerCirclePresence();   // G13 — the connect-time call may have run before circles were known
   } catch (err) {
     console.warn('[circleApp] loadCircles failed', err);

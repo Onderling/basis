@@ -88,3 +88,20 @@ describe('/toolbox at the door', () => {
     expect((await say('boodschappen misschien')).error?.message).toContain('circle.bot.toolbox_usage');
   });
 });
+
+// A PAGE ON PLAIN HTTP IN THE HOME NETWORK (ledger L1183): the card says the risk before the yes, naming the page; a page
+// on https or this device's loopback adds no such line
+describe('/toolbox card for a page on plain http in the home network', () => {
+  it('says the risk, with the page, before the yes', async () => {
+    const { say, tools } = door({ ...PLACED, page: 'http://192.168.1.5:8710/', pageOverHttp: 'home-network' }); await tools.load();
+    const ask = await say('boodschappen aan');
+    expect(ask.message).toMatch(/circle\.bot\.toolbox_page_over_http .*http:\/\/192\.168\.1\.5:8710\//);
+    expect(ask.quickReplies.map((q) => q.slash)).toContain('/toolbox boodschappen aan ja');
+  });
+  it('a loopback or https page: no risk line', async () => {
+    for (const page of ['http://127.0.0.1:8710/', 'https://box.example/']) {
+      const { say, tools } = door({ ...PLACED, page, pageOverHttp: 'home-network' }); await tools.load();
+      expect((await say('boodschappen aan')).message, page).not.toContain('toolbox_page_over_http');
+    }
+  });
+});

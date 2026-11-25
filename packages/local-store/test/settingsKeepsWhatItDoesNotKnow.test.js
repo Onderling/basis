@@ -65,3 +65,18 @@ describe('settings keep what this build does not know', () => {
     expect(JSON.parse(ds.m.get(s.SETTINGS_SHARED_PATH))).toEqual({ theme: 'dark' });
   });
 });
+
+import { notReadableStores, resetNotReadableStores } from '../index.js';
+
+describe('a settings file that does not parse is reported, as settings', () => {
+  it('reported at load (before any save), cleared once it reads again', async () => {
+    resetNotReadableStores();
+    const s = mod();
+    const ds = memoryDataSource({ [s.SETTINGS_SHARED_PATH]: '{"theme": "da', [s.SETTINGS_MIGRATION_MARKER]: JSON.stringify({ done: true }) });
+    await s.loadSettings({ dataSource: ds, deviceId: 'd1' });
+    expect(notReadableStores()).toEqual([{ name: s.SETTINGS_SHARED_PATH, kind: 'settings', reason: 'unparseable' }]);
+    ds.m.set(s.SETTINGS_SHARED_PATH, JSON.stringify({ theme: 'dark' }));
+    await s.loadSettings({ dataSource: ds, deviceId: 'd1' });
+    expect(notReadableStores()).toEqual([]);
+  });
+});

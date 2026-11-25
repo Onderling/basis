@@ -25,6 +25,8 @@
  * module — supply empty arrays for the slots they don't need.
  */
 
+import { reportNotReadable, clearNotReadable } from './notReadableStores.js';
+
 const ALLOWED_APP_ID = /^[a-z][a-z0-9_-]*$/;
 
 /**
@@ -110,12 +112,24 @@ export function createSettingsModule({
    */
   async function _readForSave(dataSource, path) {
     let raw;
-    try { raw = await dataSource.read(path); } catch { return { notReadable: true }; }
+    try { raw = await dataSource.read(path); } catch { return { notReadable: 'read-failed' }; }
     if (raw == null) return { doc: null };
     let doc = raw;
-    if (typeof raw === 'string') { try { doc = JSON.parse(raw); } catch { return { notReadable: true }; } }
-    if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return { notReadable: true };
+    if (typeof raw === 'string') { try { doc = JSON.parse(raw); } catch { return { notReadable: 'unparseable' }; } }
+    if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return { notReadable: 'shape' };
     return { doc };
+  }
+
+  /**
+   * Read a settings file for a LOAD, and say into the register whether it could be read (the one notice every shell
+   * shows: 'settings'). Not readable → null here (the defaults are used), and every save to it is refused.
+   */
+  async function _readForLoad(dataSource, path) {
+    if (!path) return null;
+    const r = await _readForSave(dataSource, path);
+    if (r.notReadable) { reportNotReadable({ name: path, kind: 'settings', reason: r.notReadable }); return null; }
+    clearNotReadable(path);
+    return r.doc;
   }
 
   const KNOWN_FIELDS = new Set(Object.keys(defaults));
@@ -125,6 +139,7 @@ export function createSettingsModule({
   async function _writeKeeping(dataSource, path, subset) {
     const r = await _readForSave(dataSource, path);
     if (r.notReadable) {
+      reportNotReadable({ name: path, kind: 'settings', reason: r.notReadable });
       if (!saidNotReadable.has(path)) {
         saidNotReadable.add(path);
         try { console.warn(`[settings] ${path}: stored settings not readable by this build — kept as they are, not saved over`); }
@@ -169,8 +184,8 @@ export function createSettingsModule({
     if (!dataSource?.read) return { ...DEFAULT_SETTINGS };
     if (deviceId) await _migrateLegacyIfPresent({ dataSource, deviceId });
     const [shared, device] = await Promise.all([
-      _safeReadJson(dataSource, SHARED_PATH),
-      deviceId ? _safeReadJson(dataSource, devicePathFor(deviceId)) : Promise.resolve(null),
+      _readForLoad(dataSource, SHARED_PATH),
+      deviceId ? _readForLoad(dataSource, devicePathFor(deviceId)) : Promise.resolve(null),
     ]);
     return mergeWithDefaults({ ...(shared ?? {}), ...(device ?? {}) });
   }

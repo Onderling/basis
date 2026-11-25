@@ -122,6 +122,8 @@ export const STORAGE = Object.freeze({
   firstOpenSeen:          row('cc.firstOpenSeen', 'key', [W, M], 'keep'),
   introCardSeen:          row('cc.introCardSeen', 'key', [W, M], 'keep'),
   lastTab:                row('cc.lastTab', 'key', [W, M], 'keep'),
+  // which tab of the assistant panel was last chosen (Gesprek / Maken); the seal value lands with the register's seal column
+  assistantTab:           row('cc.assistantTab', 'key', [W, M], 'keep', 'not content: which assistant panel tab was last chosen (view state)'),
   nativeCalendarIds:      row('cc.nativeCalendar.eventIdMap', 'key', [M], 'throwaway'),
   inFlightFlows:          row('cc-in-flight-flows', 'key', [W, M], 'throwaway'),
   wakeNudges:             row('cc-wake-nudges', 'key', [M], 'throwaway'),

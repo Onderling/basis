@@ -4845,6 +4845,8 @@ function plusThreadNow() {
 
 function showVandaagPlus({ edit = null } = {}) {
   const { card, close } = _restoreOverlay();
+  // the tab the person last chose (Gesprek / Maken: `assistantTabs.js`), remembered on this device
+  let tab = (() => { try { return localStorage.getItem(storageName('assistantTab')); } catch { return null; } })();
   // opened on an own row: its act, its words, its id — Save changes it, Remove takes it away
   let actId = edit?.act?.id ?? null;
   let values = edit?.values ?? {};
@@ -4951,6 +4953,8 @@ function showVandaagPlus({ edit = null } = {}) {
     // forgetting the conversation is the door's own op (`assistant-forget`), as in a private Telegram chat
     onForget: async () => { await plusDoorNow().forget({ asSelf: conversationSelf(asSelf, selves.length) }); paint(); },
     acts: orderedPlusActs(PLUS_ACTS, actionFrequency),
+    tab,
+    onTab: (id) => { tab = id; try { localStorage.setItem(storageName('assistantTab'), id); } catch { /* the default stands */ } paint(); },
     pinned: pinnedView,
     pinnedActIds: pinsOf(_screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId),
     onTogglePin: (actId) => {

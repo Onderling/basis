@@ -46,6 +46,7 @@ test('a stranger\'s first five minutes: onboarding, a handle, a note, their card
 
     // STEP 3 — a note with the "+"
     await page.locator('.cc-fab').dblclick();
+    await page.locator('.circle-vandaag-plus__tab[data-tab="maken"]').click();   // the own acts are on the assistant's Maken tab
     await page.locator('.circle-vandaag-plus__act[data-act="household.note"]').click();
     await page.locator('.circle-vandaag-plus__body').fill('melk halen');
     await page.locator('.circle-vandaag-plus__save').click();

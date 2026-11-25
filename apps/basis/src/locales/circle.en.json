@@ -27,8 +27,8 @@
   },
   "plus": {
     "chat": {
-      "text": "Chat",
-      "doc": "The opened '+' (docked in the tab bar): the button to the person's own conversation, on the '+''s own spot by default."
+      "text": "Assistant",
+      "doc": "The opened '+' (docked in the tab bar): the button to the assistant panel, on the '+''s own spot by default."
     },
     "scan": {
       "text": "Scan",
@@ -1522,8 +1522,8 @@
       "doc": "A block's cap. n = how many rows."
     },
     "plus": {
-      "text": "Add",
-      "doc": "Vandaag → the '+' beside 'Pas aan': add an own note or an own appointment (the person's own store; never a circle)."
+      "text": "Assistant",
+      "doc": "The '+' and the panel it opens: the person's own assistant (a conversation with their own model, slash commands and forms) and what they can make. Its title, and the '+''s name when closed."
     },
     "plus_own": {
       "text": "Own {{noun}}",
@@ -11684,5 +11684,15 @@
   "back_to": {
     "text": "← {{place}}",
     "doc": "Back link to the tab the person came from, named by that tab (the settings home, share my card, shared with me)."
+  },
+  "assistant": {
+    "tab_conversation": {
+      "text": "Conversation",
+      "doc": "The assistant panel's first tab: the conversation with the person's own assistant (its thread and its line)."
+    },
+    "tab_make": {
+      "text": "Make",
+      "doc": "The assistant panel's second tab: what the person pinned and their own acts (a note, an appointment, feedback), each opening its form."
+    }
   }
 }

@@ -9,49 +9,45 @@
  *   - A "Paste instead" affordance when the camera isn't a fit
  *     (permission denied, blurry QR, simulator)
  *
- * Calls `onResult({kind, payload})` where `kind` is whatever the
- * registered classifiers returned (e.g. 'contact', 'invite') or
- * `'unknown'`.  The owning screen decides what to do with the
- * payload — routes to /add-contact-from-qr, opens joinGroup wizard,
- * etc.
+ * Every code goes through the ONE scan router (`routeScan`, shared): `onResult({kind, payload})` is called for a code
+ * that opens something; one that opens nothing (unreadable, made for the bot's chat, or not the kind this scanner was
+ * opened FOR) is said here in words and the scanner stays open. `forKind`: the scanner was called for one purpose
+ * (connecting a screen, pairing a device), so it routes only that kind.
  */
 
 import React, { useState, useCallback } from 'react';
 import { View, Text, Pressable, Modal, StyleSheet, ScrollView } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
-import { classifyQrPayload } from '@onderling/react-native/qr';
-import { getBasisClassifiers } from '../core/qrClassifiers.js';
+import { routeScan, scanSayKey } from '../../../basis/src/v2/scanRoute.js';   // the one router (lint-scan-schemes)
 import { theme } from '../screens/v2/theme.js';
 import ThemedTextInput from '../screens/v2/ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
-// `classifiers`: what this scanner reads (default the shared router's list; 'Apparaten & sleutels' passes a screen offer's)
-export default function QrScannerModal({ visible, onClose, onResult, t, classifiers = null }) {
+// `forKind`: the one kind this scanner was opened for (null: Me → Scan, every kind the router routes)
+export default function QrScannerModal({ visible, onClose, onResult, t, forKind = null }) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanLock, setScanLock]   = useState(false);
   const [hint, setHint]           = useState(null);
   const [pasted, setPasted]       = useState('');
   const [showPaste, setShowPaste] = useState(false);
-  const CLASSIFIERS = classifiers ?? getBasisClassifiers();
 
-  const dispatch = useCallback((res) => {
-    if (res.kind === 'unknown') {
-      setHint(t('scan_qr.scan_unknown'));
-      return;
-    }
+  const dispatch = useCallback((text) => {
+    const r = routeScan(text, { for: forKind });
+    const say = scanSayKey(r);
+    if (say) { setHint(t(say)); return; }
     setScanLock(true);
-    onResult?.(res);
+    onResult?.({ kind: r.kind, payload: r.payload });
     onClose?.();
-  }, [onResult, onClose, t]);
+  }, [onResult, onClose, t, forKind]);
 
   const onBarcode = useCallback(({ data }) => {
     if (scanLock) return;
-    dispatch(classifyQrPayload(String(data), CLASSIFIERS));
-  }, [scanLock, dispatch, CLASSIFIERS]);
+    dispatch(String(data));
+  }, [scanLock, dispatch]);
 
   const submitPasted = useCallback(() => {
-    dispatch(classifyQrPayload(pasted.trim(), CLASSIFIERS));
-  }, [pasted, dispatch, CLASSIFIERS]);
+    dispatch(pasted.trim());
+  }, [pasted, dispatch]);
 
   // Reset lock when the modal is shown again.
   React.useEffect(() => {

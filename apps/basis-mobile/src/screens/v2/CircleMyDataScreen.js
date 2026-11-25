@@ -36,7 +36,7 @@ import { ownActionsLines, OWN_RECORD_KEY } from '../../../../basis/src/ownAction
 import {
   connectionRows, connectionOpChoices, connectionSectionChoices, connectionSelfChoice,
 } from '../../../../basis/src/v2/connections.js';
-import { createAppScreenPairing, SCREEN_OFFER_CLASSIFIERS } from '../../../../basis/src/v2/appScreenPairing.js';
+import { createAppScreenPairing } from '../../../../basis/src/v2/appScreenPairing.js';
 import QrScannerModal from '../../rn/QrScannerModal.js';
 import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../../../basis/src/v2/syncSelection.js';
 import { makeThisDevicePrimary, makePrimaryResultWords } from '../../../../basis/src/v2/circleAddressAnnounce.js';
@@ -69,7 +69,7 @@ import ThemedTextInput from './ThemedTextInput.js';   // every text input's colo
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
-export default function CircleMyDataScreen({ selvesOn = null, showBotActions = false, callSkill, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onSetRelay, onReconnectPeer, agent = null,
+export default function CircleMyDataScreen({ screenOffer = null, onScreenOfferTaken = null, selvesOn = null, showBotActions = false, callSkill, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onSetRelay, onReconnectPeer, agent = null,
   eventLog = null,
   // what this person used most, per circle, ON THIS DEVICE (`usageRows`) — never synced; `onClearFrequent` forgets it
   frequent = [], onClearFrequent = null,
@@ -161,6 +161,12 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
     setPairNote(t('circle.mydata.connection_pick_code'));
     setPairCodes(r.codes);
   }, [screenPairing]);
+  // a connect code scanned on Me: into the field once, read as if typed (the person still picks the screen's code)
+  useEffect(() => {
+    if (typeof screenOffer !== 'string' || !screenOffer) return;
+    onScreenOfferTaken?.();
+    onOfferText(screenOffer);
+  }, [screenOffer, onOfferText, onScreenOfferTaken]);
   const onPickCode = useCallback(async (code) => {
     setPairCodes(null);
     const r = await screenPairing.pick(code);
@@ -1037,8 +1043,8 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
           <QrScannerModal
             visible={scanOpen}
             onClose={() => setScanOpen(false)}
-            classifiers={SCREEN_OFFER_CLASSIFIERS}
-            onResult={(res) => { if (res?.kind === 'connect' && typeof res.payload === 'string') onOfferText(res.payload); }}
+            forKind="screen"
+            onResult={(res) => { if (res?.kind === 'screen' && typeof res.payload === 'string') onOfferText(res.payload); }}
             t={t}
           />
           {pairNote ? <Text style={styles.privacyBody} testID="mydata-connection-note">{pairNote}</Text> : null}

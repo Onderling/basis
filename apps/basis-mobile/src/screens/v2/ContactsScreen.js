@@ -1,9 +1,9 @@
 /**
  * basis-mobile v2 — Contacten roster (feedback-extension, mobile parity).
  *
- * RN mirror of web's `renderContactsRoster` + add-a-bot. Reads the app-owned
- * PeerGraph (`bundle.peerGraph`) via the SHARED `listContacts`, and adds a bot via
- * the SHARED `addBotToGraph` (URL → reuse `discoverA2A`; raw address → upsert).
+ * RN mirror of web's `renderContactsRoster`. Reads the app-owned PeerGraph (`bundle.peerGraph`) via the SHARED
+ * `listContacts`. Its ONE add button reads what is pasted or scanned through the scan router (the Contacts add field)
+ * and hands it on routed: the host adds the card, joins the invite, or asks before it adds a bot.
  * The roster + the conversation logic are shared web≡mobile; only this RN shell
  * (and the thread screen) is platform code.
  */
@@ -16,7 +16,8 @@ import { useTheme } from './themeContext.js';
 import { FAB_CLEARANCE } from './fab.js';
 import FaceView from './FaceView.js';
 import { splitShownHidden, loadContactRoster, sealedContactNameStore, contactRowMeta } from '../../../../basis/src/v2/contactsSource.js';
-import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
+import { routeScan, scanSayKey } from '../../../../basis/src/v2/scanRoute.js';   // the one router: the pasted text says what it is
+import QrScannerModal from '../../rn/QrScannerModal.js';
 import { DEFAULT_PERSONA } from '../../../../basis/src/v2/contactPersona.js';
 import { withHelpContact } from '../../../../basis/src/v2/helpContact.js';
 // first messages from people not chosen: the requests section and its three acts, shared with web
@@ -29,7 +30,10 @@ import { PERSONA_BUTTON_SIDE_CLEARANCE } from './fab.js';
 import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
-export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePictureFor = null, onAddPerson = null,
+export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePictureFor = null,
+  // ONE add button (Frits 2026-11-20): what is pasted or scanned goes through the router as the Contacts add field and is
+  // handed here routed (`{kind, payload}`): the host's painters add the card, join the invite, or ask before a bot
+  onRouted = null,
   // the people this device blocks, and the one place a block is undone (web: contactsRoster.js); absent = no door
   onBlocked = null,
   // the help circle is on this device: Contacten shows the help bot as one synthetic row (shared `withHelpContact`)
@@ -84,31 +88,17 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
     return () => { for (const ev of ['added', 'removed', 'reachable', 'unreachable', 'cleared']) peerGraph.off?.(ev, h); };
   }, [peerGraph, reload]);
 
-  const submitAdd = useCallback(async () => {
+  const [scanOpen, setScanOpen] = useState(false);
+  const submitAdd = useCallback(() => {
     const input = addText.trim();
     if (!input) return;
     setError(false);
-    try {
-      // A PeerGraph peer/bot (an agent-card URL or a peer address). Same precedence as web's addBotFromInput.
-      await addBotToGraph({
-        input, peerGraph, coreAgent: bundle?.coreAgent, discover: bundle?.discoverA2A,
-        // C13 fast rung — a onderling-contact:// card routes to pinboard's addContactFromQr (the one
-        // decoder); the unified roster merges the ContactBook, so the person appears DM-ready.
-        // …asking first what they will see of you (L125); closing the sheet adds nothing
-        addContact: callSkill ? async (payload) => {
-          const r = await lens.addWithSheet(payload);
-          if (r === null) throw Object.assign(new Error('cancelled'), { code: 'cancelled' });
-          return r;
-        } : undefined,
-      });
-      setAddText(''); setAddOpen(false);
-      reload();
-    } catch (err) {
-      if (err?.code === 'cancelled') return;   // the person closed the sheet: nothing added, the text stays
-      // A circle invite pasted here is the VERIFIED rung — point at the join flow instead of failing mutely.
-      setError(err?.code === 'circle-invite' ? 'invite' : true);
-    }
-  }, [addText, peerGraph, bundle, callSkill, reload, lens]);
+    const r = routeScan(input, { for: 'contacts-add' });
+    const say = scanSayKey(r);
+    if (say) { setError(say); return; }   // unreadable, or a code for somewhere else: said, the text stays
+    setAddText(''); setAddOpen(false);
+    onRouted?.({ kind: r.kind, payload: r.payload });
+  }, [addText, onRouted]);
 
   const rowFor = (c, isHidden = false) => {
     const n = Number(unread?.[c.contactId]?.unread) || 0;   // what is NEW here (2026-09-21), web parity
@@ -189,13 +179,8 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
       {lens.sheet}
       <View style={styles.head}>
         <Text style={styles.title}>{t('circle.contacts.title')}</Text>
-        {/* the two ways in: a PERSON (the scanner — Me's Scan, the same door) and a bot (its address) */}
+        {/* ONE way in: a card, an invite or a bot's address — pasted or scanned, the text says which */}
         <View style={styles.acts}>
-          {typeof onAddPerson === 'function' ? (
-            <Pressable style={styles.add} onPress={onAddPerson} accessibilityRole="button" testID="contacts-add-person">
-              <Text style={styles.addText}>{t('circle.contacts.add_person')}</Text>
-            </Pressable>
-          ) : null}
           <Pressable style={styles.add} onPress={() => setAddOpen((v) => !v)} accessibilityRole="button" testID="contacts-add">
             <Text style={styles.addText}>{t('circle.contacts.add')}</Text>
           </Pressable>
@@ -218,9 +203,15 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
           <Pressable style={styles.addSubmit} onPress={submitAdd} accessibilityRole="button" testID="contacts-add-submit">
             <Text style={styles.addSubmitText}>{t('circle.contacts.send')}</Text>
           </Pressable>
+          <Pressable style={styles.addSubmit} onPress={() => setScanOpen(true)} accessibilityRole="button" testID="contacts-add-scan">
+            <Text style={styles.addSubmitText}>{t('circle.profile.scan')}</Text>
+          </Pressable>
         </View>
       )}
-      {error && <Text style={styles.error}>{t(error === 'invite' ? 'circle.contacts.invite_not_contact' : 'circle.contacts.add_failed')}</Text>}
+      {/* the scanner opened FOR this field: a card, an invite or a bot; anything else is said there */}
+      <QrScannerModal visible={scanOpen} onClose={() => setScanOpen(false)} forKind="contacts-add" t={t}
+        onResult={(res) => { setAddOpen(false); onRouted?.(res); }} />
+      {error && <Text style={styles.error}>{t(typeof error === 'string' ? error : 'circle.contacts.add_failed')}</Text>}
       {requestsSection}
 
       {contacts.length === 0 ? (

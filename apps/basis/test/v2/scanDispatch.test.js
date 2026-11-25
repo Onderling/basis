@@ -28,6 +28,7 @@ describe('every declared scan target has a painter in each shell', () => {
     it(`${shell}: SCAN_PAINTERS names every declared target`, () => {
       expect(map, `${shell} has no SCAN_PAINTERS`).not.toBe('');
       for (const t of Object.values(SCAN_TARGETS)) {
+        if (t.kind === 'not') continue;   // deliberately not routed: its words are said (scanSayKey) before any painter
         const key = /^[A-Za-z_$][\w$]*$/.test(t.id) ? `${t.id}:` : `'${t.id}':`;
         expect(map, `${shell}: no painter entry for ${t.id}`).toContain(key);
       }
@@ -53,13 +54,14 @@ describe('every declared scan target has a painter in each shell', () => {
   });
   it("the scanner itself speaks the shared words: one 'unknown' key and one paste placeholder on both shells", () => {
     const scanner = read('../../../basis-mobile/src/rn/QrScannerModal.js');
-    expect(scanner).toMatch(/t\('scan_qr\.scan_unknown'\)/);
+    // the words for a code that opens nothing come from the router's one answer (scanSayKey: 'scan_qr.scan_unknown', …)
+    expect(scanner).toMatch(/const say = scanSayKey\(r\);\n\s*if \(say\) \{ setHint\(t\(say\)\); return; \}/);
     expect(scanner).toMatch(/t\('circle\.scan\.paste_placeholder'\)/);
     expect(scanner).not.toMatch(/chat\.scan_unknown/);
     expect(SHELLS.web).toMatch(/t\('scan_qr\.scan_unknown'\)/);
   });
   it("web: scanQr's seam is the paste prompt, through the route table", () => {
     expect(SHELLS.web).toMatch(/openQrScanner: \(\) => \{[^\n]*takeScannedText\(v\)/);
-    expect(SHELLS.web).toMatch(/const r = routeScan\(text\);/);
+    expect(SHELLS.web).toMatch(/const r = routeScan\(text, \{ for: purpose \}\);/);
   });
 });

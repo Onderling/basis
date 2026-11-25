@@ -643,6 +643,14 @@
     "paste_placeholder": {
       "text": "Plak een code, een link of een claimregel",
       "doc": "Me → Scan on web (no camera): the paste prompt."
+    },
+    "botlink_for_chat": {
+      "text": "Deze code is voor de chat met je bot: plak hem daar.",
+      "doc": "A scanned or pasted bot-link offer (onderling-koppel:): the app made it for the chat with the person's bot, so the scanner says where it goes and opens nothing."
+    },
+    "not_for_here": {
+      "text": "Deze code hoort hier niet. Scan hem vanuit Scannen, of open waar hij voor is.",
+      "doc": "A scanner opened for one purpose (connecting a screen) read a code of another kind: it routes only its own kind and says so."
     }
   },
   "membercard_close": {
@@ -2106,7 +2114,7 @@
         "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
       },
       "awaiting": {
-        "text": "Wacht op jou",
+        "text": "Voor jou te doen",
         "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
       }
     },
@@ -6539,20 +6547,16 @@
       "doc": "P5 — empty state of the contacts roster."
     },
     "add": {
-      "text": "+ Bot toevoegen",
-      "doc": "P5 — button on the contacts roster to add a bot by URL/address."
+      "text": "+ Toevoegen",
+      "doc": "Contacten → the ONE add button: a contact card, an invite or a bot's address; the scanned or pasted text says which (scanRoute 'contacts-add')."
     },
     "add_prompt": {
-      "text": "Botadres: een webadres (de agent card), een peer-adres of een contactkaart",
-      "doc": "P5 — prompt when adding a bot or a contact card (C13 fast rung)."
+      "text": "Plak een contactkaart, een uitnodiging of het adres van een bot",
+      "doc": "The paste field behind Contacten's one add button: a person's card, a circle invite, or a bot (its peer address, or on this field its https agent-card address)."
     },
     "add_failed": {
       "text": "Kon die bot niet toevoegen — controleer de URL/het adres.",
       "doc": "P5 — shown when discoverA2A / add fails."
-    },
-    "invite_not_contact": {
-      "text": "Dat is een kringuitnodiging, geen contactkaart — gebruik hiervoor “Lid worden van een kring”.",
-      "doc": "C13 — a onderling-invite:// pasted in the contact-add box: the VERIFIED rung belongs to the join flow."
     },
     "added": {
       "text": "{{name}} toegevoegd.",
@@ -6772,10 +6776,6 @@
       "text": "Kopieer de tekst hierboven en plak die in een QR-maker. De ander scant hem en voegt je toe met /add-contact, met het vertrouwen dat jij voorstelt.",
       "doc": "Hint in the /share-my-contact record."
     },
-    "add_person": {
-      "text": "+ Persoon toevoegen",
-      "doc": "Contacts: add a person — opens the scanner (web: paste their link or card), the same door as Me's Scan."
-    },
     "blocked": {
       "text": "Geblokkeerd op dit apparaat",
       "doc": "A door at the foot of Contacten: the people this device blocks, and the one place a block is undone."
@@ -6828,6 +6828,14 @@
     "wire_peer_older": {
       "text": "{{name}} gebruikt een oudere Basis. Zodra die is bijgewerkt praten jullie weer",
       "doc": "On a contact's row while this device refuses their Basis version (the wire refusal): they are on the older one."
+    },
+    "add_bot_confirm_host": {
+      "text": "Bot toevoegen van {{host}}?",
+      "doc": "Before a bot is added from an address (nothing is fetched before the yes): the host named."
+    },
+    "add_bot_confirm_addr": {
+      "text": "Bot toevoegen: {{addr}}?",
+      "doc": "Before a bot is added from a peer address: its name, or the start of the address."
     }
   },
   "pairedDevices": {

@@ -368,7 +368,7 @@ export { normalizeCircleMembers, circleMemberCount } from '@onderling/kring-host
 // 5.9d — Proof-of-Location placeholder seam (real attestation deferred).
 export { getCirclePolStatus, formatPolStatus, formatAttestedAt } from './v2/circlePol.js';
 export {
-  COMPLAINT_TYPES, ADVISOR_DEFAULTS, makeTooBusyEvent, computeAdvice,
+  COMPLAINT_TYPES, ADVISOR_DEFAULTS, makeTooBusyEvent, computeAdvice, advisorShownKey,
 } from './v2/circleAdvisor.js';
 export {
   OFFERING_AXES, DEFAULT_OFFERING, normalizeOffering, mergeOffering,

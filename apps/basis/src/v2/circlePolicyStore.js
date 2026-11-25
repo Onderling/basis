@@ -196,7 +196,7 @@ export function localPolicyPendingMarks(storage = globalThis.localStorage) {
 
 /** localStorage-backed load/save (web). Key: `cc.circlePolicy.<circleId>`. */
 export function localStoragePolicyIo(storage = globalThis.localStorage) {
-  const key = (id) => `cc.circlePolicy.${id}`;
+  const key = (id) => `${storageName('circlePolicy')}${id}`;
   const kv = storage ? jsonKv(storage, { name: 'the circle policy', kind: 'settings' }) : null;
   return {
     load: async (id) => {
@@ -235,7 +235,7 @@ export function createMemberOverrideStore({ load, save } = {}) {
 export function localStorageOverrideIo(storage = globalThis.localStorage) {
   // SEALED at rest (ledger L1083: per-member overrides), on web and phone alike
   const kv = sealedKeyValue(storage, { name: 'the member overrides', kind: 'settings', strict: true, said: true, resealAtStart: [storageName('circleOverride')] });
-  const key = (id) => `cc.circleOverride.${id}`;
+  const key = (id) => `${storageName('circleOverride')}${id}`;
   return {
     load: async (id) => {
       try { return await kv.getJson(key(id)); } catch { return null; }   // not JSON = kept + refused + said

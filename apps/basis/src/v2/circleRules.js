@@ -14,6 +14,7 @@
  * this into the existing createGroup/joinGroup wizard state machines is a
  * follow-on so those shared wizards stay stable.
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
 import { sealedKeyValue, jsonKv } from './localStoreSeal.js';
 
@@ -148,8 +149,8 @@ export function localCircleRulesStore(storage = globalThis.localStorage) {
 }
 
 /** localStorage-backed load/save (web). Key: `cc.circleRules.<circleId>`. */
-export function localStorageRulesIo(storage = globalThis.localStorage) {
-  const key = (id) => `cc.circleRules.${id}`;
+export function localStorageRulesIo(storage) {   // no default: a raw localStorage would write the rules plain
+  const key = (id) => `${storageName('circleRules')}${id}`;
   const kv = storage ? jsonKv(storage, { name: 'the circle rules', kind: 'settings' }) : null;
   return {
     load: async (id) => {

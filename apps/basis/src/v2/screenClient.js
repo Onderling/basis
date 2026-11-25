@@ -103,7 +103,7 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
       globalThis.history.replaceState(null, '', `${loc.pathname}${loc.search}`);
     }
   } catch { /* an address that cannot be rewritten keeps its fragment; the ticket is one use either way */ }
-  const keyPrefix = `onderling.screen.${name}.`;
+  const keyPrefix = `${storageName('screenClient')}${name}.`;
   const vaultPrefix = `${storageName('screenGrant')}${name}:`;
   const store = prefixed(storage, keyPrefix);
   // THE BOT, FROM THE KEPT GRANT (L1179): the link's fragment is cleared at once (its ticket is one use), so a reload, a

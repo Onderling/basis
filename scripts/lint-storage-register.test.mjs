@@ -4,7 +4,7 @@
  * a name passed through, or a `scope:` that is not storage. And the repo itself is clean.
  */
 import { describe, it, expect } from 'vitest';
-import { handNamesIn, check, OPENED_ELSEWHERE } from './lint-storage-register.mjs';
+import { handNamesIn, check, OPENED_ELSEWHERE, sealProblems, WRITES_FOR_ITS_CALLER } from './lint-storage-register.mjs';
 import { STORAGE } from '../apps/basis/src/v2/storageRegister.js';
 
 const names = (t) => handNamesIn(t).map((h) => h.name);
@@ -22,6 +22,44 @@ describe('lint-storage-register', () => {
   });
   it('does not see a register call, a name passed through, or a scope that is not storage', () => {
     expect(names("kv.getItem(storageName('lastTab'));\ns.getItem(`${prefix}${id}`);\nconst control = { scope: 'circle' };\nstore.getItem(key);")).toEqual([]);
+  });
+  it('sees a key built by hand from a prefix row (a key helper), through check()', async () => {
+    const { mkdirSync, writeFileSync, rmSync } = await import('node:fs');
+    const dir = new URL('../apps/basis/src/guard-fixture-storage-tmp/', import.meta.url);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(new URL('keyHelper.js', dir), 'export const key = (id) => `cc.circlePolicy.${id}`;\n');
+    try {
+      expect((await check()).some((p) => p.includes("builds a 'cc.circlePolicy.' key by hand"))).toBe(true);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+  describe('rule 3: the seal ruled on the row', () => {
+    const REG = {
+      secret: { name: 'cc.secret', seal: 'sealed' },
+      flag:   { name: 'cc.flag', seal: 'not content: a first-run flag' },
+    };
+    const run = (texts, reg = REG) => sealProblems(reg, texts).filter((p) => !p.startsWith('WRITES_FOR_ITS_CALLER'));
+    it('a raw write to a sealed row is red, named or through a const', () => {
+      expect(run({ 'a.js': "localStorage.setItem(storageName('secret'), v);" })).toHaveLength(1);
+      expect(run({ 'a.js': "const K = storageName('secret');\nAsyncStorage.setItem(K, v);" })).toHaveLength(1);
+    });
+    it('a raw write to a plain row, or a sealed write to a sealed row, is green', () => {
+      expect(run({ 'a.js': "localStorage.setItem(storageName('flag'), '1');\nkv.setItem(storageName('secret'), v);" })).toEqual([]);
+    });
+    it('a const exported by another file resolves only where it is imported', () => {
+      const lib = "export const K = storageName('secret');";
+      expect(run({ 'lib.js': lib, 'a.js': "import { K } from './lib.js';\nlocalStorage.setItem(K, v);" })).toHaveLength(1);
+      expect(run({ 'lib.js': lib, 'a.js': "const K = 'x';\nlocalStorage.setItem(K, v);" })[0]).toMatch(/names no register row/);
+    });
+    it('a raw write under a key that names no row is red', () => {
+      expect(run({ 'a.js': 'localStorage.setItem(`cc.other.${id}`, v);' })[0]).toMatch(/names no register row/);
+    });
+    it('a row without a seal ruling, or debt without its ledger row, is red', () => {
+      expect(run({}, { x: { name: 'cc.x' } })[0]).toMatch(/no seal ruling/);
+      expect(run({}, { x: { name: 'cc.x', seal: 'debt: written plain today' } })[0]).toMatch(/without its ledger row/);
+    });
+    it('every WRITES_FOR_ITS_CALLER entry says which row and who seals', () => {
+      for (const [f, why] of Object.entries(WRITES_FOR_ITS_CALLER)) expect(why.length, f).toBeGreaterThan(20);
+    });
   });
   it('every OPENED_ELSEWHERE entry is a register row', () => {
     for (const id of Object.keys(OPENED_ELSEWHERE)) expect(STORAGE[id], id).toBeTruthy();

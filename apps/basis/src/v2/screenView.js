@@ -19,6 +19,7 @@
  * Pure composition: the secure agent is made by the shell (`makeAgent`, a persistent key for this browser), the
  * tokens are kept in the shell's storage. Nothing here touches a page.
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { DataPart, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { encodePairingOffer, acceptConnectionGrant, CONNECTION_GRANT_SUBTYPE } from './connectionPairing.js';
 import { parseScreenLink, parseScreenStartLink, parseScreenLaunchLink, screenAddressFor } from './botScreens.js';
@@ -43,7 +44,7 @@ export const SCREEN_WAITING_EVERY_MS = param({ key: 'screen.waitingEveryMs', sco
  *  read after the last, inside the bot's per-screen call budget (a read costs a call per list). */
 export const HOUSEHOLD_SETTLE_MS = param({ key: 'screen.householdSettleMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1_500 });
 
-const storeKey = (botAddress) => `onderling.screen.${botAddress}`;
+const storeKey = (botAddress) => `${storageName('screenClient')}${botAddress}`;
 const randomNonce = () => { const b = new Uint8Array(16); globalThis.crypto.getRandomValues(b); return [...b].map((x) => x.toString(16).padStart(2, '0')).join(''); };
 
 /**

@@ -2171,9 +2171,9 @@ person's Basis keeps its keys.
 ## 2026-11-19 — Everything a shell writes to the device is sealed, unless it must be read before a key exists (Frits)
 
 **Status:** decided and built (2026-11-20). The stores and the small key-value stores of a person's content are
-sealed on every shell; `lint-sealed-key-value` counts every raw key-value write against a baseline in which each
-remaining one is named with its reason (sealed by its caller, not content, or not sealable), none as debt. What stays
-readable is listed in `docs/architecture.md`, the Agent home.
+sealed on every shell. Since 2026-11-25 the ruling sits on each row of the storage register (`seal`), held by
+`lint-storage-register` (it replaced `lint-sealed-key-value` and its baseline); the two trust-level vaults are named
+as debt. What stays readable is listed in `docs/architecture.md`, the Agent home.
 
 **Context:** the agent's vaults and the shells' stores were sealed, but small key-value values the shells write
 (settings, caches, marks) were decided one by one, and one of them held the person's own model endpoint with its API

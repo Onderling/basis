@@ -14,7 +14,14 @@ before the next is started.
 | # | Rung | What it checks | Who runs it, when | Time |
 |---|---|---|---|---|
 | 0 | **The one test** | the test you wrote red-first for the thing you are changing (a unit test, a relay walk, one browser spec) | you, while working — every edit | seconds to 2 min |
-| 1 | **The package suite + the guards** | the suite of the package(s) you touched (`npx vitest run` in `apps/basis`, `apps/basis-mobile`, `packages/<x>`), then `npm run guards` at the root | you, before pushing | 2–8 min |
+| 1 | **The affected tests + the guards** | the tests your change reaches (`npx vitest related <changed files> --run` in the package), ALWAYS with the package's `test/fitness` folder (those tests read source as text, which `related` cannot follow), then `npm run guards` at the root. The WHOLE package suite (`npx vitest run`) only when the change touches a shared table or register, a package's exports, the kernel (`packages/core`) or a rail; otherwise rung 3 is the whole-suite run | you, before pushing | 1–8 min |
+
+**Rung 1 since 2026-11-25 (Frits, after the first retro on where the time goes):** the whole suite ran 471 times in two
+weeks before a push (14.6 hours). It now runs locally only for the changes named in the row; a red that rung 1 missed
+and rung 3 caught adds a line to the list below, so the same miss is caught locally the next time. If more than about
+one in ten skipped runs turns out red in CI after two weeks, the whole suite comes back to rung 1.
+
+- *(no misses recorded yet)*
 | 2 | **The cheapest real thing** | the change on a REAL composition: the relay walks in `apps/basis/test/*.relay.test.js` (real agents over a real relay), one browser spec (`npx playwright test test-browser/<spec>.spec.js`), a headless browser against the published app, a throwaway profile against the real box | you, when the change touches a shell, a transport, or the box — before opening the PR | 1–10 min |
 | 3 | **The gate** (CI) | the guards, every package suite, the live-pod tier, the e2e journeys — on the PR's merge result | GitHub, on every PR and every push to `development`/`live` | ~8 min |
 | 4 | **The tail** (CI) | the browser suite, eight shards — the only thing that tests a **shell composition** | GitHub, after a merge to `development` or `live`, or by hand (`workflow_dispatch`) — never on a PR | 10–20 min |

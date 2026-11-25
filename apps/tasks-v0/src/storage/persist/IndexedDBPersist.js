@@ -15,6 +15,7 @@
  * See the pinboard original for the storage-shape rationale + browser-only
  * contract (`globalThis.indexedDB` is required).
  */
+import { mapSnapshotGate } from '@onderling/local-store';
 
 const DEFAULT_STORE_NAME = 'snapshots';
 const SNAPSHOT_KEY       = 'state';
@@ -28,6 +29,7 @@ export class IndexedDBPersist {
   #pendingTimer = null;
   /** Most recent saved snapshot (for diffing / no-op skip). */
   #lastSerialised = null;
+  #gate = null;
 
   /**
    * @param {object} args
@@ -56,17 +58,15 @@ export class IndexedDBPersist {
    * @returns {Promise<Map<string, any>>}
    */
   async load() {
-    try {
-      const raw = await this.#get(SNAPSHOT_KEY);
-      if (typeof raw !== 'string') return new Map();
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return new Map();
-      this.#lastSerialised = raw;
-      return new Map(Object.entries(parsed));
-    } catch {
-      return new Map();
-    }
+    let raw;
+    try { raw = await this.#get(SNAPSHOT_KEY); } catch { return this.#gateOf().readFailed(); }
+    const map = this.#gateOf().read(raw);   // not readable → empty here, and every save refused
+    if (!this.#gateOf().notReadable) this.#lastSerialised = raw;
+    return map;
   }
+
+  /** The snapshot's format and the refusal to save over one this build could not read (`mapSnapshotGate`). */
+  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#dbName)); }
 
   /**
    * Write a Map to IndexedDB (single-key replace).
@@ -74,8 +74,8 @@ export class IndexedDBPersist {
    * @param {Map<string, any>} map
    */
   async save(map) {
-    const obj        = Object.fromEntries(map);
-    const serialised = JSON.stringify(obj);
+    const serialised = this.#gateOf().encode(map);
+    if (serialised == null) return;   // not readable at load: nothing is saved over it
     if (serialised === this.#lastSerialised) return;     // no-op skip
     await this.#put(SNAPSHOT_KEY, serialised);
     this.#lastSerialised = serialised;

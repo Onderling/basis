@@ -8,6 +8,7 @@
  * `@onderling/local-store` once we have a third consumer.
  */
 
+import { mapSnapshotGate } from '@onderling/local-store';
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
@@ -18,6 +19,7 @@ export class FilePersist {
   #pendingTimer = null;
   /** Most recent saved-to-disk snapshot (for diffing / no-op skip). */
   #lastSerialised = null;
+  #gate = null;
 
   /**
    * @param {object} args
@@ -34,17 +36,16 @@ export class FilePersist {
    * @returns {Promise<Map<string, any>>}
    */
   async load() {
-    try {
-      const raw = await readFile(this.#path, 'utf-8');
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return new Map();
-      this.#lastSerialised = raw;
-      return new Map(Object.entries(parsed));
-    } catch (err) {
-      if (err && err.code === 'ENOENT') return new Map();
-      return new Map();
-    }
+    let raw;
+    try { raw = await readFile(this.#path, 'utf-8'); }
+    catch (err) { return err?.code === 'ENOENT' ? this.#gateOf().read(null) : this.#gateOf().readFailed(); }
+    const map = this.#gateOf().read(raw);   // not readable → empty here, and every save refused
+    if (!this.#gateOf().notReadable) this.#lastSerialised = raw;
+    return map;
   }
+
+  /** The snapshot's format and the refusal to save over one this build could not read (`mapSnapshotGate`). */
+  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#path)); }
 
   /**
    * Atomic write (write to `.tmp`, rename).
@@ -52,8 +53,8 @@ export class FilePersist {
    * @param {Map<string, any>} map
    */
   async save(map) {
-    const obj = Object.fromEntries(map);
-    const serialised = JSON.stringify(obj);
+    const serialised = this.#gateOf().encode(map);
+    if (serialised == null) return;   // not readable at load: nothing is saved over it
     if (serialised === this.#lastSerialised) return;
     await mkdir(dirname(this.#path), { recursive: true });
     const tmp = `${this.#path}.tmp`;

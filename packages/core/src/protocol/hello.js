@@ -63,21 +63,33 @@ export async function sendHello(agent, peerAddress, timeout = 15_000) {
 
   let timer   = null;
   let handler = null;
+  let refused = null;
+  const stopWaiting = () => { if (handler) agent.off('peer', handler); if (refused) agent.off('wire-refused', refused); };
 
   const waitForPeer = new Promise((resolve, reject) => {
     timer = setTimeout(() => {
-      if (handler) agent.off('peer', handler);
+      stopWaiting();
       reject(new Error(`Hello timeout — no response from ${peerAddress}`));
     }, timeout);
 
     handler = ({ address }) => {
       if (address === peerAddress) {
         clearTimeout(timer);
-        agent.off('peer', handler);
+        stopWaiting();
         resolve();
       }
     };
     agent.on('peer', handler);
+    // A refusal frame (protocol/wire.js): the peer refuses our wire. The hello fails WITH that reason, not by timing out.
+    // (The event fires once per peer per start; a later hello to a peer that already refused us is answered by its frame
+    // only if the peer sends one again, which it does not: it times out, and `agent.wireRefusal` holds the reason.)
+    refused = ({ address, side, wire }) => {
+      if (address !== peerAddress || side !== 'they-refused') return;
+      clearTimeout(timer);
+      stopWaiting();
+      reject(Object.assign(new Error(`Hello refused — ${peerAddress} speaks wire ${wire ?? '?'}; this build is older`), { code: 'WIRE_REFUSED', peerWire: wire ?? null }));
+    };
+    agent.on('wire-refused', refused);
   });
   // Attach a noop catch so a pending rejection (e.g. when sendHello throws
   // before we reach `await waitForPeer`) is not treated as unhandled.
@@ -95,7 +107,7 @@ export async function sendHello(agent, peerAddress, timeout = 15_000) {
     ackSet(agent).add(peerAddress);
   } catch (err) {
     clearTimeout(timer);
-    if (handler) agent.off('peer', handler);
+    stopWaiting();
     throw err;
   }
 }

@@ -27,7 +27,7 @@ describe('routeScan — one scanner, routed by scheme', () => {
     expect(routeScan(null).kind).toBe('unknown');
   });
   it('the classifier list carries every kind, in the one order', () => {
-    expect(SCAN_CLASSIFIERS.map((c) => c.kind)).toEqual(['contact', 'invite', 'pair', 'enroll', 'claim']);
+    expect(SCAN_CLASSIFIERS.map((c) => c.kind)).toEqual(['contact', 'invite', 'pair', 'enroll', 'claim', 'screen', 'botlink', 'bot']);
   });
 });
 
@@ -36,6 +36,7 @@ describe('the route table names only DECLARED targets', () => {
   it('every kind has a target, and every target exists in its manifest', () => {
     expect(Object.keys(SCAN_TARGETS).sort()).toEqual(SCAN_CLASSIFIERS.map((c) => c.kind).sort());
     for (const [kind, t] of Object.entries(SCAN_TARGETS)) {
+      if (t.kind === 'view' || t.kind === 'not') continue;   // a view no op backs, or deliberately nothing: no manifest entry
       const m = MANIFESTS[t.app];
       expect(m, `${kind}: unknown app ${t.app}`).toBeTruthy();
       const found = t.kind === 'flow'
@@ -47,6 +48,7 @@ describe('the route table names only DECLARED targets', () => {
   it("each target's needs are ones it declares (a flow's needs, an op's params)", () => {
     const sample = { contact: 'onderling-contact://x', invite: 'onderling-invite://x', enroll: 'onderling-enroll://x', claim: { code: 'ABCD-EFGH', node: 'n' }, pair: 'onderling-pair://a' };
     for (const [kind, t] of Object.entries(SCAN_TARGETS)) {
+      if (t.kind === 'view' || t.kind === 'not') continue;
       const m = MANIFESTS[t.app];
       const decl = t.kind === 'flow' ? (m.flows.find((f) => f.id === t.id).needs ?? []) : (m.operations.find((o) => o.id === t.id).params ?? []);
       const names = new Set(decl.map((n) => (typeof n === 'string' ? n : n.name)));

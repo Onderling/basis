@@ -15,14 +15,14 @@ import { mijScreenBlocks } from '../../src/v2/mijScreen.js';
 const t = (k, v) => (v ? `${k}:${JSON.stringify(v)}` : k);
 
 describe('Contacts', () => {
-  it('two ways in: a person (the scanner) and a bot', () => {
-    const onAddPerson = vi.fn();
-    const el = renderContactsRoster(document.createElement('div'), { contacts: [], t, onOpen: () => {}, onAdd: () => {}, onAddPerson });
-    const person = el.querySelector('[data-role=add-person]');
-    expect(person?.textContent).toBe('circle.contacts.add_person');
-    expect(el.querySelector('[data-role=add-bot]')?.textContent).toBe('circle.contacts.add');
-    person.click();
-    expect(onAddPerson).toHaveBeenCalledOnce();
+  it('ONE way in: one add button, the pasted text says what it is (a card, an invite, a bot)', () => {
+    const onAdd = vi.fn();
+    const el = renderContactsRoster(document.createElement('div'), { contacts: [], t, onOpen: () => {}, onAdd });
+    const buttons = [...el.querySelectorAll('.cc-contacts__add')];
+    expect(buttons.map((b) => b.dataset.role)).toEqual(['add']);
+    expect(buttons[0].textContent).toBe('circle.contacts.add');
+    buttons[0].click();
+    expect(onAdd).toHaveBeenCalledOnce();
   });
   it('trust is its word, from either enum — never the raw level', () => {
     expect(trustWordKey('known')).toBe('circle.contacts.trust.bekend');

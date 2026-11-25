@@ -206,7 +206,8 @@ import QrScannerModal from '../../rn/QrScannerModal.js';
 import EnrollDeviceModal from './EnrollDeviceModal.js';
 import CeremonyFlowModal from './CeremonyFlowModal.js';
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
-import { SCAN_TARGETS, scanOpResultWords } from '../../../../basis/src/v2/scanRoute.js';
+import { SCAN_TARGETS, scanOpResultWords, botAddConfirm } from '../../../../basis/src/v2/scanRoute.js';
+import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
 import { opFormOrRun } from '../../../../basis/src/forms/opFormOrRun.js';
 import { makePickerFetcher } from '../../../../basis/src/forms/pickerChoices.js';
 import { contactPointAdopter, useRelayQuestion, relayQuestion } from './RelayQuestionModal.js';
@@ -842,7 +843,9 @@ export default function CircleLauncherScreen({
   // Vandaag: a block of the page opened whole ("meer"), or null; the customise sheet open or not
   const [expandedBlockId, setExpandedBlockId] = useState(null);
   const [customiseOpen, setCustomiseOpen] = useState(false);
-  const [plusOpen, setPlusOpen] = useState(false);   // Vandaag's "+": the person's own acts
+  const [plusOpen, setPlusOpen] = useState(false);
+  // a screen's connect code scanned on Me: handed to 'connect a screen' on Apparaten once (web twin: showMyData screenOffer)
+  const [scannedScreenOffer, setScannedScreenOffer] = useState(null);   // Vandaag's "+": the person's own acts
   const [plusDialOpen, setPlusDialOpen] = useState(false);   // THE "+" in the bar, opened into its round buttons
   const [plusEdit, setPlusEdit] = useState(null);     // …opened on an own row: `{ act, id, values, asSelf }` (shared `plusEditFor`)
   // …and, when its act shares, the contacts it can go to (the shared `plusShareTargets`; read when the sheet opens on it)
@@ -2081,6 +2084,19 @@ export default function CircleLauncherScreen({
     'claim-companion': (needs) => setScanTask({ id: 'claim-companion', needs }),
     // the code names the address; the circle is the person's pick (none asked with one circle)
     pairCirclePeer:    (needs) => runOpFromScan({ app: 'household', id: 'pairCirclePeer' }, needs),
+    // a screen's connect code: Apparaten opens with the offer in 'connect a screen' (the code pick follows there)
+    screenPairing:     (needs) => { setScannedScreenOffer(needs.offer); setSettingsGroupId(settingsGroupForAction({ kind: 'connect-screen' })); setView('settingsGroup'); },
+    // a bot: asked first (its host or address named), nothing fetched before the yes; then the shared add (web twin)
+    addBot:            (needs) => {
+      const q = botAddConfirm(needs.input);
+      Alert.alert('', t(q.key, q.params), [
+        { text: t('circle.confirm.cancel'), style: 'cancel' },
+        { text: t('circle.contacts.add_sheet.add'), onPress: () => {
+          addBotToGraph({ input: needs.input, peerGraph: bundle?.peerGraph, coreAgent: bundle?.coreAgent, discover: bundle?.discoverA2A })
+            .catch(() => Alert.alert('', t('circle.contacts.add_failed')));
+        } },
+      ]);
+    },
   };
   const onScan = (res) => {
     setJoinScanOpen(false);
@@ -2656,7 +2672,7 @@ export default function CircleLauncherScreen({
   // My data, and a settings group's screen: ONE element with every section's handlers — a group passes `only`,
   // `groupTitle` and its own back (the gear's home), and paints just its declared sections.
   const myDataScreen = (extra = {}) => (
-    <CircleMyDataScreen selvesOn={selvesOn} showBotActions={botActionsShown} frequent={usageRows(actionFrequency.snapshot(), { names: { ...Object.fromEntries((circles ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t, labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; } })} onClearFrequent={() => { actionFrequency.clear(); setFrequencyTick((n) => n + 1); }} callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('settingsHome')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
+    <CircleMyDataScreen screenOffer={scannedScreenOffer} onScreenOfferTaken={() => setScannedScreenOffer(null)} selvesOn={selvesOn} showBotActions={botActionsShown} frequent={usageRows(actionFrequency.snapshot(), { names: { ...Object.fromEntries((circles ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t, labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; } })} onClearFrequent={() => { actionFrequency.clear(); setFrequencyTick((n) => n + 1); }} callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('settingsHome')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
           doors={{ points: () => setView('points') }}
           personClock={personClockRef.current} selfSet={{ held: heldSelves, on: selvesOn }} {...extra} />
   );
@@ -2739,7 +2755,7 @@ export default function CircleLauncherScreen({
           helpAvailable={circles.some((c) => c.id === HELP_CIRCLE_ID)}
           onOpen={(c) => { const target = contactOpenTarget(c); if (target.kind === 'circle') { const hc = circles.find((x) => x.id === target.circleId); if (hc) openCircle(hc); } else openContactThread(c); }}
           resolvePictureFor={(c) => circlePictureResolver(c?.pairCircleId)}
-          onAddPerson={() => onMeAction('scan')} onBlocked={() => setView('blocked')}
+          onRouted={onScan} onBlocked={() => setView('blocked')}
           keep={heldSelves.length > 1 ? (list) => contactsInSet(list, selvesOn, profileIdOfCircle) : null} />
       </WithTabBar>
     );

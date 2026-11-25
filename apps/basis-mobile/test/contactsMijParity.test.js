@@ -15,10 +15,11 @@ const view = read('CircleScreenView.js');
 const profile = read('CircleProfileScreen.js');
 
 describe('Contacts and Me on the phone', () => {
-  it('Persoon toevoegen opens the scanner (Me\'s Scan, one door)', () => {
-    expect(contacts).toMatch(/testID="contacts-add-person"/);
-    expect(contacts).toMatch(/t\('circle\.contacts\.add_person'\)/);
-    expect(launcher).toMatch(/onAddPerson=\{\(\) => onMeAction\('scan'\)\}/);
+  it('ONE add button: pasted or scanned, routed as the Contacts add field, handed to the host\'s painters', () => {
+    expect(contacts).not.toMatch(/contacts-add-person/);
+    expect(contacts).toMatch(/routeScan\(input, \{ for: 'contacts-add' \}\)/);
+    expect(contacts).toMatch(/forKind="contacts-add"/);
+    expect(launcher).toMatch(/onRouted=\{onScan\}/);
   });
   it('the row line is the shared one', () => {
     expect(contacts).toMatch(/contactRowMeta\(c, t\)/);

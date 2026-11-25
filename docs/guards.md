@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 87
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 88
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -98,6 +98,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `unstyled-buttons` | — | every web button wears the one button family (`.cc-btn` in web/v2/circle.css) or a |
 | `untrusted-json` | — | JSON that someone else wrote is parsed with `parseUntrustedJson` (@onderling/core) |
 | `web-buttons` | — | no bare <button> in the web shell |
+| `wire-shapes` | — | a peer message's declared shape does not change without its version, and its version does not |
 
 ## Named design guards (`G-*`, in fitness tests) · 31
 

@@ -74,6 +74,10 @@ export const SEAMS = Object.freeze([
   // says it in its log and on the bot's admin line and stops restarting.
   { id: 'start-over-door', pattern: /readStartOverMark\(/, shells: ['web', 'mobile'], why: 'a device whose key can never be read must have a way out that does not loop: start over from the phrase, finished even after a crash, never a clear without the phrase' },
   { id: 'stored-value-refusal-said', pattern: /onStoredValueRefused\(/, shells: ['web', 'mobile'], why: 'a change the person made that was not saved (the stored value could not be opened) must be said, not silently dropped' },
+  // DATA KEPT BUT NOT READABLE IS SAID: a store that could not read what it holds keeps it and refuses every save over it
+  // (local-store's register, `notReadableStores`); every shell says so through the one shared notice — the web and the
+  // phone on the launcher, the box in its log.
+  { id: 'unreadable-store-said', pattern: /storeNoticeView\(/, why: 'a store this build could not read keeps its data and saves nothing over it; unsaid, what the person changes meanwhile is lost without a word' },
   // A KEPT PICTURE STAYS UNTIL THE LIVE STATE IS CAUGHT UP (keptPicture.js): Today's kept day and the circles list's
   // kept picture are painted until the circles were read, and only a caught-up state is kept. The phone replaced its
   // kept day with an early empty read for ten seconds (2026-11-22) and wrote that read back as the next picture.

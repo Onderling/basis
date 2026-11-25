@@ -22,6 +22,8 @@
 /** The format version this build writes and reads. */
 export const MAP_SNAPSHOT_V = 1;
 
+import { reportNotReadable, clearNotReadable } from './notReadableStores.js';
+
 /**
  * Read stored text into a Map.
  * @param {string|null|undefined} raw  the stored text; null/undefined/'' = nothing stored
@@ -33,7 +35,11 @@ export function readMapSnapshot(raw) {
   let parsed;
   try { parsed = JSON.parse(raw); } catch { return { map: new Map(), notReadable: 'unparseable' }; }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { map: new Map(), notReadable: 'shape' };
-  if (!Object.prototype.hasOwnProperty.call(parsed, 'v')) {
+  // Stamped = it has BOTH `v` and `data`. A plain map that merely holds a key named `v` is today's format, not a
+  // stamp (store keys are paths, but a refusal for ever over one odd key is too high a price); a newer build that adds
+  // a top-level field next to `v` and `data` is still read as stamped, and so refused rather than saved over.
+  const own = (k) => Object.prototype.hasOwnProperty.call(parsed, k);
+  if (!(own('v') && own('data'))) {
     return { map: new Map(Object.entries(parsed)), notReadable: null };   // before the stamp: today's format
   }
   if (parsed.v !== MAP_SNAPSHOT_V) return { map: new Map(), notReadable: 'version' };
@@ -50,21 +56,28 @@ export function writeMapSnapshot(map) {
 /**
  * One adapter's gate: read through it at load, ask it for the text at every save.
  *
- * @param {string} name  the store's name for the one log line (a path or db name; never content)
- * @param {(msg: string) => void} [warn]
+ * @param {string} name  the store's name for the one log line (a path or db name; never content, never shown)
+ * @param {object} [opts]
+ * @param {string} [opts.kind='data']  what the store holds as a person names it (`STORE_KINDS`): the notice says it
+ * @param {(msg: string) => void} [opts.warn]
  */
-export function mapSnapshotGate(name, warn = (m) => console.warn(m)) {
+export function mapSnapshotGate(name, { kind = 'data', warn = (m) => console.warn(m) } = {}) {
   let notReadable = null;
   let said = false;
+  const settle = () => {
+    if (notReadable) reportNotReadable({ name, kind, reason: notReadable });
+    else clearNotReadable(name);
+  };
   return {
     /** The stored text (or null when nothing is stored) → the Map for the cache. */
     read(raw) {
       const r = readMapSnapshot(raw);
       notReadable = r.notReadable;
+      settle();
       return r.map;
     },
     /** A read that failed outright (the store was there but could not be read): refuse like unreadable bytes. */
-    readFailed() { notReadable = 'read-failed'; return new Map(); },
+    readFailed() { notReadable = 'read-failed'; settle(); return new Map(); },
     /** The text to store, or null: a save over a snapshot this build could not read is refused. */
     encode(map) {
       if (notReadable) {

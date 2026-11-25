@@ -37,7 +37,7 @@ import '../../src/web/shims/bufferPolyfill.js';
 // Dev: mirror the privacy-first structured log (@onderling/logger) to the browser console. Prod fills the
 // buffer only; a bug-report door reads it (pending — see the report kind's appender note). PII-safe.
 import { configureLog, consoleSink } from '@onderling/logger';
-import { flushPendingSaves } from '@onderling/local-store';
+import { flushPendingSaves, notReadableStores, onNotReadableChange } from '@onderling/local-store';
 if (import.meta.env?.DEV) configureLog({ sink: consoleSink });
 
 import { createPeek } from '../../src/v2/circlePeek.js';
@@ -261,6 +261,7 @@ import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLi
 import { installWebSignatureEquation } from '../../src/v2/signatureEquations.js';
 import { runStartQueue, startQueueSiblings } from '../../src/v2/startQueue.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
+import { storeNoticeView } from '../../src/v2/storeNotice.js';
 import { renderUpdateBar } from './updateBar.js';
 import { renderHostFrame } from './hostFrameBar.js';
 import { hostFrameOf } from '../../src/v2/hostFrame.js';
@@ -525,7 +526,7 @@ function getContactDmStore() {
     _contactDmStorePromise = (async () => {
       try {
         let dataSource;
-        try { dataSource = await buildHouseholdDataSource({ dbName: 'cc-contact-dm-state', storeName: 'items' }); }
+        try { dataSource = await buildHouseholdDataSource({ dbName: 'cc-contact-dm-state', storeName: 'items', kind: 'messages' }); }
         catch { dataSource = null; }
         // The shared wrapper (web ≡ mobile): one constructor for the durable DM home, both shells.
         return createContactDmStore({ dataSource, localActor: LOCAL_ACTOR });
@@ -3985,6 +3986,12 @@ let _bootFailure = null;   // the agent boot's error, if it died — painted on 
 // A save refused because the value it would replace could not be opened (L1115): said on the launcher, once heard.
 let _storedRefusal = false;
 let _storedRefusalSaid = false;   // said once a session: dismissed, it does not come back
+// DATA THIS DEVICE KEEPS BUT CANNOT READ: a store that could not read what it holds keeps it and refuses every save
+// over it; the launcher says so (the one shared notice), repainted whenever the register changes.
+onNotReadableChange(() => {
+  if (getActiveCircle() == null && _activeTab === 'circles') { try { paintLauncher(); } catch { /* painted at the next visit */ } }
+});
+
 onStoredValueRefused(() => {
   if (_storedRefusal || _storedRefusalSaid) return;
   _storedRefusal = true;
@@ -4043,6 +4050,7 @@ function paintLauncher() {
     mutedMap:  launcherMutedMap,
     bootFailure: _bootFailure,
     storedRefusal: _storedRefusal,
+    storeNotice: storeNoticeView(notReadableStores(), t),
     onDismissStoredRefusal: () => { _storedRefusal = false; _storedRefusalSaid = true; try { paintLauncher(); } catch { /* the next visit */ } },
     onRetryBoot:  () => window.location.reload(),
     onStartOver:  () => openStartOverPage(),

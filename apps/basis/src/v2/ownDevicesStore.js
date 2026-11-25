@@ -39,7 +39,7 @@ export function lazyOwnStore(persistDb) {
   return () => (made ??= (async () => {
     let dataSource = null;
     if (persistDb) {
-      try { dataSource = await buildHouseholdDataSource(persistDb, { strategy: shellContentSeal() }); } catch { dataSource = null; }
+      try { dataSource = await buildHouseholdDataSource({ ...persistDb, kind: 'data' }, { strategy: shellContentSeal() }); } catch { dataSource = null; }
     }
     return createOwnDevicesStore({ dataSource });
   })());

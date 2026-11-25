@@ -59,6 +59,8 @@ export function renderCircleLauncher(container, {
   // "try again" a start failure may offer (`bootFailureNotice`): a fresh start of the app.
   storedRefusal = false,
   onDismissStoredRefusal = null,
+  // Data on this device that a store could not read (kept, never saved over): `storeNoticeView`'s words, or null.
+  storeNotice = null,
   onRetryBoot = null,
   onStartOver = null,
   // The circles an admin removed this person from (`loadRemovedCircles`): tiles of their own, marked, read-only, until
@@ -126,6 +128,13 @@ export function renderCircleLauncher(container, {
       ok.addEventListener('click', () => onDismissStoredRefusal());
       container.appendChild(ok);
     }
+  }
+  if (storeNotice) {
+    const notice = document.createElement('div');
+    notice.className = 'circle-launcher__boot-failed circle-launcher__store-notice';
+    notice.setAttribute('role', 'alert');
+    notice.textContent = `${storeNotice.text} ${storeNotice.cost}`;
+    container.appendChild(notice);
   }
   if (!circles.length && !bootFailure) {
     const empty = document.createElement('div');

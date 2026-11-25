@@ -34,7 +34,7 @@
  * Project Files/basis/mobile-roadmap-2026-05-24.md.
  */
 
-import { trackPendingSave } from '@onderling/local-store';
+import { trackPendingSave, mapSnapshotGate } from '@onderling/local-store';
 
 const DEFAULT_PREFIX = 'pinboard-cache:';
 const KEY_SUFFIX     = '::state';
@@ -48,6 +48,7 @@ export class AsyncStoragePersist {
   #untrack = null;
   /** Most recent saved snapshot (for diffing / no-op skip). */
   #lastSerialised = null;
+  #gate = null;
 
   /**
    * @param {object} args
@@ -87,7 +88,8 @@ export class AsyncStoragePersist {
    * @returns {Promise<Map<string, any>>}
    */
   async load() {
-    try { return await this.loadStrict(); } catch { return new Map(); }   // corrupt blob or open failure → empty (silent recovery)
+    // not readable → empty for the cache above, and every save refused (the gate); a store move uses loadStrict
+    try { return await this.loadStrict(); } catch { return new Map(); }
   }
 
   /**
@@ -96,14 +98,17 @@ export class AsyncStoragePersist {
    * @returns {Promise<Map<string, any>>}
    */
   async loadStrict() {
-    const raw = await this.#storage.getItem(this.#key);
-    if (raw == null) return new Map();
-    if (typeof raw !== 'string') throw new Error('not a store snapshot');
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') throw new Error('not a store snapshot');
+    let raw;
+    try { raw = await this.#storage.getItem(this.#key); }
+    catch (err) { this.#gateOf().readFailed(); throw err; }
+    const map = this.#gateOf().read(raw);
+    if (this.#gateOf().notReadable) throw new Error(`not a store snapshot (${this.#gateOf().notReadable})`);
     this.#lastSerialised = raw;
-    return new Map(Object.entries(parsed));
+    return map;
   }
+
+  /** The snapshot's format and the refusal to save over one this build could not read (`mapSnapshotGate`). */
+  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#key)); }
 
   /**
    * Write a Map to AsyncStorage.  Single-key replace.
@@ -111,8 +116,8 @@ export class AsyncStoragePersist {
    * @param {Map<string, any>} map
    */
   async save(map) {
-    const obj        = Object.fromEntries(map);
-    const serialised = JSON.stringify(obj);
+    const serialised = this.#gateOf().encode(map);
+    if (serialised == null) return;   // not readable at load: nothing is saved over it
     if (serialised === this.#lastSerialised) return;    // no-op skip
     await this.#storage.setItem(this.#key, serialised);
     this.#lastSerialised = serialised;

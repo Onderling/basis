@@ -23,7 +23,7 @@
  * `Project Files/Substrates/substrate-candidates.md`.
  */
 
-import { trackPendingSave } from '@onderling/local-store';
+import { trackPendingSave, mapSnapshotGate } from '@onderling/local-store';
 
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -36,6 +36,7 @@ export class FilePersist {
   #untrack = null;
   /** Most recent saved-to-disk snapshot (for diffing / no-op skip). */
   #lastSerialised = null;
+  #gate = null;
 
   /**
    * @param {object} args
@@ -56,7 +57,8 @@ export class FilePersist {
    * @returns {Promise<Map<string, any>>}
    */
   async load() {
-    try { return await this.loadStrict(); } catch { return new Map(); }   // corrupt / unreadable → empty (silent recovery)
+    // not readable → empty for the cache above, and every save refused (the gate); a store move uses loadStrict
+    try { return await this.loadStrict(); } catch { return new Map(); }
   }
 
   /**
@@ -67,12 +69,15 @@ export class FilePersist {
   async loadStrict() {
     let raw;
     try { raw = await readFile(this.#path, 'utf-8'); }
-    catch (err) { if (err && err.code === 'ENOENT') return new Map(); throw err; }
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') throw new Error('FilePersist: not a store snapshot');
+    catch (err) { if (err?.code === 'ENOENT') return this.#gateOf().read(null); this.#gateOf().readFailed(); throw err; }
+    const map = this.#gateOf().read(raw);
+    if (this.#gateOf().notReadable) throw new Error(`not a store snapshot (${this.#gateOf().notReadable})`);
     this.#lastSerialised = raw;
-    return new Map(Object.entries(parsed));
+    return map;
   }
+
+  /** The snapshot's format and the refusal to save over one this build could not read (`mapSnapshotGate`). */
+  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#path)); }
 
   /**
    * Write a Map to disk atomically (write to `.tmp`, rename).
@@ -81,8 +86,8 @@ export class FilePersist {
    * @param {Map<string, any>} map
    */
   async save(map) {
-    const obj = Object.fromEntries(map);
-    const serialised = JSON.stringify(obj);
+    const serialised = this.#gateOf().encode(map);
+    if (serialised == null) return;   // not readable at load: nothing is saved over it
     if (serialised === this.#lastSerialised) return;       // no-op skip
     await mkdir(dirname(this.#path), { recursive: true });
     const tmp = `${this.#path}.tmp`;

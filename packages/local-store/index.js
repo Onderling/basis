@@ -22,6 +22,8 @@
  */
 
 export { CachingDataSource } from './src/CachingDataSource.js';
+// The one format a persist adapter stores a Map in, and the gate that never saves over a snapshot it could not read.
+export { mapSnapshotGate, readMapSnapshot, writeMapSnapshot, MAP_SNAPSHOT_V } from './src/mapSnapshot.js';
 // The saves waiting on a debounce, made all at once when the page or the app goes away.
 export { trackPendingSave, flushPendingSaves, pendingSaveCount } from './src/pendingSaves.js';
 

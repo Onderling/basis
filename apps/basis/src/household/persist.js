@@ -22,7 +22,7 @@
  * tasks-v0's `storage/persist/*` so behaviour is identical.
  */
 
-import { CachingDataSource, sealedPersist, trackPendingSave } from '@onderling/local-store';
+import { CachingDataSource, sealedPersist, trackPendingSave, mapSnapshotGate } from '@onderling/local-store';
 
 /**
  * Build a persistent household DataSource from a `persistDb` descriptor.
@@ -152,6 +152,7 @@ class FilePersist {
   #pendingTimer = null;
   #untrack = null;
   #lastSerialised = null;
+  #gate = null;
 
   constructor({ path, saveDelayMs = 200 } = {}) {
     if (typeof path !== 'string' || !path) throw new TypeError('FilePersist: path required');
@@ -160,22 +161,22 @@ class FilePersist {
   }
 
   async load() {
-    const { readFile } = await import('node:fs/promises');
-    try {
-      const raw    = await readFile(this.#path, 'utf-8');
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return new Map();
-      this.#lastSerialised = raw;
-      return new Map(Object.entries(parsed));
-    } catch {
-      return new Map();
-    }
+    let raw;
+    try { raw = await (await import('node:fs/promises')).readFile(this.#path, 'utf-8'); }
+    catch (err) { return err?.code === 'ENOENT' ? this.#gateOf().read(null) : this.#gateOf().readFailed(); }
+    const map = this.#gateOf().read(raw);   // not readable → empty here, and every save refused
+    if (!this.#gateOf().notReadable) this.#lastSerialised = raw;
+    return map;
   }
+
+  /** The snapshot's format and the refusal to save over one this build could not read (`mapSnapshotGate`). */
+  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#path)); }
 
   async save(map) {
     const { writeFile, mkdir, rename } = await import('node:fs/promises');
     const { dirname } = await import('node:path');
-    const serialised = JSON.stringify(Object.fromEntries(map));
+    const serialised = this.#gateOf().encode(map);
+    if (serialised == null) return;   // not readable at load: nothing is saved over it
     if (serialised === this.#lastSerialised) return;
     await mkdir(dirname(this.#path), { recursive: true });
     const tmp = `${this.#path}.tmp`;
@@ -222,6 +223,7 @@ class IndexedDBPersist {
   #pendingTimer = null;
   #untrack = null;
   #lastSerialised = null;
+  #gate = null;
   static #SNAPSHOT_KEY = 'state';
 
   constructor({ dbName, storeName = 'snapshots', saveDelayMs = 200 } = {}) {
@@ -237,20 +239,19 @@ class IndexedDBPersist {
   }
 
   async load() {
-    try {
-      const raw = await this.#get(IndexedDBPersist.#SNAPSHOT_KEY);
-      if (typeof raw !== 'string') return new Map();
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return new Map();
-      this.#lastSerialised = raw;
-      return new Map(Object.entries(parsed));
-    } catch {
-      return new Map();
-    }
+    let raw;
+    try { raw = await this.#get(IndexedDBPersist.#SNAPSHOT_KEY); } catch { return this.#gateOf().readFailed(); }
+    const map = this.#gateOf().read(raw);   // not readable → empty here, and every save refused
+    if (!this.#gateOf().notReadable) this.#lastSerialised = raw;
+    return map;
   }
 
+  /** The snapshot's format and the refusal to save over one this build could not read (`mapSnapshotGate`). */
+  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#dbName)); }
+
   async save(map) {
-    const serialised = JSON.stringify(Object.fromEntries(map));
+    const serialised = this.#gateOf().encode(map);
+    if (serialised == null) return;   // not readable at load: nothing is saved over it
     if (serialised === this.#lastSerialised) return;
     await this.#put(IndexedDBPersist.#SNAPSHOT_KEY, serialised);
     this.#lastSerialised = serialised;
@@ -334,6 +335,7 @@ class AsyncStoragePersist {
   #pendingTimer = null;
   #untrack = null;
   #lastSerialised = null;
+  #gate = null;
 
   constructor({ dbName, prefix = 'household-cache:', saveDelayMs = 200, asyncStorage } = {}) {
     if (typeof dbName !== 'string' || !dbName) {
@@ -355,20 +357,19 @@ class AsyncStoragePersist {
   }
 
   async load() {
-    try {
-      const raw = await this.#storage.getItem(this.#key);
-      if (typeof raw !== 'string') return new Map();
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return new Map();
-      this.#lastSerialised = raw;
-      return new Map(Object.entries(parsed));
-    } catch {
-      return new Map();
-    }
+    let raw;
+    try { raw = await this.#storage.getItem(this.#key); } catch { return this.#gateOf().readFailed(); }
+    const map = this.#gateOf().read(raw);   // not readable → empty here, and every save refused
+    if (!this.#gateOf().notReadable) this.#lastSerialised = raw;
+    return map;
   }
 
+  /** The snapshot's format and the refusal to save over one this build could not read (`mapSnapshotGate`). */
+  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#key)); }
+
   async save(map) {
-    const serialised = JSON.stringify(Object.fromEntries(map));
+    const serialised = this.#gateOf().encode(map);
+    if (serialised == null) return;   // not readable at load: nothing is saved over it
     if (serialised === this.#lastSerialised) return;
     await this.#storage.setItem(this.#key, serialised);
     this.#lastSerialised = serialised;

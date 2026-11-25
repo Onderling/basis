@@ -101,7 +101,7 @@ describe('AsyncStoragePersist — debounce', () => {
 
     // Only the LAST scheduled value was persisted.
     const raw = await storage.getItem('pinboard-cache:d::state');
-    expect(JSON.parse(raw)).toEqual({ a: 3 });
+    expect(JSON.parse(raw)).toEqual({ v: 1, data: { a: 3 } });   // stamped with its format
   });
 
   it('flush writes pending state immediately + cancels the timer', async () => {
@@ -113,7 +113,7 @@ describe('AsyncStoragePersist — debounce', () => {
     persist.scheduleSave(new Map([['x', 'pending']]));
     await persist.flush(new Map([['x', 'flushed']]));
     const raw = await storage.getItem('pinboard-cache:d::state');
-    expect(JSON.parse(raw)).toEqual({ x: 'flushed' });
+    expect(JSON.parse(raw)).toEqual({ v: 1, data: { x: 'flushed' } });
   });
 
   it('cancel drops a pending save without writing', async () => {

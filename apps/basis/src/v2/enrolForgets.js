@@ -21,7 +21,11 @@
  * shell decides WHAT is forgotten, only HOW its storage is reached.
  */
 import { renamedFrom } from '@onderling-app/pinboard/lib/moveRenamedStore';
-import { circleStorageName } from './localStoreSeal.js';   // the circle storage names, one rule with the stores themselves
+import { circleStorageName } from './localStoreSeal.js';
+import { storageNames } from './storageRegister.js';   // every name and what an enrolled device does with it
+
+/** The register's names a freshly enrolled device forgets, of one kind. */
+const throwaway = (kind) => storageNames((r) => r.forget === 'throwaway' && r.kind === kind);   // the circle storage names, one rule with the stores themselves
 
 /**
  * The stores and keys a former self wrote, and the ones that are this device's own.
@@ -34,112 +38,19 @@ export const THROWAWAY_CONTENT = Object.freeze({
    * Whole namespaces: an IndexedDB database on web, an AsyncStorage scope on mobile, a file or directory on the
    * box. Per-circle stores are added at run time from the registry — see `perCircleStores`.
    */
-  stores: Object.freeze([
-    'cc-agent-registry',        // which circles this device is in, which devices the person has
-    'cc-device-log',            // the record every lane rides
-    'cc-contact-dm-state',      // 1:1 threads
-    'cc-own-devices',           // the person's own items: their appointments of no circle, their planned rows
-    'cc-outbox-state',          // web's outbox
-    'cc-outbox-cache',          // mobile's
-    // what the former self had already taken (the inbound repeat record), kept BESIDE each outbox under a derived
-    // name (`besidePersistDb`) — named here because the classification guard reads only literal names
-    'cc-outbox-state-seen-inbound',
-    'cc-outbox-cache-seen-inbound',
-    'cc-push-device',           // push subscriptions (the former self's wake tokens), on every shell
-    // Settings, the pinboard and the household — each shell names its own, and the two sets are NOT the same
-    // words. `lint-content-classification` found the web half missing from this list on its first run, which
-    // is the entire reason it exists: the table was assembled by hand and reviewed by hand, and three of the
-    // person's stores were still unsaid.
-    'cc-settings-state',        // web
-    'cc-settings-cache',        // mobile
-    'cc-pinboard-state',
-    'cc-pinboard-cache',
-    'cc-household-state',
-    'cc-household-cache',
-    'cc-tasks-cache',
-    'cc-circle-lists-state',
-    'cc-circle-rag',            // embeddings of the former self's items
-    // The help circle's own stores, named explicitly. `HELP_CIRCLE_ID` is the literal `cc-help`, so the
-    // throwaway self and the enrolled person do not merely both HAVE a help circle — they share its store NAME,
-    // and it is the one database where two identities' sealed rows sit together. A throwaway self that never
-    // provisioned it is also not in the registry, so the registry-driven route below would skip exactly this one.
-    'cc-circle-cc-help',
-    'cc-circle-cache-cc-help',
-  ]),
+  stores: Object.freeze(throwaway('store')),
 
   /** Flat keys — `localStorage` on web, `AsyncStorage` on mobile. Statements about, or marks on, people. */
-  keys: Object.freeze([
-    // The help circle's two flags go TOGETHER. `helpCircleProvisioned` says the circle exists; `onboardingDone`
-    // gates the bot's guided conversation inside it. Clear one and keep the other and the enrolled person gets a
-    // fresh Uitleg circle that never says anything, for ever.
-    'cc.helpCircleProvisioned',
-    'cc.onboardingDone',
-    // Set for the THROWAWAY chat identity's phrase. The enrolled person typed the owner phrase, which is a
-    // different phrase — so a kept flag is a safety record making a false claim, and a redundant prompt is the
-    // cheaper mistake.
-    'cc.mnemonicAck',
-    'cc.keyCardSnoozedUntil',  // a "Later" on the key card belongs to the former key too
-    'cc.contactNames',          // who the former self saw renamed
-    'cc.contactSeenAt',
-    'cc.circleSeenAt',          // when the former self last read a thread: kept, every thread opens already-read
-    'cc.circlePinned',
-    'cc.activeCircle',
-    'cc.circleViewMode',
-    'cc.connectionPoints',
-    'cc.delivery',
-    'cc.availability',
-    'cc.agentRequests',
-    'cc.agentRequestQueue',
-    'cc.reciprocityQueue',
-    'cc.sharedWithMe',
-    'cc.userScreens',
-    'cc.actionFrequency',       // which ops the former self used
-    'cc.firstBootSeeded.v1',
-    'basis.nearbyAllows',       // who this device was told to allow — the former self's consent…
-    'basis.nearbyMineSeen',
-    'cc.nearbyAllows',
-    'cc.nearbyMineSeen',
-  ]),
+  keys: Object.freeze(throwaway('key')),
 
   /** Key families, cleared by prefix. The suffix is a circle id, a persona, or a screen — all the former self's. */
-  keyPrefixes: Object.freeze([
-    'cc.sharedDisclosure.',     // what was last shared with a circle. Keyed `<persona>::<circle>` with no
-                                // identity in it, so on `cc-help` — whose id is a constant — the two selves
-                                // collide exactly and a stale memo answers "unchanged" to a real first disclosure.
-    'cc.circlePolicy.',
-    'cc.circlePolicyHead.',     // the version + statement of the circle's policy lane this device applied
-    'cc.circleRules.',
-    'cc.circleRulesPending.',
-    'cc.circleRecipe.',
-    'cc.circleRecipePending.',
-    'cc.screenBlocksCache.',
-    'basis.keptCircles',           // the kept picture of the circles list (keptPicture.js): what the last start showed
-    'cc.circleOverride.',
-    'basis.nearby-asked:',      // the Nearby first-use question, asked per self on this device — the former selves'
-    'cc.nearby-asked:',
-  ]),
+  keyPrefixes: Object.freeze(throwaway('prefix')),
 
   /**
    * This device's own, or the ceremony's. Named out loud so the totality check has something to check against,
    * and so a reader can see the survivors rather than infer them from an absence.
    */
-  keep: Object.freeze([
-    'onderling.enrollOffer',    // the offer stash — the next start joins the circles it names. The box keeps it
-                                // explicitly; a device that forgets it comes back enrolled and in no circle.
-    // The vault, which the ceremony JUST wrote. It lives in its own store (the `cc-owner-root:` / `cc-chat-id:` /
-    // `cc-host-id:` / `cc-circle-pod:` prefixes on mobile), so a key sweep cannot reach it by accident — but an
-    // unsaid survivor is the failure mode this list exists to prevent, so it is said.
-    'vault:owner-root',
-    'vault:content-at-rest-key',
-    'vault:device-delegation-seed',
-    'vault:custody-mode',
-    // How this browser or phone is set up. No person in them.
-    'cc.relayUrl',
-    'cc.userLlmDefault',
-    'basis.theme',
-    'circle.app.lang',
-    'cc.welcomed',              // the welcome screen is about the app, not about who is using it
-  ]),
+  keep: Object.freeze(storageNames((r) => r.forget === 'keep')),
 
   /** The per-circle stores for one circle id. Resolved from the registry before the registry is dropped. */
   perCircleStores: (circleId) => [circleStorageName.store(circleId), circleStorageName.cache(circleId)],

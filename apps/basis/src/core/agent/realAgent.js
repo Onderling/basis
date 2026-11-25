@@ -54,6 +54,7 @@ import { settingsSealStrategyForIdentity, sealStrategyForRecipients } from '../.
 import { contentSealStrategy } from '../../v2/contentAtRest.js';   // the device's content-at-rest key — a person's own words on their own disk
 import { KeyUnreadable } from './keyUnreadable.js';   // a key that is there but will not read: the boot stops, nothing is minted (L1115)
 import { createSealingBackend } from '@onderling/pseudo-pod';            // the seal above a blind local store
+import { reportNotReadable } from '@onderling/local-store';   // the one register the not-readable notice reads
 import { setShellContentSeal } from '../../v2/localStoreSeal.js';        // hand the content key to the shell's own stores
 import { wireEventLogPersistence } from '../../v2/eventLogPersistence.js';   // the device log hydrates HERE, where the key is
 import {
@@ -637,7 +638,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // a shell now hands over the storage and this decides when to read it.
   if (opts.deviceLog && opts.deviceLogIo) {
     try {
-      const { hydrated } = await wireEventLogPersistence({ eventLog: opts.deviceLog, io: opts.deviceLogIo });
+      const { hydrated } = await wireEventLogPersistence({ eventLog: opts.deviceLog, io: opts.deviceLogIo, onNotReadable: reportNotReadable });
       if (hydrated && typeof console !== 'undefined') console.info(`[device-log] hydrated ${hydrated} persisted entries`);
     } catch (err) {
       if (typeof console !== 'undefined') console.warn('[device-log] persistence wiring failed — in-memory this session:', err?.message ?? err);
@@ -858,6 +859,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The outbox (held messages + the dead-address verdict) on a DEVICE-LOCAL store, so neither resets
     // on every launch. Same builder as the settings store; never the pod — a held message is this
     // device's promise to try again, not the person's data.
+    // a stored outbox / inbound record this build cannot read: kept, nothing saved over it, said through the one notice
+    onStoreNotReadable: reportNotReadable,
     holdStore:    opts.outboxPersistDb ? await buildHouseholdDataSource({ ...opts.outboxPersistDb, kind: 'messages' }, { strategy: contentSeal }) : undefined,
     holdStoreUri: 'mem://basis/outbox.json',
     // What this device has already TAKEN (a repeat lands once, also after a restart): beside the outbox on the same

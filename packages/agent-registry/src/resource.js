@@ -90,9 +90,25 @@ export function normaliseResource(raw) {
   });
 }
 
+/** The agent fields this build reads; anything else on a stored agent is a newer build's, carried as found. */
+const KNOWN_AGENT_FIELDS = new Set(['agentId', 'pubKey', 'webid', 'agentUri', 'role', 'name', 'deviceId', 'capabilities',
+  'grants', 'signedAt', 'revokedAt', 'properties', 'ownerFingerprint', 'disclosure', 'exposure', 'kind']);
+
+/**
+ * A WRITE NEVER NARROWS A NEWER BUILD'S AGENT. The fields this build knows are checked (the allowlist below); the
+ * ones it does not know are carried along exactly as they were, under them, so the next write keeps them. A known
+ * field is never taken from the carried part (a stray `kind` stays out).
+ */
+function _carried(a) {
+  const out = {};
+  for (const [k, v] of Object.entries(a)) if (!KNOWN_AGENT_FIELDS.has(k)) out[k] = v;
+  return out;
+}
+
 function _normaliseAgent(a) {
   if (!a || typeof a !== 'object') return Object.freeze({ ...emptyAgent() });
   return Object.freeze({
+    ..._carried(a),
     agentId:      typeof a.agentId === 'string' ? a.agentId : '',
     pubKey:       typeof a.pubKey  === 'string' ? a.pubKey  : '',
     webid:        typeof a.webid   === 'string' ? a.webid   : null,

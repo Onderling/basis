@@ -72,7 +72,7 @@ export default function PairedDevices({ selfAddr = '', peers: initialPeers = [],
       </Pressable>
       {paired ? <Text style={styles.paired}>{tr('circle.pairedDevices.paired')}</Text> : null}
 
-      <QrScannerModal visible={scanOpen} onClose={() => setScanOpen(false)} onResult={onScanResult} t={tr} />
+      <QrScannerModal visible={scanOpen} onClose={() => setScanOpen(false)} onResult={onScanResult} t={tr} forKind="pair" />
 
       <View style={styles.addRow}>
         <ThemedTextInput

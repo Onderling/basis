@@ -238,7 +238,7 @@ import { enableWebPush, disableWebPush, getWebPushState } from '../../src/web/we
 // Objective D / Surface 4 — generic docked side-panel renderer for manifest ops
 // that declare `surfaces.page` (first LIVE consumer: the my-data relay-URL editor).
 import { openPagePanel } from '../../src/web/pagePanel.js';
-import { routeScan, scanOpResultWords } from '../../src/v2/scanRoute.js';   // Me → Scan / `/scan-qr`: the route table of declared targets
+import { routeScan, scanOpResultWords, scanSayKey } from '../../src/v2/scanRoute.js';   // Me → Scan / `/scan-qr`: the route table of declared targets
 import { opFormOrRun } from '../../src/forms/opFormOrRun.js';   // a declared op with part of its args known: the form, or it runs
 import { makePickerFetcher, ceremonyChoices } from '../../src/forms/pickerChoices.js';
 import { renderForm } from '../../src/web/domForm.js';
@@ -5417,8 +5417,10 @@ async function showMyData(opts) {
   const group = typeof opts?.group === 'string' ? settingsGroupFor(basisManifest, opts.group) : null;
   // every section lives in a group now: without one there is nothing to show but the groups themselves
   if (!group) { showSettingsHome(); return; }
-  // a ceremony or wizard that closes comes back to the screen it was opened from
-  const again = () => showMyData(opts);
+  // a ceremony or wizard that closes comes back to the screen it was opened from (a scanned offer is taken once)
+  const again = () => showMyData({ ...opts, screenOffer: null });
+  let screenOffer = opts?.screenOffer ?? null;
+  const takeScreenOffer = () => { const o = screenOffer; screenOffer = null; return o; };
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
   // the selves this device holds now (a persona made since the last refresh): the pairing form asks which one a screen is for
   try { await refreshSelfSet(); } catch { /* the set as held stands */ }
@@ -5520,7 +5522,7 @@ async function showMyData(opts) {
     names: { ...Object.fromEntries((circlesCache ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t,
     labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; },
   });
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showSettingsHome,
+  const rerender = () => renderCircleMyData(rootEl, { screenOffer: takeScreenOffer(), dataLocation, podStatus, privacy, metrics, t, onBack: showSettingsHome,
     only: group.sections.map((sec) => sec.id), groupTitle: t(group.labelKey),
     frequent: frequentRows(), onClearFrequent: () => { actionFrequency.clear(); rerender(); },
     // the person's own record (ownActions.js): its switch (the registered param, set through the waist), how much is
@@ -5822,6 +5824,8 @@ const SCAN_PAINTERS = {
     showContacts();
   },
   joinGroup:         (needs, text) => showJoinCircle(String(text).trim()),   // the whole text: the app's own link carries its relay
+  // a screen's connect code: Apparaten opens with the offer in 'connect a screen' (the pick of its code follows there)
+  screenPairing:     (needs) => showMyData({ group: settingsGroupForAction({ kind: 'connect-screen' }), screenOffer: needs.offer }),
   'enroll-device':   (needs) => showEnrollDeviceFlow({ needs }),
   'claim-companion': (needs) => showClaimCompanionFlow({ needs }),
   // the code names the address; the circle is the person's pick (none asked with one circle)
@@ -5852,6 +5856,9 @@ async function runOpFromScan(target, needs) {
 /** What `scanQr` hands over on web (the paste prompt): through the route table to its declared target's painter. */
 async function takeScannedText(text) {
   const r = routeScan(text);
+  // a code that opens nothing (unreadable, or made for the bot's chat) is said in its own words
+  const say = scanSayKey(r);
+  if (say) { globalThis.alert?.(t(say)); return; }
   const paint = r.target ? SCAN_PAINTERS[r.target.id] : undefined;
   if (paint === undefined) { globalThis.alert?.(t('scan_qr.scan_unknown')); return; }
   await paint(r.needs, text, r.target);

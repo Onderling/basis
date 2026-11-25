@@ -85,6 +85,8 @@ export function renderCircleMyData(container, {
   // re-reads the list after a grant. Absent ⇒ no pairing form.
   connectionChoices = null,
   screenPairing = null,
+  // a screen's connect code scanned on Me: put in 'connect a screen' once, read as if typed (the code pick follows)
+  screenOffer = null,
   onPaired = null,
   notifications,
   onToggleNotifications,
@@ -1057,6 +1059,8 @@ export function renderCircleMyData(container, {
           if (typeof onPaired === 'function') onPaired();
         });
         container.appendChild(sec);
+        // a connect code scanned on Me: in the field, read as if typed (the person still picks the code the screen shows)
+        if (typeof screenOffer === 'string' && screenOffer) { input.value = screenOffer; input.dispatchEvent(new Event('input')); }
       }
     },
     // ── Apparaten: the device acts, each a button of its own (gated on its callback: the section only appears where the

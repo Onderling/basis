@@ -110,8 +110,7 @@ import MultiFieldFormBubble from '../rn/MultiFieldFormBubble.js';
 import { QrCodeView }     from '@onderling/react-native/qr/view';
 import QrScannerModal     from '../rn/QrScannerModal.js';
 // L125 — a scanned contact card asks first what the contact will see of you (web parity)
-import { classifyQrPayload } from '@onderling/react-native/qr';
-import { getBasisClassifiers } from '../core/qrClassifiers.js';
+import { routeScan, scanSayKey } from '../../../basis/src/v2/scanRoute.js';   // the one scan router (lint-scan-schemes)
 // Extension install (feedback-extension mobile parity) — consent sheet + controller.
 import ExtensionConsentSheet from './v2/ExtensionConsentSheet.js';
 import { useExtensionInstall } from '../core/extensionInstallRN.js';
@@ -1549,9 +1548,12 @@ export default function ChatScreen({
     const url = pendingLinkRef.current;
     if (!url) return;
     pendingLinkRef.current = null;
-    const res = classifyQrPayload(url, getBasisClassifiers());
-    console.info(`[link] drained → kind=${res?.kind ?? 'none'}`);
-    onQrScanResult(res);
+    // through the one router: a link that opens nothing here (made for the bot's chat) is said, never dropped
+    const r = routeScan(url);
+    console.info(`[link] drained → kind=${r?.kind ?? 'none'}`);
+    const say = r.kind !== 'unknown' ? scanSayKey(r) : null;
+    if (say) { sayToPerson(t(say)); return; }
+    onQrScanResult({ kind: r.kind, payload: r.payload });
   }
 
   // What a link says to the person, from this HIDDEN shell (App.js mounts it out of sight for its peer wiring): a native

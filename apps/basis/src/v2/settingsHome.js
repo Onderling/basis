@@ -58,5 +58,6 @@ export function settingsSectionIds(manifest) {
  * @returns {string|null}
  */
 export function settingsGroupForAction(action) {
-  return action?.kind === 'open-my-data' || action?.kind === 'open-mydata' ? 'devices' : null;
+  // a screen's connect code, scanned on Me (`scanRoute.js` → screenPairing): Apparaten, where a screen is connected
+  return action?.kind === 'open-my-data' || action?.kind === 'open-mydata' || action?.kind === 'connect-screen' ? 'devices' : null;
 }

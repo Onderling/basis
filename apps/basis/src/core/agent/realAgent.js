@@ -6006,9 +6006,10 @@ export async function createRealHouseholdAgent(opts = {}) {
    * enrolment, device retirement, recovery, surface grants) are 'private': SELF only, never granted — a
    * household bot's admin at 'trusted' reaches none of them. hostAgent is IN-PROCESS ONLY (InternalTransport;
    * no external peer can reach it), so the sole caller is the chat agent — the owner — named SELF below.
-   * Reads stay 'authenticated'. Revocation feeds from the issuer-side agentsTokenRegistry. Best-effort:
-   * a failure leaves the gate absent (prior behaviour) — never breaks boot. */
-  try {
+   * Reads stay 'authenticated'. Revocation feeds from the issuer-side agentsTokenRegistry. NO GATE, NO HOST: a
+   * failure here (its sealed trust vault will not read, a tier will not write) stops the boot like the other sealed
+   * vaults do. It used to be caught and warned, which left the gate absent, and the 'private' ops are what it guards. */
+  {
     // Vault-backed TrustRegistry: unknown peers → 'authenticated'; the owner's chat identity → 'private' (self).
     hostTrustRegistry = new TrustRegistry(await sealedVault(opts.hostTrustVault ?? pickVault(storageName('vaultHostTrust'))));   // sealed: trust levels are metadata about people
     hostAgent.policyEngine = new PolicyEngine({
@@ -6035,7 +6036,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     await hostTrustRegistry.setTier(hostId.pubKey, 'private');
     // The in-process chat caller is the owner's device — it is self, so it clears the 'private' host ops.
     await hostTrustRegistry.setTier(chatId.pubKey, 'private');
-  } catch (e) { console.warn('[realAgent] hostAgent PolicyEngine attach skipped:', e?.message ?? e); }
+  }
 
   await Promise.all([
     hostAgent.start(),

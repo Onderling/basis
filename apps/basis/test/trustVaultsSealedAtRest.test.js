@@ -28,4 +28,20 @@ describe('the trust-level vaults are sealed at rest', () => {
       expect(await peerTrustVault.get(VAULT_ENC_SENTINEL_KEY)).not.toBeNull();
     } finally { await a.stop?.(); }
   });
+
+  it('no gate, no host: a host trust vault that will not read stops the boot instead of leaving the gate off', async () => {
+    const broken = new VaultMemory();
+    const fail = () => { throw new Error('storage unreadable'); };
+    broken.get = fail; broken.set = fail; broken.has = fail; broken.list = fail;
+    let booted = null;
+    let err = null;
+    try {
+      booted = await createRealHouseholdAgent({ ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), hostTrustVault: broken, peerTrustVault: new VaultMemory() });
+    } catch (e) { err = e; }
+    try {
+      expect(booted?.hostAgent?.policyEngine ?? null, 'never a host without its gate').toBeNull();
+      // the vault's own unreadable key stops the boot, not a later check that happens to need the gate
+      expect(err?.message ?? '', 'the boot fails on the unreadable trust vault').toMatch(/vault-sentinel/);
+    } finally { await booted?.stop?.(); }
+  });
 });

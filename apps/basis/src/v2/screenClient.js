@@ -11,6 +11,7 @@
  * person pastes `paste` into their own chat with the bot → `waitForGrant`), and from then on resumes from what this
  * browser kept.
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { createScreenView, screenAddressFor } from './screenView.js';
 import { parseScreenStartLink } from './botScreens.js';
 import { isKeyUnreadable } from '../core/agent/keyUnreadable.js';
@@ -103,7 +104,7 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
     }
   } catch { /* an address that cannot be rewritten keeps its fragment; the ticket is one use either way */ }
   const keyPrefix = `onderling.screen.${name}.`;
-  const vaultPrefix = `onderling-screen:${name}:`;
+  const vaultPrefix = `${storageName('screenGrant')}${name}:`;
   const store = prefixed(storage, keyPrefix);
   // THE BOT, FROM THE KEPT GRANT (L1179): the link's fragment is cleared at once (its ticket is one use), so a reload, a
   // bookmark or a browser restart opens the page without it. The grant a pairing kept is stored under the bot's ADDRESS
@@ -136,7 +137,7 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
     current = s;
     for (const fn of listeners) { try { fn(s); } catch { /* a listener's fault is its own */ } }
   };
-  const kept = () => (start.ok ? store.getItem(`onderling.screen.${start.botAddress}`) : null);
+  const kept = () => (start.ok ? store.getItem(`${storageName('screenClient')}${start.botAddress}`) : null);
   // the view for what this browser has: a kept grant resumes, else the start link pairs
   const viewFor = (wanted) => {
     if (view && mode === wanted) return view;
@@ -260,7 +261,7 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
         const keys = [];
         for (let i = 0; i < (storage?.length ?? 0); i += 1) { const k = storage.key(i); if (k && (k.startsWith(keyPrefix) || k.startsWith(vaultPrefix))) keys.push(k); }
         for (const k of keys) storage.removeItem(k);
-      } catch { /* a storage that cannot list: the grant key at least */ try { store.removeItem(`onderling.screen.${start.botAddress}`); } catch { /* nothing kept */ } }
+      } catch { /* a storage that cannot list: the grant key at least */ try { store.removeItem(`${storageName('screenClient')}${start.botAddress}`); } catch { /* nothing kept */ } }
       setState('not-paired');
       return { ok: true };
     },

@@ -19,12 +19,13 @@
  * users; no migration).
  */
 
+import { storageName } from '../../../basis/src/v2/storageRegister.js';   // every storage name from the one register
 import { createObjectVersionsAdapter } from '@onderling/kring-host/objectVersionsStorage';
 import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
 import { sealedLocalBackend } from '../../../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 
 /** AsyncStorage scope for circle version history (disjoint from `pp:`). */
-export const VERSIONS_AS_SCOPE = 'ccv';
+export const VERSIONS_AS_SCOPE = storageName('objectVersionsPhone');
 
 /**
  * Compose the shared adapter factory with an AsyncStorage StorageBackend.

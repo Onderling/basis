@@ -14,7 +14,7 @@ import { storageName } from '../../../basis/src/v2/storageRegister.js';   // eve
  * without any RN runtime.
  */
 
-const CHAT_IDENTITY_KEY = 'cc-chat-id:agent-privkey';
+const CHAT_IDENTITY_KEY = `${storageName('vaultChatId')}agent-privkey`;   // the chat identity's own key in its vault
 const WELCOMED_KEY      = storageName('welcomed');
 
 /**

@@ -49,6 +49,8 @@ export const STORAGE = Object.freeze({
   tasksWeb:               row('cc-tasks-state', 'store', [W], 'throwaway'),
   circleLists:            row('cc-circle-lists-state', 'store', [M], 'throwaway'),
   circleRag:              row('cc-circle-rag', 'store', [W, M], 'throwaway'),
+  // the phone's object-version snapshots (a circle's policy, rules and recipe as they were): the throwaway self's too
+  objectVersionsPhone:    row('ccv', 'store', [M], 'throwaway'),
   // The help circle's own stores, named explicitly. Its id is the literal `cc-help`, so the throwaway self and the
   // enrolled person share its store NAME: the one database where two identities' sealed rows sit together. A
   // throwaway self that never provisioned it is not in the registry either, so the per-circle route would skip it.

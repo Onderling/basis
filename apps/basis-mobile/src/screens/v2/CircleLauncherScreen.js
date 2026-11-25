@@ -4542,7 +4542,7 @@ function CircleDetail({
   useEffect(() => {
     let alive = true;
     if (!circle?.id) { setCircleLlmPolicy(CIRCLE_LLM_POLICY); setCircleApps([]); return undefined; }
-    AsyncStorage.getItem(`cc.circlePolicy.${circle.id}`)
+    AsyncStorage.getItem(`${storageName('circlePolicy')}${circle.id}`)
       .then((s) => {
         if (!alive) return;
         let raw = null;

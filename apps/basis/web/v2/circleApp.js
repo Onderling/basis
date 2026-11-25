@@ -4319,7 +4319,7 @@ function showNearby() {
   let wizard = null;      // the first-time wizard while it is open: `{step, notice}` (`nearbyWizardPress` moves it)
   // which self the level is for: null while the room still asks who enters
   const roomSelfId = () => { const s = nearbyRoomSelfNow().self; return s?.asking ? null : (s?.id ?? null); };
-  const markAsked = (id) => { try { localStorage.setItem(`basis.${nearbyAskedKey(id)}`, '1'); } catch { /* best-effort */ } };
+  const markAsked = (id) => { try { localStorage.setItem(`${storageName('nearbyAskedWeb')}${id}`, '1'); } catch { /* best-effort */ } };
   const changeLevel = async (v) => {
     const id = roomSelfId();
     const w = await _nearbyIdentity?.setLevel?.(v);
@@ -4357,7 +4357,7 @@ function showNearby() {
     nearbyScreen?.levelChanged();
     const id = roomSelfId();
     let asked = true;
-    try { asked = id ? !!localStorage.getItem(`basis.${nearbyAskedKey(id)}`) : true; } catch { asked = true; }
+    try { asked = id ? !!localStorage.getItem(`${storageName('nearbyAskedWeb')}${id}`) : true; } catch { asked = true; }
     const fu = nearbyFirstUse({ self: id ? { id } : { asking: true }, asked, levelSet: st.set });
     if (fu.mark) markAsked(id);
     if (fu.ask && !wizard) wizard = { step: 1 };   // an open wizard stays open (a self picked in step 1 re-reads the level)

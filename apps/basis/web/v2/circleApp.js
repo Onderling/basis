@@ -18,6 +18,7 @@
 
 // Buffer polyfill (with base64url) — on-device signing runs in this browser bundle;
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
+import { buildShellSealedDataSource } from '../../src/v2/shellSealedDataSource.js';   // a shell's own store: sealed, never before the key
 import { pinsOf, pinKey, paintablePins, openPin } from '../../src/v2/plusPins.js';
 import { usageRows } from '../../src/v2/actionFrequency.js';
 import { processRefusalLog, noteKeyFanFailed } from '../../src/v2/refusalLog.js';
@@ -526,7 +527,7 @@ function getContactDmStore() {
     _contactDmStorePromise = (async () => {
       try {
         let dataSource;
-        try { dataSource = await buildHouseholdDataSource({ dbName: 'cc-contact-dm-state', storeName: 'items', kind: 'messages' }); }
+        try { dataSource = await buildShellSealedDataSource({ dbName: 'cc-contact-dm-state', storeName: 'items', kind: 'messages' }); }   // sealed at rest, built once the key is there
         catch { dataSource = null; }
         // The shared wrapper (web ≡ mobile): one constructor for the durable DM home, both shells.
         return createContactDmStore({ dataSource, localActor: LOCAL_ACTOR });

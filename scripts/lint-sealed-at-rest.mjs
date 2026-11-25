@@ -78,6 +78,35 @@ for (const { path, factory, wrapper } of FILES) {
   });
 }
 
+// A STORE A SHELL BUILDS FOR ITSELF through the persist builder. `buildHouseholdDataSource` without a strategy
+// returns the adapter unsealed: the contact DMs on web and phone and the phone's circle lists were written as plain
+// text that way (found 2026-11-25) while the box sealed its copy, and the factory list above never named the builder.
+// In a shell file every call must carry a strategy within a few lines; `buildShellSealedDataSource`
+// (src/v2/shellSealedDataSource.js) is the way a shell builds one: sealed, and never before the key.
+{
+  const { readdirSync, statSync } = await import('node:fs');
+  const SHELL_ROOTS = ['apps/basis/web', 'apps/basis-mobile/src', 'apps/basis-mobile/App.js', 'apps/basis/bin'];
+  const shellFiles = [];
+  const walk = (rel) => {
+    let st; try { st = statSync(rel); } catch { return; }
+    if (st.isFile()) { if (/\.(m?js)$/.test(rel) && !/\.test\.|\.spec\./.test(rel)) shellFiles.push(rel); return; }
+    for (const n of readdirSync(rel)) { if (n === 'node_modules' || n.startsWith('.') || n === 'test' || n === 'dist') continue; walk(`${rel}/${n}`); }
+  };
+  for (const r of SHELL_ROOTS) walk(r);
+  for (const path of shellFiles) {
+    const lines = readFileSync(path, 'utf8').split('\n');
+    lines.forEach((raw, i) => {
+      const line = raw.trim();
+      if (line.startsWith('*') || line.startsWith('//') || line.startsWith('import ')) return;
+      if (!/\bbuildHouseholdDataSource\s*\(/.test(line)) return;
+      checked += 1;
+      const window = lines.slice(i, i + 4).join('\n');
+      if (/\bstrategy\s*:/.test(window)) return;
+      problems.push({ path, line: i + 1, text: `${line.slice(0, 100)}  ← a shell's own store without the content seal: use buildShellSealedDataSource` });
+    });
+  }
+}
+
 if (problems.length) {
   console.error('✖ sealed-at-rest: a local store is built without a seal — it would write a person\'s content readable:');
   for (const p of problems) console.error(`    ${p.path}:${p.line}  ${p.text}`);

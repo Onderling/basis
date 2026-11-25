@@ -28,7 +28,7 @@ import { withAnswers, RSVP_TYPE, rosterAnswerRule } from '../../v2/rsvpItems.js'
 import { THREAD_LANGS } from '../../v2/threadLangs.js';
 import { TRANSPORT_MODES } from '../../v2/circleSettingsControls.js';
 import {
-  Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry, CapabilityToken,
+  Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry, CapabilityToken, WIRE_VERSION,
   PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed, wireDeviceId,
   signDeviceRevocation, verifyDeviceRevocation, signDeviceStatement, STATEMENT_DOMAINS,
@@ -4076,6 +4076,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   });
   // what each peer could not receive and what this device answered it could not (notUnderstood.js), per start
   const notUnderstood = createNotUnderstood();
+  // the wire this device speaks (the kernel layer's stamp), for the not-understood answer and the comparison with a peer's
+  const ourWire = () => (Number.isInteger(sa.agent?.security?.wire) ? sa.agent.security.wire : WIRE_VERSION);
   const refusedInbound = new Map();
   const refusedInboundWarned = new Set();
   sa.agent.on?.('security-error', (err, raw) => {
@@ -10447,8 +10449,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         // A PEER'S ANSWER that it could not receive a subtype of ours (notUnderstood.js): kept per peer (the words on its
         // row), logged once, never answered and never handed to the shell router (so it can never be "unknown" itself).
         if (isNotUnderstood(env?.payload)) {
-          if (notUnderstood.noteAnswer(env?.from, env.payload)) {
-            try { structuredLog.warn('agent', 'peer.not-understood', { of: env.payload.of, peer: String(env?.from ?? '?').slice(0, 12) }); } catch { /* the log never breaks */ }
+          const kind = notUnderstood.noteAnswer(env?.from, env.payload, ourWire());
+          // an older build: kept for its row; the SAME wire: two current builds disagree, a gap in one of our shells
+          if (kind) {
+            try { structuredLog.warn('agent', kind === 'older' ? 'peer.not-understood' : 'peer.not-understood.same-wire', { of: env.payload.of, wire: env.payload.wire ?? null, peer: String(env?.from ?? '?').slice(0, 12) }); } catch { /* the log never breaks */ }
           }
           return undefined;
         }
@@ -10456,7 +10460,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         // …and a NAMED subtype the shell router did not take: answered ONCE per peer and subtype per start, through the
         // send gate (a blocked peer gets nothing; the answer is direct contact). Only a verified sender reaches here.
         Promise.resolve(verdict).then((v) => {
-          const answer = notUnderstood.answerFor(env?.from, v?.notUnderstood);
+          const answer = notUnderstood.answerFor(env?.from, v?.notUnderstood, ourWire());
           if (answer) return peerSend(env.from, answer);
           return null;
         }).catch(() => {});

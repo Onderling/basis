@@ -11,6 +11,7 @@ import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown, addCardOf } from './support/pairRealAgents.js';
 import { contactRowMeta, withPeerNotices } from '../src/v2/contactsSource.js';
 import { makePeerRouter, NOT_TAKEN } from '../src/core/handlers/peerRouter.js';
+import { SecurityLayer, WIRE_VERSION } from '@onderling/core';
 
 const t = (k, v = {}) => `${k}${v.name ? `:${v.name}` : ''}`;
 const tick = (ms) => new Promise((r) => { setTimeout(r, ms); });
@@ -32,6 +33,7 @@ describe('the router names a subtype nobody took', () => {
 
 describe('an unknown subtype between two real agents over a relay', () => {
   let relay; let me; let ann;
+  const coreOf = (n) => n.agent.sa.agent;
   beforeAll(async () => {
     relay = await startJourneyRelay();
     const opts = () => ({ contactChannel: true, agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend() } });
@@ -41,23 +43,46 @@ describe('an unknown subtype between two real agents over a relay', () => {
   }, 120_000);
   afterAll(async () => { await teardown(me, ann); await relay?.close?.(); });
 
-  it('her device answers once; my row says she cannot receive it yet; a repeat is not answered again', async () => {
+  /** Count the not-understood answers a node's agent sends (they ride its own send gate, then the secure agent). */
+  function countAnswers(node) {
     const answers = [];
-    const real = ann.agent.sendPeerMessage;
-    // count what her agent sends back (her not-understood rides her own send gate)
-    const sa = ann.agent.sa.peer;
-    const sendTo = sa.sendTo;
-    sa.sendTo = (to, payload, o) => { if (payload?.subtype === 'not-understood') answers.push(payload); return sendTo(to, payload, o); };
+    const peer = node.agent.sa.peer;
+    const sendTo = peer.sendTo;
+    peer.sendTo = (to, payload, o) => { if (payload?.subtype === 'not-understood') answers.push(payload); return sendTo(to, payload, o); };
+    return { answers, restore: () => { peer.sendTo = sendTo; } };
+  }
+
+  it('between two CURRENT builds it is a shell gap: answered once (with her wire), but no words on my row', async () => {
+    const { answers, restore } = countAnswers(ann);
+    try {
+      await me.agent.sendPeerMessage(ann.pubKey, { subtype: 'from-a-sibling-shell', msgId: 's1' });
+      expect(await until(() => (answers.length ? answers : null), { timeout: 10_000, step: 100 }), 'she answered')
+        .toEqual([{ subtype: 'not-understood', of: 'from-a-sibling-shell', wire: WIRE_VERSION }]);
+      await me.agent.sendPeerMessage(ann.pubKey, { subtype: 'from-a-sibling-shell', msgId: 's2' });
+      await tick(1500);
+      expect(answers, 'once per peer and subtype per start').toHaveLength(1);
+      expect(me.agent.notUnderstoodBy(ann.pubKey), 'the same wire is not "an older Basis"').toEqual([]);
+    } finally { restore(); }
+    const [row] = withPeerNotices([{ contactId: ann.pubKey, name: 'Ann', peerAddr: ann.pubKey, reachable: true }], me.agent);
+    expect(contactRowMeta(row, t)).not.toContain('not_understood');
+  }, 40_000);
+
+  it('from a NEWER build: her older device answers once, and my row says she cannot receive it yet', async () => {
+    // my device as a NEWER build: every envelope it signs carries a wire above hers (she still accepts it: the newer
+    // side decides), and it compares answers against that wire
+    const mySec = coreOf(me).security;
+    const newer = new SecurityLayer({ identity: coreOf(me).identity, wire: WIRE_VERSION + 1 });
+    newer.registerPeer(ann.pubKey, mySec.getPeerKey(ann.pubKey) ?? ann.pubKey);
+    const realEncrypt = mySec.encrypt;
+    mySec.encrypt = (env) => newer.encrypt(env);
+    Object.defineProperty(mySec, 'wire', { value: WIRE_VERSION + 1, configurable: true });
+    const { answers, restore } = countAnswers(ann);
     try {
       await me.agent.sendPeerMessage(ann.pubKey, { subtype: 'from-the-future', msgId: 'f1' });
       expect(await until(() => { const l = me.agent.notUnderstoodBy(ann.pubKey); return l.length ? l : null; }, { timeout: 10_000, step: 100 }), 'her answer reached me')
         .toEqual(['from-the-future']);
-      await me.agent.sendPeerMessage(ann.pubKey, { subtype: 'from-the-future', msgId: 'f2' });
-      await tick(1500);
-      expect(answers, 'once per peer and subtype per start').toHaveLength(1);
-      expect(answers[0]).toEqual({ subtype: 'not-understood', of: 'from-the-future' });
-    } finally { sa.sendTo = sendTo; ann.agent.sendPeerMessage = real; }
-
+      expect(answers).toEqual([{ subtype: 'not-understood', of: 'from-the-future', wire: WIRE_VERSION }]);
+    } finally { restore(); mySec.encrypt = realEncrypt; delete mySec.wire; }
     const [row] = withPeerNotices([{ contactId: ann.pubKey, name: 'Ann', peerAddr: ann.pubKey, reachable: true }], me.agent);
     expect(contactRowMeta(row, t)).toContain('circle.contacts.not_understood:Ann');
   }, 40_000);

@@ -20,6 +20,7 @@
  * Every shell hands its own adapter (drop a named store, drop a key, list the keys, list the circle ids); no
  * shell decides WHAT is forgotten, only HOW its storage is reached.
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { renamedFrom } from '@onderling-app/pinboard/lib/moveRenamedStore';
 import { circleStorageName } from './localStoreSeal.js';
 import { storageNames } from './storageRegister.js';   // every name and what an enrolled device does with it
@@ -198,7 +199,7 @@ export async function runPendingForget({ markerVault, shell } = {}) {
  * The prefix is the owner-root vault's, so the marker lives with the ceremony that wrote it and survives the
  * clear for the same reason the delegation blob does.
  */
-export function markerVaultOver(storage, prefix = 'cc-owner-root:') {
+export function markerVaultOver(storage, prefix = storageName('vaultOwnerRoot')) {
   const at = (k) => `${prefix}${k}`;
   return {
     get: async (k) => { try { return (await storage?.getItem?.(at(k))) ?? null; } catch { return null; } },

@@ -18,6 +18,7 @@
 
 // Buffer polyfill (with base64url) — on-device signing runs in this browser bundle;
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
+import { storageName } from '../../src/v2/storageRegister.js';   // every storage name from the one register
 import { pinsOf, pinKey, paintablePins, openPin } from '../../src/v2/plusPins.js';
 import { usageRows } from '../../src/v2/actionFrequency.js';
 import { processRefusalLog, noteKeyFanFailed } from '../../src/v2/refusalLog.js';
@@ -526,7 +527,7 @@ function getContactDmStore() {
     _contactDmStorePromise = (async () => {
       try {
         let dataSource;
-        try { dataSource = await buildHouseholdDataSource({ dbName: 'cc-contact-dm-state', storeName: 'items', kind: 'messages' }); }
+        try { dataSource = await buildHouseholdDataSource({ dbName: storageName('contactDms'), storeName: 'items', kind: 'messages' }); }
         catch { dataSource = null; }
         // The shared wrapper (web ≡ mobile): one constructor for the durable DM home, both shells.
         return createContactDmStore({ dataSource, localActor: LOCAL_ACTOR });
@@ -1293,7 +1294,7 @@ const availabilityStore = createAvailabilityStore(
 // persisted pending proposals (multi-admin consensus).
 // persisted pending agent-add requests. Reuses
 // the same {load, save} adapter shape as the proposal store.
-const AGENT_REQ_STORE_KEY = 'cc.agentRequestQueue';
+const AGENT_REQ_STORE_KEY = storageName('agentRequestQueue');
 const agentRequestIo = sealedJsonIo(globalThis.localStorage);   // sealed at rest: pending agent-add requests
 const agentRequestStore = createAgentRequestStore({
   io: {
@@ -1325,7 +1326,7 @@ let personClock = null;
  */
 function getThemePref() {
   // pre-boot cache of display.theme
-  try { return localStorage.getItem('basis.theme') || 'system'; } catch { return 'system'; }
+  try { return localStorage.getItem(storageName('theme')) || 'system'; } catch { return 'system'; }
 }
 
 /**
@@ -1338,8 +1339,8 @@ function setThemePref(v) {
   if (v !== 'system' && v !== 'light' && v !== 'dark') return false;
   try {
     // pre-boot cache of display.theme — written through so the pre-paint hook sees the new choice
-    if (v === 'system') localStorage.removeItem('basis.theme');
-    else localStorage.setItem('basis.theme', v);
+    if (v === 'system') localStorage.removeItem(storageName('theme'));
+    else localStorage.setItem(storageName('theme'), v);
   } catch { /* best-effort */ }
   // The register is the AUTHORITY (device-params consolidation); localStorage stays the
   // PRE-PAINT CACHE (index.html's boot hook reads it before any script runs). Same-value
@@ -1959,7 +1960,7 @@ let feedHouseholdRosterForCircle = null;
 // SEALED at rest: it holds two private keys per circle. It is built here rather than in `realAgent`,
 // which is why `sealedVault()` never reached it and its rows sat readable — see `sealedLocalVault`.
 const circleVault = sealedLocalVault((() => {
-  try { return new VaultIndexedDB({ dbName: 'cc-circle-pod' }); }
+  try { return new VaultIndexedDB({ dbName: storageName('circlePodVault') }); }
   catch { return new VaultMemory(); }
 })());
 const circlePods = new Map();    // circleId → per-circle pod producer (sealing identity + control agent)
@@ -2345,7 +2346,7 @@ const circleInputHistory = createInputHistory();
 // #7). Same @onderling/pseudo-pod substrate the circle pods run on. Objective L:
 // browser-PERSISTENT (IndexedDB) so embedded vectors survive a reload instead of
 // re-embedding; falls back to in-memory under SSR / tests (no `indexedDB`).
-const circleSearchVectorStore = sealedLocalBackend(pickWebBackend('cc-circle-rag'), { scope: 'cc-circle-rag' });
+const circleSearchVectorStore = sealedLocalBackend(pickWebBackend(storageName('circleRag')), { scope: storageName('circleRag') });
 
 function buildCircleBot(agent) {
   // Merged catalogue (the LLM tool list + dispatch catalogue) — mirrors main.js.
@@ -3912,7 +3913,7 @@ function refreshUnreadMyRefs() {
 // landing surface is the admin's `policy.view` front door
 // (defaultViewModeFromPolicy): 'screen' → screen, 'chat'/'cross-stream'
 // → chat.  Once the user flips the pill, their choice persists and wins.
-const VIEW_MODE_KEY = 'cc.circleViewMode';
+const VIEW_MODE_KEY = storageName('circleViewMode');
 function readViewMode(id, policy = null) {
   try {
     const raw = window.localStorage.getItem(VIEW_MODE_KEY);
@@ -4072,7 +4073,7 @@ function paintLauncher() {
 function showLauncher() {
   setActiveCircle(null);
   refreshUnreadMyRefs();
-  try { sessionStorage.removeItem('cc.activeCircle'); } catch { /* ignore */ }
+  try { sessionStorage.removeItem(storageName('activeCircle')); } catch { /* ignore */ }
   // β.1 — Stream/Availability/Hop/Nearby/My-things buttons are gone from the launcher; those surfaces
   // are reachable via the Screens + Mij tabs. The `show*` functions stay defined below.
   paintLauncher();
@@ -4480,8 +4481,8 @@ function openNearbyContact(address, label, transports = null) {
 // The room face: 'name' (default) · 'handle' · 'none' — per device, like the allows.
 // WHO THIS DEVICE ENTERS THE NEARBY ROOM AS: the switcher's set decides (nearbyIdentity.js); with several ticked, the last
 // answer here is the default — kept per device, nothing more durable
-function readNearbySelf() { try { return localStorage.getItem('basis.nearbySelf'); } catch { return null; } }
-function writeNearbySelf(id) { try { if (typeof id === 'string' && id) localStorage.setItem('basis.nearbySelf', id); } catch { /* best-effort */ } }
+function readNearbySelf() { try { return localStorage.getItem(storageName('nearbySelfWeb')); } catch { return null; } }
+function writeNearbySelf(id) { try { if (typeof id === 'string' && id) localStorage.setItem(storageName('nearbySelfWeb'), id); } catch { /* best-effort */ } }
 // the general persona's handle, as the room sees it — read when Nearby opens (showNearby)
 let _nearbyHandle = null;
 function nearbyRoomSelfNow() {
@@ -4490,10 +4491,10 @@ function nearbyRoomSelfNow() {
   return { r, view, self: roomSelfFor(r, _selfSet.held) };
 }
 // The room's per-device allows (card / chat) — kept across opens, this browser only.
-function readNearbyAllows() { try { const raw = localStorage.getItem('basis.nearbyAllows'); return raw ? JSON.parse(raw) : null; } catch { return null; } }
+function readNearbyAllows() { try { const raw = localStorage.getItem(storageName('nearbyAllowsWeb')); return raw ? JSON.parse(raw) : null; } catch { return null; } }
 function writeNearbyAllows(next) {
   if (!next || typeof next !== 'object') return;
-  try { localStorage.setItem('basis.nearbyAllows', JSON.stringify({ card: next.card === true, chat: next.chat === true })); } catch { /* best-effort */ }
+  try { localStorage.setItem(storageName('nearbyAllowsWeb'), JSON.stringify({ card: next.card === true, chat: next.chat === true })); } catch { /* best-effort */ }
 }
 let _unsubscribeNearbyHeard = null;
 function closeNearby() {
@@ -5477,7 +5478,7 @@ async function showMyData(opts) {
     // localStorage stays the PRE-BOOT CACHE (i18n initialises before the agent); the register is
     // the authority (device-params consolidation).
     // pre-boot cache of app.lang
-    try { localStorage.setItem('circle.app.lang', lng); } catch { /* best-effort */ }
+    try { localStorage.setItem(storageName('language'), lng); } catch { /* best-effort */ }
     circleHouseholdAgent?.callSkill?.('params', 'set-param', { key: 'app.lang', value: lng })
       .catch(() => { /* the cache stands */ });
     if (group) showMyData({ group: group.id }); else showSettingsHome();
@@ -7601,7 +7602,7 @@ async function showDetail(id) {
   // OBJ-2 S1c-shell — (re)feed the household sync roster with THIS circle's members
   // so items added here fan out to them. Member-only + deduped; safe to call often.
   feedHouseholdRosterForCircle?.(id)?.catch?.(() => {});
-  try { sessionStorage.setItem('cc.activeCircle', id); } catch { /* ignore */ }
+  try { sessionStorage.setItem(storageName('activeCircle'), id); } catch { /* ignore */ }
   // 52.25 — this circle's embed policy may differ from the last → re-resolve
   // folio /zoek's embedder (or null it for an 'off' circle). Best-effort.
   try { circleSyncFolioNoteEmbedder?.(); } catch { /* /zoek stays lexical */ }
@@ -9642,7 +9643,7 @@ async function showSettings(id) {
 // fresh start of the app. The page always opens on a FRESH load, before the boot opens a single store: a database this
 // tab already holds cannot be deleted (no store here closes on `versionchange`), so the door only asks for the page
 // (`START_OVER_PAGE_KEY`, a per-tab view choice that clears nothing) and reloads.
-const START_OVER_PAGE_KEY = 'basis.startOverPage';
+const START_OVER_PAGE_KEY = storageName('startOverPage');
 const START_OVER_MARK_KEY = `cc-owner-root:${START_OVER_PENDING_KEY}`;
 function openStartOverPage() {
   try { window.sessionStorage.setItem(START_OVER_PAGE_KEY, '1'); } catch { /* the page opens on this load only */ }
@@ -9665,7 +9666,7 @@ async function canClearThisBrowser() {
 function showStartOver({ mark = null } = {}) {
   const root = document.getElementById('circle-root') ?? document.body;
   const markerVault = markerVaultOver(window.localStorage);
-  const rootKeyStore = () => pickRootKeyStore({ fallbackVault: makeBrowserVault('cc-owner-root:') });
+  const rootKeyStore = () => pickRootKeyStore({ fallbackVault: makeBrowserVault(storageName('vaultOwnerRoot')) });
   const el = (tag, attrs = {}, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'onclick') n.addEventListener('click', v); else n.setAttribute(k, v); } for (const c of kids) n.append(c); return n; };
   const said = el('p', { role: 'alert', class: 'start-over__said' });
   const box = el('textarea', { rows: '4', class: 'start-over__phrase', 'aria-label': t('circle.start_over.phrase_label'), autocomplete: 'off', spellcheck: 'false' });
@@ -9689,7 +9690,7 @@ function showStartOver({ mark = null } = {}) {
         said.textContent = t('circle.start_over.working');
         const r = await startDeviceOver({
           phrase: checked.phrase, fingerprint: checked.fingerprint, markerVault, canClear: canClearThisBrowser, wipe: wipeThisBrowser,
-          restore: (p) => restorePhraseWithoutAgent({ mnemonic: p, rootKeyStore: rootKeyStore(), chatVault: makeBrowserVault('cc-chat-id:'), markerVault: makeBrowserVault('cc-owner-root:') }),
+          restore: (p) => restorePhraseWithoutAgent({ mnemonic: p, rootKeyStore: rootKeyStore(), chatVault: makeBrowserVault(storageName('vaultChatId')), markerVault: makeBrowserVault(storageName('vaultOwnerRoot')) }),
         }).catch(() => ({ ok: false, code: 'storage' }));
         if (r.ok) { window.location.reload(); return; }
         said.textContent = t({ blocked: 'circle.start_over.error_blocked', 'cannot-list': 'circle.start_over.error_cannot_list' }[r.code] ?? 'circle.start_over.error_storage');
@@ -9720,7 +9721,7 @@ let offerPendingAtBoot = false;
 // App language: a persisted user choice (the Mij toggle) wins over the device locale; localStorage is the pre-boot
 // cache of app.lang. Before the boot's first paint — the start-over page (L1115) paints before the rest of the boot too.
 async function initAppLocale() {
-  let stored = null; try { stored = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ } // pre-boot cache of app.lang
+  let stored = null; try { stored = localStorage.getItem(storageName('language')); } catch { /* no storage */ } // pre-boot cache of app.lang
   await initLocalisation({ lng: (stored === 'nl' || stored === 'en') ? stored : detectDeviceLang() });
 }
 
@@ -9761,7 +9762,7 @@ async function boot() {
   // Hydration happens INSIDE the agent now, at the first moment the content key exists — see the note
   // there. Reading it here, before that, handed back a sealed envelope and started the log empty on
   // every reload. The shell's job is the storage; when to read it is the agent's.
-  const deviceLogIo = backendSnapshotIo(sealedLocalBackend(pickWebBackend('cc-device-log'), { scope: 'cc-device-log' }));
+  const deviceLogIo = backendSnapshotIo(sealedLocalBackend(pickWebBackend(storageName('deviceLog')), { scope: storageName('deviceLog') }));
   rootEl = document.getElementById('circle-root');
   tabBarEl = document.getElementById('circle-tabbar');
   // IS THIS TAB THE BUILD THE SITE SERVES? A page never updates itself: on 2026-09-19 a laptop ran the build from
@@ -9831,7 +9832,7 @@ async function boot() {
       // a circle's appointments are that circle's store's items (read and written with its id); no circle → my own calendar
       ...PERSON_NODE_STORE_OPTS,
       // …which is my OWN store (the own-devices scope): sealed, in IndexedDB, back after a reload
-      ownStore: lazyOwnStore({ dbName: 'cc-own-devices', storeName: 'items' }),
+      ownStore: lazyOwnStore({ dbName: storageName('ownDevices'), storeName: 'items' }),
       publishEvent: publishEventToLog,
       // The membership rider: hand the DEVICE LOG so membership statements ride its membership lane
       // (signed, fanned, verified, caught-up) and the roster folds the rail's verified bodies.
@@ -9884,18 +9885,18 @@ async function boot() {
       // the circle roster's recorded address goes stale, and peers can no longer reach it (no-pod
       // sync silently dies after a refresh). localStorage-backed, same 'cc-chat-id:' prefix the
       // mobile bundle uses (VaultAsyncStorage) → stable address across reloads, web≡mobile.
-      chatVault: new VaultLocalStorage({ prefix: 'cc-chat-id:' }),
-      pinboardPersistDb: { dbName: 'cc-pinboard-state', storeName: 'items' },
+      chatVault: new VaultLocalStorage({ prefix: storageName('vaultChatId') }),
+      pinboardPersistDb: { dbName: storageName('pinboardWeb'), storeName: 'items' },
       // OBJ-2 S1e (web) — persist the household store in IndexedDB so items survive
       // a reload (mobile already threads its AsyncStorage descriptor). Parity with pinboard.
-      householdPersistDb: { dbName: 'cc-household-state', storeName: 'items' },
+      householdPersistDb: { dbName: storageName('householdWeb'), storeName: 'items' },
       // #36 — persist the PARAMETER REGISTER's settings (retention etc.) in IndexedDB so a set-param survives
       // a reload (cross-app-settings shared.json / devices/<id>.json layout, on this store).
-      settingsPersistDb: { dbName: 'cc-settings-state', storeName: 'settings' },
+      settingsPersistDb: { dbName: storageName('settingsWeb'), storeName: 'settings' },
       // The outbox — held messages + the dead-address verdict — survives a reload (device-local, never the pod).
-      outboxPersistDb: { dbName: 'cc-outbox-state', storeName: 'outbox' },
+      outboxPersistDb: { dbName: storageName('outboxWeb'), storeName: 'outbox' },
       // Push subscriptions: their own device-local store (never the pod, never a sibling).
-      pinboardPushPersistDb: { dbName: 'cc-push-device', storeName: 'subscriptions' },
+      pinboardPushPersistDb: { dbName: storageName('pushDevice'), storeName: 'subscriptions' },
       // #36 pod-sync — when signed in, hand realAgent the SELF-SEALED settings pod inner so agent/circle
       // params ride the user's OWN pod (not a device-local island): `attachInner` write-throughs the local
       // cache to `<pod>/basis/settings/…`, sealed to this agent's key. Not signed in → null → local-only
@@ -9913,7 +9914,7 @@ async function boot() {
       // a sealed mirror on the user's own pod under an opaque name. Same shape as the settings medium.
       // NOT wrapped here on purpose: realAgent seals the registry itself, because it also owns the pod
       // mirror's strategy and the two must be the same key. Wrapping it again would seal twice.
-      registryBackend: pickWebBackend('cc-agent-registry'),
+      registryBackend: pickWebBackend(storageName('agentRegistry')),
       provisionRegistryMedium: async (strategy) => {
         try {
           return await createRegistryPodMedium({
@@ -9990,10 +9991,10 @@ async function boot() {
         if ((th === 'light' || th === 'dark' || th === 'system') && th !== getThemePref()) setThemePref(th);
         const lg = agent.getParamValue?.('app.lang');
         // pre-boot cache of app.lang
-        let cachedLang = null; try { cachedLang = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ }
+        let cachedLang = null; try { cachedLang = localStorage.getItem(storageName('language')); } catch { /* no storage */ }
         if ((lg === 'nl' || lg === 'en') && lg !== cachedLang) {
           // pre-boot cache of app.lang
-          try { localStorage.setItem('circle.app.lang', lg); } catch { /* best-effort */ }
+          try { localStorage.setItem(storageName('language'), lg); } catch { /* best-effort */ }
           setLang(lg).catch(() => {});
         }
         const ru = agent.getParamValue?.('relay.url');

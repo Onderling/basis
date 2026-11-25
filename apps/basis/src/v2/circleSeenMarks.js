@@ -15,10 +15,11 @@
  * them once the content key exists (`onShellContentSeal`). The one write a load may make is the one that applies
  * opens made before it; a load with nothing pending writes nothing (beyond the one-time reseal of an old plain value).
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { bumpSeenAt } from './circleTilePreviews.js';
 import { sealedJsonIo } from './localStoreSeal.js';
 
-export const CIRCLE_SEEN_AT_KEY = 'cc.circleSeenAt';
+export const CIRCLE_SEEN_AT_KEY = storageName('circleSeenAt');
 
 /**
  * The marks' sealed io, over localStorage (web) or AsyncStorage (phone). `load` THROWS when the marks could not be read

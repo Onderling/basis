@@ -21,6 +21,7 @@
  * storage in the browser, NO OIDC/CSS) — a real Solid pod-client is the env-gated
  * swap later. p0/p1 circles seal nothing → `controlAgent` is null (plain storage).
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { createCircleControlAgent } from './circleControlAgent.js';
 import { processRefusalLog } from './refusalLog.js';
 import { circleHasPod } from './circleDataPolicy.js';
@@ -130,8 +131,8 @@ export async function createCirclePodProducer({
   mayEstablish = null,
   keyEventLog = null,
   sealingKeyPair = null,
-  controllerKeyPrefix = 'cc.circle-controller-key',
-  groupKeyPrefix = 'cc.circle-groupkey',
+  controllerKeyPrefix = storageName('circleControllerKey'),
+  groupKeyPrefix = storageName('circleGroupKey'),
 } = {}) {
   if (!circleId) throw new Error('createCirclePodProducer: circleId is required');
   if (!vault || typeof vault.get !== 'function' || typeof vault.set !== 'function') {
@@ -310,7 +311,7 @@ export async function createCirclePodProducer({
  * key): never the roster, the lane or the pod.
  * @param {{ vault: {get: Function, set: Function}, circleId: string, webId: string, podAgent: string, groupKeyPrefix?: string }} a
  */
-export async function notePodAgentFor({ vault, circleId, webId, podAgent, groupKeyPrefix = 'cc.circle-groupkey' }) {
+export async function notePodAgentFor({ vault, circleId, webId, podAgent, groupKeyPrefix = storageName('circleGroupKey') }) {
   if (!vault || !circleId || !webId || typeof podAgent !== 'string' || !podAgent) return false;
   const key = `${groupKeyPrefix}:pod-agents:${circleId}`;
   let saved = {};

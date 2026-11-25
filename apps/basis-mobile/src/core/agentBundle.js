@@ -27,6 +27,7 @@
  * The V0 'agent-not-booted' stub fell away in V1 (replaced by
  * boot-failure error or the real factory's reply).
  */
+import { storageName } from '../../../basis/src/v2/storageRegister.js';   // every storage name from the one register
 import { composeManifests, buildManifestsByOrigin } from './composeManifests.js';
 import { connectionManifests } from '../../../basis/src/v2/connectionManifests.js';
 import { getCircleVersionStore } from './circleVersioning.js';
@@ -241,11 +242,11 @@ export async function bootAgentBundle(opts = {}) {
   // tests use it with a mock AsyncStorage.
   const chatVault = opts.chatVault
     ?? (opts.asyncStorage
-      ? new VaultAsyncStorage({ prefix: 'cc-chat-id:', asyncStorage: opts.asyncStorage })
+      ? new VaultAsyncStorage({ prefix: storageName('vaultChatId'), asyncStorage: opts.asyncStorage })
       : undefined);
   const hostVault = opts.hostVault
     ?? (opts.asyncStorage
-      ? new VaultAsyncStorage({ prefix: 'cc-host-id:', asyncStorage: opts.asyncStorage })
+      ? new VaultAsyncStorage({ prefix: storageName('vaultHostId'), asyncStorage: opts.asyncStorage })
       : undefined);
   // The OWNER ROOT — and it was missing (2026-07-30). Two vaults were synthesised here and this third one
   // was not, so `realAgent` fell back to its `makeBrowserVault('cc-owner-root:')`, which on React Native
@@ -261,7 +262,7 @@ export async function bootAgentBundle(opts = {}) {
   //     they would not have got anyone back to anything.
   const ownerRootVault = opts.ownerRootVault
     ?? (opts.asyncStorage
-      ? new VaultAsyncStorage({ prefix: 'cc-owner-root:', asyncStorage: opts.asyncStorage })
+      ? new VaultAsyncStorage({ prefix: storageName('vaultOwnerRoot'), asyncStorage: opts.asyncStorage })
       : undefined);
 
   // Custody cutover: the root SEED lives behind the device keystore (expo-secure-store, passed in
@@ -280,7 +281,7 @@ export async function bootAgentBundle(opts = {}) {
   // to apps/pinboard/src/lib/persistPicker.js → AsyncStoragePersist).
   const pinboardPersistDb = opts.pinboardPersistDb
     ?? (opts.asyncStorage
-      ? { dbName: 'cc-pinboard-cache', asyncStorage: opts.asyncStorage }
+      ? { dbName: storageName('pinboardPhone'), asyncStorage: opts.asyncStorage }
       : undefined);
 
   // Parallel synthesis for tasks-v0 — without this, the tasks
@@ -292,7 +293,7 @@ export async function bootAgentBundle(opts = {}) {
   // persistPicker (mirrors pinboard's three-adapter shape).
   const tasksPersistDb = opts.tasksPersistDb
     ?? (opts.asyncStorage
-      ? { dbName: 'cc-tasks-cache', asyncStorage: opts.asyncStorage }
+      ? { dbName: storageName('tasksPhone'), asyncStorage: opts.asyncStorage }
       : undefined);
 
   // OBJ-2 S1e (mobile) — persist the household store across reloads, same shape
@@ -300,12 +301,12 @@ export async function bootAgentBundle(opts = {}) {
   // new HouseholdStore({ dataSource }) → buildHouseholdDataSource → AsyncStoragePersist.
   const householdPersistDb = opts.householdPersistDb
     ?? (opts.asyncStorage
-      ? { dbName: 'cc-household-cache', asyncStorage: opts.asyncStorage }
+      ? { dbName: storageName('householdPhone'), asyncStorage: opts.asyncStorage }
       : undefined);
   // #36 — persist the parameter register's settings (retention etc.) across app opens (AsyncStorage), parity
   // with web circleApp's `settingsPersistDb`.
   const settingsPersistDb = opts.settingsPersistDb
-    ?? (opts.asyncStorage ? { dbName: 'cc-settings-cache', asyncStorage: opts.asyncStorage } : undefined);
+    ?? (opts.asyncStorage ? { dbName: storageName('settingsPhone'), asyncStorage: opts.asyncStorage } : undefined);
 
   let agent;
   try {
@@ -319,7 +320,7 @@ export async function bootAgentBundle(opts = {}) {
       // a circle's appointments are that circle's store's items (read and written with its id); no circle → my own calendar
       ...PERSON_NODE_STORE_OPTS,
       // …which is my OWN store (the own-devices scope): sealed, in AsyncStorage, back after a restart
-      ownStore: lazyOwnStore(opts.asyncStorage ? { dbName: 'cc-own-devices', asyncStorage: opts.asyncStorage } : null),
+      ownStore: lazyOwnStore(opts.asyncStorage ? { dbName: storageName('ownDevices'), asyncStorage: opts.asyncStorage } : null),
       chatVault,
       hostVault,
       ownerRootVault,
@@ -333,9 +334,9 @@ export async function bootAgentBundle(opts = {}) {
       householdPersistDb,
       settingsPersistDb,
       // Held messages + the dead-address verdict survive a launch (AsyncStorage, like the settings cache).
-      outboxPersistDb: opts.asyncStorage ? { dbName: 'cc-outbox-cache', asyncStorage: opts.asyncStorage } : undefined,
+      outboxPersistDb: opts.asyncStorage ? { dbName: storageName('outboxPhone'), asyncStorage: opts.asyncStorage } : undefined,
       // Push subscriptions: their own device-local store (never the pod, never a sibling).
-      pinboardPushPersistDb: opts.asyncStorage ? { dbName: 'cc-push-device', asyncStorage: opts.asyncStorage } : undefined,
+      pinboardPushPersistDb: opts.asyncStorage ? { dbName: storageName('pushDevice'), asyncStorage: opts.asyncStorage } : undefined,
       pinboardControlAgent: opts.pinboardControlAgent,   // S4 — multi-member sealing router (redeem/leave)
       // Connectivity Phase 3 — LIVE shared-pod key-custody seams (member-side, keyed by circleId), RN
       // parity with web circleApp. A shared/hybrid circle WITH a pod + group key seals→writes the pod +
@@ -768,7 +769,7 @@ export async function bootAgentBundle(opts = {}) {
   // (get/set/delete/list). Same pattern as pinboard-mobile's agentBundle.
   // …SEALED at rest (ledger L1083), through the same backend the web uses; built here, after the agent, so the key exists
   const peerGraph = new PeerGraph({
-    storageBackend: createLocalStoragePeerBackend({ prefix: 'cc-peers:', storage: sealedKeyValue(AsyncStorage, { name: 'the peer graph', strict: true }) }),
+    storageBackend: createLocalStoragePeerBackend({ prefix: storageName('peerGraph'), storage: sealedKeyValue(AsyncStorage, { name: 'the peer graph', strict: true }) }),
   });
   const sendContactTask = async (peerUrl, skillId, args) => {
     const task = sendA2ATask(agent, peerUrl, skillId, args);
@@ -787,7 +788,7 @@ export async function bootAgentBundle(opts = {}) {
         try {
           let dataSource = null;
           if (opts.asyncStorage) {
-            try { dataSource = await buildHouseholdDataSource({ dbName: 'cc-contact-dm-state', asyncStorage: opts.asyncStorage, kind: 'messages' }); }
+            try { dataSource = await buildHouseholdDataSource({ dbName: storageName('contactDms'), asyncStorage: opts.asyncStorage, kind: 'messages' }); }
             catch { dataSource = null; }
           }
           return createContactDmStore({ dataSource, localActor: 'me' });

@@ -8,9 +8,10 @@
  * keychain backup) — by design, since the recovery phrase re-derives the seed anywhere,
  * and a synced copy would be one more place the secret lives.
  */
+import { storageName } from '../../../basis/src/v2/storageRegister.js';   // every storage name from the one register
 import { RootKeyStore, assertSeed, seedToString, seedFromString } from '@onderling/vault';
 
-const SEED_KEY = 'cc-owner-root-seed';
+const SEED_KEY = storageName('vaultOwnerRootSeed');
 
 /**
  * @param {object} secureStore  the expo-secure-store module (passed in from the app

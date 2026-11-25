@@ -1,3 +1,4 @@
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 // The member's IN-APP relay URL — so the cross-peer relay (packages/relay) can be pointed at a reachable
 // server from the SETTINGS UI, not only the build-time env var (VITE_/EXPO_PUBLIC_CIRCLE_RELAY_URL). One
 // per member/device (user-global, not per-circle), persisted via an injectable load/save: localStorage on
@@ -8,7 +9,7 @@
 // the same in the Mij/My-data screen.
 
 // pre-boot cache of relay.url
-const STORAGE_KEY = 'cc.relayUrl';
+const STORAGE_KEY = storageName('relayUrl');
 
 /** Coerce raw input to a valid ws://|wss:// relay URL, or '' (blank ⇒ use the env fallback). */
 export function normalizeRelayUrl(raw) {

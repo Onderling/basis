@@ -1,3 +1,4 @@
+import { storageName } from '../../../basis/src/v2/storageRegister.js';   // every storage name from the one register
 /**
  * V0 mobile storage for extension mappings (feedback-extension mobile parity).
  *
@@ -13,7 +14,7 @@
  * real pseudo-pod when the mobile pod layer lands (3.3c).
  */
 
-const PREFIX = 'onderling.mappings:';   // AsyncStorage namespace; JSON stored under PREFIX + <uri>
+const PREFIX = storageName('mappings');   // AsyncStorage namespace; JSON stored under PREFIX + <uri>
 
 /** The fixed V0 device id for mobile mappings (app-scoped; no real pod yet). */
 export const MAPPINGS_DEVICE = 'mobile';

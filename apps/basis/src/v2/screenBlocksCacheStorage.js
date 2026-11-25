@@ -7,10 +7,11 @@
  * other v2 per-id cache (`cc.circleRecipePending.<id>`, etc.).
  */
 
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { createScreenBlocksCache } from './screenBlocksCache.js';
 import { sealedKeyValue } from './localStoreSeal.js';
 
-const KEY_PREFIX = 'cc.screenBlocksCache.';
+const KEY_PREFIX = storageName('screenBlocksCache');
 
 /**
  * SEALED AT REST (ledger L1081). The kept blocks are a page's content — appointment titles, task texts, circle names, the

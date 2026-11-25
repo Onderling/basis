@@ -19,6 +19,7 @@
  * receipts off is precisely the disclosure `deliveryState.js` refuses to make — it would let anyone spot
  * the setting by looking at a conversation.
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { CHAT_KIND } from './conversationKinds.js';
 import {
   DELIVERY, DELIVERY_TERMINAL, DELIVERY_LABELS, DELIVERY_REASON_LABELS, DELIVERY_WAITING_ENTRY, DELIVERY_WAITING_LABEL, isDeliveryState, shouldSendReceipt, receiveReceipt, RECEIPT_MESSAGE,
@@ -35,7 +36,7 @@ export function deliverySettings(stored = {}) {
 }
 
 /** localStorage IO (web). One key, both settings — they are decided together. */
-export function localStorageDeliveryIo(storage = globalThis.localStorage, key = 'cc.delivery') {
+export function localStorageDeliveryIo(storage = globalThis.localStorage, key = storageName('delivery')) {
   return {
     load: () => { try { return JSON.parse(storage?.getItem(key) ?? '{}'); } catch { return {}; } },
     save: (v) => { try { storage?.setItem(key, JSON.stringify(v ?? {})); } catch { /* ignore */ } },
@@ -43,7 +44,7 @@ export function localStorageDeliveryIo(storage = globalThis.localStorage, key = 
 }
 
 /** AsyncStorage IO (mobile). */
-export function asyncStorageDeliveryIo(AsyncStorage, key = 'cc.delivery') {
+export function asyncStorageDeliveryIo(AsyncStorage, key = storageName('delivery')) {
   return {
     load: async () => { try { return JSON.parse((await AsyncStorage?.getItem(key)) ?? '{}'); } catch { return {}; } },
     save: async (v) => { try { await AsyncStorage?.setItem(key, JSON.stringify(v ?? {})); } catch { /* ignore */ } },

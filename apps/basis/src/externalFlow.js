@@ -1,3 +1,4 @@
+import { storageName } from './v2/storageRegister.js';   // every storage name from the one register
 /**
  * basis — external-flow primitive (J6).
  *
@@ -32,7 +33,7 @@
  * Phase v0.6 per `/Project Files/basis/coding-plan.md`.
  */
 
-const IN_FLIGHT_STORE_KEY = 'cc-in-flight-flows';
+const IN_FLIGHT_STORE_KEY = storageName('inFlightFlows');
 
 /**
  * @typedef {object} InFlightFlow

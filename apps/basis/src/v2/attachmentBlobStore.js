@@ -1,3 +1,4 @@
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 /**
  * The attachment blob store — where a received file's BYTES live, which is never a snapshot.
  *
@@ -22,7 +23,7 @@
  * honest and recoverable; a thread that lost its messages is neither.
  */
 
-const DB_NAME  = 'cc-attachment-blobs';
+const DB_NAME  = storageName('attachmentBlobs');
 const STORE    = 'blobs';
 
 /** Open (and create) the object store. Rejects when IndexedDB is unavailable — the caller degrades. */

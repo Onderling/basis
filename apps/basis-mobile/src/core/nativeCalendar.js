@@ -21,9 +21,10 @@
  * calendar): the injected storage is wrapped in `sealedKeyValue` (strict). It has no reader yet (see above); when the
  * live half lands it runs on the person's act, after the agent's boot, so after the content key exists.
  */
+import { storageName } from '../../../basis/src/v2/storageRegister.js';   // every storage name from the one register
 import { sealedKeyValue } from '../../../basis/src/v2/localStoreSeal.js';
 
-const STORAGE_KEY = 'cc.nativeCalendar.eventIdMap';
+const STORAGE_KEY = storageName('nativeCalendarIds');
 const sealedIn = (storage) => sealedKeyValue(storage, { name: 'the calendar id map', strict: true });
 
 /**

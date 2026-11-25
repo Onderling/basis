@@ -26,6 +26,7 @@
  *      breath. An offer that only says "this will fix it" is not a choice either.
  */
 
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 // Parameter register (#36) — address-fallback offer thresholds (scope:device, kind:internal). These are
@@ -151,7 +152,7 @@ export function createFallbackOffer({
  * has (localStorage on web, AsyncStorage on mobile — each wrapped in `sealedKeyValue`). Sync or async storage
  * alike; a storage that refuses (a sealed one before the content key exists) loses the memory, never throws.
  */
-export function fallbackOfferStateIo(storage, key = 'cc.fallbackOffer') {
+export function fallbackOfferStateIo(storage, key = storageName('fallbackOffer')) {
   return {
     load: async () => {
       try { const raw = await storage?.getItem?.(key); return raw ? JSON.parse(raw) : null; } catch { return null; }

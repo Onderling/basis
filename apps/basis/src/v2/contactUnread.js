@@ -8,9 +8,10 @@
  * VIEW fact of this device — not carried to the siblings (a phone you read on does not silence the laptop; that is a
  * later choice) — read through an injected io so web (localStorage) and mobile (AsyncStorage) run one code.
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { sealedKeyValue, shellContentSeal } from './localStoreSeal.js';
 
-export const CONTACT_SEEN_KEY = 'cc.contactSeenAt';
+export const CONTACT_SEEN_KEY = storageName('contactSeenAt');
 
 /**
  * @param {{ turns: Array<{contactId?: string, origin?: string, ts?: number, receivedAt?: number}>, seenAt: Object<string, number> }} a

@@ -3,9 +3,10 @@
  * on the relay, its key kept in this browser (like a device key) — no person's identity, no pods, no circles. What the
  * screen does with it is `src/v2/screenView.js`.
  */
+import { storageName } from '../v2/storageRegister.js';   // every storage name from the one register
 import { createSecureAgent, makeBrowserVault } from '@onderling/secure-agent';
 
-export const makeBrowserScreenAgent = () => createSecureAgent({ vault: makeBrowserVault('onderling-screen:'), transportMode: 'relay', warnOnInsecure: false });
+export const makeBrowserScreenAgent = () => createSecureAgent({ vault: makeBrowserVault(storageName('screenGrant')), transportMode: 'relay', warnOnInsecure: false });
 
 /**
  * This screen's key and grants in this browser, forgotten (L1115): for a key that is there but will not read, which is
@@ -16,7 +17,7 @@ export const makeBrowserScreenAgent = () => createSecureAgent({ vault: makeBrows
  */
 export function forgetScreenKey(storage = globalThis.localStorage) {
   const keys = [];
-  try { for (let i = 0; i < storage.length; i += 1) { const k = storage.key(i); if (k && (k.startsWith('onderling-screen:') || k.startsWith('onderling.screen.'))) keys.push(k); } } catch { return 0; }
+  try { for (let i = 0; i < storage.length; i += 1) { const k = storage.key(i); if (k && (k.startsWith(storageName('screenGrant')) || k.startsWith(storageName('screenClient')))) keys.push(k); } } catch { return 0; }
   for (const k of keys) { try { storage.removeItem(k); } catch { /* the rest still go */ } }
   return keys.length;
 }

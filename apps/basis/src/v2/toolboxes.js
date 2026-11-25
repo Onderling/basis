@@ -13,6 +13,7 @@
  * What leaves on a call: the tool's id and its input (the words of the question), nothing about the person or circle.
  * The wire is `toolboxClient.js`. Pure composition: the store, the key reader and `fetch` are handed in.
  */
+import { isReservedName } from './storageRegister.js';
 import { readToolboxCard, callTool, readItemList, fetchThumbs } from './toolboxClient.js';
 import { firstPartyFirstWords } from '@onderling/app-manifest';
 import { GATE_WORDS } from './gateWords.js';
@@ -131,6 +132,8 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
      */
     async addToolbox({ name, confirm = false } = {}) {
       const n = String(name ?? '').trim();
+      // a name Basis stores under is not a toolbox's to take (its page shares the web origin): refused before anything
+      if (isReservedName(n)) { log('tools', 'refused', { check: 'switch-on', reason: 'toolbox-name-reserved' }); return { ok: false, code: 'toolbox-name-reserved', name: n }; }
       const p = (await placed()).find((x) => x.name === n);
       if (!p) return { ok: false, code: 'toolbox-not-placed', name: n };
       if (!(await keyFor(n))) { log('tools', 'refused', { check: 'switch-on', reason: 'toolbox-no-key' }); return { ok: false, code: 'toolbox-no-key', name: n }; }
@@ -341,6 +344,7 @@ const REFUSAL_KEY = Object.freeze({
   'toolbox-error': 'toolbox_unreachable', 'toolbox-timeout': 'toolbox_timeout', 'tool-not-offered': 'toolbox_tool_not_offered', 'toolbox-word-taken': 'toolbox_word_taken',
   'tool-error': 'toolbox_tool_failed', 'toolbox-bad-answer': 'toolbox_failed',
   'toolbox-page-is-app-origin': 'toolbox_page_app_origin',
+  'toolbox-name-reserved': 'toolbox_name_reserved',
 });
 
 /**

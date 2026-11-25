@@ -1,3 +1,4 @@
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 /**
  * onboardingFlags — the two one-time first-run booleans, shared web ↔ mobile.
  *
@@ -12,16 +13,16 @@
  * adapters, so it's unit-testable off-platform.
  */
 
-export const HELP_CIRCLE_PROVISIONED_KEY = 'cc.helpCircleProvisioned';
-export const ONBOARDING_DONE_KEY = 'cc.onboardingDone';
+export const HELP_CIRCLE_PROVISIONED_KEY = storageName('helpCircleProvisioned');
+export const ONBOARDING_DONE_KEY = storageName('onboardingDone');
 /** Vandaag's onboarding strip: the "Nieuw bij Basis?" card was seen (read or put away) on this device. */
-export const INTRO_CARD_SEEN_KEY = 'cc.introCardSeen';
+export const INTRO_CARD_SEEN_KEY = storageName('introCardSeen');
 /** The first open's three doors were answered on this device (one chosen): the screen does not come back. */
-export const FIRST_OPEN_SEEN_KEY = 'cc.firstOpenSeen';
+export const FIRST_OPEN_SEEN_KEY = storageName('firstOpenSeen');
 /** The recovery phrase was written down (or photographed) on this device — the key card is done. */
-export const KEY_SAVED_KEY = 'cc.mnemonicAck';
+export const KEY_SAVED_KEY = storageName('mnemonicAck');
 /** The key card was put away with "Later" until this moment (epoch ms, as a string). */
-export const KEY_SNOOZED_UNTIL_KEY = 'cc.keyCardSnoozedUntil';
+export const KEY_SNOOZED_UNTIL_KEY = storageName('keyCardSnoozedUntil');
 
 /**
  * A boolean-flag store over an injectable io (`{ get(key), set(key, '1') }`). `get`

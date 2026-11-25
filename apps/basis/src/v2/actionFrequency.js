@@ -40,6 +40,7 @@
  * @param {{ onChange?: (snap: Record<string, Record<string, number>>) => void }} [opts]
  * @returns {ActionFrequencyStore}
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { featureActionLabelKey } from './circleTabs.js';
 import { sealedKeyValue } from './localStoreSeal.js';
 
@@ -159,7 +160,7 @@ export function usageRows(snap, { names = {}, t = (k) => k, labelOf = null } = {
 }
 
 /** Where the snapshot is kept on a device. */
-export const ACTION_FREQ_KEY = 'cc.actionFrequency';
+export const ACTION_FREQ_KEY = storageName('actionFrequency');
 
 /**
  * The action-frequency snapshot's io, SEALED at rest (ledger L1083: which ops the person uses), over localStorage (web)

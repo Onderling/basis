@@ -12,6 +12,7 @@
  *   `url` (the A2A base URL) → the HTTP A2A path (skill dispatch) for a
  *     URL-only agent with no peer address.
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { isPairCircleId } from './pairCircleId.js';
 import { personLabel, isKeyLike } from './personLabel.js';
 import { sealedKeyValue } from './localStoreSeal.js';
@@ -492,7 +493,7 @@ export function markRenames(rows = [], { lastSeenNames = {} } = {}) {
 }
 
 /** Where the last-painted names live (device-local, like the seen-marks: `cc.contactNames`). */
-export const CONTACT_NAMES_KEY = 'cc.contactNames';
+export const CONTACT_NAMES_KEY = storageName('contactNames');
 
 /**
  * The per-device memory of what each contact's row LAST READ — the left-hand side of `markRenames`. Duck-typed

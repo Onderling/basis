@@ -9,6 +9,7 @@
 // embedBaseUrl, embedModel, apiKey, attestation }`. `mode` is derived from the preset and kept on the
 // value because it stays load-bearing for `resolveCircleLlm` (local|cloud|off selection).
 
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { CIRCLE_LLM_ROUTE_PRESETS } from './circleLlmRoutes.js';
 import { hmacBase64Url } from '@onderling/core';
 import { sealedJsonIo } from './localStoreSeal.js';
@@ -94,7 +95,7 @@ function withCacheSecret(cfg) {
   return { ...cfg, cacheSecret: hmacBase64Url([...bytes].join(','), 'cache-secret') };
 }
 
-const STORAGE_KEY = 'cc.userLlmDefault';
+const STORAGE_KEY = storageName('userLlmDefault');
 
 /**
  * The setting's io, SEALED at rest (ledger L1083): it holds the person's own model endpoint WITH its API key. One io for

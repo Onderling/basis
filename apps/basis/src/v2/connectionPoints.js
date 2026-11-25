@@ -1,3 +1,4 @@
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 /**
  * basis v2 — connection points (Nearby step I, §7).
  *
@@ -565,7 +566,7 @@ export function endpointToDialForInvite({ invite, activeUrl = null } = {}) {
 
 // ── Persistence + migration ─────────────────────────────────────────────────
 
-const POINTS_STORAGE_KEY = 'cc.connectionPoints';
+const POINTS_STORAGE_KEY = storageName('connectionPoints');
 
 /** localStorage-backed IO (web). Mirrors `relayPref.js` so both settings persist the same way. */
 export function localStorageConnectionPointsIo(storage = globalThis.localStorage) {

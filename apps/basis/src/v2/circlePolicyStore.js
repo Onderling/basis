@@ -18,6 +18,7 @@
  *     restore(circleId, ts)    → Promise<value|null>  // optional (@onderling/versioning consolidation)
  *   }
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
 import { sealedKeyValue } from './localStoreSeal.js';
 import {
@@ -235,7 +236,7 @@ export function createMemberOverrideStore({ load, save } = {}) {
 /** localStorage-backed load/save for member overrides. Key: `cc.circleOverride.<circleId>`. */
 export function localStorageOverrideIo(storage = globalThis.localStorage) {
   // SEALED at rest (ledger L1083: per-member overrides), on web and phone alike
-  const kv = sealedKeyValue(storage, { name: 'the member overrides', strict: true, said: true, resealAtStart: ['cc.circleOverride.'] });
+  const kv = sealedKeyValue(storage, { name: 'the member overrides', strict: true, said: true, resealAtStart: [storageName('circleOverride')] });
   const key = (id) => `cc.circleOverride.${id}`;
   return {
     load: async (id) => {

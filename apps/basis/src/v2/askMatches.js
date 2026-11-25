@@ -8,6 +8,7 @@
  *
  * Ask opens the contact thread with the match; Skip hides that match on THIS device (`createAskMatchSkips`).
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { findOfferingMatches } from '@onderling/kring-host/findOfferingMatches';
 import { noticeboardIntentOf } from '@onderling/item-types';
 import { memberLabelFor } from './circleStream.js';
@@ -73,7 +74,7 @@ export function createAskMatchSkips({ load, save } = {}) {
   };
 }
 
-const STORAGE_KEY = 'cc.askMatchSkips';
+const STORAGE_KEY = storageName('askMatchSkips');
 
 /**
  * The Skips' io, SEALED at rest (ledger L1083: which ask posts the person skipped for whom), over localStorage (web) or

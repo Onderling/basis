@@ -11,6 +11,7 @@
  * vitest exercises the round-trip with a mock and the RN screens pass the
  * real AsyncStorage instance.
  */
+import { storageName } from '../../../basis/src/v2/storageRegister.js';   // every storage name from the one register
 import { localPolicyPendingMarks } from '../../../basis/src/v2/circlePolicyStore.js';
 import {
   createCirclePolicyStore,
@@ -81,7 +82,7 @@ export function asyncFixedIo(key, storage) {
 export function makeCirclePolicyStoreRN(rawStorage, { getPodWriter } = {}) {
   // the policy sealed at rest with the shell's content key, as web and the box do (its versions seal on their own:
   // `asyncStorageObjectVersions` wraps its backend in `sealedLocalBackend`)
-  const localIo = asyncKeyedIo('cc.circlePolicy.', sealedKeyValue(rawStorage, { name: 'the circle policy' }));
+  const localIo = asyncKeyedIo(storageName('circlePolicy'), sealedKeyValue(rawStorage, { name: 'the circle policy' }));
   const podIo   = podPolicyIo({
     getWriter: typeof getPodWriter === 'function' ? getPodWriter : () => null,
     app: 'cc-circle',
@@ -153,7 +154,7 @@ export function makeCircleRecipeStoreRN(storage) {
   const versions = asyncStorageObjectVersions('recipe', storage);
   return createCircleRecipeStore({
     // the recipe sealed at rest, as on web (its versions seal on their own)
-    io: asyncKeyedIo('cc.circleRecipe.', sealedKeyValue(storage, { name: 'the circle recipe' })),
+    io: asyncKeyedIo(storageName('circleRecipe'), sealedKeyValue(storage, { name: 'the circle recipe' })),
     versions,
   });
 }
@@ -165,7 +166,7 @@ export function makeCircleRulesStoreRN(storage) {
   const versions = asyncStorageObjectVersions('rules', storage);
   return createCircleRulesStore({
     // the rules sealed at rest, as on web (their versions seal on their own)
-    ...asyncKeyedIo('cc.circleRules.', sealedKeyValue(storage, { name: 'the circle rules' })),
+    ...asyncKeyedIo(storageName('circleRules'), sealedKeyValue(storage, { name: 'the circle rules' })),
     versions,
   });
 }

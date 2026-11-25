@@ -1,3 +1,4 @@
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 /**
  * basis v2 — agent-add admin approval.
  *
@@ -155,7 +156,7 @@ function normalizeAgent(raw = {}) {
  * Persistence store — same IO contract as the proposal store.
  * ────────────────────────────────────────────────────────────────── */
 
-const STORE_KEY = 'cc.agentRequests';
+const STORE_KEY = storageName('agentRequests');
 
 export function createAgentRequestStore({ io, storeKey = STORE_KEY } = {}) {
   if (!io || typeof io.load !== 'function' || typeof io.save !== 'function') {

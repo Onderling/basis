@@ -1567,6 +1567,10 @@
 .circle-screen__list-add button { flex: 0 0 auto; }
 
 /* The shared overlay sheet (the "+" sheet, restore, …): the theme's card, so it follows dark mode. */
+/* THE ASSISTANT PANEL: a floating card above the tab bar (the backdrop ends where the bar starts), tall, inset */
+.cc-assistant-backdrop { bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important; align-items: flex-end !important; }
+.cc-overlay-card.cc-assistant-panel { max-width: 34rem; width: calc(100% - 24px); max-height: calc(100% - 24px); margin: 0 auto 12px; border-radius: 16px; box-shadow: 0 8px 28px rgba(0, 0, 0, .28); }
+@media (max-width: 640px) { .cc-overlay-card.cc-assistant-panel { height: calc(100% - 24px); } }
 .circle-vandaag-plus__tabs { display: flex; gap: 4px; margin: 2px 0 8px; border-bottom: 1px solid var(--line); }
 .circle-vandaag-plus__tab { border-radius: 0; border-bottom: 2px solid transparent; }
 .circle-vandaag-plus__tab[aria-selected="true"] { border-bottom-color: var(--accent-ink); color: var(--accent-ink); font-weight: 600; }

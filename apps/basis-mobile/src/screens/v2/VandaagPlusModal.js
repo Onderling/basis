@@ -6,7 +6,7 @@
  * is typed in words ("morgen om 14:00"), read by the shared bounded reader.
  */
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Modal, View, Text, Pressable, ScrollView, StyleSheet, Keyboard, useWindowDimensions } from 'react-native';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { conversationSelf } from '../../../../basis/src/assistant/plusDoor.js';
@@ -51,6 +51,17 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const sheetCap = useSheetCap(0.92);
+  // THE ASSISTANT PANEL is a floating card (web twin: .cc-assistant-panel): inset, tall, ending above the tab bar so the
+  // bar stays in sight; while the keyboard is open it takes the full height (the line and its answers need the room)
+  const { height: winH } = useWindowDimensions();
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  useEffect(() => {
+    const on = Keyboard.addListener('keyboardDidShow', () => setKeyboardOpen(true));
+    const off = Keyboard.addListener('keyboardDidHide', () => setKeyboardOpen(false));
+    return () => { on.remove(); off.remove(); };
+  }, []);
+  const aboveBar = keyboardOpen ? 8 : 76;   // the tab bar (6 + 48 + 10) and a gap
+  const panelHeight = Math.min(sheetCap.maxHeight, winH - aboveBar - 24);
   const [actId, setActId] = useState(null);
   // the sheet scrolls (a long thread, the "/" list): the line is brought into view whenever its place changes, so on
   // open and after each turn the person sees the line, not old turns (web twin: scrollIntoView on the line)
@@ -130,9 +141,10 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
     if (r?.error) setError(r.error); else { setDone(r?.done ?? null); setError(null); }
   };
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={closeSheet}>
-      <View style={styles.backdrop}>
-        <View style={[styles.card, sheetCap]} testID="vandaag-plus">
+    <Modal visible transparent animationType="fade" onRequestClose={closeSheet}>
+      {/* a touch outside the card leaves as "Klaar" does (closeSheet: an unsaved form the line opened is settled) */}
+      <Pressable style={[styles.backdrop, { paddingBottom: aboveBar }]} onPress={closeSheet} testID="vandaag-plus-backdrop" accessible={false}>
+        <Pressable style={[styles.card, { height: panelHeight, maxHeight: panelHeight }]} onPress={() => {}} testID="vandaag-plus" accessible={false}>
           {/* the sheet scrolls: a long thread or the "/" list must never push the line and the first lines off the screen */}
           <ScrollView ref={scrollRef} style={SHEET_SCROLL} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.cardBody} testID="vandaag-plus-scroll">
           <Text style={styles.title}>{t(edit ? 'circle.vandaag.plus_edit' : 'circle.vandaag.plus')}</Text>
@@ -275,15 +287,15 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
           {/* the way out, not one of the acts */}
           <Btn variant="ghost" onPress={closeSheet} testID="vandaag-plus-close" label={t('circle.vandaag.done')} style={styles.btnAt} />
           </ScrollView>
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
 
 const makeStyles = (theme) => StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  card: { backgroundColor: theme.color.card, borderTopLeftRadius: 12, borderTopRightRadius: 12, padding: 16 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end', paddingHorizontal: 12 },
+  card: { backgroundColor: theme.color.card, borderRadius: 16, padding: 16, elevation: 8 },
   cardBody: { gap: 8 },
   title: { fontSize: 17, fontWeight: '700', color: theme.color.ink, marginBottom: 4 },
   field: { gap: 4, marginBottom: 8 },

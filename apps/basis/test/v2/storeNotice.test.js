@@ -63,3 +63,14 @@ describe('the not-readable notice', () => {
     expect(storeNoticeView(notReadableStores(), t).cost).toContain('andere gegevens');
   });
 });
+
+describe('the not-readable notice, both causes at once', () => {
+  it('the kinds an update fixes and the kinds it does not each get their own cost line', () => {
+    const v = storeNoticeView([
+      { name: 'a', kind: 'lists', reason: 'version' },
+      { name: 'b', kind: 'settings', reason: 'unparseable' },
+    ], t);
+    expect(v.reason).toBe('version');
+    expect(v.cost).toBe('Wat je hier nu verandert in lijsten, wordt pas bewaard na de update. Wat je hier nu verandert in instellingen, wordt niet bewaard.');
+  });
+});

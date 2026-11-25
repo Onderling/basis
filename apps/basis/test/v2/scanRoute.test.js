@@ -27,7 +27,7 @@ describe('routeScan — one scanner, routed by scheme', () => {
     expect(routeScan(null).kind).toBe('unknown');
   });
   it('the classifier list carries every kind, in the one order', () => {
-    expect(SCAN_CLASSIFIERS.map((c) => c.kind)).toEqual(['contact', 'invite', 'pair', 'enroll', 'claim', 'screen', 'botlink']);
+    expect(SCAN_CLASSIFIERS.map((c) => c.kind)).toEqual(['contact', 'invite', 'pair', 'enroll', 'claim', 'screen', 'botlink', 'bot']);
   });
 });
 

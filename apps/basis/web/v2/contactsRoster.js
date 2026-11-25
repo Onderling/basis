@@ -12,7 +12,7 @@ import { translatorOr } from '../../src/locales/translatorOr.js';
 import { splitShownHidden, contactRowMeta } from '../../src/v2/contactsSource.js';
 import { paintFace } from './faceView.js';
 
-export function renderContactsRoster(container, { contacts = [], unread = {}, t, onOpen, onAdd, onAddPerson = null, resolvePictureFor = null, onBlocked = null, requests = [], onAccept = null, onIgnore = null, onBlock = null } = {}) {
+export function renderContactsRoster(container, { contacts = [], unread = {}, t, onOpen, onAdd, resolvePictureFor = null, onBlocked = null, requests = [], onAccept = null, onIgnore = null, onBlock = null } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'contactsRoster.js');
   container.innerHTML = '';
@@ -24,7 +24,7 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
   heading.className = 'cc-contacts__title';
   heading.textContent = tr('circle.contacts.title');
   head.appendChild(heading);
-  // the two ways in: a PERSON (the scanner — their card or link; Me's Scan, the same door) and a bot (its address)
+  // ONE way in (Frits 2026-11-20): a person's card, an invite or a bot's address — the pasted text says which
   const acts = document.createElement('div');
   acts.className = 'cc-contacts__acts';
   const addButton = (labelKey, role, fn) => {
@@ -36,8 +36,7 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
     b.addEventListener('click', () => fn());
     acts.appendChild(b);
   };
-  if (typeof onAddPerson === 'function') addButton('circle.contacts.add_person', 'add-person', onAddPerson);
-  if (typeof onAdd === 'function') addButton('circle.contacts.add', 'add-bot', onAdd);
+  if (typeof onAdd === 'function') addButton('circle.contacts.add', 'add', onAdd);
   if (acts.childElementCount) head.appendChild(acts);
   container.appendChild(head);
 

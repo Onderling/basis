@@ -11,6 +11,7 @@
  * can import this without an AsyncStorage native module); the group-key resource persists
  * there for durability across reloads.
  */
+import { buildShellSealedDataSource } from '../../../basis/src/v2/shellSealedDataSource.js';   // a shell's own store: sealed, never before the key
 import { storageName } from '../../../basis/src/v2/storageRegister.js';   // every storage name from the one register
 import { onPolicyPostureChange } from '../../../basis/src/v2/circlePolicyStore.js';
 import { VaultAsyncStorage } from '@onderling/react-native/identity/VaultAsyncStorage';
@@ -418,7 +419,7 @@ function getDefaultCircleLists() {
       try {
         // AsyncStorage-backed on device (durable); in-memory when no store is wired (SSR/tests).
         dataSource = asyncStorageRef
-          ? await buildHouseholdDataSource({ dbName: storageName('circleLists'), asyncStorage: asyncStorageRef, kind: 'lists' })
+          ? await buildShellSealedDataSource({ dbName: storageName('circleLists'), asyncStorage: asyncStorageRef, kind: 'lists' })   // sealed at rest, built once the key is there
           : undefined;
       } catch { dataSource = undefined; }   // no store → in-memory (makeCircleLists' default)
       return makeCircleLists({ dataSource });

@@ -27,6 +27,7 @@
  * The V0 'agent-not-booted' stub fell away in V1 (replaced by
  * boot-failure error or the real factory's reply).
  */
+import { buildShellSealedDataSource } from '../../../basis/src/v2/shellSealedDataSource.js';   // a shell's own store: sealed, never before the key
 import { storageName } from '../../../basis/src/v2/storageRegister.js';   // every storage name from the one register
 import { composeManifests, buildManifestsByOrigin } from './composeManifests.js';
 import { connectionManifests } from '../../../basis/src/v2/connectionManifests.js';
@@ -788,7 +789,7 @@ export async function bootAgentBundle(opts = {}) {
         try {
           let dataSource = null;
           if (opts.asyncStorage) {
-            try { dataSource = await buildHouseholdDataSource({ dbName: storageName('contactDms'), asyncStorage: opts.asyncStorage, kind: 'messages' }); }
+            try { dataSource = await buildShellSealedDataSource({ dbName: storageName('contactDms'), asyncStorage: opts.asyncStorage, kind: 'messages' }); }   // sealed at rest, built once the key is there
             catch { dataSource = null; }
           }
           return createContactDmStore({ dataSource, localActor: 'me' });

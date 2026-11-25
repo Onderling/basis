@@ -2098,7 +2098,7 @@
         "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
       },
       "awaiting": {
-        "text": "Wacht op jou",
+        "text": "Voor jou te doen",
         "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
       }
     },

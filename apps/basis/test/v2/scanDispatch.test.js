@@ -62,6 +62,6 @@ describe('every declared scan target has a painter in each shell', () => {
   });
   it("web: scanQr's seam is the paste prompt, through the route table", () => {
     expect(SHELLS.web).toMatch(/openQrScanner: \(\) => \{[^\n]*takeScannedText\(v\)/);
-    expect(SHELLS.web).toMatch(/const r = routeScan\(text\);/);
+    expect(SHELLS.web).toMatch(/const r = routeScan\(text, \{ for: purpose \}\);/);
   });
 });

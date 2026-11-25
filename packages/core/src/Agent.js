@@ -85,6 +85,7 @@ export class Agent extends Emitter {
   #wireRefusals  = new Map();   // address → { side: 'we-refused' | 'they-refused', wire }
   #wireSaid      = new Set();   // `${side}:${address}`
   #wireFramed    = new Set();   // addresses we sent a refusal frame
+  static #WIRE_MAX = 256;       // each of the three is capped, oldest let go (as the layer caps its hello bindings)
   #sealedConfigs = null;   // Map<groupId, { enabled, ... }> — Group BB
 
   /**
@@ -1317,11 +1318,23 @@ export class Agent extends Emitter {
   #markWire(address, side, wire) {
     if (typeof address !== 'string' || !address) return;
     const w = Number.isInteger(wire) ? wire : null;
+    this.#wireRefusals.delete(address);
     this.#wireRefusals.set(address, { side, wire: w });
+    Agent.#capWire(this.#wireRefusals);
     const said = `${side}:${address}`;
     if (this.#wireSaid.has(said)) return;
     this.#wireSaid.add(said);
+    Agent.#capWire(this.#wireSaid);
     this.emit('wire-refused', { address, side, wire: w });
+  }
+
+  static #capWire(m) {
+    while (m.size > Agent.#WIRE_MAX) m.delete(m.keys().next().value);
+  }
+
+  /** How many entries the wire bookkeeping holds, all three together (for the bound's test). */
+  wireBookkeepingSize() {
+    return this.#wireRefusals.size + this.#wireSaid.size + this.#wireFramed.size;
   }
 
   /**
@@ -1337,12 +1350,15 @@ export class Agent extends Emitter {
    * @param {Error & {from?: string, to?: string|null, envelopeId?: string, peerWire?: number|null}} err
    */
   refuseWire(transport, err) {
+    // only a sender the layer proved (or a first-contact hello) is marked and answered: see SecurityLayer step 5b'
+    if (err?.answerable !== true) return;
     const from = err.from;
     this.#markWire(from, 'we-refused', err.peerWire);
     if (typeof from !== 'string' || !from || this.#wireFramed.has(from)) return;
     const to = typeof err.to === 'string' && err.to ? err.to : null;
     if (to && !transport.holdsAddress?.(to)) return;
     this.#wireFramed.add(from);
+    Agent.#capWire(this.#wireFramed);
     const wire = Number.isInteger(this.#security?.wire) ? this.#security.wire : WIRE_VERSION;
     transport.sendHello(from, { ack: true, refused: WIRE_REFUSAL, wire }, { re: err.envelopeId ?? null, ...(to ? { from: to } : {}) })
       .catch((e) => this.emit('error', e));
@@ -1351,7 +1367,9 @@ export class Agent extends Emitter {
   /**
    * An envelope that passed the receive gate, before anything else sees it. A refusal frame is the peer saying it refuses
    * our wire: marked, said once, and CONSUMED (true: it is not a hello, nothing registers, nothing answers it). Any other
-   * envelope passed our wire gate, so a mark on its sender clears (false: handle it as usual).
+   * envelope passed our wire gate, so OUR refusal of its sender clears (false: handle it as usual). Their refusal of us
+   * stands for the start: the newer side's own envelopes still reach us, and clearing on them would let us send again
+   * into a silence (an update is a restart).
    * @param {object} envelope  verified
    * @returns {boolean} true when it was a refusal frame
    */
@@ -1361,7 +1379,10 @@ export class Agent extends Emitter {
       this.#markWire(from, 'they-refused', envelope.payload.wire);
       return true;
     }
-    if (typeof from === 'string' && this.#wireRefusals.delete(from)) this.emit('wire-cleared', { address: from });
+    if (typeof from === 'string' && this.#wireRefusals.get(from)?.side === 'we-refused') {
+      this.#wireRefusals.delete(from);
+      this.emit('wire-cleared', { address: from });
+    }
     return false;
   }
 

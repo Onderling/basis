@@ -67,13 +67,16 @@ describe('the wire refusal between two real agents over a relay', () => {
     expect(contactRowMeta(herRow, t)).toContain('circle.contacts.wire_older:Ik');
   });
 
-  it('the marks clear once an envelope with an accepted wire arrives (her device updated)', async () => {
+  it('my mark clears once an envelope with an accepted wire arrives; hers stands for her start', async () => {
     // her updated build speaks the current wire: after an update she starts fresh (the marks live in memory, per start),
     // so her first envelope leaves below her app's gate here, over her own relay connection
     await ann.agent.sa.peer.sendTo(me.pubKey, { subtype: 'delivery-receipt', messageId: 'new-1' }).catch(() => {});
     expect(await until(() => (me.agent.wireRefusal(ann.pubKey) === null ? true : null), { timeout: 10_000, step: 100 }), 'my mark cleared').toBe(true);
     const mine = await me.agent.sendPeerMessage(ann.pubKey, { subtype: 'delivery-receipt', messageId: 'z' });
     expect(mine?.refused ?? null, JSON.stringify(mine)).not.toBe('wire');
-    expect(await until(() => (ann.agent.wireRefusal(me.pubKey) === null ? true : null), { timeout: 10_000, step: 100 }), 'her mark cleared on my next envelope').toBe(true);
+    // HER mark is our refusal of her, and it stands for her start: an accepted envelope from me does not clear it (else
+    // her device sends again into my silence). Her real update is a restart, which starts with no marks.
+    await new Promise((r) => { setTimeout(r, 500); });
+    expect(ann.agent.wireRefusal(me.pubKey)?.side, 'her mark stands until she restarts').toBe('they-refused');
   }, 30_000);
 });

@@ -97,6 +97,69 @@ describe('the refusal between two agents', () => {
     expect(ahead.wireRefusal(plain.address)).toBeNull();
   });
 
+  it('an old-wire envelope naming a bound address but signed by another key: refused as a substitution, no mark, no frame', async () => {
+    const bus = new InternalBus();
+    const contact = agentOn(bus, await AgentIdentity.generate(new VaultMemory()), { wire: 2 });
+    const me = agentOn(bus, await AgentIdentity.generate(new VaultMemory()), { wire: 2, minWire: 2 });
+    await contact.start(); await me.start();
+    await contact.hello(me.address);   // binds the contact's key at my side
+    const frames = [];
+    const orig = me.transport.sendHello.bind(me.transport);
+    me.transport.sendHello = (to, payload, opts) => { frames.push(payload); return orig(to, payload, opts); };
+    const errors = [];
+    me.on('security-error', (e) => errors.push(e.code));
+
+    // a throwaway key, an old wire, and the contact's address as the sender
+    const throwaway = new SecurityLayer({ identity: await AgentIdentity.generate(new VaultMemory()), wire: 1 });
+    const forged = throwaway.encrypt(mkEnvelope(P.HI, contact.address, me.address, { pubKey: contact.address, ack: false }));
+    me.transport._receive(forged);
+    await tick();
+
+    expect(errors).toEqual([SEC.SENDER_NOT_BOUND]);
+    expect(me.wireRefusal(contact.address), 'nobody proved this sender: no mark').toBeNull();
+    expect(frames, 'and no signed answer').toEqual([]);
+  });
+
+  it('an old-wire envelope from a key no roster vouches for, to a circle address of mine: no frame, no mark', async () => {
+    const meId = await AgentIdentity.generate(new VaultMemory());
+    const circleAddress = 'circle-address-of-mine';
+    const layer = new SecurityLayer({
+      identity: meId, minWire: 2,
+      authorizeSender: ({ ownAddress }) => (ownAddress ? { allow: false, reason: 'not on the roster' } : { allow: true }),
+    });
+    layer.ownAddressFor = (to) => (to === circleAddress ? circleAddress : null);
+    const strangerId = await AgentIdentity.generate(new VaultMemory());
+    const stranger = new SecurityLayer({ identity: strangerId, wire: 1 });
+    const env = stranger.encrypt(mkEnvelope(P.HI, strangerId.pubKey, circleAddress, { pubKey: strangerId.pubKey, ack: false }));
+    let err = null;
+    try { layer.decryptAndVerify(env); } catch (e) { err = e; }
+    expect(err?.code, 'refused as a stranger, not answered for its wire').toBe(SEC.SENDER_NOT_AUTHORIZED);
+  });
+
+  it('a they-refused mark stands for the start: an accepted envelope from the newer side does not clear it', async () => {
+    const bus = new InternalBus();
+    const older = agentOn(bus, await AgentIdentity.generate(new VaultMemory()), { wire: 1 });
+    const newer = agentOn(bus, await AgentIdentity.generate(new VaultMemory()), { wire: 2, minWire: 2 });
+    await older.start(); await newer.start();
+    await older.hello(newer.address).catch(() => {});
+    expect(older.wireRefusal(newer.address)?.side).toBe('they-refused');
+    // the newer side's own hello reaches the older device (its gate accepts wire 2)
+    await Promise.race([newer.hello(older.address).catch(() => {}), tick(300)]);
+    await tick();
+    expect(older.wireRefusal(newer.address)?.side, 'the words do not vanish').toBe('they-refused');
+  });
+
+  it('the refusal bookkeeping is bounded: a flood of names does not grow it past its cap', async () => {
+    const bus = new InternalBus();
+    const me = agentOn(bus, await AgentIdentity.generate(new VaultMemory()), { wire: 2, minWire: 2 });
+    await me.start();
+    const tx = { holdsAddress: () => true, sendHello: () => Promise.resolve() };
+    for (let i = 0; i < 1000; i += 1) me.refuseWire(tx, { from: `addr-${i}`, to: null, envelopeId: `e${i}`, peerWire: 1, answerable: true });
+    expect(me.wireRefusal('addr-0'), 'the oldest is let go').toBeNull();
+    expect(me.wireRefusal('addr-999')?.side).toBe('we-refused');
+    expect(me.wireBookkeepingSize()).toBeLessThanOrEqual(3 * 256);
+  });
+
   it('the mark clears when an envelope with an accepted wire arrives from that peer', async () => {
     const bus = new InternalBus();
     const oldId = await AgentIdentity.generate(new VaultMemory());

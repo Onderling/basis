@@ -23,6 +23,15 @@ describe('lint-storage-register', () => {
   it('does not see a register call, a name passed through, or a scope that is not storage', () => {
     expect(names("kv.getItem(storageName('lastTab'));\ns.getItem(`${prefix}${id}`);\nconst control = { scope: 'circle' };\nstore.getItem(key);")).toEqual([]);
   });
+  it('sees a key built by hand from a prefix row (a key helper), through check()', async () => {
+    const { mkdirSync, writeFileSync, rmSync } = await import('node:fs');
+    const dir = new URL('../apps/basis/src/guard-fixture-storage-tmp/', import.meta.url);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(new URL('keyHelper.js', dir), 'export const key = (id) => `cc.circlePolicy.${id}`;\n');
+    try {
+      expect((await check()).some((p) => p.includes("builds a 'cc.circlePolicy.' key by hand"))).toBe(true);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
   it('every OPENED_ELSEWHERE entry is a register row', () => {
     for (const id of Object.keys(OPENED_ELSEWHERE)) expect(STORAGE[id], id).toBeTruthy();
   });

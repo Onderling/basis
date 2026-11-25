@@ -98,6 +98,17 @@ export async function check(root = ROOT) {
       problems.push(`${rel}:${line} names '${name}' by hand — take it from the register: storageName('<id>') (${REGISTER})`);
     }
   }
+  // 1b: a key BUILT by hand from a prefix row's name (`cc.circlePolicy.${id}` in a key helper), wherever it is written
+  const prefixes = Object.entries(STORAGE).filter(([, r]) => r.kind === 'prefix').map(([id, r]) => [id, r.name]);
+  for (const rel of shellFiles(root)) {
+    if (rel === REGISTER) continue;
+    readFileSync(path.join(root, rel), 'utf8').split('\n').forEach((l, i) => {
+      if (/^\s*(\/\/|\*)/.test(l)) return;
+      for (const [id, name] of prefixes) {
+        if (l.includes('`' + name + '${')) problems.push(`${rel}:${i + 1} builds a '${name}' key by hand — use \`\${storageName('${id}')}\${…}\``);
+      }
+    });
+  }
   for (const [id] of Object.entries(STORAGE)) {
     if (all.includes(`storageName('${id}')`)) continue;
     if (OPENED_ELSEWHERE[id]) continue;

@@ -92,7 +92,7 @@ export async function buildHouseholdDataSource(persistDb, { strategy = null } = 
  * @param {string}  [args.storeName]     IndexedDB-only
  * @param {string}  [args.prefix]        AsyncStorage-only
  * @param {number}  [args.saveDelayMs]
- * @param {string}  [args.kind='lists']  what the store holds as a person names it (`STORE_KINDS`), for the not-readable notice
+ * @param {string}  [args.kind='data']  what the store holds as a person names it (`STORE_KINDS`), for the not-readable notice
  * @returns {Promise<{ persist: object, kind: 'file'|'idb'|'async' } | null>}
  */
 async function pickPersist(args = {}) {
@@ -158,7 +158,7 @@ class FilePersist {
   #gate = null;
   #kind;
 
-  constructor({ kind = 'lists', path, saveDelayMs = 200 } = {}) {
+  constructor({ kind = 'data', path, saveDelayMs = 200 } = {}) {
     this.#kind = kind;   // what it holds as a person names it, for the not-readable notice
     if (typeof path !== 'string' || !path) throw new TypeError('FilePersist: path required');
     this.#path        = path;
@@ -232,7 +232,7 @@ class IndexedDBPersist {
   #kind;
   static #SNAPSHOT_KEY = 'state';
 
-  constructor({ kind = 'lists', dbName, storeName = 'snapshots', saveDelayMs = 200 } = {}) {
+  constructor({ kind = 'data', dbName, storeName = 'snapshots', saveDelayMs = 200 } = {}) {
     this.#kind = kind;   // what it holds as a person names it, for the not-readable notice
     if (typeof dbName !== 'string' || !dbName) {
       throw new TypeError('IndexedDBPersist: dbName required');
@@ -345,7 +345,7 @@ class AsyncStoragePersist {
   #gate = null;
   #kind;
 
-  constructor({ kind = 'lists', dbName, prefix = 'household-cache:', saveDelayMs = 200, asyncStorage } = {}) {
+  constructor({ kind = 'data', dbName, prefix = 'household-cache:', saveDelayMs = 200, asyncStorage } = {}) {
     this.#kind = kind;   // what it holds as a person names it, for the not-readable notice
     if (typeof dbName !== 'string' || !dbName) {
       throw new TypeError('AsyncStoragePersist: dbName required');

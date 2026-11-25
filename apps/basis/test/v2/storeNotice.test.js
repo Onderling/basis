@@ -71,6 +71,17 @@ describe('the not-readable notice, both causes at once', () => {
       { name: 'b', kind: 'settings', reason: 'unparseable' },
     ], t);
     expect(v.reason).toBe('version');
-    expect(v.cost).toBe('Wat je hier nu verandert in lijsten, wordt pas bewaard na de update. Wat je hier nu verandert in instellingen, wordt niet bewaard.');
+    expect(v.cost).toBe('Wat je hier nu verandert in lijsten, wordt pas bewaard na de update. Wat je hier nu verandert in instellingen, wordt niet bewaard. Blijft dit staan, gebruik dan Meld een probleem.');
+  });
+});
+
+describe('the not-readable notice, the report hint in the mixed case', () => {
+  it('with both causes, the damaged part still gets its "report a problem" line', () => {
+    const v = storeNoticeView([{ name: 'a', kind: 'lists', reason: 'version' }, { name: 'b', kind: 'settings', reason: 'unparseable' }], t);
+    expect(v.cost.endsWith('Blijft dit staan, gebruik dan Meld een probleem.')).toBe(true);
+  });
+  it('a newer build alone has no report line', () => {
+    const v = storeNoticeView([{ name: 'a', kind: 'lists', reason: 'version' }], t);
+    expect(v.cost).not.toContain('Meld een probleem');
   });
 });

@@ -97,6 +97,9 @@ export function createAgentRegistry({
   // lives on the pseudo-pod, which is NOT a versioned circle pod, so it gets none for free).
   versionStore = null,
   now = () => new Date().toISOString(),
+  // a stored registry this build cannot read: said here (the shell hands in the device's one notice register), as
+  // 'other data' — every write is refused meanwhile, so a change the person makes to their profiles is not kept
+  onNotReadable = null,
 } = {}) {
   if (!pseudoPod || typeof pseudoPod.read !== 'function') {
     throw Object.assign(
@@ -124,8 +127,16 @@ export function createAgentRegistry({
     return {
       body: normaliseResource(rec.bytes),
       etag: rec.etag ?? null,
-      notReadable: _notReadable(rec.bytes),
+      notReadable: _said(_notReadable(rec.bytes)),
     };
+  }
+  let _saidReason = null;
+  function _said(reason) {
+    if (reason && reason !== _saidReason) {
+      _saidReason = reason;
+      try { onNotReadable?.({ name: uri, kind: 'data', reason }); } catch { /* a report never breaks a read */ }
+    }
+    return reason;
   }
   /** The read a WRITE starts from: refused when the stored registry cannot be read by this build. */
   async function _readForWrite() {

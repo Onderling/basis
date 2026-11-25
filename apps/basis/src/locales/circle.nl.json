@@ -10232,6 +10232,10 @@
       "text": "Wat je hier nu verandert in {{what}}, wordt niet bewaard.",
       "doc": "Second line under the not-readable notice (no update fixes it). what = the kinds of stores affected as plain words, joined."
     },
+    "reportHint": {
+      "text": "Blijft dit staan, gebruik dan Meld een probleem.",
+      "doc": "Third line of the notice when BOTH a newer build's data and damaged data are on this device: the headline says 'update the app', so the damaged part keeps its own way out."
+    },
     "and": {
       "text": " en ",
       "doc": "Joins the last two kind words in the cost line ('berichten en lijsten')."

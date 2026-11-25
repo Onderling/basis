@@ -9,7 +9,7 @@
  * later choice) — read through an injected io so web (localStorage) and mobile (AsyncStorage) run one code.
  */
 import { storageName } from './storageRegister.js';   // every storage name from the one register
-import { sealedKeyValue, shellContentSeal } from './localStoreSeal.js';
+import { sealedKeyValue, shellContentSeal, jsonKv } from './localStoreSeal.js';
 
 export const CONTACT_SEEN_KEY = storageName('contactSeenAt');
 
@@ -54,10 +54,10 @@ export function totalUnread(map) {
  * one-contact map never lands over the person's marks.
  */
 export function makeContactSeenStore(io) {
+  // one store for reads and writes: a value that does not parse is kept (said), and `mark` writes nothing over it
+  const kv = jsonKv(io, { name: 'the contact seen-marks', kind: 'messages' });
   async function readOrThrow() {
-    const raw = await io.getItem(CONTACT_SEEN_KEY);   // a storage error comes through
-    let v = {};
-    try { v = raw ? JSON.parse(raw) : {}; } catch { v = {}; }
+    const v = await kv.getJson(CONTACT_SEEN_KEY);   // a storage error comes through; not JSON = kept + refused + said
     return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
   }
   async function read() {
@@ -69,7 +69,7 @@ export function makeContactSeenStore(io) {
     try { map = await readOrThrow(); } catch { return; }   // not read: write nothing over the marks
     if (typeof map[contactId] === 'number' && map[contactId] >= ts) return;
     map[contactId] = ts;
-    try { await io.setItem(CONTACT_SEEN_KEY, JSON.stringify(map)); } catch { /* quota / disabled: the badge stays, nothing breaks */ }
+    try { await kv.setItem(CONTACT_SEEN_KEY, JSON.stringify(map)); } catch { /* quota / disabled / kept: the badge stays, nothing breaks */ }
   }
   return { read, mark };
 }

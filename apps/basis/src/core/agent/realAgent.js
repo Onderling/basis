@@ -647,7 +647,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
   // Now the stores that hold content can be built, sealed from their first write.
   householdDataSource = opts.householdPersistDb
-    ? await buildHouseholdDataSource(opts.householdPersistDb, { strategy: contentSeal })
+    ? await buildHouseholdDataSource({ ...opts.householdPersistDb, kind: 'lists' }, { strategy: contentSeal })
     : undefined;
   // THE EXTENSIONS this node runs with: their nouns join the stores' registry (checked: under their origin, no shadow,
   // their words their own); their free atoms run over the same circle stores. Refused ones bring nothing.
@@ -1724,7 +1724,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         agent:       chatAgent,
         opts: { capabilities: ['basis'], name: opts.agentsSelfName ?? 'basis (this device)' },
       }))
-      ?? createAgentRegistry({ pseudoPod: registryPseudoPod, deviceId: chatId.pubKey });
+      ?? createAgentRegistry({ pseudoPod: registryPseudoPod, deviceId: chatId.pubKey, onNotReadable: reportNotReadable });
 
     // THE FACTS' WRITE SEAM: every writer of a profile's curated properties or disclosure ends in `register` (the
     // property, driver, disclosure and Nearby ops, a persona's creation…). A change of the FACTS is stamped here

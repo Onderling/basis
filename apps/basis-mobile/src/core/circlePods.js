@@ -418,7 +418,7 @@ function getDefaultCircleLists() {
       try {
         // AsyncStorage-backed on device (durable); in-memory when no store is wired (SSR/tests).
         dataSource = asyncStorageRef
-          ? await buildHouseholdDataSource({ dbName: storageName('circleLists'), asyncStorage: asyncStorageRef })
+          ? await buildHouseholdDataSource({ dbName: storageName('circleLists'), asyncStorage: asyncStorageRef, kind: 'lists' })
           : undefined;
       } catch { dataSource = undefined; }   // no store → in-memory (makeCircleLists' default)
       return makeCircleLists({ dataSource });

@@ -46,3 +46,13 @@ describe('the agent registry keeps what it does not know', () => {
     expect((await pod.read(URI)).bytes).toEqual(newer);
   });
 });
+
+describe('a registry this build cannot read is said', () => {
+  it('reported through onNotReadable as other data, with its reason', async () => {
+    const pod = await podWith({ v: RESOURCE_VERSION + 1, agents: [ANNE], updatedAt: 'x' });
+    const said = [];
+    const reg = createAgentRegistry({ pseudoPod: pod, deviceId: 'd1', onNotReadable: (r) => said.push(r) });
+    await reg.lookup('a1');
+    expect(said).toContainEqual({ name: URI, kind: 'data', reason: 'version' });
+  });
+});

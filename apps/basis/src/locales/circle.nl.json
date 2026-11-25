@@ -6380,6 +6380,10 @@
       "text": "Het woord '{{word}}' van {{title}} gebruik ik al voor iets anders. Kies in het bestand op de box een ander woord.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
+    "toolbox_switches_unreadable": {
+      "text": "Ik kan niet lezen welke gereedschapskisten aan staan, dus ik verander er nu niets aan. Er is niets weg. Blijft dit staan, gebruik dan Meld een probleem.",
+      "doc": "The household bot's /toolbox door: the stored toolbox switches could not be read (a vault entry that will not decrypt, or a value that does not parse), so a switch on or off is refused and nothing is written over them."
+    },
     "toolbox_name_reserved": {
       "text": "De naam '{{name}}' is van Basis zelf. Geef deze gereedschapskist in het bestand op de box een andere naam.",
       "doc": "The household bot's /toolbox door: a placed toolbox whose name is one Basis stores under (basis, circle, cc, onderling) is refused before it is switched on. name = the toolbox's name."
@@ -10231,6 +10235,10 @@
     "costNotSaved": {
       "text": "Wat je hier nu verandert in {{what}}, wordt niet bewaard.",
       "doc": "Second line under the not-readable notice (no update fixes it). what = the kinds of stores affected as plain words, joined."
+    },
+    "reportHint": {
+      "text": "Blijft dit staan, gebruik dan Meld een probleem.",
+      "doc": "Third line of the notice when BOTH a newer build's data and damaged data are on this device: the headline says 'update the app', so the damaged part keeps its own way out."
     },
     "and": {
       "text": " en ",

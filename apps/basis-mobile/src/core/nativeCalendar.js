@@ -25,7 +25,7 @@ import { storageName } from '../../../basis/src/v2/storageRegister.js';   // eve
 import { sealedKeyValue } from '../../../basis/src/v2/localStoreSeal.js';
 
 const STORAGE_KEY = storageName('nativeCalendarIds');
-const sealedIn = (storage) => sealedKeyValue(storage, { name: 'the calendar id map', strict: true });
+const sealedIn = (storage) => sealedKeyValue(storage, { name: 'the calendar id map', kind: 'data', strict: true });
 
 /**
  * Pure-fn diff. `prev` and `next` are arrays of `{itemId, dueAt?,
@@ -130,9 +130,8 @@ export async function applyDiff({
 export async function loadEventIdMap({ storage } = {}) {
   if (!storage?.getItem) return {};
   try {
-    const raw = await sealedIn(storage).getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
+    const parsed = await sealedIn(storage).getJson(STORAGE_KEY);   // not JSON = kept + refused + said
+    if (!parsed) return {};
     return (parsed && typeof parsed === 'object') ? parsed : {};
   } catch {
     return {};

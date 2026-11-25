@@ -20,6 +20,7 @@
  * the setting by looking at a conversation.
  */
 import { storageName } from './storageRegister.js';   // every storage name from the one register
+import { jsonKv } from './localStoreSeal.js';
 import { CHAT_KIND } from './conversationKinds.js';
 import {
   DELIVERY, DELIVERY_TERMINAL, DELIVERY_LABELS, DELIVERY_REASON_LABELS, DELIVERY_WAITING_ENTRY, DELIVERY_WAITING_LABEL, isDeliveryState, shouldSendReceipt, receiveReceipt, RECEIPT_MESSAGE,
@@ -37,17 +38,21 @@ export function deliverySettings(stored = {}) {
 
 /** localStorage IO (web). One key, both settings — they are decided together. */
 export function localStorageDeliveryIo(storage = globalThis.localStorage, key = storageName('delivery')) {
-  return {
-    load: () => { try { return JSON.parse(storage?.getItem(key) ?? '{}'); } catch { return {}; } },
-    save: (v) => { try { storage?.setItem(key, JSON.stringify(v ?? {})); } catch { /* ignore */ } },
-  };
+  return deliveryIoOver(storage, key);
 }
 
 /** AsyncStorage IO (mobile). */
 export function asyncStorageDeliveryIo(AsyncStorage, key = storageName('delivery')) {
+  return deliveryIoOver(AsyncStorage, key);
+}
+
+/** Both shells' io: one plain key, read through `getJson` — a value that does not parse is kept, the save after it
+ *  refused, and said (the device's one notice); the defaults hold meanwhile. */
+function deliveryIoOver(storage, key) {
+  const kv = storage ? jsonKv(storage, { name: 'the delivery settings', kind: 'settings' }) : null;
   return {
-    load: async () => { try { return JSON.parse((await AsyncStorage?.getItem(key)) ?? '{}'); } catch { return {}; } },
-    save: async (v) => { try { await AsyncStorage?.setItem(key, JSON.stringify(v ?? {})); } catch { /* ignore */ } },
+    load: async () => { try { return (kv ? await kv.getJson(key) : null) ?? {}; } catch { return {}; } },
+    save: async (v) => { try { await kv?.setItem(key, JSON.stringify(v ?? {})); } catch { /* ignore: quota, or a kept value */ } },
   };
 }
 

@@ -28,7 +28,7 @@
 import { judgePolicyChain, judgeWithProposals, proposalsOn } from './governanceReceiverGate.js';
 import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, mergeCirclePolicy } from './circlePolicy.js';
 import { processRefusalLog } from './refusalLog.js';
-import { sealedKeyValue } from './localStoreSeal.js';
+import { sealedKeyValue, jsonKv } from './localStoreSeal.js';
 import { noteKeptPolicyChanges, provideKeptPolicyChanges } from './keptPolicyChanges.js';
 
 export const POLICY_UPDATE_KIND = 'policy-update';
@@ -162,16 +162,17 @@ export function makePolicyUpdateEmitter({ rail, fan = null, membershipUpToFor = 
  */
 export const POLICY_HEAD_KEY = (circleId) => `cc.circlePolicyHead.${circleId}`;
 export function makePolicyHeadStore(io) {
+  // one store for reads and writes: a head that does not parse is kept, the write after it refused, and said
+  const kv = jsonKv(io, { name: 'the policy head', kind: 'settings' });
   return {
     async read(circleId) {
       try {
-        const raw = await io.getItem(POLICY_HEAD_KEY(circleId));
-        const v = raw ? JSON.parse(raw) : null;
+        const v = await kv.getJson(POLICY_HEAD_KEY(circleId));
         return v && typeof v === 'object' && Number.isFinite(v.version) ? v : null;
       } catch { return null; }
     },
     async write(circleId, head) {
-      try { await io.setItem(POLICY_HEAD_KEY(circleId), JSON.stringify(head)); } catch { /* the next apply retries */ }
+      try { await kv.setItem(POLICY_HEAD_KEY(circleId), JSON.stringify(head)); } catch { /* the next apply retries; a kept head is not written over */ }
     },
   };
 }

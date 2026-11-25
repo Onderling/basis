@@ -172,6 +172,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `isReservedProfileLabel` | function | [`core.md`](core.md#isreservedprofilelabel) |
 | `isSelfPersonKeyStatement` | function | [`core.md`](core.md#isselfpersonkeystatement) |
 | `isStandardRole` | function | [`core.md`](core.md#isstandardrole) |
+| `isWireRefusal` | function | [`core.md`](core.md#iswirerefusal) |
 | `lastWriteWins` | function | [`core.md`](core.md#lastwritewins) |
 | `listKnownRoles` | function | [`core.md`](core.md#listknownroles) |
 | `listRoleBundles` | function | [`core.md`](core.md#listrolebundles) |
@@ -190,6 +191,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `MemorySource` | class | [`core.md`](core.md#memorysource) |
 | `MemoryStorageBackend` | class | [`core.md`](core.md#memorystoragebackend) |
 | `MergeContracts` | constant | [`core.md`](core.md#mergecontracts) |
+| `MIN_WIRE` | constant | [`core.md`](core.md#min_wire) |
 | `mintProfileId` | function | [`core.md`](core.md#mintprofileid) |
 | `mkEnvelope` | function | [`core.md`](core.md#mkenvelope) |
 | `mnemonicToSeed` | function | [`core.md`](core.md#mnemonictoseed) |
@@ -351,6 +353,10 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `verifyPersonKeyChain` | function | [`core.md`](core.md#verifypersonkeychain) |
 | `verifyReachabilityClaim` | function | [`core.md`](core.md#verifyreachabilityclaim) |
 | `verifySpine` | function | [`core.md`](core.md#verifyspine) |
+| `WIRE_FIELD` | constant | [`core.md`](core.md#wire_field) |
+| `WIRE_REFUSAL` | constant | [`core.md`](core.md#wire_refusal) |
+| `WIRE_VERSION` | constant | [`core.md`](core.md#wire_version) |
+| `wireAccepted` | function | [`core.md`](core.md#wireaccepted) |
 | `wireDeviceId` | function | [`core.md`](core.md#wiredeviceid) |
 
 ### From `@onderling/transports`

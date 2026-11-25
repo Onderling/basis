@@ -738,6 +738,14 @@
       "peer_unreachable": {
         "text": "Not reached, maybe offline (tap to retry)",
         "doc": "A message to one person did not reach them right now: their device is not on any connection point we share. Retryable."
+      },
+      "wire_older": {
+        "text": "Not sent: this device has an older Basis. Update Basis to talk to each other again",
+        "doc": "A send the send gate refused because the other side refused this device's Basis version; nothing left this device."
+      },
+      "wire_peer_older": {
+        "text": "Not sent: the other side uses an older Basis. Once it is updated you talk again",
+        "doc": "A send the send gate refused because this device refuses the other side's older Basis version; nothing left this device."
       }
     },
     "unknown_sender": {
@@ -6810,6 +6818,14 @@
         "text": "Ignored ({{n}})",
         "doc": "The fold holding ignored requests. {{n}} is how many."
       }
+    },
+    "wire_older": {
+      "text": "This device is older than {{name}}'s: update Basis to talk to each other again",
+      "doc": "On a contact's row while their device refuses this device's Basis version (the wire refusal): this device is the older one."
+    },
+    "wire_peer_older": {
+      "text": "{{name}} uses an older Basis. Once it is updated you talk again",
+      "doc": "On a contact's row while this device refuses their Basis version (the wire refusal): they are on the older one."
     },
     "add_bot_confirm_host": {
       "text": "Add the bot at {{host}}?",

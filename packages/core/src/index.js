@@ -215,6 +215,7 @@ export { Task }                                           from './protocol/Task.
 export { ping }                                           from './protocol/ping.js';
 export { sendMessage, handleMessage }                     from './protocol/messaging.js';
 export { sendHello, handleHello, forgetHello }            from './protocol/hello.js';
+export { WIRE_VERSION, MIN_WIRE, WIRE_FIELD, WIRE_REFUSAL, wireAccepted, isWireRefusal } from './protocol/wire.js';
 export { requestSkills, handleSkillDiscovery }            from './protocol/skillDiscovery.js';
 export { invokeAgentSkill, handleTaskRequest, handleTaskOneWay, tokenAgentKeyFor } from './protocol/taskExchange.js';
 export { subscribe, unsubscribe, publish, handlePubSub, setSubscribeAuthorizer, dropSubscriber }

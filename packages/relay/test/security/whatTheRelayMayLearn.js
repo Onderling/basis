@@ -410,6 +410,15 @@ export const DERIVABLE_FACTS = Object.freeze([
         + 'the argument that pays it.',
   },
   {
+    id: 'wire-version',
+    fact: 'Which WIRE each device speaks: the one integer `_w` every signed envelope carries in its header '
+        + '(2026-11-25), inside the signature so nobody on the path can lower it, read by the receiver BEFORE '
+        + 'it opens anything so an older device is refused in words instead of in silence. The relay learns '
+        + 'a build generation per address, not a person or a circle: at a given time every current build '
+        + 'speaks the same wire, so it singles out only a device that has not updated. Distinct from `_v`, '
+        + 'the envelope skeleton\'s own version, which a parser checks for exactly one value.',
+  },
+  {
     id: 'push-token',
     fact: 'At most one push token per connection, applied to every address on it. Same linkage as '
         + 'above, and durable across restarts by design (G15).',
@@ -532,6 +541,9 @@ export const ENVELOPE_HEADER_FIELDS = Object.freeze([
   // verifies against it instead of against whatever key the claimed `_from` maps to. See the
   // `signing-key` derivable fact — it is listed as something the relay reads, not argued away.
   '_signedBy',
+  // Added 2026-11-25: the wire this build speaks, inside the signature (core protocol/wire.js). See the `wire-version`
+  // derivable fact.
+  '_w',
 ]);
 
 /** The only key a sealed payload may carry. Anything else is content the relay can read. */

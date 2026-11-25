@@ -94,7 +94,7 @@ registries, peer graph, storage, config, and routing strategy. Register skills w
 envelopes; talk to peers via `hello()` and `invoke()`. Emits lifecycle and protocol
 events (extends Emitter).
 
-**Methods:** `addTransport()` · `removeTransport()` · `getTransport()` · `addPeer()` · `forget()` · `register()` · `bindToHub()` · `unbindFromHub()` · `start()` · `stop()` · `transportFor()` · `routeFor()` · `reachabilityFor()` · `hello()` · `call()` · `invoke()` · `invokeWithHop()` · `callWithHop()` · `swapIdentity()` · `enableRelayForward()` · `enableTunnelForward()` · `enableReachabilityOracle()` · `enableRendezvous()` · `upgradeToRendezvous()` · `isRendezvousActive()` · `enableSealedForwardFor()` · `disableSealedForwardFor()` · `getSealedForwardConfig()` · `setHelloGate()` · `startDiscovery()` · `enableAutoHello()` · `message()` · `introduce()` · `discoverA2A()` · `issueCapabilityToken()` · `issueA2ACapabilityToken()` · `storeA2AToken()` · `discoverSkills()` · `publish()` · `clearPubSubHistory()` · `export()` · `_asCallCtx()` · `_dispatch()`
+**Methods:** `addTransport()` · `removeTransport()` · `getTransport()` · `addPeer()` · `forget()` · `register()` · `bindToHub()` · `unbindFromHub()` · `start()` · `stop()` · `transportFor()` · `routeFor()` · `reachabilityFor()` · `hello()` · `call()` · `invoke()` · `invokeWithHop()` · `callWithHop()` · `swapIdentity()` · `enableRelayForward()` · `enableTunnelForward()` · `enableReachabilityOracle()` · `enableRendezvous()` · `upgradeToRendezvous()` · `isRendezvousActive()` · `enableSealedForwardFor()` · `disableSealedForwardFor()` · `getSealedForwardConfig()` · `setHelloGate()` · `startDiscovery()` · `enableAutoHello()` · `message()` · `introduce()` · `discoverA2A()` · `issueCapabilityToken()` · `issueA2ACapabilityToken()` · `storeA2AToken()` · `discoverSkills()` · `publish()` · `clearPubSubHistory()` · `export()` · `_asCallCtx()` · `wireRefusal()` · `refuseWire()` · `takeWireFrame()` · `_dispatch()`
 
 ## `src/Emitter.js`
 
@@ -3411,6 +3411,61 @@ Returns true if handled.
 - `agent` `import('../Agent.js').Agent`
 - `envelope` `object` — decrypted OW/AS envelope
 
+## `src/protocol/wire.js`
+
+### `WIRE_VERSION`
+
+**Kind:** constant · **Import:** `WIRE_VERSION` from `'@onderling/core'`
+
+The wire this build speaks.
+
+### `MIN_WIRE`
+
+**Kind:** constant · **Import:** `MIN_WIRE` from `'@onderling/core'`
+
+The lowest wire this build accepts from a peer.
+
+### `WIRE_FIELD`
+
+**Kind:** constant · **Import:** `WIRE_FIELD` from `'@onderling/core'`
+
+The envelope field that carries the wire, inside the signature.
+
+### `WIRE_REFUSAL`
+
+**Kind:** constant · **Import:** `WIRE_REFUSAL` from `'@onderling/core'`
+
+The `refused` value of a refusal frame (an HI answer) sent for a wire below ours.
+
+### `wireAccepted`
+
+**Kind:** function · **Import:** `wireAccepted` from `'@onderling/core'`
+
+```js
+wireAccepted(wire, minWire = MIN_WIRE)
+```
+
+Is a peer's carried wire accepted by a build whose lowest accepted wire is `minWire`?
+
+**Parameters**
+
+- `wire` `unknown`
+- `[minWire]` `number`
+
+### `isWireRefusal`
+
+**Kind:** function · **Import:** `isWireRefusal` from `'@onderling/core'`
+
+```js
+isWireRefusal(payload)
+```
+
+Is this HI payload a refusal frame for the wire? (`{ ack: true, refused: 'wire', wire: <n> }`)
+
+**Parameters**
+
+- `payload` `unknown`
+
 ## `src/routing/FallbackTable.js`
 
 ### `FallbackTable`
@@ -3624,7 +3679,7 @@ Error thrown when an envelope fails a security check. Carries a machine-readable
 
 ```js
 class SecurityLayer
-new SecurityLayer({ identity, authorizeSender = null, senderKeyLookup = null })
+new SecurityLayer({ identity, authorizeSender = null, senderKeyLookup = null, wire = WIRE_VERSION, minWire = MIN_WIRE })
 ```
 
 Per-agent envelope crypto: `encrypt()` boxes + signs outbound envelopes and

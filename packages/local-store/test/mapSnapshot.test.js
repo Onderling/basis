@@ -36,7 +36,7 @@ describe('mapSnapshot', () => {
 
   it('the gate refuses every save over a snapshot it could not read, and says so once', () => {
     const said = [];
-    const gate = mapSnapshotGate('household-items.json', (m) => said.push(m));
+    const gate = mapSnapshotGate('household-items.json', { warn: (m) => said.push(m) });
     expect(gate.read(JSON.stringify({ v: 9, data: {} }))).toEqual(new Map());
     expect(gate.notReadable).toBe('version');
     expect(gate.encode(new Map())).toBeNull();
@@ -46,13 +46,13 @@ describe('mapSnapshot', () => {
   });
 
   it('a failed read refuses saves too', () => {
-    const gate = mapSnapshotGate('db', () => {});
+    const gate = mapSnapshotGate('db', { warn: () => {} });
     gate.readFailed();
     expect(gate.encode(new Map())).toBeNull();
   });
 
   it('a readable snapshot saves normally', () => {
-    const gate = mapSnapshotGate('x', () => {});
+    const gate = mapSnapshotGate('x', { warn: () => {} });
     gate.read(null);
     expect(gate.encode(new Map([['k', 'v']]))).toBe(writeMapSnapshot(new Map([['k', 'v']])));
   });

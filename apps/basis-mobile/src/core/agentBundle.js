@@ -787,7 +787,7 @@ export async function bootAgentBundle(opts = {}) {
         try {
           let dataSource = null;
           if (opts.asyncStorage) {
-            try { dataSource = await buildHouseholdDataSource({ dbName: 'cc-contact-dm-state', asyncStorage: opts.asyncStorage }); }
+            try { dataSource = await buildHouseholdDataSource({ dbName: 'cc-contact-dm-state', asyncStorage: opts.asyncStorage, kind: 'messages' }); }
             catch { dataSource = null; }
           }
           return createContactDmStore({ dataSource, localActor: 'me' });

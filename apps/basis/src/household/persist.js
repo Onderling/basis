@@ -92,6 +92,7 @@ export async function buildHouseholdDataSource(persistDb, { strategy = null } = 
  * @param {string}  [args.storeName]     IndexedDB-only
  * @param {string}  [args.prefix]        AsyncStorage-only
  * @param {number}  [args.saveDelayMs]
+ * @param {string}  [args.kind='lists']  what the store holds as a person names it (`STORE_KINDS`), for the not-readable notice
  * @returns {Promise<{ persist: object, kind: 'file'|'idb'|'async' } | null>}
  */
 async function pickPersist(args = {}) {
@@ -109,7 +110,7 @@ async function pickPersist(args = {}) {
   if (hasFile) {
     return {
       kind:    'file',
-      persist: new FilePersist({ path: args.path, saveDelayMs: args.saveDelayMs }),
+      persist: new FilePersist({ path: args.path, saveDelayMs: args.saveDelayMs, kind: args.kind }),
     };
   }
   if (hasAsync) {
@@ -125,6 +126,7 @@ async function pickPersist(args = {}) {
         prefix:       args.prefix,
         saveDelayMs:  args.saveDelayMs,
         asyncStorage: args.asyncStorage,
+        kind:         args.kind,
       }),
     };
   }
@@ -135,6 +137,7 @@ async function pickPersist(args = {}) {
         dbName:      args.dbName,
         storeName:   args.storeName,
         saveDelayMs: args.saveDelayMs,
+        kind:        args.kind,
       }),
     };
   }
@@ -153,8 +156,10 @@ class FilePersist {
   #untrack = null;
   #lastSerialised = null;
   #gate = null;
+  #kind;
 
-  constructor({ path, saveDelayMs = 200 } = {}) {
+  constructor({ kind = 'lists', path, saveDelayMs = 200 } = {}) {
+    this.#kind = kind;   // what it holds as a person names it, for the not-readable notice
     if (typeof path !== 'string' || !path) throw new TypeError('FilePersist: path required');
     this.#path        = path;
     this.#saveDelayMs = saveDelayMs;
@@ -170,7 +175,7 @@ class FilePersist {
   }
 
   /** The snapshot's format and the refusal to save over one this build could not read (`mapSnapshotGate`). */
-  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#path)); }
+  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#path, { kind: this.#kind })); }
 
   async save(map) {
     const { writeFile, mkdir, rename } = await import('node:fs/promises');
@@ -224,9 +229,11 @@ class IndexedDBPersist {
   #untrack = null;
   #lastSerialised = null;
   #gate = null;
+  #kind;
   static #SNAPSHOT_KEY = 'state';
 
-  constructor({ dbName, storeName = 'snapshots', saveDelayMs = 200 } = {}) {
+  constructor({ kind = 'lists', dbName, storeName = 'snapshots', saveDelayMs = 200 } = {}) {
+    this.#kind = kind;   // what it holds as a person names it, for the not-readable notice
     if (typeof dbName !== 'string' || !dbName) {
       throw new TypeError('IndexedDBPersist: dbName required');
     }
@@ -247,7 +254,7 @@ class IndexedDBPersist {
   }
 
   /** The snapshot's format and the refusal to save over one this build could not read (`mapSnapshotGate`). */
-  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#dbName)); }
+  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#dbName, { kind: this.#kind })); }
 
   async save(map) {
     const serialised = this.#gateOf().encode(map);
@@ -336,8 +343,10 @@ class AsyncStoragePersist {
   #untrack = null;
   #lastSerialised = null;
   #gate = null;
+  #kind;
 
-  constructor({ dbName, prefix = 'household-cache:', saveDelayMs = 200, asyncStorage } = {}) {
+  constructor({ kind = 'lists', dbName, prefix = 'household-cache:', saveDelayMs = 200, asyncStorage } = {}) {
+    this.#kind = kind;   // what it holds as a person names it, for the not-readable notice
     if (typeof dbName !== 'string' || !dbName) {
       throw new TypeError('AsyncStoragePersist: dbName required');
     }
@@ -365,7 +374,7 @@ class AsyncStoragePersist {
   }
 
   /** The snapshot's format and the refusal to save over one this build could not read (`mapSnapshotGate`). */
-  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#key)); }
+  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#key, { kind: this.#kind })); }
 
   async save(map) {
     const serialised = this.#gateOf().encode(map);

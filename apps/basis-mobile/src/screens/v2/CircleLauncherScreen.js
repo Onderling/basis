@@ -359,6 +359,7 @@ import { bindCircleGovernance, openPolicyProposals, makeGovernanceBroadcast } fr
 import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-circle delivery — personal "shared with me" inbox (web≡mobile)
 import { launcherListPaint } from './launcherListPaint.js';
 import { bootFailureNotice, storedValueRefusedNotice } from '../../../../basis/src/v2/bootFailure.js';
+import { storeNoticeView } from '../../../../basis/src/v2/storeNotice.js';
 import { DEVELOPER_PARAM_KEY } from '../../../../basis/src/v2/paramsService.js';
 import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
 import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
@@ -566,6 +567,9 @@ export default function CircleLauncherScreen({
   onStartOver = null,
   storedRefusal = false,
   onDismissStoredRefusal = null,
+  // The stores holding data this phone could not read (`notReadableStores()`, App.js follows the register): said
+  // through the one shared notice, never dismissed while it stands.
+  unreadableStores = [],
   // The circle's policy on the governance lane (App.js builds it): stated here when an admin saves and when the
   // create wizard writes a new circle's first policy.
   circlePolicyLane = null,
@@ -3164,6 +3168,14 @@ export default function CircleLauncherScreen({
                 {t(storedValueRefusedNotice().key)}
               </Text>
             ) : null}
+            {(() => {
+              const notice = storeNoticeView(unreadableStores, t);
+              return notice ? (
+                <Text style={styles.bootFailed} accessibilityRole="alert" testID="launcher-store-notice">
+                  {`${notice.text} ${notice.cost}`}
+                </Text>
+              ) : null;
+            })()}
             {storedRefusal && typeof onDismissStoredRefusal === 'function' ? (
               <Pressable onPress={onDismissStoredRefusal} accessibilityRole="button" testID="launcher-stored-refused-ok">
                 <Text style={styles.bootRetry}>{t('circle.stored_value_unreadable_ok')}</Text>

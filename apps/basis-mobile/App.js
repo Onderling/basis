@@ -18,7 +18,7 @@ import * as sodium from 'react-native-libsodium';
 import { installPhoneSignatureEquation, installPhoneSigning, installPhoneSecretbox } from '../basis/src/v2/signatureEquations.js';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, Pressable, Text, StyleSheet, BackHandler, AppState } from 'react-native';
-import { flushPendingSaves } from '@onderling/local-store';
+import { flushPendingSaves, notReadableStores, onNotReadableChange } from '@onderling/local-store';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { asyncStorageMappingsStore, MAPPINGS_DEVICE } from './src/core/mappingsStoreRN.js';
@@ -157,6 +157,9 @@ export default function App() {
   const [storedRefusal, setStoredRefusal] = useState(false);
   const storedRefusalSaid = useRef(false);
   useEffect(() => onStoredValueRefused(() => { if (!storedRefusalSaid.current) setStoredRefusal(true); }), []);
+  // Data this phone keeps but a store could not read (kept, never saved over): the launcher says so, from the register.
+  const [unreadableStores, setUnreadableStores] = useState(() => notReadableStores());
+  useEffect(() => onNotReadableChange((list) => setUnreadableStores(list)), []);
   const dismissStoredRefusal = useCallback(() => { storedRefusalSaid.current = true; setStoredRefusal(false); }, []);
 
   // Shared EventLog: boot-time agent events + ChatScreen's inbound peer
@@ -764,6 +767,7 @@ export default function App() {
           onRetryBoot={retryBoot}
           onStartOver={startOver}
           storedRefusal={storedRefusal}
+          unreadableStores={unreadableStores}
           onDismissStoredRefusal={dismissStoredRefusal}
           deliveryStateMap={deliveryStateMapRef.current}
           registerCircleBotSink={registerCircleBotSink}

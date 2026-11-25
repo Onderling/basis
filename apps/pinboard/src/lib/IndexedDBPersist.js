@@ -43,6 +43,7 @@ export class IndexedDBPersist {
   /** Most recent saved snapshot (for diffing / no-op skip). */
   #lastSerialised = null;
   #gate = null;
+  #kind;
 
   /**
    * @param {object} args
@@ -50,7 +51,8 @@ export class IndexedDBPersist {
    * @param {string} [args.storeName='snapshots']
    * @param {number} [args.saveDelayMs=200]     debounce window (ms)
    */
-  constructor({ dbName, storeName = DEFAULT_STORE_NAME, saveDelayMs = 200 } = {}) {
+  constructor({ kind = 'posts', dbName, storeName = DEFAULT_STORE_NAME, saveDelayMs = 200 } = {}) {
+    this.#kind = kind;   // what it holds as a person names it, for the not-readable notice
     if (typeof dbName !== 'string' || !dbName) {
       throw new TypeError('IndexedDBPersist: dbName required');
     }
@@ -92,7 +94,7 @@ export class IndexedDBPersist {
   }
 
   /** The snapshot's format and the refusal to save over one this build could not read (`mapSnapshotGate`). */
-  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#dbName)); }
+  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#dbName, { kind: this.#kind })); }
 
   /**
    * Write a Map to IndexedDB.  Single-key replace; the prior blob

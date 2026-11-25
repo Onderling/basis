@@ -55,7 +55,8 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { VaultNodeFs } from '@onderling/vault';
-import { flushPendingSaves } from '@onderling/local-store';
+import { flushPendingSaves, onNotReadableChange } from '@onderling/local-store';
+import { storeNoticeView } from '../src/v2/storeNotice.js';
 
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 import { bootFailureNotice } from '../src/v2/bootFailure.js';
@@ -384,6 +385,13 @@ const hiddenLanded = (item) => {
 // stores stamp it on what the row writes, and no host's change feed hands such a write on.
 const writeOrigin = new AsyncLocalStorage();
 const modelWatch = { ref: null };   // the model route's watch, made once the admin can be reached
+// DATA THIS BOX KEEPS BUT CANNOT READ: a store that could not read what it holds keeps it and refuses every save over
+// it. The box has no screen: the one shared notice goes to its log, in words, each time the list changes (an operator
+// page will show it later). Listening before the agent builds its stores, which is when they read.
+onNotReadableChange((list) => {
+  const notice = storeNoticeView(list, t);
+  if (notice) console.warn(`device-runner: ${notice.text} ${notice.cost} (${list.length} store(s))`);
+});
 const agent = await createRealHouseholdAgent({
   // WHICH RELAY EACH CIRCLE RIDES: on a box, the one it is on (every circle it holds is reached there, as its
   // registration below says). The agent reopens a persona's own socket at that point after a restart: a box holding a

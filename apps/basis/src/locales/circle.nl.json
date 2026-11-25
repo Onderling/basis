@@ -10211,6 +10211,54 @@
       "doc": "The bar's one action: reload the page to get the newer build."
     }
   },
+  "storeNotice": {
+    "newer": {
+      "text": "Een deel van wat dit apparaat bewaart is gemaakt door een nieuwere versie van Basis en kan hier niet gelezen worden. Er is niets veranderd. Werk de app bij.",
+      "doc": "The notice at the top when a store on this device holds data a NEWER build wrote (its format is unknown here). Nothing was changed or saved over."
+    },
+    "unreadable": {
+      "text": "Een deel van wat dit apparaat bewaart kan niet gelezen worden. Er is niets veranderd. Blijft dit staan, gebruik dan Meld een probleem.",
+      "doc": "The notice at the top when a store on this device holds data that does not parse or could not be read (not a newer version). Nothing was changed or saved over."
+    },
+    "costAfterUpdate": {
+      "text": "Wat je hier nu verandert in {{what}}, wordt pas bewaard na de update.",
+      "doc": "Second line under the newer-version notice. what = the kinds of stores affected as plain words (circle.storeNotice.kind.*), joined."
+    },
+    "costNotSaved": {
+      "text": "Wat je hier nu verandert in {{what}}, wordt niet bewaard.",
+      "doc": "Second line under the not-readable notice (no update fixes it). what = the kinds of stores affected as plain words, joined."
+    },
+    "and": {
+      "text": " en ",
+      "doc": "Joins the last two kind words in the cost line ('berichten en lijsten')."
+    },
+    "kind": {
+      "messages": {
+        "text": "berichten",
+        "doc": "A store kind as a person names it: messages (chats, the outbox)."
+      },
+      "lists": {
+        "text": "lijsten",
+        "doc": "A store kind: lists (a circle's lists, the household)."
+      },
+      "tasks": {
+        "text": "taken",
+        "doc": "A store kind: tasks."
+      },
+      "posts": {
+        "text": "het prikbord",
+        "doc": "A store kind: the pinboard's posts."
+      },
+      "settings": {
+        "text": "instellingen",
+        "doc": "A store kind: settings."
+      },
+      "data": {
+        "text": "andere gegevens",
+        "doc": "A store kind nobody classed: other data on this device."
+      }
+    }
+  },
   "shareContact": {
     "title": {
       "text": "Deel mijn kaart",

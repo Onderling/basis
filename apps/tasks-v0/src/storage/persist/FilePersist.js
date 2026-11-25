@@ -20,13 +20,15 @@ export class FilePersist {
   /** Most recent saved-to-disk snapshot (for diffing / no-op skip). */
   #lastSerialised = null;
   #gate = null;
+  #kind;
 
   /**
    * @param {object} args
    * @param {string} args.path                 absolute file path (created on first save)
    * @param {number} [args.saveDelayMs=200]    debounce window (ms)
    */
-  constructor({ path, saveDelayMs = 200 } = {}) {
+  constructor({ kind = 'tasks', path, saveDelayMs = 200 } = {}) {
+    this.#kind = kind;   // what it holds as a person names it, for the not-readable notice
     if (typeof path !== 'string' || !path) throw new TypeError('FilePersist: path required');
     this.#path        = path;
     this.#saveDelayMs = saveDelayMs;
@@ -45,7 +47,7 @@ export class FilePersist {
   }
 
   /** The snapshot's format and the refusal to save over one this build could not read (`mapSnapshotGate`). */
-  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#path)); }
+  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#path, { kind: this.#kind })); }
 
   /**
    * Atomic write (write to `.tmp`, rename).

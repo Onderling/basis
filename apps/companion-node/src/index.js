@@ -514,12 +514,18 @@ export async function startCompanionNode(opts = {}) {
   // 5-min in-memory queue. It NEVER decrypts (sealed-only ⇒ any-host trust tier,
   // invariant #7): `deposit` refuses anything not sealed; the node holds no key.
   let sealedInbox = null;
+  let inboxNotReadableAtStart = null;   // the held-messages file could not be read at start (see below)
   if (inbox) {
     if (!inboxOwnerPubKey) {
       throw new Error('companion-node: inbox requires opts.inboxOwnerPubKey (the owner the node holds for)');
     }
     const store = inboxStore
       ?? new FileSealedInboxStore(join(resolveConfigDir(configDir), 'sealed-inbox.json'));
+    // An inbox file this build cannot read is kept as it is (every deposit and drain refused): said at start, in words.
+    const inboxNotReadable = inboxNotReadableAtStart = store.notReadable?.() ?? null;
+    if (inboxNotReadable) {
+      console.error(`[companion] the held-messages file cannot be read (${inboxNotReadable}); it is kept as it is, and nothing is held or delivered until it reads again. Messages stay with their senders meanwhile.`);
+    }
 
     // The reliable wake: on a deposit for the away owner, fire a CONTENTLESS
     // alert-push + mutable-content wake (behind the PushSender port). Throttled
@@ -536,13 +542,20 @@ export async function startCompanionNode(opts = {}) {
       ...(typeof inboxThrottleMs === 'number' ? { throttleMs: inboxThrottleMs } : {}),
     });
 
+    // An inbox file this build cannot read answers every call with a plain refusal: a deposit is not taken (the sender
+    // keeps its copy), a drain hands out nothing and clears nothing.
+    const refusedWhenNotReadable = async (run) => {
+      try { return await run(); }
+      catch (err) { if (err?.code === 'INBOX_NOT_READABLE') return { ok: false, error: 'inbox-not-readable' }; throw err; }
+    };
+
     // `inbox.deposit` — UNGATED + SELF-GUARDING (like `pod.acceptDelegation`):
     // any peer may drop a message into the owner's mailbox, but ONLY a sealed
     // envelope is accepted (deny-by-default). The node can't read it, so an open
     // slot leaks nothing — it's a blind sealed drop-box.
     agent.register('inbox.deposit', async (ctx) => {
       const data = Parts.data(ctx?.parts) ?? {};
-      return sealedInbox.deposit(inboxOwnerPubKey, data.sealed, { topic: data.topic });
+      return refusedWhenNotReadable(() => sealedInbox.deposit(inboxOwnerPubKey, data.sealed, { topic: data.topic }));
     });
 
     // `inbox.drain` — OWNER-GATED (reuse of the R2b delegation posture): only the
@@ -551,15 +564,17 @@ export async function startCompanionNode(opts = {}) {
     agent.register('inbox.drain', async (ctx) => {
       const caller = ctx?.originFrom ?? ctx?.from;
       if (caller !== inboxOwnerPubKey) return { ok: false, error: 'forbidden' };
-      const { items, digest } = await sealedInbox.drain(inboxOwnerPubKey);
-      return { ok: true, items, digest };
+      return refusedWhenNotReadable(async () => {
+        const { items, digest } = await sealedInbox.drain(inboxOwnerPubKey);
+        return { ok: true, items, digest };
+      });
     });
 
     // `inbox.count` — OWNER-GATED presence/status probe (contentless count).
     agent.register('inbox.count', async (ctx) => {
       const caller = ctx?.originFrom ?? ctx?.from;
       if (caller !== inboxOwnerPubKey) return { ok: false, error: 'forbidden' };
-      return { ok: true, count: await sealedInbox.count(inboxOwnerPubKey) };
+      return refusedWhenNotReadable(async () => ({ ok: true, count: await sealedInbox.count(inboxOwnerPubKey) }));
     });
   }
 
@@ -907,6 +922,8 @@ export async function startCompanionNode(opts = {}) {
     get managementOwnerRoot() { return management ? mgmtOwner() : null; },
     /** An owner record is there but cannot be read: nothing is claimable or managed until the operator mends it. */
     get managementOwnerUnreadable() { return Boolean(management && ownerClaim?.unreadable()); },
+    /** The held-messages file is there but this build cannot read it (every deposit and drain refused). */
+    get inboxUnreadable() { return Boolean(sealedInbox && inboxNotReadableAtStart); },
     /** The code to claim this node with, or null once it has an owner (or when management is off). */
     claimCode: () => ownerClaim?.code() ?? null,
     /** What the owner pastes into their app: `<code>@<node address>`, or null once owned. */

@@ -107,13 +107,34 @@ export function createAgentRegistry({
   const uri = resourceUri ?? registryResourceUri({ anchorPodUri, deviceId, preferPodUri });
   const withCAS = (args) => _serialised(pseudoPod, uri, () => withCASUnserialised(args));
 
+  /**
+   * A REGISTRY THIS BUILD CANNOT READ IS NEVER WRITTEN OVER. A stored resource whose `v` is newer than this build's
+   * (a newer build wrote it, in a format this one does not know) or that is not an object at all: lookups read what
+   * they can, but every write is refused (`REGISTRY_NOT_READABLE`), so the stored bytes stay as they are. An older
+   * `v` is this build's own past format and reads forward as before.
+   */
+  function _notReadable(bytes) {
+    if (!bytes || typeof bytes !== 'object' || Array.isArray(bytes)) return 'shape';
+    if (typeof bytes.v === 'number' && bytes.v > RESOURCE_VERSION) return 'version';
+    return null;
+  }
   async function _readCurrent() {
     const rec = await pseudoPod.read(uri);
-    if (!rec) return { body: emptyResource(), etag: null };
+    if (!rec) return { body: emptyResource(), etag: null, notReadable: null };
     return {
       body: normaliseResource(rec.bytes),
       etag: rec.etag ?? null,
+      notReadable: _notReadable(rec.bytes),
     };
+  }
+  /** The read a WRITE starts from: refused when the stored registry cannot be read by this build. */
+  async function _readForWrite() {
+    const cur = await _readCurrent();
+    if (cur.notReadable) {
+      throw Object.assign(new Error(`agent-registry: the stored registry is not readable by this build (${cur.notReadable}); nothing is written over it`),
+        { code: 'REGISTRY_NOT_READABLE', reason: cur.notReadable });
+    }
+    return cur;
   }
 
   async function _writeNext(body, etag) {
@@ -201,7 +222,7 @@ export function createAgentRegistry({
     }
     const signedAt = entry.signedAt ?? now();
     return withCAS({
-      readCurrent: _readCurrent,
+      readCurrent: _readForWrite,
       writeNext:   _writeNext,
       maxRetries:  maxRetries ?? 3,
       onPersistentConflict,
@@ -236,7 +257,7 @@ export function createAgentRegistry({
    */
   async function revoke(identifier) {
     return withCAS({
-      readCurrent: _readCurrent,
+      readCurrent: _readForWrite,
       writeNext:   _writeNext,
       maxRetries:  maxRetries ?? 3,
       onPersistentConflict,
@@ -268,7 +289,7 @@ export function createAgentRegistry({
       );
     }
     return withCAS({
-      readCurrent: _readCurrent,
+      readCurrent: _readForWrite,
       writeNext:   _writeNext,
       maxRetries:  maxRetries ?? 3,
       onPersistentConflict,
@@ -300,7 +321,7 @@ export function createAgentRegistry({
    */
   async function updateExposure(identifier, exposure) {
     return withCAS({
-      readCurrent: _readCurrent,
+      readCurrent: _readForWrite,
       writeNext:   _writeNext,
       maxRetries:  maxRetries ?? 3,
       onPersistentConflict,
@@ -327,7 +348,7 @@ export function createAgentRegistry({
       throw Object.assign(new Error(`updateKind: kind must be one of ${PROFILE_KINDS.join(', ')}`), { code: 'INVALID_ARGUMENT' });
     }
     return withCAS({
-      readCurrent: _readCurrent,
+      readCurrent: _readForWrite,
       writeNext:   _writeNext,
       maxRetries:  maxRetries ?? 3,
       onPersistentConflict,
@@ -348,7 +369,7 @@ export function createAgentRegistry({
    */
   async function purge(identifier) {
     return withCAS({
-      readCurrent: _readCurrent,
+      readCurrent: _readForWrite,
       writeNext:   _writeNext,
       maxRetries:  maxRetries ?? 3,
       onPersistentConflict,
@@ -380,7 +401,7 @@ export function createAgentRegistry({
       );
     }
     return withCAS({
-      readCurrent: _readCurrent,
+      readCurrent: _readForWrite,
       writeNext:   _writeNext,
       maxRetries:  maxRetries ?? 3,
       onPersistentConflict,
@@ -413,7 +434,7 @@ export function createAgentRegistry({
    */
   async function revokeGrant(identifier, tokenId) {
     return withCAS({
-      readCurrent: _readCurrent,
+      readCurrent: _readForWrite,
       writeNext:   _writeNext,
       maxRetries:  maxRetries ?? 3,
       onPersistentConflict,

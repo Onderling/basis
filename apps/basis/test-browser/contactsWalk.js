@@ -15,7 +15,16 @@ export const whoAmI = async (page) => (await call(page, 'pinboard', 'whoAmI'))?.
 export async function nameMe(page, name) {
   await gotoCircles(page);
   await page.locator('.cc-persona-button__button').click(); await page.waitForTimeout(1200);
-  await page.locator('.circle-screen__identity-edit').click(); await page.locator('.cc-profile__display').fill(name);
+  await page.locator('.circle-screen__identity-edit').click();
+  // FILLED UNTIL IT HOLDS THE NAME. The editor paints at once and again when the stored profile arrives. Playwright's
+  // fill selects the field and then inserts as two steps: when the load paints the stored name in between (the field
+  // was still empty, so nothing was typed yet and the panel rightly shows the stored value), the new name lands after
+  // it ('FritsFrits de Vries', seen in CI 2026-11-25). A person cannot hit this: their first keystroke counts as typed.
+  const display = page.locator('.cc-profile__display');
+  await expect(async () => {
+    await display.fill(name);
+    await expect(display).toHaveValue(name, { timeout: 1000 });
+  }).toPass({ timeout: 15_000 });
   await page.locator('.cc-profile__save').click(); await page.waitForTimeout(1500); await page.locator('.cc-screen-panel__close').click();
   await gotoCircles(page);
 }

@@ -35,7 +35,6 @@
  * Production apps should pass a platform-appropriate adapter:
  *   - Web:  `IndexedDBTombstones`
  *   - RN:   `AsyncStorageTombstones`
- *   - Node: `FileTombstones`
  */
 import { Emitter } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
@@ -125,7 +124,7 @@ export class PodClient extends Emitter {
    * @param {object} [opts.tombstoneStore] — `TombstoneStore` impl.  Defaults to
    *   a `MemoryTombstones` (non-persistent).  Production apps should pass a
    *   platform-appropriate adapter (`IndexedDBTombstones` /
-   *   `AsyncStorageTombstones` / `FileTombstones`) so deletions survive
+   *   `AsyncStorageTombstones`) so deletions survive
    *   process restarts.
    * @param {Function} [opts.podSourceFactory] — escape hatch for tests; receives
    *   `({ podUrl, fetch })` and returns a SolidPodSource-shaped object.

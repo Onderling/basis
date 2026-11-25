@@ -3,8 +3,8 @@
  * fallback when no platform adapter is configured.
  *
  * NOT persistent.  Production apps should pass a platform-appropriate
- * adapter (`IndexedDBTombstones` / `AsyncStorageTombstones` /
- * `FileTombstones`) on the `PodClient` constructor.
+ * adapter (`IndexedDBTombstones` / `AsyncStorageTombstones`) on the
+ * `PodClient` constructor.
  *
  * Multiple `PodClient` instances can share a single `MemoryTombstones`
  * instance to verify cross-client visibility within a single process.

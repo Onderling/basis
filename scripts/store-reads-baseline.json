@@ -79,14 +79,6 @@
     "count": 1,
     "note": "never saved over: a record that does not parse is handed on as its raw bytes"
   },
-  "packages/react-native/src/storage/bundleRegistry.js": {
-    "count": 1,
-    "note": "debt: a list that does not parse reads as [] and the next register writes over it; no shell composes createBundleRegistry today (unreached), to fix or remove when touched"
-  },
-  "packages/pod-client/src/tombstones/FileTombstones.js": {
-    "count": 1,
-    "note": "debt: a tombstone file that does not parse starts fresh and the next add writes over it (a deleted item could return from the pod); no Basis shell composes it (the box keeps its own link tombstones), to fix when touched"
-  },
   "packages/pseudo-pod/src/NodeFsBackend.js": {
     "count": 2,
     "note": "debt: _readRecord (:145) reads a record that does not parse as absent, and the next put writes over it; folio's pod cache, not a Basis shell; the list (:246) only skips, never writes"

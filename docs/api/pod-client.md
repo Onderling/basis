@@ -1906,23 +1906,6 @@ dynamic-imported from the host app's `node_modules` on first use.
 
 **Methods:** `add()` · `has()` · `remove()` · `list()` · `close()`
 
-## `src/tombstones/FileTombstones.js`
-
-### `FileTombstones`
-
-**Kind:** class · **Import:** `FileTombstones` from `'@onderling/pod-client'`
-
-```js
-class FileTombstones extends TombstoneStore
-new FileTombstones({ path: filePath } = {})
-```
-
-Node-side `TombstoneStore` backed by a single JSON file, persistent across `PodClient` restarts.
-Writes are atomic (written to `<path>.tmp`, then renamed onto `<path>`). Defaults to
-`os.tmpdir() + '/onderling-tombstones.json'`; pass an explicit `{ path }` for production use.
-
-**Methods:** `add()` · `has()` · `remove()` · `list()` · `close()`
-
 ## `src/tombstones/IndexedDBTombstones.js`
 
 ### `IndexedDBTombstones`

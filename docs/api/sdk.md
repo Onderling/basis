@@ -410,7 +410,6 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `discoverAcrUrl` | function | [`pod-client.md`](pod-client.md#discoveracrurl) |
 | `EncryptionError` | class | [`pod-client.md`](pod-client.md#encryptionerror) |
 | `establishKeyEvent` | function | [`pod-client.md`](pod-client.md#establishkeyevent) |
-| `FileTombstones` | class | [`pod-client.md`](pod-client.md#filetombstones) |
 | `foldKeyEvents` | function | [`pod-client.md`](pod-client.md#foldkeyevents) |
 | `generateGroupKey` | function | [`pod-client.md`](pod-client.md#generategroupkey) |
 | `generateKeypair` | function | [`pod-client.md`](pod-client.md#generatekeypair) |

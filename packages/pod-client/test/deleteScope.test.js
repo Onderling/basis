@@ -6,7 +6,6 @@ import path from 'node:path';
 import {
   PodClient,
   MemoryTombstones,
-  FileTombstones,
 } from '../src/index.js';
 
 // ── Inrupt mocks (unused here, but PodClient imports it lazily) ──────────────
@@ -218,59 +217,5 @@ describe('PodClient — shared tombstoneStore visibility', () => {
     ps2.list.mockResolvedValue({ container: '/c/', entries: [{ uri: '/c/shared.md' }, { uri: '/c/other.md' }] });
     const r = await b.list('/c/');
     expect(r.entries.map((e) => e.uri)).toEqual(['/c/other.md']);
-  });
-});
-
-// ── FileTombstones round-trip ────────────────────────────────────────────────
-
-describe('FileTombstones — persistence round-trip', () => {
-  let tmpPath;
-
-  beforeEach(async () => {
-    tmpPath = path.join(os.tmpdir(), `onderling-tombstones-test-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
-  });
-
-  afterEach(async () => {
-    await fs.rm(tmpPath, { force: true });
-    await fs.rm(`${tmpPath}.tmp`, { force: true });
-  });
-
-  it('persists across close + reopen', async () => {
-    const a = new FileTombstones({ path: tmpPath });
-    await a.add('/c/a.md');
-    await a.add('/c/b.md', { at: 12345 });
-    expect(await a.has('/c/a.md')).toBe(true);
-    await a.close();
-
-    const b = new FileTombstones({ path: tmpPath });
-    expect(await b.has('/c/a.md')).toBe(true);
-    expect(await b.has('/c/b.md')).toBe(true);
-    const listed = await b.list();
-    const bEntry = listed.find((e) => e.uri === '/c/b.md');
-    expect(bEntry?.at).toBe(12345);
-
-    await b.remove('/c/a.md');
-    await b.close();
-
-    const c = new FileTombstones({ path: tmpPath });
-    expect(await c.has('/c/a.md')).toBe(false);
-    expect(await c.has('/c/b.md')).toBe(true);
-    await c.close();
-  });
-
-  it('returns empty list when the file does not exist', async () => {
-    const fresh = new FileTombstones({ path: tmpPath });
-    expect(await fresh.list()).toEqual([]);
-    expect(await fresh.has('/anything')).toBe(false);
-    await fresh.close();
-  });
-
-  it('survives a corrupt file by starting fresh', async () => {
-    await fs.writeFile(tmpPath, 'not json {{{', 'utf8');
-    const t = new FileTombstones({ path: tmpPath });
-    expect(await t.list()).toEqual([]);
-    await t.add('/c/recovered.md');
-    expect(await t.has('/c/recovered.md')).toBe(true);
-    await t.close();
   });
 });

@@ -238,7 +238,7 @@ import { enableWebPush, disableWebPush, getWebPushState } from '../../src/web/we
 // Objective D / Surface 4 — generic docked side-panel renderer for manifest ops
 // that declare `surfaces.page` (first LIVE consumer: the my-data relay-URL editor).
 import { openPagePanel } from '../../src/web/pagePanel.js';
-import { routeScan, scanOpResultWords, scanSayKey } from '../../src/v2/scanRoute.js';   // Me → Scan / `/scan-qr`: the route table of declared targets
+import { routeScan, scanOpResultWords, scanSayKey, botAddConfirm } from '../../src/v2/scanRoute.js';   // Me → Scan / `/scan-qr`: the route table of declared targets
 import { opFormOrRun } from '../../src/forms/opFormOrRun.js';   // a declared op with part of its args known: the form, or it runs
 import { makePickerFetcher, ceremonyChoices } from '../../src/forms/pickerChoices.js';
 import { renderForm } from '../../src/web/domForm.js';
@@ -3264,13 +3264,12 @@ async function showContacts() {
       const target = contactOpenTarget(contacts.find((c) => c.contactId === contactId) ?? { contactId });
       if (target.kind === 'circle') showDetail(target.circleId); else showContactThread(contactId);
     },
-    // a person: the scanQr op (web: the paste prompt), routed by what it reads — Me's Scan, the same door
-    onAddPerson: () => runMeAction('scan'),
     // the people this device blocks (once a door on My data): at the foot of Contacten
     onBlocked: showBlocked,
+    // ONE add button: the pasted text goes through the one router as the Contacts add field (a card, an invite, a bot)
     onAdd: () => {
       const input = (globalThis.prompt?.(t('circle.contacts.add_prompt')) || '').trim();
-      if (input) addBotFromInput(input);
+      if (input) takeScannedText(input, { for: 'contacts-add' });
     },
   });
 }
@@ -5826,6 +5825,12 @@ const SCAN_PAINTERS = {
   joinGroup:         (needs, text) => showJoinCircle(String(text).trim()),   // the whole text: the app's own link carries its relay
   // a screen's connect code: Apparaten opens with the offer in 'connect a screen' (the pick of its code follows there)
   screenPairing:     (needs) => showMyData({ group: settingsGroupForAction({ kind: 'connect-screen' }), screenOffer: needs.offer }),
+  // a bot: asked first (its host or address named), nothing fetched before the yes; then the shared add
+  addBot:            (needs) => {
+    const q = botAddConfirm(needs.input);
+    if (globalThis.confirm?.(t(q.key, q.params))) return addBotFromInput(needs.input);
+    return undefined;
+  },
   'enroll-device':   (needs) => showEnrollDeviceFlow({ needs }),
   'claim-companion': (needs) => showClaimCompanionFlow({ needs }),
   // the code names the address; the circle is the person's pick (none asked with one circle)
@@ -5853,9 +5858,10 @@ async function runOpFromScan(target, needs) {
   }));
 }
 
-/** What `scanQr` hands over on web (the paste prompt): through the route table to its declared target's painter. */
-async function takeScannedText(text) {
-  const r = routeScan(text);
+/** What `scanQr` hands over on web (the paste prompt): through the route table to its declared target's painter.
+ *  `for`: the purpose of the field it came from (`SCAN_PURPOSES`: the Contacts add field). */
+async function takeScannedText(text, { for: purpose = null } = {}) {
+  const r = routeScan(text, { for: purpose });
   // a code that opens nothing (unreadable, or made for the bot's chat) is said in its own words
   const say = scanSayKey(r);
   if (say) { globalThis.alert?.(t(say)); return; }

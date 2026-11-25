@@ -6534,12 +6534,12 @@
       "doc": "P5 — empty state of the contacts roster."
     },
     "add": {
-      "text": "+ Add a bot",
-      "doc": "P5 — button on the contacts roster to add a bot by URL/address."
+      "text": "+ Add",
+      "doc": "Contacten → the ONE add button: a contact card, an invite or a bot's address; the scanned or pasted text says which (scanRoute 'contacts-add')."
     },
     "add_prompt": {
-      "text": "Bot address: a web address (its agent card), a peer address or a contact card",
-      "doc": "P5 — prompt when adding a bot or a contact card (C13 fast rung)."
+      "text": "Paste a contact card, an invitation or a bot's address",
+      "doc": "The paste field behind Contacten's one add button: a person's card, a circle invite, or a bot (its peer address, or on this field its https agent-card address)."
     },
     "add_failed": {
       "text": "Couldn’t add that bot — check the URL/address.",
@@ -6818,6 +6818,14 @@
         "text": "Ignored ({{n}})",
         "doc": "The fold holding ignored requests. {{n}} is how many."
       }
+    },
+    "add_bot_confirm_host": {
+      "text": "Add the bot at {{host}}?",
+      "doc": "Before a bot is added from an address (nothing is fetched before the yes): the host named."
+    },
+    "add_bot_confirm_addr": {
+      "text": "Add the bot {{addr}}?",
+      "doc": "Before a bot is added from a peer address: its name, or the start of the address."
     }
   },
   "pairedDevices": {

@@ -25,6 +25,8 @@ export default defineConfig({
   test: {
     // Per-file env via @vitest/environment directive at the top of each test file that needs DOM.
     environment: 'node',
+    // The wire register's shape check at the one wire call, for every test file (test/support/wireShapeCheck.setup.js).
+    setupFiles: ['./test/support/wireShapeCheck.setup.js'],
     // ── The flakiness fix: a regression must be distinguishable from noise ────────────────────────────────────────
     // One test failed per full run, a DIFFERENT one each time, every one passing in isolation — so a
     // red run carried no information. The relay package went fully serial at 283 tests; this suite is

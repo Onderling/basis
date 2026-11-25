@@ -11,6 +11,7 @@ import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { conversationSelf } from '../../../../basis/src/assistant/plusDoor.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
+import { ASSISTANT_TABS, assistantTabFor, assistantSectionsOf } from '../../../../basis/src/v2/assistantTabs.js';   // the two tabs, shared (web twin)
 import { t, lang } from '../../core/localisation.js';
 import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardWords, plusMomentNeedsTime, plusAskTime, plusAnswerLineShown } from '../../../../basis/src/v2/vandaagPlus.js';
 import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';   // the card's cap in window pixels, the scroll may shrink to it
@@ -44,7 +45,9 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   // the line naming the route that answers (`plusRouteLine`, shared): painted above the conversation
   routeLine = null,
   // what can be typed here: `suggestFor(line)` → the lines to offer (shared `plusSuggest` over the sheet's pool)
-  suggestFor = null }) {
+  suggestFor = null,
+  // the assistant panel's two tabs (`assistantTabs.js`): the one the person last chose, and what a tap on a tab does
+  tab = null, onTab = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const sheetCap = useSheetCap(0.92);
@@ -81,6 +84,9 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   }, [visible, writeAsSelf, edit]);
   if (!visible) return null;
   const act = PLUS_ACTS.find((a) => a.id === actId) ?? null;
+  // which tab shows: the chosen one; an open form shows on Maken, where it is painted (web twin: the same call)
+  const shown = assistantTabFor({ chosen: tab, actId, editing: !!edit });
+  const inShown = new Set(assistantSectionsOf(shown));
   // closing tells the host which self and which form were open: a form the "+" opened from a line, closed unsaved, is
   // refused, and the host has the conversation say so (the shared door's `settled`)
   const closeSheet = () => onClose?.({ asSelf, actId, editing: Boolean(edit?.act) });
@@ -130,10 +136,22 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
           {/* the sheet scrolls: a long thread or the "/" list must never push the line and the first lines off the screen */}
           <ScrollView ref={scrollRef} style={SHEET_SCROLL} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.cardBody} testID="vandaag-plus-scroll">
           <Text style={styles.title}>{t(edit ? 'circle.vandaag.plus_edit' : 'circle.vandaag.plus')}</Text>
+          {/* the two tabs under the title (web twin: circle-vandaag-plus__tabs); none when opened on an own row */}
+          {!edit ? (
+            <View style={styles.tabs} accessibilityRole="tablist">
+              {ASSISTANT_TABS.map((x) => (
+                <Pressable key={x.id} onPress={() => onTab?.(x.id)} accessibilityRole="tab" accessibilityState={{ selected: x.id === shown }}
+                  testID={`vandaag-plus-tab-${x.id}`} style={[styles.tab, x.id === shown ? styles.tabOn : null]}>
+                  <Text style={[styles.tabText, x.id === shown ? styles.tabTextOn : null]}>{t(x.labelKey)}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
           {/* which route answers this conversation, and whether it is confidential (web twin: circle-vandaag-plus__route) */}
-          {!edit && routeLine ? <Text style={styles.route} testID="vandaag-plus-route">{routeLine}</Text> : null}
+          {!edit && routeLine && shown === 'gesprek' ? <Text style={styles.route} testID="vandaag-plus-route">{routeLine}</Text> : null}
           {/* the sheet's DECLARED sections (`screenSections.js` plusSheet), in order, each by its id (= the web data-section) */}
           {sectionsOf('plusSheet').map((d) => {
+            if (!inShown.has(d.id)) return null;   // a section of the other tab
             const piece = {
               'plus-thread': () => (!edit && (opening?.intro || opening?.news || (Array.isArray(shownTurns) && shownTurns.length)) ? (
             <View testID="vandaag-plus-thread" accessibilityLabel={t('circle.vandaag.plus_thread')}>
@@ -271,6 +289,11 @@ const makeStyles = (theme) => StyleSheet.create({
   field: { gap: 4, marginBottom: 8 },
   label: { fontSize: 13, color: theme.color.inkSoft },
   route: { fontSize: 13, color: theme.color.inkSoft, marginBottom: 6 },
+  tabs: { flexDirection: 'row', gap: 4, borderBottomWidth: 1, borderBottomColor: theme.color.line, marginBottom: 6 },
+  tab: { paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabOn: { borderBottomColor: theme.color.accent },
+  tabText: { fontSize: 14, color: theme.color.inkSoft },
+  tabTextOn: { color: theme.color.accent, fontWeight: '600' },
   // a turn of the kept conversation: the assistant's on the left, the person's own to the right
   turn: { fontSize: 14, color: theme.color.ink, marginVertical: 2, alignSelf: 'flex-start' },
   turnYou: { alignSelf: 'flex-end', color: theme.color.inkSoft },

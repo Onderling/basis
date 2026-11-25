@@ -40,6 +40,10 @@ const FILES = [
   // makes sure the snapshot's backend keeps its wrapper on both shells.
   { path: 'apps/basis/web/v2/circleApp.js',                        factory: 'backendSnapshotIo', wrapper: 'sealedLocalBackend' },
   { path: 'apps/basis-mobile/App.js',                              factory: 'backendSnapshotIo', wrapper: 'sealedLocalBackend' },
+  // A RECEIVED FILE'S BYTES, kept beside the thread (IndexedDB on web, a file on the phone). Written as the plain base64
+  // of the photo until 2026-11-25, while the thread pointing to it was sealed. The box keeps no file bytes.
+  { path: 'apps/basis/web/v2/circleApp.js',                        factory: 'createAttachmentBlobStore',   wrapper: 'sealedBlobStore' },
+  { path: 'apps/basis-mobile/src/core/agentBundle.js',             factory: 'createAttachmentBlobStoreRN', wrapper: 'sealedBlobStore' },
 ];
 
 /**

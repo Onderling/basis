@@ -14,6 +14,12 @@
  *      register: storageName('<id>');
  *   2. a register row nothing opens is red: its id is never passed to storageName(...) in the shipped files, and it is
  *      not in OPENED_ELSEWHERE below with the place that opens it and why.
+   3. how a row sits on the disk is ruled on the row (`seal`): `'sealed'`, or a reason under one head (`not content:` ·
+ *      `not sealable:` · `unwritten:` · `debt: L<n>`). A RAW write (`.setItem(` on localStorage, AsyncStorage or a
+ *      handed storage, not through a sealed store) must name a row, by `storageName('<id>')` on the line or through a
+ *      const (of any shell file) holding one, and that row must not be `'sealed'`. A file whose writes go through a
+ *      storage AND a key its caller hands it is listed in WRITES_FOR_ITS_CALLER with the row(s) and who seals.
+ *      This rule replaces lint-sealed-key-value and its baseline: the decision now sits on the row, once.
  * NOT_STORAGE lists the few hand-written names rule 1 sees that are not a device-level storage name (a key inside a
  * vault the box owns, a pod path), each with its reason.
  */
@@ -32,7 +38,7 @@ export const OPENED_ELSEWHERE = Object.freeze({
   podClientDb: 'by its package: @onderling/pod-client IndexedDBTombstones opens it under its own default name',
   sealingIdentity: 'by its package: @onderling/pod-client sealing/memberIdentity keeps it under its own default name',
   wakeNudges: 'by its package: @onderling/react-native/push createWakeNudges (agentBundle.js) keeps it',
-  basisDb: 'by the web shell under its plain name (too common a word for rule 1); listed so the start-over removes it',
+  basisDb: 'by nothing today (an earlier build\'s database); listed so the start-over removes it',
   helpCircleStore: "by the per-circle name (circleStorageName) for the help circle, whose id is the literal 'cc-help'",
   helpCircleCache: "by the per-circle cache name (circleStorageName) for the help circle, whose id is the literal 'cc-help'",
   vaultOwnerRootKey: "a key inside the device vault ('owner-root', ownerRootRestore.js / personaRuntime.js); the vault adds the prefix",
@@ -45,6 +51,65 @@ export const OPENED_ELSEWHERE = Object.freeze({
 });
 
 /** Hand-written names rule 1 sees that are not a device-level storage name. */
+/** Files whose raw writes go through a storage and a key their CALLER hands them: the rows, and who seals. */
+export const WRITES_FOR_ITS_CALLER = Object.freeze({
+  'apps/basis/src/household/persist.js': 'the persist adapter of every household-shaped store; sealedPersist wraps it in buildHouseholdDataSource when a strategy is given (lint-sealed-at-rest holds the shells to one)',
+  'apps/basis/src/v2/circleRules.js': "circleRules ('sealed'): localCircleRulesStore hands the IO sealedKeyValue; the IO has no default storage",
+  'apps/basis/src/v2/addressFallback.js': "fallbackOffer ('sealed'): both shells hand fallbackOfferStateIo sealedKeyValue",
+  'apps/basis/src/v2/enrolForgets.js': "vaultOwnerRoot ('not sealable'): the plain marker vault (forget-pending beside restore-pending)",
+  'apps/basis/src/v2/onboardingFlags.js': "the first-run flags ('not content'): helpCircleProvisioned, onboardingDone, mnemonicAck, keyCardSnoozedUntil, firstOpenSeen, introCardSeen",
+  'apps/basis/src/v2/screenClient.js': "screenClient ('not sealable'): a screen's own storage",
+  'apps/basis/src/v2/themePref.js': "theme ('not content')",
+  'apps/basis/src/web/localStoragePeerBackend.js': "peerGraph ('sealed'): both shells hand the peer backend sealedKeyValue (strict)",
+  'apps/basis-mobile/src/core/mappingsStoreRN.js': "mappings ('not sealable'): read before the content key",
+});
+
+export const SEAL_HEADS = Object.freeze(['not content:', 'not sealable:', 'unwritten:', 'debt:']);
+const RAW_WRITE = /\.setItem\s*(\?\.)?\s*\(/;
+const VIA_SEAL = /\b(?:kv|sealed)\??\.setItem\b|\bsealedIn\([^)]*\)\.setItem/;
+const NAMED = /setItem\s*(?:\?\.)?\s*\(\s*`?\$?\{?storageName\('(\w+)'\)/;
+const BY_CONST = /setItem\s*(?:\?\.)?\s*\(\s*`?\$?\{?([A-Za-z_][A-Za-z0-9_]*)/;
+const CONST_DEF = /\b(?:export\s+)?const\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?:\([^)]*\)\s*=>\s*)?`?\$?\{?storageName\('(\w+)'\)/g;
+
+/** Rule 3 over a set of files `{rel: text}`: the problems. */
+export function sealProblems(STORAGE, texts) {
+  const problems = [];
+  for (const [id, r] of Object.entries(STORAGE)) {
+    const seal = r.seal;
+    if (seal === 'sealed') continue;
+    if (typeof seal !== 'string' || !SEAL_HEADS.some((h) => seal.startsWith(h)) || seal.length < 16) {
+      problems.push(`${REGISTER}: row '${id}' has no seal ruling — 'sealed', or a reason under ${SEAL_HEADS.join(' · ')}`);
+    } else if (seal.startsWith('debt:') && !/^debt: L\d+/.test(seal)) {
+      problems.push(`${REGISTER}: row '${id}' is debt without its ledger row ('debt: L<n> …')`);
+    }
+  }
+  // a const resolves in its own file, or in another file that EXPORTS it when this file imports that name
+  const exported = new Map();
+  for (const text of Object.values(texts)) {
+    for (const m of text.matchAll(CONST_DEF)) if (m[0].startsWith('export')) exported.set(m[1], m[2]);
+  }
+  const callerFilesSeen = new Set();
+  for (const [rel, text] of Object.entries(texts)) {
+    const own = new Map([...text.matchAll(CONST_DEF)].map((m) => [m[1], m[2]]));
+    const imported = (name) => new RegExp(`import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}`).test(text);
+    const resolve = (name) => (name ? (own.get(name) ?? (imported(name) ? exported.get(name) : undefined)) : undefined);
+    text.split('\n').forEach((l, i) => {
+      if (/^\s*(\/\/|\*)/.test(l) || !RAW_WRITE.test(l) || VIA_SEAL.test(l)) return;
+      if (WRITES_FOR_ITS_CALLER[rel]) { callerFilesSeen.add(rel); return; }   // the caller's storage decides
+      const id = (l.match(NAMED) ?? [])[1] ?? resolve((l.match(BY_CONST) ?? [])[1]);
+      if (!id) {
+        problems.push(`${rel}:${i + 1} writes raw under a key that names no register row — take the key from the register, or seal the write`);
+        return;
+      }
+      if (STORAGE[id]?.seal === 'sealed') problems.push(`${rel}:${i + 1} writes the row '${id}' raw, and the row is ruled 'sealed' — write it through sealedKeyValue`);
+    });
+  }
+  for (const rel of Object.keys(WRITES_FOR_ITS_CALLER)) {
+    if (!callerFilesSeen.has(rel)) problems.push(`WRITES_FOR_ITS_CALLER names '${rel}', which has no raw write by a handed key — remove the entry`);
+  }
+  return problems;
+}
+
 export const NOT_STORAGE = Object.freeze({
   'tools.on': "a key inside the box's own vault (toolboxes.js), not a name on a device's storage",
 });
@@ -114,6 +179,9 @@ export async function check(root = ROOT) {
     if (OPENED_ELSEWHERE[id]) continue;
     problems.push(`${REGISTER}: row '${id}' is opened by nothing — remove it, or say in OPENED_ELSEWHERE where it is opened`);
   }
+  const texts = {};
+  for (const rel of shellFiles(root)) if (rel !== REGISTER && !rel.endsWith('/localStoreSeal.js')) texts[rel] = readFileSync(path.join(root, rel), 'utf8');
+  problems.push(...sealProblems(STORAGE, texts));
   for (const id of Object.keys(OPENED_ELSEWHERE)) {
     if (!STORAGE[id]) problems.push(`OPENED_ELSEWHERE names '${id}', which is not a register row — remove the entry`);
     else if (all.includes(`storageName('${id}')`)) problems.push(`OPENED_ELSEWHERE names '${id}', which is now opened by id — remove the entry`);

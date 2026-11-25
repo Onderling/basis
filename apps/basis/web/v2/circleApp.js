@@ -801,7 +801,7 @@ import { renderCircleScreen } from './circleScreen.js';
 import { renderRecipeEditor } from './circleRecipeEditor.js';
 // ε.6 — multi-offer catch-up chooser modal (opt-in via
 // policy.catchUpChooserMode === 'prompt').
-import { computeAdvice, makeTooBusyEvent } from '../../src/v2/circleAdvisor.js';
+import { computeAdvice, makeTooBusyEvent, advisorShownKey } from '../../src/v2/circleAdvisor.js';
 import { mergeOffering, normalizeOffering, offeringsMatchingEnabled } from '@onderling/kring-host/circleOfferings';
 import { buildCircleFiles, circleFilesFromListFiles } from '../../src/v2/circleFolio.js';
 import { myThingsFromListFiles } from '../../src/v2/folioMyThings.js';
@@ -9043,11 +9043,10 @@ async function showRules(id) {
 }
 
 // Advisor cooldown (≤1 card/month) persists per-circle in localStorage.
-const advisorSeenKey = (id) => `cc.advisorShown.${id}`;
 function showAdvisor(id) {
   const rerender = () => {
     let lastShownAt = null;
-    try { const s = localStorage.getItem(advisorSeenKey(id)); if (s) lastShownAt = Number(s); } catch { /* ignore */ }
+    try { const s = localStorage.getItem(advisorShownKey(id)); if (s) lastShownAt = Number(s); } catch { /* ignore */ }
     const advice = computeAdvice({
       events: eventLog.query({ excludeMuted: true }),
       circleId: id,
@@ -9058,7 +9057,7 @@ function showAdvisor(id) {
       t,
       onTooBusy: () => { eventLog.append(makeTooBusyEvent({ circleId: id })); rerender(); },
       onDismiss: () => {
-        try { localStorage.setItem(advisorSeenKey(id), String(Date.now())); } catch { /* ignore */ }
+        try { localStorage.setItem(advisorShownKey(id), String(Date.now())); } catch { /* ignore */ }
         rerender();
       },
       onBack: () => showDetail(id),

@@ -10,6 +10,10 @@
  * the `lastShownAt` it persisted; this decides whether to advise.
  */
 import { eventCircleId } from './circleStream.js';
+import { storageName } from './storageRegister.js';   // every storage name from the one register
+
+/** The key under which a shell keeps when the advisor card was last shown for a circle. */
+export const advisorShownKey = (circleId) => `${storageName('advisorShown')}${circleId}`;
 
 /** Event types that count as a strain signal for a circle. */
 export const COMPLAINT_TYPES = ['too-busy', 'dispute', 'complaint'];

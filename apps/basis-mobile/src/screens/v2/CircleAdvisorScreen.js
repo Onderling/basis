@@ -11,10 +11,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { computeAdvice, makeTooBusyEvent } from '@onderling-app/basis';
+import { computeAdvice, makeTooBusyEvent, advisorShownKey } from '@onderling-app/basis';
 import { t } from '../../core/localisation.js';
 
-const seenKey = (id) => `cc.advisorShown.${id}`;
 
 export default function CircleAdvisorScreen({ eventLog, circleId, onBack }) {
   const theme = useTheme();
@@ -23,7 +22,7 @@ export default function CircleAdvisorScreen({ eventLog, circleId, onBack }) {
 
   const recompute = useCallback(async () => {
     let lastShownAt = null;
-    try { const s = await AsyncStorage.getItem(seenKey(circleId)); if (s) lastShownAt = Number(s); }
+    try { const s = await AsyncStorage.getItem(advisorShownKey(circleId)); if (s) lastShownAt = Number(s); }
     catch { /* fresh */ }
     const events = eventLog?.query ? eventLog.query({ excludeMuted: true }) : [];
     setAdvice(computeAdvice({ events, circleId, lastShownAt }));
@@ -37,7 +36,7 @@ export default function CircleAdvisorScreen({ eventLog, circleId, onBack }) {
   }, [eventLog, circleId, recompute]);
 
   const onDismiss = useCallback(async () => {
-    try { await AsyncStorage.setItem(seenKey(circleId), String(Date.now())); } catch { /* ignore */ }
+    try { await AsyncStorage.setItem(advisorShownKey(circleId), String(Date.now())); } catch { /* ignore */ }
     recompute();
   }, [circleId, recompute]);
 

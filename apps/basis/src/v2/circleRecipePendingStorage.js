@@ -9,12 +9,13 @@
  * (would orphan already-cached broadcasts on disk).
  */
 
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import {
   createCircleKindPendingStore,
   makeCircleKindPendingLocalIo,
 } from './circleKindFactory.js';
 
-const KEY_PREFIX = 'cc.circleRecipePending.';
+const KEY_PREFIX = storageName('circleRecipePending');
 
 export function localStorageCircleRecipePendingIo(storage = globalThis.localStorage) {
   return makeCircleKindPendingLocalIo(KEY_PREFIX, storage);

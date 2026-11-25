@@ -21,6 +21,7 @@
  * queue substrate.
  */
 
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { translatorOr } from '../locales/translatorOr.js';
 
 /**
@@ -70,7 +71,7 @@ export function buildUnavailableNotice({ recipientName, circleName, t } = {}) {
  * Save-for-later queue: messages Anne writes while Bob has chat-off.
  * ────────────────────────────────────────────────────────────────── */
 
-const STORE_KEY = 'cc.reciprocityQueue';
+const STORE_KEY = storageName('reciprocityQueue');
 
 /**
  * Create a queue over a pluggable IO adapter ({load(key),save(key,value)},

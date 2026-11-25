@@ -12,6 +12,7 @@
  * the shared helpers; otherwise the empty states show + create is a no-op.
  * Flagged for device verification.
  */
+import { storageName } from '../../../../basis/src/v2/storageRegister.js';   // every storage name from the one register
 import { flushPendingSaves } from '@onderling/local-store';
 import Btn from './Btn.js';
 import { GOVERNANCE_OPEN_ACTION } from '../../../../basis/src/v2/governanceNotices.js';
@@ -397,7 +398,7 @@ const CIRCLE_LLM_APPS = (process.env.EXPO_PUBLIC_CIRCLE_LLM_APPS || '').split(',
 // path is exercised there). The remaining path — a real signed-in Solid pod —
 // stays the live-pod tail.
 const circleSearchVectorStore = (AsyncStorage && typeof AsyncStorage.getItem === 'function')
-  ? sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-circle-rag' }), { scope: 'cc-circle-rag' })
+  ? sealedLocalBackend(createAsBackend({ AsyncStorage, scope: storageName('circleRag') }), { scope: storageName('circleRag') })
   : createMemoryBackend();
 
 // Sealed media: the per-circle composition (ONE dev bucket per app session, the compositions cached per circle) lives
@@ -3899,7 +3900,7 @@ function CircleDetail({
       if (!circle?.id) return;
       const fallback = alphaViewMode(defaultViewModeFromPolicy(policy));
       try {
-        const raw = await AsyncStorage.getItem('cc.circleViewMode');
+        const raw = await AsyncStorage.getItem(storageName('circleViewMode'));
         const map = raw ? JSON.parse(raw) : {};
         const saved = map?.[circle.id];
         // clamped to what the alpha paints: a mode saved before the cut opens as chat (alphaSurface.js)
@@ -3913,10 +3914,10 @@ function CircleDetail({
     setViewModeState(mode);
     if (!circle?.id) return;
     try {
-      const raw = await AsyncStorage.getItem('cc.circleViewMode');
+      const raw = await AsyncStorage.getItem(storageName('circleViewMode'));
       const map = raw ? JSON.parse(raw) : {};
       map[circle.id] = mode;
-      await AsyncStorage.setItem('cc.circleViewMode', JSON.stringify(map));
+      await AsyncStorage.setItem(storageName('circleViewMode'), JSON.stringify(map));
     } catch { /* quota / disabled */ }
   }, [circle?.id]);
 

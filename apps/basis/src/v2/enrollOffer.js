@@ -28,6 +28,7 @@
  *                                              announce own address to the sibling
  *                                              pull membership + governance catch-up from it
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { CIRCLE_ADDRESS_ANNOUNCE_KIND, ownAnnouncementFor, announceOwnCircleAddress } from './circleAddressAnnounce.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { MEMBERSHIP_CATCHUP_SUBTYPES } from './membershipRail.js';
@@ -53,7 +54,7 @@ const ENROL_SEED_WAIT_MS = param({ key: 'enrol.seedWaitMs', scope: PARAM_SCOPE.D
 export const ENROLL_SCHEME = 'onderling-enroll://';
 
 /** Where a scanned/pasted offer waits out the ceremony reload (plain storage — it is public data). */
-export const ENROLL_OFFER_STORAGE_KEY = 'onderling.enrollOffer';
+export const ENROLL_OFFER_STORAGE_KEY = storageName('enrollOffer');
 
 const b64url = {
   encode(obj) {

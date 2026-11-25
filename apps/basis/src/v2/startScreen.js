@@ -4,6 +4,7 @@
  * write the same one and My data shows it. The last-used tab itself is a per-device convenience kept beside the shell
  * (plain storage), not a setting: it changes on every tab switch.
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /** The choice: 'vandaag' (default) · 'circles' · 'last'. */
@@ -17,7 +18,7 @@ export const START_SCREEN_CHOICES = Object.freeze([
 ]);
 
 /** Where a shell keeps the last tab used (plain storage, this device only). */
-export const LAST_TAB_STORAGE_KEY = 'cc.lastTab';
+export const LAST_TAB_STORAGE_KEY = storageName('lastTab');
 
 const TABS = new Set(['screens', 'circles', 'contacten']);
 

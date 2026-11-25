@@ -1,3 +1,4 @@
+import { storageName } from '../v2/storageRegister.js';   // every storage name from the one register
 /**
  * localStoragePeerBackend — persistent storageBackend for core's `PeerGraph`
  * on the web, so the v2 Contacten roster survives a reload (it was in-memory
@@ -22,7 +23,7 @@
  * @returns {{ get(k:string):Promise<string|null>, set(k:string,v:string):Promise<void>,
  *             delete(k:string):Promise<void>, list():Promise<string[]> }}
  */
-export function createLocalStoragePeerBackend({ prefix = 'cc-peers:', storage } = {}) {
+export function createLocalStoragePeerBackend({ prefix = storageName('peerGraph'), storage } = {}) {
   const store = storage ?? safeLocalStorage();
   const keyFor = (key) => `${prefix}${key}`;
 

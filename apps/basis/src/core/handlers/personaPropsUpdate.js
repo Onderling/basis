@@ -20,6 +20,7 @@
  *   • REVEAL-GATING — everything downstream only ever sees the release; the persona's private values never leave.
  */
 
+import { storageName } from '../../v2/storageRegister.js';   // every storage name from the one register
 import { releaseUnchanged, changedReleaseKeys } from '@onderling/agent-registry';
 import { sealedJsonIo } from '../../v2/localStoreSeal.js';
 
@@ -59,7 +60,7 @@ export function createDisclosureShareMemo(io = {}) {
 
 /** localStorage io for `createDisclosureShareMemo` (web; mobile passes an AsyncStorage-backed one). */
 export function localStorageDisclosureShareIo(storage = globalThis.localStorage) {
-  const KEY_PREFIX = 'cc.sharedDisclosure.';
+  const KEY_PREFIX = storageName('sharedDisclosure');
   // SEALED at rest (ledger L1083: what the person last shared of themselves with each circle)
   const io = sealedJsonIo(storage);
   return {

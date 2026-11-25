@@ -47,6 +47,7 @@
  * ceremony that asks for it, once (`--enrol`, on stdin, echo off on a terminal); storing it beside the
  * machine that runs unattended would hand the whole account to anyone who reads that machine's disk.
  */
+import { storageName } from '../src/v2/storageRegister.js';   // every storage name from the one register
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, rmSync, statSync, readdirSync, renameSync } from 'node:fs';
 import nodeCrypto, { randomBytes } from 'node:crypto';
@@ -318,25 +319,25 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 // are not in that object and cannot be reached from here even by mistake.
 {
   const boxPathFor = {
-    'cc-agent-registry': contentPaths.registry,
-    'cc-device-log': [contentPaths.deviceLog, path.join(dataDir, 'device-log.json')],   // + the plain file a box kept before
-    'cc-contact-dm-state': contentPaths.contactDm,
-    'cc-own-devices': stores.paths.ownDevices,
-    'cc-outbox-state': contentPaths.outbox,
-    'cc-outbox-cache': contentPaths.outbox,
-    'cc-outbox-state-seen-inbound': besidePersistDb({ path: contentPaths.outbox }, 'seen-inbound').path,
-    'cc-outbox-cache-seen-inbound': besidePersistDb({ path: contentPaths.outbox }, 'seen-inbound').path,
-    'cc-push-device': contentPaths.push,
-    'cc-settings-state': contentPaths.settings,
-    'cc-settings-cache': contentPaths.settings,
-    'cc-pinboard-state': contentPaths.pinboard,
-    'cc-pinboard-cache': contentPaths.pinboard,
+    [storageName('agentRegistry')]: contentPaths.registry,
+    [storageName('deviceLog')]: [contentPaths.deviceLog, path.join(dataDir, 'device-log.json')],   // + the plain file a box kept before
+    [storageName('contactDms')]: contentPaths.contactDm,
+    [storageName('ownDevices')]: stores.paths.ownDevices,
+    [storageName('outboxWeb')]: contentPaths.outbox,
+    [storageName('outboxPhone')]: contentPaths.outbox,
+    [storageName('outboxSeenWeb')]: besidePersistDb({ path: contentPaths.outbox }, 'seen-inbound').path,
+    [storageName('outboxSeenPhone')]: besidePersistDb({ path: contentPaths.outbox }, 'seen-inbound').path,
+    [storageName('pushDevice')]: contentPaths.push,
+    [storageName('settingsWeb')]: contentPaths.settings,
+    [storageName('settingsPhone')]: contentPaths.settings,
+    [storageName('pinboardWeb')]: contentPaths.pinboard,
+    [storageName('pinboardPhone')]: contentPaths.pinboard,
     // the pinboard store under its name before the rename (the forget names that twin too)
-    [renamedFrom({ dbName: 'cc-pinboard-state' }).dbName]: renamedFrom({ path: contentPaths.pinboard }).path,
-    [renamedFrom({ dbName: 'cc-pinboard-cache' }).dbName]: renamedFrom({ path: contentPaths.pinboard }).path,
-    'cc-household-state': contentPaths.household,
-    'cc-household-cache': contentPaths.household,
-    'cc-tasks-cache': contentPaths.tasks,
+    [renamedFrom({ dbName: storageName('pinboardWeb') }).dbName]: renamedFrom({ path: contentPaths.pinboard }).path,
+    [renamedFrom({ dbName: storageName('pinboardPhone') }).dbName]: renamedFrom({ path: contentPaths.pinboard }).path,
+    [storageName('householdWeb')]: contentPaths.household,
+    [storageName('householdPhone')]: contentPaths.household,
+    [storageName('tasksPhone')]: contentPaths.tasks,
   };
   // THE SIGNATURE CHECK: node:crypto behind the one strict rule (taken only if it agrees on the edge-case vectors and on an
   // honest and a tampered signature; else tweetnacl stays). Before any store is read, so every check of this run is the fast one.
@@ -563,7 +564,7 @@ async function enrolOnce() {
     const r = await callSkill('household', 'enrollDevice', { mnemonic, label: 'box', ...enrolPickArgs(pick.state) });
     if (r?.ok) console.log(`device-runner: this box holds ${pick.state.withDefault ? 'you' : ''}${pick.state.withDefault && pick.state.personas.length ? ' and ' : ''}${pick.state.personas.map((id) => listed.find((p) => p.id === id)?.name ?? id).join(', ')} (it speaks as ${pickPrimary(pick.state) === 'default' ? 'you' : listed.find((p) => p.id === pickPrimary(pick.state))?.name ?? pickPrimary(pick.state)}).`);
     if (!r?.ok) {
-      await offerStash.removeItem('onderling.enrollOffer').catch(() => {});
+      await offerStash.removeItem(storageName('enrollOffer')).catch(() => {});
       console.error(`device-runner: not enrolled — ${r?.outcome === 'invalid-phrase' ? 'that is not a valid recovery phrase' : (r?.error ?? 'the ceremony failed')}.`);
       return 2;
     }

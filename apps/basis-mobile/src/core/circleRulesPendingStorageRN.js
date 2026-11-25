@@ -9,10 +9,11 @@
  * passes the real `@react-native-async-storage/async-storage` instance.
  */
 
+import { storageName } from '../../../basis/src/v2/storageRegister.js';   // every storage name from the one register
 import { createCircleRulesPendingStore } from '../../../basis/src/v2/circleRulesPending.js';
 import { makeCircleKindPendingLocalIo } from '../../../basis/src/v2/circleKindFactory.js';
 
-const KEY_PREFIX = 'cc.circleRulesPending.';
+const KEY_PREFIX = storageName('circleRulesPending');
 
 /** The same SEALED io as the web's (ledger L1083: an incoming circle document), over AsyncStorage. */
 export function asyncStorageCircleRulesPendingIo(storage) {

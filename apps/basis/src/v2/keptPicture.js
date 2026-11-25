@@ -1,3 +1,4 @@
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 /**
  * A KEPT PICTURE: what a screen showed when it was last caught up, painted at a cold start before the agent is whole
  * (the cold-start work, the circles list and Today on the phone).
@@ -48,7 +49,7 @@ export function keptCircleRow(circle, preview = null, { pinned = false } = {}) {
   };
 }
 
-export const KEPT_CIRCLES_KEY = 'basis.keptCircles';
+export const KEPT_CIRCLES_KEY = storageName('keptCircles');
 
 /**
  * The kept circles list over a sealed key-value store (`sealedKeyValue(storage, { strict: true, waitForKey: true })`):

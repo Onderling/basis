@@ -13,6 +13,7 @@
  * polyfills aren't loaded (the portable core in src/core/ has no RN
  * imports).
  */
+import { storageName } from '../basis/src/v2/storageRegister.js';   // every storage name from the one register
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as sodium from 'react-native-libsodium';
 import { installPhoneSignatureEquation, installPhoneSigning, installPhoneSecretbox } from '../basis/src/v2/signatureEquations.js';
@@ -511,9 +512,9 @@ export default function App() {
         } catch { /* a clear that cannot run never blocks a launch */ }
 
         const deviceLogIo = backendSnapshotIo(
-          sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-device-log' }), { scope: 'cc-device-log' }),
+          sealedLocalBackend(createAsBackend({ AsyncStorage, scope: storageName('deviceLog') }), { scope: storageName('deviceLog') }),
         );
-        const SEED_FLAG = 'cc.firstBootSeeded.v1';
+        const SEED_FLAG = storageName('firstBootSeeded');
         const alreadySeeded = await AsyncStorage.getItem(SEED_FLAG).catch(() => null) === '1';
         let eventSeq = 0;
         bootMark('agent.boot');
@@ -587,7 +588,7 @@ export default function App() {
           // sealed mirror on the user's own pod under an opaque name when signed in.
           // NOT wrapped here on purpose: realAgent seals the registry itself, because it also owns the
           // pod mirror's strategy and the two must be the same key. Wrapping it again would seal twice.
-          registryBackend: createAsBackend({ AsyncStorage, scope: 'cc-agent-registry' }),
+          registryBackend: createAsBackend({ AsyncStorage, scope: storageName('agentRegistry') }),
           provisionRegistryMedium: async (strategy) => createRegistryPodMedium({
             fetch:   getCirclePodFetch(),
             podRoot: getActiveRealPodRouting()?.podRoot ?? null,

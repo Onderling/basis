@@ -21,6 +21,7 @@
  * Only kind:user params are declared into the register (a kind:internal param is immutable by construction —
  * decision E — so it has no settable value and is never here). `set-param` refuses everything else.
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { ASSISTANT_MEMORY_DEFAULT_KEY, DEFAULT_MEMORY_MODE, MEMORY_MODES } from './botThreads.js';
 import { createParamRegistry, setParam, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { createSettingsModule } from '@onderling/local-store';
@@ -169,9 +170,9 @@ export const BASIS_USER_PARAMS = [
  * forced the cache no longer applies.
  */
 export const PARAM_PREBOOT_MIRRORS = Object.freeze({
-  'basis.theme':     'display.theme',   // the pre-paint hook in index.html stamps data-theme before any module loads
-  'circle.app.lang': 'app.lang',        // i18n initialises before the agent exists
-  'cc.relayUrl':     'relay.url',       // the transport connects before the agent exists
+  [storageName('theme')]:     'display.theme',   // the pre-paint hook in index.html stamps data-theme before any module loads
+  [storageName('language')]: 'app.lang',        // i18n initialises before the agent exists
+  [storageName('relayUrl')]:     'relay.url',       // the transport connects before the agent exists
 });
 
 /**

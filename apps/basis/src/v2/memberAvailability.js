@@ -7,6 +7,7 @@
  * the actual push-suppression into the notifier. Extends the existing
  * holiday-mode skill conceptually; here it's the v2 settings record.
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { sealedKeyValue } from './localStoreSeal.js';
 
 export const DEFAULT_AVAILABILITY = {
@@ -108,7 +109,7 @@ export function createAvailabilityStore({ load, save } = {}) {
  * early would let a match go to someone who is away.
  */
 export function localStorageAvailabilityIo(storage = globalThis.localStorage) {
-  const KEY = 'cc.availability';
+  const KEY = storageName('availability');
   const kv = sealedKeyValue(storage, { name: 'the availability', kind: 'settings', strict: true, waitForKey: true, said: true, resealAtStart: [KEY] });
   return {
     load: async () => {

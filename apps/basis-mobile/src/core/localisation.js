@@ -8,6 +8,7 @@
  * defect.  Mirrors apps/tasks-v0/src/lib/localisation.js + the
  * pinboard-mobile equivalent.
  */
+import { storageName } from '../../../basis/src/v2/storageRegister.js';   // every storage name from the one register
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import en from '../../locales/en.json';
 import nl from '../../locales/nl.json';
@@ -87,7 +88,7 @@ function interpolate(template, params, key) {
 }
 
 // pre-boot cache of app.lang
-const LANG_KEY = 'circle.app.lang';
+const LANG_KEY = storageName('language');
 const _langListeners = new Set();
 /** Subscribe to app-language changes (App.js re-renders the tree). Returns an unsubscribe fn. */
 export function subscribeLang(cb) { _langListeners.add(cb); return () => _langListeners.delete(cb); }

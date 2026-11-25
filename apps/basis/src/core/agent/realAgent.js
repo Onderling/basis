@@ -23,6 +23,7 @@
  * the wrapper at `src/web/realAgent.js` + `web/main.js`.
  */
 
+import { storageName } from '../../v2/storageRegister.js';   // every storage name from the one register
 import { withAnswers, RSVP_TYPE, rosterAnswerRule } from '../../v2/rsvpItems.js';
 import { THREAD_LANGS } from '../../v2/threadLangs.js';
 import { TRANSPORT_MODES } from '../../v2/circleSettingsControls.js';
@@ -504,7 +505,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // persisted. The old vault survives only as the legacy migration source —
   // an install from before the cutover has its cleartext phrase adopted (and
   // removed) on the first boot through here. See ownerRootCustody.js.
-  const ownerRootVault = opts.ownerRootVault ?? pickVault('cc-owner-root:', { durabilityMatters: true });
+  const ownerRootVault = opts.ownerRootVault ?? pickVault(storageName('vaultOwnerRoot'), { durabilityMatters: true });
   const rootKeyStore   = opts.rootKeyStore ?? pickRootKeyStore({ fallbackVault: ownerRootVault });
   // THE CUSTODY FORK (the non-resident root): a CUT-OVER device's key door holds its DELEGATION
   // seed and `ownerRoot` is NULL for the whole boot — the root exists only inside ceremonies,
@@ -559,7 +560,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // Host agent — in-process app skills (household, tasks-v0, pinboard,
   // folio, calendar).  No cross-peer; vault picks the standard browser
   // localStorage path.  Built manually because it's a pure backend.
-  const hostVault = await sealedVault(opts.hostVault ?? pickVault('cc-host-id:'));
+  const hostVault = await sealedVault(opts.hostVault ?? pickVault(storageName('vaultHostId')));
   // The household and folio agents are gone — their ops are the host's, and the host key is the one issuer. An install
   // from before still holds the private keys they kept at rest; nothing owns those now, so they are forgotten here, at
   // every boot (an emptied prefix lists nothing, so after the first boot this does nothing).
@@ -604,7 +605,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // silently here). An entry that exists but cannot be read (a plaintext write that
   // slipped past the sealed layer) is unrecoverable either way — re-deriving from the
   // root is the one repair that keeps the person reachable at their roster addresses.
-  const chatVaultBacking = opts.chatVault ?? pickVault('cc-chat-id:');
+  const chatVaultBacking = opts.chatVault ?? pickVault(storageName('vaultChatId'));
   const chatVault = await sealedVault(chatVaultBacking);
 
   // ── CONTENT at rest ────────────────────────────────────────────────────────────────────────────
@@ -667,7 +668,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // with the old device's re-derived key and keeps the raw keys here, sealed at rest under this device's
   // own key, so sealed history opens on the replacement with nobody else online. Keys wrapped only to a
   // retired device's random vault key are not recoverable this way — an admin re-grant is the route.
-  const historyKeysVault = await sealedVault(opts.historyKeysVault ?? pickVault('cc-history-keys:'));
+  const historyKeysVault = await sealedVault(opts.historyKeysVault ?? pickVault(storageName('vaultHistoryKeys')));
   // the STRICT read: nothing stored is an empty chain; a chain that is there but will not read (a decrypt failure, not
   // JSON, not a list) throws, so nothing is written over it (L1115): the history keys are not re-derivable
   const readHistoryChain = async (circleId) => {
@@ -846,7 +847,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     ...(opts.acceptPeerSkillCalls ? { acceptPeerSkillCalls: opts.acceptPeerSkillCalls } : {}),
     vault:               persona.vault,   // the persona's chat seed lives in its slot (personaVault.js)
     primaryDevice:       () => primaryDeviceRef.current?.isMine() === true,
-    identityVaultPrefix: 'cc-chat-id:',   // no effect when `vault` is supplied; documents the prefix
+    identityVaultPrefix: storageName('vaultChatId'),   // no effect when `vault` is supplied; documents the prefix
     muteListVaultKey:    'cc-mute',
     auditLog:            { vaultKey: 'cc-audit' },
     // T5.3b — the unified secure-mesh factory is now the single entry for the
@@ -898,7 +899,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // becomes undecryptable — safe (an unreadable tier falls closed to the lowest) but lossy, and it
     // surfaced as a decryption error the moment a walk did a ceremony and a grant in one account.
     // Mirrors the host gate, which already keeps `cc-host-trust:` separate.
-    trustRegistry: { vault: opts.peerTrustVault ?? pickVault('cc-peer-trust:') },
+    trustRegistry: { vault: opts.peerTrustVault ?? pickVault(storageName('vaultPeerTrust')) },
     // RATE LIMIT ON (the R1 go-live line, 2026-08-21) — the flood defence at the receive boundary,
     // WITH the catch-up exemption that made turning it on safe: a reconnect replay legitimately
     // serves up to 1000 items in one burst, which the chat-pace buckets would silently discard
@@ -1789,7 +1790,7 @@ export async function createRealHouseholdAgent(opts = {}) {
      * behaviour) — never breaks boot. */
     let agentsTokens = null;
     try {
-      const tokenVault = await sealedVault(opts.agentsTokenVault ?? pickVault('cc-agent-tokens:'));
+      const tokenVault = await sealedVault(opts.agentsTokenVault ?? pickVault(storageName('vaultAgentTokens')));
       const tokenRegistry = new TokenRegistry(tokenVault);
       // THE SELF THAT ISSUES A TOKEN (a persona issues its grants as itself): the one named, else this device's only self;
       // with more than one and none named, none — never a silent default to the general persona.
@@ -5983,7 +5984,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * a failure leaves the gate absent (prior behaviour) — never breaks boot. */
   try {
     // Vault-backed TrustRegistry: unknown peers → 'authenticated'; the owner's chat identity → 'private' (self).
-    hostTrustRegistry = new TrustRegistry(opts.hostTrustVault ?? pickVault('cc-host-trust:'));
+    hostTrustRegistry = new TrustRegistry(opts.hostTrustVault ?? pickVault(storageName('vaultHostTrust')));
     hostAgent.policyEngine = new PolicyEngine({
       trustRegistry: hostTrustRegistry,
       skillRegistry: hostAgent.skills,
@@ -6050,7 +6051,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * can be checked and re-signed by the host (`BotAgentRegistry.restoreAll`); then its prefix is emptied. An emptied
    * prefix holds no key, so later boots re-sign nothing — the forgetting is the one-shot marker.
    */
-  const retiredTasksVault = opts.tasksIdentityVault ?? pickVault('cc-tasks-id:');
+  const retiredTasksVault = opts.tasksIdentityVault ?? pickVault(storageName('vaultTasksId'));
   let retiredBotIssuer = null;
   try {
     // an EMPTY prefix holds no key to read: not sealed, so not written (its sentinel was set and removed again at every
@@ -6060,7 +6061,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (sealed && await sealed.has('agent-privkey')) retiredBotIssuer = (await AgentIdentity.restore(sealed)).pubKey;
   } catch (e) { console.warn('[realAgent] the retired tasks key could not be read — its bot bindings will be dropped, not re-signed:', e?.message ?? e); }
   // the task grants' durable store: the host's, one record per circle inside it
-  const hostGrantsVault = await sealedVault(opts.hostGrantsVault ?? pickVault('cc-host-grants:'));
+  const hostGrantsVault = await sealedVault(opts.hostGrantsVault ?? pickVault(storageName('vaultHostGrants')));
   // Register the chatAgent's pubKey as the local member ("admin")
   // AND keep the legacy webid:* members for demo cross-actor tests.
   // Real tasks-v0 skills use `from` (caller) to look up the actor's
@@ -6284,7 +6285,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * across page reloads.
    */
   const pinboardIdentityVault = await sealedVault(opts.pinboardIdentityVault
-    ?? pickVault('cc-pinboard-id:'));
+    ?? pickVault(storageName('vaultPinboardId')));
   await giveFreshSeedIfShared(pinboardIdentityVault, notInProcessKeys, inProcessHealed);
   // THE MEMBERSHIP RIDER: when the shell hands the DEVICE LOG (`opts.deviceLog`), membership statements
   // ride its membership lane — signed with the per-circle key, fanned via broadcastCircleMembership,

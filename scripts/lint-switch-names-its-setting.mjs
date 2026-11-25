@@ -18,6 +18,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { STORAGE } from '../apps/basis/src/v2/storageRegister.js';
 
 const KINDS = new Set(['op', 'param', 'local', 'policy', 'store', 'device', 'form', 'view']);
 const WEB_SWITCH = /\.type\s*=\s*['"]checkbox['"]|setAttribute\(\s*['"]role['"]\s*,\s*['"]switch['"]\s*\)/;
@@ -46,7 +47,10 @@ export function switchProblems(sources, { ops, sourceText }) {
         const known = prefix ? new RegExp(`['"]${prefix.replace(/\./g, '\\.')}[A-Za-z]`).test(sourceText) : sourceText.includes(`'${ref}'`);
         if (!known) problems.push(`${where}: sets param "${ref}", which nothing declares`);
       }
-      if (kind === 'local' && ref && !sourceText.includes(`getItem('${ref}')`)) problems.push(`${where}: sets local "${ref}", which nothing reads back`);
+      // read back by its name, or by its register id (`getItem(storageName('<id>'))`, apps/basis/src/v2/storageRegister.js)
+      const ids = Object.entries(STORAGE).filter(([, r]) => r.name === ref).map(([id]) => id);
+      const readBack = sourceText.includes(`getItem('${ref}')`) || ids.some((id) => sourceText.includes(`getItem(storageName('${id}'))`));
+      if (kind === 'local' && ref && !readBack) problems.push(`${where}: sets local "${ref}", which nothing reads back`);
       if ((kind === 'op' || kind === 'param' || kind === 'local') && !ref) problems.push(`${where}: "${kind}" needs a reference (or "*" for a row-declared one)`);
     });
   }

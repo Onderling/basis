@@ -3552,8 +3552,8 @@ async function addBotFromInput(input) {
   } catch (err) {
     if (err?.code === 'cancelled') return;   // the person closed the sheet — nothing was added, nothing to say
     console.warn('[circleApp] add bot failed:', err?.message ?? err);
-    // A circle invite pasted in the contact box is the VERIFIED rung — point at the join flow.
-    globalThis.alert?.(t(err?.code === 'circle-invite' ? 'circle.contacts.invite_not_contact' : 'circle.contacts.add_failed'));
+    // an invite never reaches here: the router sends it to the join (Contacten's one add field)
+    globalThis.alert?.(t('circle.contacts.add_failed'));
   }
   showContacts();
 }

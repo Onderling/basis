@@ -45,6 +45,7 @@
  * All roadmap slices S0–S8 are now wired.  STUB_OPTS is empty.
  */
 
+import { readVersionedDoc } from './versionedDoc.js';
 import {
   Agent,
   AgentIdentity,
@@ -882,6 +883,9 @@ export async function createSecureAgent(opts = {}) {
   const holdStoreUri = typeof opts.holdStoreUri === 'string' ? opts.holdStoreUri : 'mem://secure-agent/outbox.json';
   let   holdPersist = Promise.resolve();
   let   outboxRestored = Promise.resolve(0);
+  /** Why the stored outbox could not be read, or null. While set, nothing is saved over it: the holds of this run live
+   *  in memory only, and the shell's notice says so (`opts.onStoreNotReadable`, kind `messages`). */
+  let   outboxRefused = null;
 
   /** Serialise the queue. `opts` is JSON round-tripped, so anything unserialisable (a callback) is
    *  dropped rather than throwing — a resend must not depend on a closure the restart cannot restore.
@@ -896,7 +900,9 @@ export async function createSecureAgent(opts = {}) {
     if (holdPersistWaiting) return holdPersist;   // the waiting write reads the queue when it runs: this change included
     holdPersistWaiting = true;
     holdPersist = holdPersist.then(async () => {
+      await outboxRestored;                       // the stored copy is read (and judged) before anything is written over it
       holdPersistWaiting = false;                 // from here on a change needs a write of its own
+      if (outboxRefused) return;                  // a stored outbox this build could not read: never written over
       const snapshot = serialiseHolds();
       if (snapshot == null) return;               // a queue we cannot serialise stays in memory
       try { await holdStore.write(holdStoreUri, snapshot); }
@@ -924,15 +930,18 @@ export async function createSecureAgent(opts = {}) {
    *  REPORTED, exactly as the live sweep does — a restart must not resurrect what had already expired. */
   async function restoreHolds() {
     if (!holdStore || typeof holdStore.read !== 'function') return 0;
-    let parsed = null;
-    try {
-      const raw = await holdStore.read(holdStoreUri);
-      parsed = raw ? JSON.parse(typeof raw === 'string' ? raw : raw?.content ?? 'null') : null;
-    } catch (err) {
-      if (typeof console !== 'undefined') console.warn('[secure-agent] outbox unreadable — starting empty', err?.message ?? err);
+    const refuse = (reason, detail = '') => {
+      outboxRefused = reason;
+      if (typeof console !== 'undefined') console.warn(`[secure-agent] the stored outbox is not readable by this build (${reason}) — kept as it is, not saved over`, detail);
+      try { opts.onStoreNotReadable?.({ name: holdStoreUri, kind: 'messages', reason }); } catch { /* a report never breaks the outbox */ }
       return 0;
-    }
-    if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.peers)) return 0;
+    };
+    let raw;
+    try { raw = await holdStore.read(holdStoreUri); }
+    catch (err) { return refuse('read-failed', err?.message ?? err); }
+    const { doc: parsed, notReadable } = readVersionedDoc(raw, { v: 1, valid: (d) => Array.isArray(d.peers) });
+    if (notReadable) return refuse(notReadable);
+    if (!parsed) return 0;
     let restored = 0;
     const now = Date.now();
     if (Array.isArray(parsed.alive)) for (const addr of parsed.alive) if (typeof addr === 'string') markSeenAlive(addr);
@@ -1586,7 +1595,7 @@ export async function createSecureAgent(opts = {}) {
   const seenInbound = (opts.seenInbound && typeof opts.seenInbound.has === 'function' && typeof opts.seenInbound.add === 'function')
     ? opts.seenInbound
     : (opts.seenInboundStore && typeof opts.seenInboundStore.write === 'function')
-      ? createSeenInboundRing({ store: opts.seenInboundStore, ...(typeof opts.seenInboundUri === 'string' ? { uri: opts.seenInboundUri } : {}) })
+      ? createSeenInboundRing({ store: opts.seenInboundStore, onNotReadable: opts.onStoreNotReadable ?? null, ...(typeof opts.seenInboundUri === 'string' ? { uri: opts.seenInboundUri } : {}) })
       : null;
   const landingNow = new Set();              // keys whose handler is running: a concurrent copy is the same message
   const repeatSaid = new Set();              // say a dropped repeat once per subtype (never who), count every one

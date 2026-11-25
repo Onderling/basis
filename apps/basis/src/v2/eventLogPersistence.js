@@ -58,9 +58,11 @@ function debounced(save, ms) {
  * @param {{ hydrate: Function, setPersist: Function }} a.eventLog
  * @param {{ load: () => Promise<object[]|null>, save: (events: object[]) => Promise<void> }} a.io
  * @param {number} [a.debounceMs]
- * @returns {Promise<{ hydrated: number }>}
+ * @param {(r: {name: string, kind: string, reason: string}) => void} [a.onNotReadable]  a stored log this build cannot
+ *   read: said here, and no save is attached (nothing is written over it)
+ * @returns {Promise<{ hydrated: number, notReadable?: string }>}
  */
-export async function wireEventLogPersistence({ eventLog, io, debounceMs = 400 } = {}) {
+export async function wireEventLogPersistence({ eventLog, io, debounceMs = 400, onNotReadable = null } = {}) {
   if (!eventLog || typeof eventLog.hydrate !== 'function' || typeof eventLog.setPersist !== 'function') {
     throw new Error('wireEventLogPersistence: an eventLog with hydrate + setPersist is required');
   }
@@ -72,8 +74,15 @@ export async function wireEventLogPersistence({ eventLog, io, debounceMs = 400 }
     const events = await io.load();
     if (Array.isArray(events) && events.length) hydrated = eventLog.hydrate(events);
   } catch (err) {
-    // A corrupt/unreadable snapshot degrades to an empty log — never a broken boot.
-    console.warn('[device-log] snapshot load failed — starting empty:', err?.message ?? err);
+    // A STORED LOG THIS BUILD CANNOT READ IS NEVER SAVED OVER. The boot goes on with an empty log in memory — never a
+    // broken boot — but no save is attached: the first append would otherwise write new segments over the old ones, a
+    // manifest naming only those, and sweep every row it did not name (the whole record). Said once, in the log and
+    // through `onNotReadable` (the device's one notice); a later build that reads it, or the person's start-over,
+    // replaces it.
+    const reason = err?.reason ?? 'read-failed';
+    console.warn(`[device-log] the stored log is not readable by this build (${reason}) — kept as it is, nothing saved over it:`, err?.message ?? err);
+    try { onNotReadable?.({ name: 'device-log', kind: 'messages', reason }); } catch { /* a report never breaks the boot */ }
+    return { hydrated: 0, notReadable: reason };
   }
   eventLog.setPersist(debounced(io.save, debounceMs));
   return { hydrated };
@@ -152,9 +161,14 @@ export function backendSnapshotIo(backend, ref = REF) {
     async load() {
       const head = await readText(ref);
       if (head == null) return null;
-      const parsed = JSON.parse(head);
+      let parsed;
+      try { parsed = JSON.parse(head); }
+      catch (err) { throw Object.assign(new Error(`device-log: manifest does not parse (${err?.message ?? err})`), { reason: 'unparseable' }); }
       if (Array.isArray(parsed)) { known = null; return parsed; }               // the legacy single value
-      if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.segments)) throw new Error('device-log: manifest not understood');
+      if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.segments)) {
+        const reason = parsed && typeof parsed === 'object' && typeof parsed.v === 'number' && parsed.v !== 1 ? 'version' : 'shape';
+        throw Object.assign(new Error('device-log: manifest not understood'), { reason });
+      }
       const out = [];   // oldest first while reading
       for (const seg of parsed.segments) {
         const t = await readText(seg.key);
@@ -243,8 +257,11 @@ export function fileSnapshotIo(filePath) {
   return {
     async load() {
       const { readFile } = await import('node:fs/promises');
-      try { return JSON.parse(await readFile(filePath, 'utf8')); }
+      let text;
+      try { text = await readFile(filePath, 'utf8'); }
       catch (err) { if (err?.code === 'ENOENT') return null; throw err; }
+      try { return JSON.parse(text); }
+      catch (err) { throw Object.assign(new Error(`device-log: file does not parse (${err?.message ?? err})`), { reason: 'unparseable' }); }
     },
     save(events) {
       return onePerFile(filePath, async () => {

@@ -35,6 +35,7 @@
  * @returns {(fromAddr: string, payload: object) => void}
  */
 import { renderReply } from '../../renderer.js';
+import { NOT_TAKEN } from './peerRouter.js';
 
 export function makeHandleChatMessage({
   ensureDmThread,
@@ -54,7 +55,7 @@ export function makeHandleChatMessage({
       // Diagnostic only.  Infrastructure envelopes (HI/claims/handshake)
       // routinely arrive without a body — they're handled inside sa.peer.
       logger.debug?.('[peer] non-chat envelope from', String(fromAddr).slice(0, 16) + '…', payload);
-      return;
+      return NOT_TAKEN;   // not a chat turn: not taken, so a named subtype nobody handles is answered (not dropped)
     }
     if (payload.senderDisplay && typeof updatePeerDisplay === 'function') {
       updatePeerDisplay(fromAddr, payload.senderDisplay);

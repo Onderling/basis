@@ -46,6 +46,7 @@ import {
 } from '../../v2/circleSigningIdentity.js';
 import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleSenderAuthorization.js';
 import { createCircleAddressIndex, decidePeerSend, sendDecisionFields, personAllowedBy, createInviteExchange, exchangeKindOf, createHeldSends, HELD_SEND_RECHECK_MS, wireRefusedSend } from '../../v2/peerSendGate.js';
+import { createNotUnderstood, isNotUnderstood } from '../../v2/notUnderstood.js';
 import { log as structuredLog } from '@onderling/logger';
 import { createRosterReadCache, isRosterRead } from '../../v2/rosterReadCache.js';
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../v2/addressSharing.js';
@@ -4073,6 +4074,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   sa.agent.on?.('wire-refused', ({ address, side, wire }) => {
     try { structuredLog.warn('agent', 'wire.refused', { side, wire, peer: typeof address === 'string' ? address.slice(0, 12) : '?' }); } catch { /* the log never breaks */ }
   });
+  // what each peer could not receive and what this device answered it could not (notUnderstood.js), per start
+  const notUnderstood = createNotUnderstood();
   const refusedInbound = new Map();
   const refusedInboundWarned = new Set();
   sa.agent.on?.('security-error', (err, raw) => {
@@ -10441,7 +10444,23 @@ export async function createRealHouseholdAgent(opts = {}) {
           inboundRefused['old-envelope'] = (inboundRefused['old-envelope'] ?? 0) + 1;
           return { refused: true };
         }
-        return onPeerMessage?.(env);
+        // A PEER'S ANSWER that it could not receive a subtype of ours (notUnderstood.js): kept per peer (the words on its
+        // row), logged once, never answered and never handed to the shell router (so it can never be "unknown" itself).
+        if (isNotUnderstood(env?.payload)) {
+          if (notUnderstood.noteAnswer(env?.from, env.payload)) {
+            try { structuredLog.warn('agent', 'peer.not-understood', { of: env.payload.of, peer: String(env?.from ?? '?').slice(0, 12) }); } catch { /* the log never breaks */ }
+          }
+          return undefined;
+        }
+        const verdict = onPeerMessage?.(env);
+        // …and a NAMED subtype the shell router did not take: answered ONCE per peer and subtype per start, through the
+        // send gate (a blocked peer gets nothing; the answer is direct contact). Only a verified sender reaches here.
+        Promise.resolve(verdict).then((v) => {
+          const answer = notUnderstood.answerFor(env?.from, v?.notUnderstood);
+          if (answer) return peerSend(env.from, answer);
+          return null;
+        }).catch(() => {});
+        return verdict;
       };
       // THE RELAY NEVER WAITS ON NKN (2026-09-18). This used to `await` NKN first and dial the relay after
       // — so an unreachable NKN network (its fallback chain is minutes long, then it throws) meant the relay,
@@ -10969,6 +10988,12 @@ export async function createRealHouseholdAgent(opts = {}) {
      * contact row reads it for its words; the send gate reads the same mark (`peerSend`).
      * @param {string} address
      */
+    /**
+     * The subtypes this peer answered it could not receive, in this start (its build is older): the words on its row.
+     * @param {string} address
+     * @returns {string[]}
+     */
+    notUnderstoodBy: (address) => (typeof address === 'string' && address ? notUnderstood.toldBy(address) : []),
     wireRefusal: (address) => {
       if (typeof address !== 'string' || !address) return null;
       try { return sa.agent?.wireRefusal?.(address) ?? null; } catch { return null; }

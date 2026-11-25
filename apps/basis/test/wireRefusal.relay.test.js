@@ -11,7 +11,7 @@ import { createMemoryBackend } from '@onderling/pseudo-pod';
 import { SecurityLayer, WIRE_VERSION } from '@onderling/core';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown, addCardOf } from './support/pairRealAgents.js';
-import { contactRowMeta, withWireRefusals } from '../src/v2/contactsSource.js';
+import { contactRowMeta, withPeerNotices } from '../src/v2/contactsSource.js';
 import { deliveryPresentation } from '../src/v2/deliverySettings.js';
 import { DELIVERY } from '../src/v2/deliveryState.js';
 
@@ -61,9 +61,9 @@ describe('the wire refusal between two real agents over a relay', () => {
   }, 30_000);
 
   it('the contact row says it, in words, on both sides', () => {
-    const [myRow] = withWireRefusals([{ contactId: ann.pubKey, name: 'Ann', peerAddr: ann.pubKey, reachable: true }], (a) => me.agent.wireRefusal(a));
+    const [myRow] = withPeerNotices([{ contactId: ann.pubKey, name: 'Ann', peerAddr: ann.pubKey, reachable: true }], me.agent);
     expect(contactRowMeta(myRow, t)).toContain('circle.contacts.wire_peer_older:Ann');
-    const [herRow] = withWireRefusals([{ contactId: me.pubKey, name: 'Ik', peerAddr: me.pubKey, reachable: true }], (a) => ann.agent.wireRefusal(a));
+    const [herRow] = withPeerNotices([{ contactId: me.pubKey, name: 'Ik', peerAddr: me.pubKey, reachable: true }], ann.agent);
     expect(contactRowMeta(herRow, t)).toContain('circle.contacts.wire_older:Ik');
   });
 

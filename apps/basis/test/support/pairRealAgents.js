@@ -54,7 +54,7 @@ import { runKeyAudienceCheck } from '../../src/v2/keyAudienceCheck.js';
 import { createCirclePodProducer, createCircleControlAgentRouter, memberStatusReader } from '../../src/v2/circlePodProducer.js';
 import { openerForIdentity } from '../../src/v2/sharedCopyOpener.js';
 import { createKeyEventStore, openViaKeyEvents } from '../../src/v2/keyEventStore.js';
-import { makePeerRouter } from '../../src/core/handlers/peerRouter.js';
+import { makePeerRouter, NOT_TAKEN } from '../../src/core/handlers/peerRouter.js';
 // The contact-thread channel + its own-devices fan — composed here ONLY when a walk asks for it
 // (`contactChannel: true`), so every existing node keeps sending contact turns to `received`.
 import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
@@ -589,8 +589,13 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
 
   routerRef.fn = makePeerRouter({
     handlers,
-    // Everything else (plain chat-message bubbles, etc.) lands here for assertions.
-    defaultHandler: (from, payload) => { received.push({ from, payload }); },
+    // Everything else (plain chat-message bubbles, etc.) lands here for assertions. Taken only when it is a chat turn
+    // (a body), as the phone's chat fallback does: anything else is refused, so a named subtype nobody handles is
+    // answered as not understood, the way a shell answers it.
+    defaultHandler: (from, payload) => {
+      received.push({ from, payload });
+      return (typeof payload?.body === 'string' && payload.body) ? undefined : NOT_TAKEN;
+    },
     logger: QUIET,
   });
 

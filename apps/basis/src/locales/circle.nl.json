@@ -6828,6 +6828,10 @@
     "wire_peer_older": {
       "text": "{{name}} gebruikt een oudere Basis. Zodra die is bijgewerkt praten jullie weer",
       "doc": "On a contact's row while this device refuses their Basis version (the wire refusal): they are on the older one."
+    },
+    "not_understood": {
+      "text": "{{name}} kan nog niet alles ontvangen wat je stuurt (oudere Basis)",
+      "doc": "On a contact's row when their device answered that it could not receive a kind of message this device sent (an older build: the not-understood answer)."
     }
   },
   "pairedDevices": {

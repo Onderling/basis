@@ -10,7 +10,7 @@
  * channel's `in` / `out`.
  */
 
-import { mapKeysOf, wireNamesOf } from './wireRegister.js';
+import { mapKeysOf, blockedDirectNames } from './wireRegister.js';
 
 /**
  * Direct contact: refused for a blocked sender (inbound) and to a blocked address (outbound). A projection of the wire
@@ -43,8 +43,8 @@ export function blockedFirst(isBlocked, handler) {
   };
 }
 
-/** Every direct row's wire value (an outbound payload carries the value, never a constant's name). */
-const DIRECT_WIRE = Object.freeze(wireNamesOf('direct'));
+/** The wire value of every direct row a blocked address is refused (an outbound payload carries the value). */
+export const DIRECT_WIRE = Object.freeze(blockedDirectNames());
 
 /** Whether an outbound payload is DIRECT contact (its subtype, flat or inside the A2A data part). */
 export function isDirectPayload(payload) {

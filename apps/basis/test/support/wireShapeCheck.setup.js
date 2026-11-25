@@ -4,10 +4,10 @@
  * no register row, or whose keys and value kinds are not its row's, is refused there and recorded, and the test that
  * sent it fails here. Recorded as well as thrown, because many sends are best-effort and swallow their own errors.
  *
- * Shell builds never install it (a fitness test pins that only test files name the hook).
+ * Shell builds never set it (a fitness test pins that no file outside test/ calls the setter).
  */
 import { afterEach, expect } from 'vitest';
-import { wireShapeProblem, WIRE_SHAPE_CHECK } from '../../src/v2/wireRegister.js';
+import { wireShapeProblem, setWireShapeCheck } from '../../src/v2/wireRegister.js';
 
 /**
  * What a test sends ON PURPOSE that no build sends: an unknown kind to see it answered, a bare chat body to see the
@@ -27,13 +27,13 @@ const testOnly = (payload) => {
 };
 
 const refused = [];
-globalThis[WIRE_SHAPE_CHECK] = (payload) => {
+setWireShapeCheck((payload) => {
   if (testOnly(payload)) return;
   const problem = wireShapeProblem(payload);
   if (!problem) return;
   refused.push(problem);
   throw new Error(`wire shape refused under test: ${problem}`);
-};
+});
 
 afterEach(() => {
   const seen = refused.splice(0);

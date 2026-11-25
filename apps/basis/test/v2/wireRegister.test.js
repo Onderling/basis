@@ -7,7 +7,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { WIRE, UNNAMED, NOT_HERE, WIRE_HOMES, VALUE_KINDS, WIRE_SHAPE_CHECK, wireShapeProblem, wireNamesOf } from '../../src/v2/wireRegister.js';
+import { WIRE, UNNAMED, NOT_HERE, WIRE_HOMES, VALUE_KINDS, wireShapeProblem, wireNamesOf, wireShapeCheckSet } from '../../src/v2/wireRegister.js';
+import { DIRECT_WIRE } from '../../src/v2/directDoors.js';
 import { CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
 import { KEY_STATEMENT_BROADCAST } from '../../src/v2/keyRail.js';
 import { ITEMS_BROADCAST, OWN_ITEMS_CATCHUP_SUBTYPES } from '../../src/v2/itemsRail.js';
@@ -83,23 +84,35 @@ describe('the register', () => {
   });
 });
 
+describe('no behaviour change: the outbound block list is what it was before the register', () => {
+  it('DIRECT_WIRE is exactly the old list', () => {
+    const OLD = [
+      'contact-msg', 'contact-reply', 'file-share', 'chat-message', 'shared-copy', 'delivery-receipt', 'calendar-invite',
+      'calendar-rsvp', 'calendar-cancel', 'group-redeem-request', 'group-redeem-response',
+      'screen-offer', 'screen-waiting', 'companion-grant', 'identity-link-revoke', 'screen-nudge', 'surface-lane-nudge',
+      ...NEARBY_ROOM_SUBTYPES, 'not-understood',
+    ];
+    expect([...DIRECT_WIRE].sort()).toEqual([...OLD].sort());
+  });
+});
+
 describe('the check is on under test and in no shell', () => {
   const root = fileURLToPath(new URL('../../', import.meta.url));
-  it('the test setup installed it at the one wire call', () => {
-    expect(typeof globalThis[WIRE_SHAPE_CHECK]).toBe('function');
-    expect(readFileSync(path.join(root, 'src/core/agent/realAgent.js'), 'utf8')).toMatch(/async function wireSend\([^)]*\) \{\n(?:\s*\/\/[^\n]*\n)*\s*\{ const check = globalThis\[WIRE_SHAPE_CHECK\]/);
+  it('the test setup set it, and the one wire call runs it', () => {
+    expect(wireShapeCheckSet()).toBe(true);
+    expect(readFileSync(path.join(root, 'src/core/agent/realAgent.js'), 'utf8')).toMatch(/async function wireSend\([^)]*\) \{\n(?:\s*\/\/[^\n]*\n)*\s*runWireShapeCheck\(payload\);/);
   });
-  it('no shell or shared source file installs it (only the register names it, and the wire call reads it)', () => {
+  it('no file outside test/ calls the setter', () => {
     const offenders = [];
     const walk = (dir) => {
       for (const f of readdirSync(dir)) {
         const p = path.join(dir, f);
-        if (f === 'node_modules' || f.startsWith('.')) continue;
+        if (f === 'node_modules' || f.startsWith('.') || f === 'test' || f === 'test-browser') continue;
         if (statSync(p).isDirectory()) walk(p);
-        else if (/\.(m?js|jsx)$/.test(f) && /globalThis\[WIRE_SHAPE_CHECK\]\s*=/.test(readFileSync(p, 'utf8'))) offenders.push(path.relative(root, p));
+        else if (/\.(m?js|jsx)$/.test(f) && /\bsetWireShapeCheck\(/.test(readFileSync(p, 'utf8'))) offenders.push(path.relative(root, p));
       }
     };
     for (const d of ['src', 'web', 'bin', '../basis-mobile/src']) walk(path.join(root, d));
-    expect(offenders).toEqual([]);
+    expect(offenders.filter((f) => f !== 'src/v2/wireRegister.js')).toEqual([]);
   });
 });

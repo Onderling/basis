@@ -114,7 +114,7 @@ import { makeContactTurnFan, makeContactTurnPeerHandler, CONTACT_TURN_BROADCAST 
 import { makeSiblingCarry } from '../../v2/siblingCarry.js';
 import { createPersonKeySync, routePersonKeySync, PERSON_KEY_CARRY, PERSON_KEY_SELF_REVEAL } from '../../v2/personKeySync.js';
 import { circleSendRoute } from '../../v2/circleSendRoute.js';
-import { WIRE_SHAPE_CHECK } from '../../v2/wireRegister.js';   // the shape check under test, at the one wire call
+import { runWireShapeCheck } from '../../v2/wireRegister.js';   // the shape check under test, at the one wire call
 import { createPrimaryDeviceChoice, SPINE_POINT_VAULT_KEY, SPINE_POINT_SUBTYPES } from '../../v2/primaryDevice.js';
 import { pairRouteFor } from '../../v2/pairRoster.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
@@ -1206,7 +1206,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    */
   async function wireSend(to, payload, sendOpts = {}, decision = null) {
     // UNDER TEST ONLY: the wire register's shape check (wireRegister.js; installed by the test setup, never by a shell)
-    { const check = globalThis[WIRE_SHAPE_CHECK]; if (typeof check === 'function') check(payload); }
+    runWireShapeCheck(payload);
     // the route the send TOOK, reported by the send itself; the candidates are explained only when nothing took it (a
     // recomputed route beside a delivered send could name a branch the send did not take)
     let taken = null;

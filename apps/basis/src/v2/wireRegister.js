@@ -11,6 +11,7 @@
  *     `additive: true` and the reason an older build still reads the new shape (the shape guard holds this).
  *   - `fields` name each top-level key and the kind of its value: string · number · boolean · list · object, with `?`
  *     for optional (null counts as absent). One level deep; anything deeper is `object`.
+ *   - `blockList: false` marks a direct row that is NOT refused to a blocked address (kept as it was; ruled per row).
  *   - `inMap` marks a row the shells key in a handler map that the block-list fitness tests read; `mapKey` is the name
  *     that map keys it by when it is not the wire value (an imported constant's NAME, or the catch-up trio's role).
  *
@@ -19,8 +20,17 @@
  * against the register. Shell builds do not run the check.
  */
 
-/** The hook the test setup installs at the one wire call; nothing in a shell build sets it. */
-export const WIRE_SHAPE_CHECK = Symbol.for('onderling.wireShapeCheck');
+/**
+ * The shape check at the one wire call: held here, set only by the test setup (a fitness test pins that no file outside
+ * test/ calls the setter), so a shell build has no tap on its sends.
+ */
+let shapeCheck = null;
+/** @param {((payload: object) => void)|null} fn */
+export function setWireShapeCheck(fn) { shapeCheck = typeof fn === 'function' ? fn : null; }
+/** Called by the wire call with every payload; does nothing unless the test setup set a check. */
+export function runWireShapeCheck(payload) { if (shapeCheck) shapeCheck(payload); }
+/** Whether a check is set (for the fitness test). */
+export const wireShapeCheckSet = () => shapeCheck !== null;
 
 export const WIRE_HOMES = Object.freeze(['direct', 'circle', 'own']);
 export const VALUE_KINDS = Object.freeze(['string', 'number', 'boolean', 'list', 'object']);
@@ -82,14 +92,15 @@ export const WIRE = Object.freeze({
   'nearby-reach':          row('direct', { msgId: 'string', reach: 'object' }),
   // the answer that this build could not receive a subtype (notUnderstood.js)
   'not-understood':        row('direct', { of: 'string', wire: 'number?' }),
-  // ── direct by nature, NOT on the block list's outbound list before the register (see the PR): a bot link and its
-  //    answer, the person-key chain a contact asks for, the box's answers to a screen, a connection grant
-  'identity-link':         row('direct', { statement: 'object', unlinked: 'boolean?' }),
-  'person-key-chain-request': row('direct', { since: 'number' }),
-  'person-key-chain':      row('direct', { current: 'object', links: 'list' }),
-  'screen-offer-refused':  row('direct', {}),
-  'screen-step-up':        row('direct', { outcome: 'string', op: 'string?' }),
-  'surface-grant-offer':   row('direct', { nonce: 'string', tokens: 'list', label: 'string?' }),
+  // ── direct by nature, but NOT refused to a blocked address (`blockList: false`), as before the register: a bot link
+  //    and its answer, the person-key chain a contact asks for, the box's answers to a screen, a connection grant.
+  //    Whether each should be is its own ruling (the person-key chain may have to reach a blocked co-member).
+  'identity-link':         row('direct', { statement: 'object', unlinked: 'boolean?' }, { blockList: false }),
+  'person-key-chain-request': row('direct', { since: 'number' }, { blockList: false }),
+  'person-key-chain':      row('direct', { current: 'object', links: 'list' }, { blockList: false }),
+  'screen-offer-refused':  row('direct', {}, { blockList: false }),
+  'screen-step-up':        row('direct', { outcome: 'string', op: 'string?' }, { blockList: false }),
+  'surface-grant-offer':   row('direct', { nonce: 'string', tokens: 'list', label: 'string?' }, { blockList: false }),
 
   // ── circle: a circle's traffic ──────────────────────────────────────────────────────────────────────────────────
   'circle-chat-statement': row('circle', { ...BROADCAST, msgId: 'string', ts: 'number', type: 'string?', fromWebid: 'string?' }, { inMap: true, mapKey: 'CHAT_STATEMENT_BROADCAST' }),
@@ -175,6 +186,9 @@ export const mapKeysOf = (...homes) => [...new Set(Object.entries(WIRE)
 
 /** The rows of one home, by wire value. */
 export const wireNamesOf = (home) => Object.keys(WIRE).filter((name) => WIRE[name].home === home);
+
+/** The direct rows refused to a blocked address (every direct row not marked `blockList: false`). */
+export const blockedDirectNames = () => wireNamesOf('direct').filter((name) => WIRE[name].blockList !== false);
 
 const kindOf = (v) => (Array.isArray(v) ? 'list' : typeof v);
 

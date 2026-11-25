@@ -1310,7 +1310,7 @@ export class Agent extends Emitter {
 
   #onSecurityError(transport, err, raw) {
     this.emit('security-error', err, raw);
-    if (err?.code === SEC.WIRE_REFUSED) this.#refuseWire(transport, err);
+    if (err?.code === SEC.WIRE_REFUSED) this.refuseWire(transport, err);
   }
 
   /** Mark a peer refused and say so ONCE per peer and side per start (`wire-refused`; the app turns it into words). */
@@ -1329,8 +1329,14 @@ export class Agent extends Emitter {
    * instead of timing out. The frame is an HI answer carrying our wire and nothing else, sent on the transport the
    * refused envelope came in on, as the address it was sent to, and only when this transport holds that address (the
    * same rule as the delivery ack: never the primary in place of a circle address).
+   *
+   * Public because not every wire transport is owned by this agent: a host that owns its transports and hands their
+   * envelopes on itself (the secure agent) calls this from its own `security-error` listener, and `takeWireFrame` from
+   * its own envelope path, so the wire is refused the same way on every transport.
+   * @param {object} transport  the transport the refused envelope came in on
+   * @param {Error & {from?: string, to?: string|null, envelopeId?: string, peerWire?: number|null}} err
    */
-  #refuseWire(transport, err) {
+  refuseWire(transport, err) {
     const from = err.from;
     this.#markWire(from, 'we-refused', err.peerWire);
     if (typeof from !== 'string' || !from || this.#wireFramed.has(from)) return;
@@ -1342,15 +1348,25 @@ export class Agent extends Emitter {
       .catch((e) => this.emit('error', e));
   }
 
-  _dispatch(envelope) {
-    // A refusal frame is the peer saying it refuses our wire: marked, said once, and not a hello (nothing registers,
-    // nothing is answered). Any other envelope that reached us passed our wire gate, so a mark on its sender clears.
+  /**
+   * An envelope that passed the receive gate, before anything else sees it. A refusal frame is the peer saying it refuses
+   * our wire: marked, said once, and CONSUMED (true: it is not a hello, nothing registers, nothing answers it). Any other
+   * envelope passed our wire gate, so a mark on its sender clears (false: handle it as usual).
+   * @param {object} envelope  verified
+   * @returns {boolean} true when it was a refusal frame
+   */
+  takeWireFrame(envelope) {
     const from = envelope?._from;
     if (envelope?._p === P.HI && isWireRefusal(envelope.payload)) {
       this.#markWire(from, 'they-refused', envelope.payload.wire);
-      return;
+      return true;
     }
     if (typeof from === 'string' && this.#wireRefusals.delete(from)) this.emit('wire-cleared', { address: from });
+    return false;
+  }
+
+  _dispatch(envelope) {
+    if (this.takeWireFrame(envelope)) return;
 
     switch (envelope._p) {
 

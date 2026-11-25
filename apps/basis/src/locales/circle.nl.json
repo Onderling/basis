@@ -730,6 +730,14 @@
       "peer_unreachable": {
         "text": "Niet bereikt, misschien offline (tik om opnieuw te proberen)",
         "doc": "A message to one person did not reach them right now: their device is not on any connection point we share. Retryable."
+      },
+      "wire_older": {
+        "text": "Niet verstuurd: dit apparaat heeft een oudere Basis. Werk Basis bij om weer met elkaar te praten",
+        "doc": "A send the send gate refused because the other side refused this device's Basis version; nothing left this device."
+      },
+      "wire_peer_older": {
+        "text": "Niet verstuurd: de ander gebruikt een oudere Basis. Zodra die is bijgewerkt praten jullie weer",
+        "doc": "A send the send gate refused because this device refuses the other side's older Basis version; nothing left this device."
       }
     },
     "unknown_sender": {
@@ -6812,6 +6820,14 @@
         "text": "Genegeerd ({{n}})",
         "doc": "The fold holding ignored requests. {{n}} is how many."
       }
+    },
+    "wire_older": {
+      "text": "Dit apparaat is ouder dan dat van {{name}}: werk Basis bij om weer met elkaar te praten",
+      "doc": "On a contact's row while their device refuses this device's Basis version (the wire refusal): this device is the older one."
+    },
+    "wire_peer_older": {
+      "text": "{{name}} gebruikt een oudere Basis. Zodra die is bijgewerkt praten jullie weer",
+      "doc": "On a contact's row while this device refuses their Basis version (the wire refusal): they are on the older one."
     }
   },
   "pairedDevices": {

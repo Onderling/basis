@@ -119,7 +119,34 @@ export function contactRowMeta(c, t) {
   if (c?.pairCircleId) bits.push(t('circle.contacts.connected'));   // the pair roster exists
   if (!c?.isBot && Array.isArray(c?.tags) && c.tags.length) bits.push(c.tags.join(', '));
   if (c && !c.reachable) bits.push(t('circle.contacts.offline'));
+  // one side refuses the other's Basis version (the wire refusal): said on the row, in words, while it stands
+  const wireKey = WIRE_ROW_WORDS[c?.wireRefusal?.side];
+  if (wireKey) bits.push(t(wireKey, { name: c?.name ?? '' }));
   return bits.join(' · ');
+}
+
+/** The wire refusal's side → the words on that contact's row: this device older, or theirs. */
+export const WIRE_ROW_WORDS = Object.freeze({
+  'they-refused': 'circle.contacts.wire_older',
+  'we-refused': 'circle.contacts.wire_peer_older',
+});
+
+/**
+ * Stamp each row with the wire refusal that stands for its address in this start (`agent.wireRefusal`), at the address
+ * a send would go to (`writeTo`) or its own. A row without one is returned unchanged.
+ * @param {Array<object>} rows
+ * @param {((address: string) => object|null)|null} wireRefusal
+ */
+export function withWireRefusals(rows = [], wireRefusal = null) {
+  if (typeof wireRefusal !== 'function') return rows;
+  return rows.map((r) => {
+    let found = null;
+    for (const a of [r?.writeTo?.peerAddr, r?.peerAddr]) {
+      if (found || typeof a !== 'string' || !a) continue;
+      try { found = wireRefusal(a) ?? null; } catch { found = null; }
+    }
+    return found ? { ...r, wireRefusal: found } : r;
+  });
 }
 
 /**
@@ -384,7 +411,7 @@ export async function loadContactRoster({ peerGraph = null, agent = null, callSk
     circleIds: async () => (await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [],
     membersOf,
   });
-  return withNameMarkers(routed, names);
+  return withNameMarkers(withWireRefusals(routed, typeof agent?.wireRefusal === 'function' ? (a) => agent.wireRefusal(a) : null), names);
 }
 
 /**

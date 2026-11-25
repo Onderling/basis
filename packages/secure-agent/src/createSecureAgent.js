@@ -1745,6 +1745,8 @@ export async function createSecureAgent(opts = {}) {
     tx.on('security-error', (err, raw) => {
       if (typeof raw?._id === 'string' && rejudging.has(raw._id)) refusedAtRejudge.add(raw._id);
       if (err?.code === 'SENDER_STALE') { parkStale(tx, raw, err.bucket, err.staleReason === 'unbound-sender' ? 'unbound-sender' : 'stale-roster'); return; }
+      // a wire below ours (the kernel's wire gate): the agent marks the peer and answers ONE refusal frame on this transport
+      if (err?.code === 'WIRE_REFUSED') { try { agent.refuseWire?.(tx, err); } catch { /* the refusal is best-effort; the gate already refused */ } }
       try { agent.emit('security-error', err, raw); } catch { /* a listener that throws must not take the receive path down */ }
     });
     // bilateral HI auto-handshake on receive.  When we
@@ -1758,6 +1760,9 @@ export async function createSecureAgent(opts = {}) {
     // Bilateral fix: when B receives A's HI, B auto-sends HI back.
     // Now A also knows B's pubKey + can encrypt OW.
     tx.on('envelope', async (env) => {
+      // a peer's refusal frame for our wire is consumed here (marked, said once, never answered); any other envelope
+      // passed the wire gate, which clears a standing mark on its sender
+      try { if (agent.takeWireFrame?.(env)) return; } catch { /* never breaks the receive path */ }
       // the socket a peer last spoke to us on is where they are: the relay sweep tries it first (`relaySweep`)
       if (typeof env?._from === 'string' && env._from) noteHeardOn(env._from, tx);
       // 2026-05-27 (DM cross-device debug) — log every inbound

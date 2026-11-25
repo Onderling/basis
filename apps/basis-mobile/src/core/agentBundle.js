@@ -46,6 +46,7 @@ import { announceOwnCircleAddress } from '../../../basis/src/v2/circleAddressAnn
 import { makeSyncSelection } from '../../../basis/src/v2/syncSelection.js';
 import { createContactDmStore } from '../../../basis/src/v2/contactDmStore.js';
 import { createAttachmentBlobStoreRN } from './attachmentBlobStoreRN.js';
+import { sealedBlobStore } from '../../../basis/src/v2/attachmentBlobStore.js';
 import { buildHouseholdDataSource } from '../../../basis/src/household/persist.js';
 // Calendar cross-peer fan-out — wrap the bundle callSkill so a successful calendar
 // op fans its invite/RSVP envelopes out over the peer transport (web parity).
@@ -800,7 +801,7 @@ export async function bootAgentBundle(opts = {}) {
   };
   // A received file's BYTES go to the FILESYSTEM (2026-09-03), never into the DM thread's
   // AsyncStorage snapshot. Per-key AsyncStorage would not help: one photo is still one oversized row.
-  const contactAttachmentBlobs = createAttachmentBlobStoreRN();
+  const contactAttachmentBlobs = sealedBlobStore(createAttachmentBlobStoreRN());   // sealed at rest, like the thread
   // THE PAIR ROSTER (L105, web parity): the roster a contact lacks, made automatically on the first exchange from
   // the circle mechanics. The redeem sender and the post-join step are composed further down — late-bound here.
   const pairSeams = { sendPeerRedeem: null, onJoined: null };

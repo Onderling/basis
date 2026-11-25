@@ -455,7 +455,7 @@ import { makeCircleLists } from '@onderling/kring-host/circleLists';  // composa
 // pod-layer, composed at the pod site below; the op logic itself is shared (web≡mobile) in circleShare.js.
 import { sealItem, memoryDataSource } from '@onderling/item-store';
 import { createContactDmStore } from '../../src/v2/contactDmStore.js';
-import { createAttachmentBlobStore } from '../../src/v2/attachmentBlobStore.js';
+import { createAttachmentBlobStore, sealedBlobStore } from '../../src/v2/attachmentBlobStore.js';
 import {
   outOfCircleShareOffered,
   shareItemAcrossCircles, shareItemToPublishedKey, shareFailureKey, listSharedResolved, revokeItemShare, adminOutboundShares, stopShareWords, memberRevokeWords, revokeAllForMember,
@@ -2486,7 +2486,7 @@ function buildCircleBot(agent) {
   // A received file's BYTES go to IndexedDB under the file id (2026-09-03), never into the DM
   // thread's snapshot item. A snapshot store holds one serialised value; a photo inside it is what
   // takes the whole thread down on a device with a per-row read ceiling.
-  const circleAttachmentBlobs = createAttachmentBlobStore();
+  const circleAttachmentBlobs = sealedBlobStore(createAttachmentBlobStore());   // sealed at rest, like the thread
   // THE PAIR ROSTER (L105): the roster a contact lacks, made automatically on the first exchange from the circle
   // mechanics — the invite rides the turn, the join is the shared path, the founder is the webid that sorts first.
   circlePairRoster = createPairRoster({

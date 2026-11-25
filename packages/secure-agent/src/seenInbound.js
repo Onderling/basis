@@ -18,6 +18,7 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { RETAIN, retentionWindowFor } from '@onderling/item-store';
+import { readVersionedDoc } from './versionedDoc.js';
 
 export const SEEN_INBOUND_CAP = param({ key: 'secureAgent.seenInboundCap', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 20_000 });
 const SEEN_INBOUND_SAVE_DELAY_MS = param({ key: 'secureAgent.seenInboundSaveDelayMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1_000 });
@@ -42,24 +43,34 @@ function rowOf(key) {
  * @param {number} [args.cap]
  * @param {number} [args.saveDelayMs]
  * @param {() => number} [args.now]
+ * @param {(r: {name: string, kind: string, reason: string}) => void} [args.onNotReadable]  a stored record this build
+ *   cannot read: said here (the device's one notice), and nothing is saved over it
  * @returns {{ has(key: string): Promise<boolean>, add(key: string): Promise<void>, flush(): Promise<void>,
  *            ready: Promise<number>, size(): number, windowMs: number, cap: number }}
  */
 export function createSeenInboundRing({
   store, uri = 'mem://secure-agent/seen-inbound.json', cap = SEEN_INBOUND_CAP, saveDelayMs = SEEN_INBOUND_SAVE_DELAY_MS, now = Date.now,
+  onNotReadable = null,
 } = {}) {
   const windowMs = seenInboundWindowMs();
   const rows = new Map();          // row → seen-at (seconds); insertion order is oldest first
   let timer = null;
   let writing = Promise.resolve();
+  // A stored record this build could not read (a newer build's, or torn): kept as it is, nothing saved over it. The
+  // record still works in memory for this run; a repeat after a restart may land again, which is the lesser loss.
+  let refused = null;
 
   const ready = (async () => {
     if (!store || typeof store.read !== 'function') return 0;
     try {
-      const raw = await store.read(uri);
-      const text = typeof raw === 'string' ? raw : raw?.content ?? null;
-      const parsed = text ? JSON.parse(text) : null;
-      if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.rows)) return 0;
+      const { doc: parsed, notReadable } = readVersionedDoc(await store.read(uri), { v: 1, valid: (d) => Array.isArray(d.rows) });
+      if (notReadable) {
+        refused = notReadable;
+        if (typeof console !== 'undefined') console.warn(`[secure-agent] the inbound record is not readable by this build (${notReadable}) — kept as it is, not saved over`);
+        try { onNotReadable?.({ name: uri, kind: 'messages', reason: notReadable }); } catch { /* a report never breaks the record */ }
+        return 0;
+      }
+      if (!parsed) return 0;
       const oldest = Math.floor((now() - windowMs) / 1000);
       for (const r of parsed.rows) {
         if (!Array.isArray(r) || typeof r[0] !== 'string' || typeof r[1] !== 'number' || r[1] < oldest) continue;
@@ -67,7 +78,9 @@ export function createSeenInboundRing({
       }
       return rows.size;
     } catch (err) {
-      if (typeof console !== 'undefined') console.warn('[secure-agent] the inbound record is unreadable — starting empty', err?.message ?? err);
+      refused = 'read-failed';
+      if (typeof console !== 'undefined') console.warn('[secure-agent] the inbound record could not be read — kept as it is, not saved over', err?.message ?? err);
+      try { onNotReadable?.({ name: uri, kind: 'messages', reason: 'read-failed' }); } catch { /* a report never breaks the record */ }
       return 0;
     }
   })();
@@ -81,6 +94,7 @@ export function createSeenInboundRing({
   function save() {
     timer = null;
     prune();
+    if (refused) return writing;   // never over a record this build could not read
     const value = JSON.stringify({ v: 1, rows: [...rows] });
     writing = writing.then(async () => {
       try { await store.write(uri, value); }

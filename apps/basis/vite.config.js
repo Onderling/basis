@@ -19,7 +19,7 @@ const oidcSession = fileURLToPath(new URL('./src/web/shims/oidcSession.js', impo
 // `node:*` shims with the NAMED exports the static-import call sites
 // reference (sync-engine fsNode/hashNode/PathMap/versions, pseudo-pod
 // NodeFsBackend, core PodExporter + A2ATransport + reference-manifest,
-// pod-client FileTombstones, pinboard + tasks-v0 FilePersist).  Rollup
+// pinboard + tasks-v0 FilePersist).  Rollup
 // fails the production build without proper named exports (the previous
 // empty-default shim for `node:crypto` was a known leak that the per-
 // file lazy-load workarounds papered over).  Methods throw at runtime

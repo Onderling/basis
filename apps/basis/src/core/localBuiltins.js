@@ -17,6 +17,7 @@
  * `apps/basis/manifest.js`.
  */
 
+import { storageName } from '../v2/storageRegister.js';   // every storage name from the one register
 import { feedbackTarget, feedbackDraft, feedbackScreenId } from '../v2/feedbackContact.js';
 import { readTransportMode } from '../v2/circleSettingsControls.js';
 import { seedContactCard } from '../v2/seededContact.js';
@@ -1316,7 +1317,7 @@ function formatHelp(catalogue, t) {
 
 /* ─── A1 (2026-05-23) — relay-server slash handlers ─────────── */
 
-const RELAY_VAULT_KEY    = 'cc-relay-url';
+const RELAY_VAULT_KEY    = storageName('vaultRelayUrl');
 
 /**
  * `/set-relay <ws://...>` — persist + connect to a relay.

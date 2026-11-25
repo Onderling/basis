@@ -11,6 +11,7 @@
  * can import this without an AsyncStorage native module); the group-key resource persists
  * there for durability across reloads.
  */
+import { storageName } from '../../../basis/src/v2/storageRegister.js';   // every storage name from the one register
 import { onPolicyPostureChange } from '../../../basis/src/v2/circlePolicyStore.js';
 import { VaultAsyncStorage } from '@onderling/react-native/identity/VaultAsyncStorage';
 import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
@@ -73,7 +74,7 @@ export function initCirclePods(asyncStorage) {
   if (asyncStorage && !circleVault) {
     // SEALED at rest: it holds two private keys per circle. Built here rather than in `realAgent`,
     // which is why `sealedVault()` never reached it and its rows sat readable — see `sealedLocalVault`.
-    circleVault = sealedLocalVault(new VaultAsyncStorage({ prefix: 'cc-circle-pod:', asyncStorage }));
+    circleVault = sealedLocalVault(new VaultAsyncStorage({ prefix: storageName('vaultCirclePod'), asyncStorage }));
   }
 }
 
@@ -417,7 +418,7 @@ function getDefaultCircleLists() {
       try {
         // AsyncStorage-backed on device (durable); in-memory when no store is wired (SSR/tests).
         dataSource = asyncStorageRef
-          ? await buildHouseholdDataSource({ dbName: 'cc-circle-lists-state', asyncStorage: asyncStorageRef, kind: 'lists' })
+          ? await buildHouseholdDataSource({ dbName: storageName('circleLists'), asyncStorage: asyncStorageRef, kind: 'lists' })
           : undefined;
       } catch { dataSource = undefined; }   // no store → in-memory (makeCircleLists' default)
       return makeCircleLists({ dataSource });

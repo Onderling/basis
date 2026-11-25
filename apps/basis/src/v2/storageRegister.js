@@ -159,6 +159,18 @@ export const STORAGE = Object.freeze({
   vaultCustodyMode:       row('vault:custody-mode', 'vault', [W, M, B], 'keep'),
 });
 
+/**
+ * The words Basis stores under on a shared web origin (the prefixes of the names above). A toolbox may not take one as
+ * its name (Frits 2026-11-20): a toolbox's page shares the origin, and a page named after one of Basis's prefixes could
+ * read or write what Basis keeps there.
+ */
+export const RESERVED_NAMES = Object.freeze(['basis', 'circle', 'cc', 'onderling']);
+/** @param {string} name  true when the name is one of `RESERVED_NAMES` or starts with one and a separator */
+export function isReservedName(name) {
+  const n = String(name ?? '').trim().toLowerCase();
+  return RESERVED_NAMES.some((r) => n === r || n.startsWith(`${r}-`) || n.startsWith(`${r}.`) || n.startsWith(`${r}:`));
+}
+
 /** The stored name for a register id. An id that is not in the register is a programming error, said at once. */
 export function storageName(id) {
   const r = STORAGE[id];

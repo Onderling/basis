@@ -6,10 +6,11 @@
  * import from AsyncStorage: the first open before the prime lands sees the defaults, every later one
  * sees the choice. Never fanned, never shared — it decides what THIS device shows and joins.
  */
+import { storageName } from '../../../basis/src/v2/storageRegister.js';   // every storage name from the one register
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { nearbyAskedKey } from '../../../basis/src/v2/nearbyLevel.js';
 
-const KEY = 'cc.nearbyAllows';
+const KEY = storageName('nearbyAllowsPhone');
 let cached = null;
 AsyncStorage.getItem(KEY)
   .then((raw) => { try { cached = raw ? JSON.parse(raw) : null; } catch { cached = null; } })
@@ -23,7 +24,7 @@ export function readNearbyAllows() { return cached; }
  * announced on the local network — at boot, at rest, and while the screen is open — until it is
  * turned back on. Same synchronous cache as the allows.
  */
-const RADIO_KEY = 'cc.nearbyRadio';
+const RADIO_KEY = storageName('nearbyRadio');
 let radio = 'on';
 AsyncStorage.getItem(RADIO_KEY).then((raw) => { if (raw === 'on' || raw === 'off') radio = raw; }).catch(() => {});
 export function readNearbyRadio() { return radio; }
@@ -43,7 +44,7 @@ export function writeNearbyAllows(next) {
  * Who this device enters the Nearby room as, when several selves are ticked in the header: the last answer, kept per
  * device as the question's default (nothing more durable). The rule is the shared `nearbyRoomSelf`.
  */
-const SELF_KEY = 'cc.nearbySelf';
+const SELF_KEY = storageName('nearbySelfPhone');
 let roomSelf = null;
 AsyncStorage.getItem(SELF_KEY).then((raw) => { if (typeof raw === 'string' && raw) roomSelf = raw; }).catch(() => {});
 export function readNearbySelf() { return roomSelf; }

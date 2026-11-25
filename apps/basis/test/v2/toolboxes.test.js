@@ -300,3 +300,21 @@ describe('the toolbox switches are never written over when they could not be rea
     expect(vault.get('tools.on')).toBe('{"boodschappen": {"tit');
   });
 });
+
+describe('a toolbox may not take a name Basis stores under', () => {
+  for (const reserved of ['basis', 'circle', 'cc', 'onderling']) {
+    it(`'${reserved}' is refused in words before anything is asked`, async () => {
+      const vault = new Map();
+      const ops = makeToolboxOps({
+        store: { get: async (k) => vault.get(k) ?? null, set: async (k, v) => { vault.set(k, v); } },
+        placedOf: async () => [{ ...PLACED, name: reserved }], keyOf: async () => KEY,
+        fetch: async () => { throw new Error('nothing may be fetched for a reserved name'); },
+      });
+      await ops.load();
+      const r = await ops.addToolbox({ name: reserved, confirm: true });
+      expect(r).toEqual({ ok: false, code: 'toolbox-name-reserved', name: reserved });
+      expect(toolboxRefusalText(r, (k) => k)).toContain('toolbox_name_reserved');
+      expect(vault.size).toBe(0);
+    });
+  }
+});

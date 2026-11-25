@@ -23,9 +23,15 @@
 import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const ROOT = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
-const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
+// the register, from the repo root (the self-test runs a COPY of this script from a temporary folder)
+const { STORAGE } = await import(pathToFileURL(path.join(ROOT, 'apps/basis/src/v2/storageRegister.js')).href);
+// A storage name taken from the register (`storageName('<id>')`, apps/basis/src/v2/storageRegister.js) is read as the
+// name it stands for, so the mirrors, the constants and the touches below are found whichever way a file spells them.
+const byRegister = (text) => text.replace(/\[\s*storageName\(\s*'([A-Za-z0-9_]+)'\s*\)\s*\]/g, (all, id) => (STORAGE[id] ? `'${STORAGE[id].name}'` : all)).replace(/\bstorageName\(\s*'([A-Za-z0-9_]+)'\s*\)/g, (all, id) => (STORAGE[id] ? `'${STORAGE[id].name}'` : all));
+const read = (rel) => byRegister(readFileSync(path.join(ROOT, rel), 'utf8'));
 
 const REGISTER = 'apps/basis/src/v2/paramsService.js';
 const SCAN = ['apps/basis/src', 'apps/basis/web', 'apps/basis-mobile/src'];
@@ -183,10 +189,18 @@ for (const touch of rawTouches()) {
  * written. So: locate the module that DECLARES each mirrored key, find who imports it, and require any
  * importer that calls a writer to name the register param too.
  */
-const declaringFile = (key) => execSync(
-  `grep -rl "const [A-Za-z_$][A-Za-z0-9_$]* = '${key}'" --include=*.js ${SCAN.join(' ')} | grep -v node_modules || true`,
-  { cwd: ROOT, encoding: 'utf8' },
-).trim().split('\n').filter(Boolean)[0] ?? null;
+const declaringFile = (key) => {
+  // declared by its name (`const KEY = 'cc.relayUrl'`) or by its register id (`const KEY = storageName('relayUrl')`)
+  const spellings = [`'${key}'`, ...Object.entries(STORAGE).filter(([, r]) => r.name === key).map(([id]) => `storageName('${id}')`)];
+  for (const sp of spellings) {
+    const hit = execSync(
+      `grep -rlE "const [A-Za-z_$][A-Za-z0-9_$]* = ${sp.replace(/[.()]/g, (c) => `\\${c}`)}" --include=*.js ${SCAN.join(' ')} | grep -v node_modules || true`,
+      { cwd: ROOT, encoding: 'utf8' },
+    ).trim().split('\n').filter(Boolean)[0];
+    if (hit) return hit;
+  }
+  return null;
+};
 
 /**
  * The writer exports of a mirror's own module — the functions through which the cache is actually

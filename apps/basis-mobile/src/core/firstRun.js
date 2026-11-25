@@ -1,3 +1,4 @@
+import { storageName } from '../../../basis/src/v2/storageRegister.js';   // every storage name from the one register
 /**
  * basis-mobile — first-run identity probe (5.9b).
  *
@@ -14,7 +15,7 @@
  */
 
 const CHAT_IDENTITY_KEY = 'cc-chat-id:agent-privkey';
-const WELCOMED_KEY      = 'cc.welcomed';
+const WELCOMED_KEY      = storageName('welcomed');
 
 /**
  * Decide whether to show the first-run welcome.  True when neither the

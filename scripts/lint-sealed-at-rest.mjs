@@ -49,7 +49,7 @@ const FILES = [
 const SAME_SEAL = { sealedLocalBackend: ['sealedLocalBackend', 'sealedNamedBackend'] };
 
 /** Sealed by realAgent instead, so the shell hands it over bare. Matched on the store name. */
-const SEALED_ELSEWHERE = /cc-agent-registry/;
+const SEALED_ELSEWHERE = /cc-agent-registry|storageName\('agentRegistry'\)/;   // by its name, or its register id
 
 const problems = [];
 let checked = 0;

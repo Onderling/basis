@@ -38,6 +38,7 @@
 /* ─────────────────────────────────────────────────────────────────────── */
 
 /** Empty book — what a fresh user starts with (host can seed defaults). */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { BLOCK_TYPES } from './circleRecipe.js';
 import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
 import { pinsOf } from './plusPins.js';
@@ -309,7 +310,7 @@ export function localUserScreenStore(storage = globalThis.localStorage) {
  *   key: `cc.userScreens`
  */
 export function localStorageScreenIo(storage = globalThis.localStorage) {
-  const KEY = 'cc.userScreens';
+  const KEY = storageName('userScreens');
   // SEALED at rest (ledger L1083: the person's own pages). A read before the content key WAITS for it: a book that
   // cannot be opened yet is "not read yet", never an empty book — an empty one would have the first-run seeding
   // (`ensureVandaagBook`) write a fresh book over the person's own.

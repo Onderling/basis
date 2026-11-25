@@ -6384,6 +6384,10 @@
       "text": "Ik kan niet lezen welke gereedschapskisten aan staan, dus ik verander er nu niets aan. Er is niets weg. Blijft dit staan, gebruik dan Meld een probleem.",
       "doc": "The household bot's /toolbox door: the stored toolbox switches could not be read (a vault entry that will not decrypt, or a value that does not parse), so a switch on or off is refused and nothing is written over them."
     },
+    "toolbox_name_reserved": {
+      "text": "De naam '{{name}}' is van Basis zelf. Geef deze gereedschapskist in het bestand op de box een andere naam.",
+      "doc": "The household bot's /toolbox door: a placed toolbox whose name is one Basis stores under (basis, circle, cc, onderling) is refused before it is switched on. name = the toolbox's name."
+    },
     "toolbox_more_gone": {
       "text": "Die lijst is weg; zoek opnieuw.",
       "doc": "A \"meer\" tapped after its list of things was replaced or went old: nothing to page; search again (ledger L1035)."

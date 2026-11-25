@@ -21,6 +21,7 @@
  * The helper is pure (DI'd AsyncStorage) so vitest covers the full
  * decision tree against a Map-backed mock — no RN runtime needed.
  */
+import { storageName } from '../../../basis/src/v2/storageRegister.js';   // every storage name from the one register
 import { validateMnemonic } from '@onderling/core';
 import { RootKeyStoreVault } from '@onderling/vault';
 import { VaultAsyncStorage } from '@onderling/react-native/identity/VaultAsyncStorage';
@@ -28,10 +29,10 @@ import { restoreOwnerRoot } from '../../../basis/src/core/agent/ownerRootRestore
 import { makeSecureStoreRootKeyStore } from './secureStoreRootKeyStore.js';
 
 const REQUIRED_WORDS = 24;
-const CHAT_VAULT_PREFIX = 'cc-chat-id:';
+const CHAT_VAULT_PREFIX = storageName('vaultChatId');
 // Must match `realAgent`'s owner-root vault prefix — a restore that writes the phrase anywhere else is a
 // restore that silently does nothing.
-const OWNER_ROOT_VAULT_PREFIX = 'cc-owner-root:';
+const OWNER_ROOT_VAULT_PREFIX = storageName('vaultOwnerRoot');
 
 /**
  * Restore the chat-side identity from a user-typed mnemonic.

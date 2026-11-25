@@ -19,6 +19,7 @@
  * receipts off is precisely the disclosure `deliveryState.js` refuses to make — it would let anyone spot
  * the setting by looking at a conversation.
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { jsonKv } from './localStoreSeal.js';
 import { CHAT_KIND } from './conversationKinds.js';
 import {
@@ -36,12 +37,12 @@ export function deliverySettings(stored = {}) {
 }
 
 /** localStorage IO (web). One key, both settings — they are decided together. */
-export function localStorageDeliveryIo(storage = globalThis.localStorage, key = 'cc.delivery') {
+export function localStorageDeliveryIo(storage = globalThis.localStorage, key = storageName('delivery')) {
   return deliveryIoOver(storage, key);
 }
 
 /** AsyncStorage IO (mobile). */
-export function asyncStorageDeliveryIo(AsyncStorage, key = 'cc.delivery') {
+export function asyncStorageDeliveryIo(AsyncStorage, key = storageName('delivery')) {
   return deliveryIoOver(AsyncStorage, key);
 }
 

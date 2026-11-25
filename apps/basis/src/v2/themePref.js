@@ -1,3 +1,4 @@
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 /**
  * themePref — the display-theme preference contract, shared web ↔ mobile.
  *
@@ -21,7 +22,7 @@ export const DEFAULT_THEME_PREF = 'system';
 // AsyncStorage. Same string ⇒ one contract (a device that syncs prefs across a
 // web+mobile install lands on the same choice by construction).
 // pre-boot cache of display.theme
-export const THEME_PREF_KEY = 'basis.theme';
+export const THEME_PREF_KEY = storageName('theme');
 
 /** Normalize an arbitrary value to a known preference. */
 export function normalizeThemePref(value) {

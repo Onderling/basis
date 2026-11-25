@@ -43,7 +43,21 @@ describe('lint-storage-register', () => {
       expect(run({ 'a.js': "const K = storageName('secret');\nAsyncStorage.setItem(K, v);" })).toHaveLength(1);
     });
     it('a raw write to a plain row, or a sealed write to a sealed row, is green', () => {
-      expect(run({ 'a.js': "localStorage.setItem(storageName('flag'), '1');\nkv.setItem(storageName('secret'), v);" })).toEqual([]);
+      expect(run({ 'a.js': "localStorage.setItem(storageName('flag'), '1');\nconst kv = sealedKeyValue(localStorage, {});\nkv.setItem(storageName('secret'), v);" })).toEqual([]);
+    });
+    it('a store is judged by its definition, never its name', () => {
+      // jsonKv over raw storage is the plain twin: named kv, still raw
+      expect(run({ 'a.js': "const kv = jsonKv(localStorage, {});\nkv.setItem(storageName('secret'), v);" })).toHaveLength(1);
+      // jsonKv over a sealed store is sealed
+      expect(run({ 'a.js': "const sealed = sealedKeyValue(localStorage, {});\nconst kv = jsonKv(sealed, {});\nkv.setItem(storageName('secret'), v);" })).toEqual([]);
+      // a kv with no definition in the file (a parameter) is not trusted
+      expect(run({ 'a.js': "function f(kv) {\n  kv.setItem(storageName('secret'), v);\n}" })).toHaveLength(1);
+      // the NEAREST definition above the line decides (names repeat per function)
+      expect(run({ 'a.js': "const kv = sealedKeyValue(s, {});\nkv.setItem(storageName('secret'), v);\nconst kv = jsonKv(localStorage, {});\nkv.setItem(storageName('secret'), v);" })).toHaveLength(1);
+    });
+    it('a key helper resolves to the nearest definition above the write', () => {
+      const t = "const key = (id) => `${storageName('flag')}${id}`;\nlocalStorage.setItem(key(1), v);\nconst key = (id) => `${storageName('secret')}${id}`;";
+      expect(run({ 'a.js': t })).toEqual([]);
     });
     it('a const exported by another file resolves only where it is imported', () => {
       const lib = "export const K = storageName('secret');";

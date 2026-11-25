@@ -255,7 +255,7 @@ export function updateRecipe(book, recipeId, mutator) {
  * Per-circle RecipeBook store.  One book per circle; the book holds N
  * recipes.  Injectable {load, save} so pod io can swap in later.
  *
- *   const store = createCircleRecipeStore({ io: localStorageRecipeIo() });
+ *   const store = createCircleRecipeStore({ io: localStorageRecipeIo(sealedKeyValue(localStorage, { name: 'the circle recipe' })) });
  *   const book = await store.get(circleId);
  *   await store.update(circleId, (cur) => addRecipe(cur, 'Standaard'));
  *
@@ -320,7 +320,7 @@ export function localCircleRecipeStore(storage = globalThis.localStorage) {
 }
 
 /** localStorage-backed io.  Key: `cc.circleRecipe.<circleId>`. */
-export function localStorageRecipeIo(storage = globalThis.localStorage) {
+export function localStorageRecipeIo(storage) {   // no default: a raw localStorage would write the recipe plain
   const key = (id) => `${storageName('circleRecipe')}${id}`;
   const kv = storage ? jsonKv(storage, { name: 'the circle recipe', kind: 'settings' }) : null;
   return {

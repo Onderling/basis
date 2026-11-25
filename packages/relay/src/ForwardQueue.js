@@ -91,7 +91,7 @@ export class ForwardQueue {
     this.#store         = store;
     // What the last run was holding, back in the working set. An entry that expired while the relay was down is
     // dropped by the next sweep like any other — its `at` is the original enqueue time, so the TTL is unchanged.
-    for (const row of store?.load?.() ?? []) {
+    for (const row of store?.load?.({ ttlMs }) ?? []) {
       if (!this.#buffers.has(row.address)) this.#buffers.set(row.address, []);
       this.#buffers.get(row.address).push({ envelope: row.envelope, topic: row.topic ?? null, at: row.at, id: row.id });
     }

@@ -16,6 +16,8 @@
  *      open · answered · building · done, or no retire condition — unless it is in the baseline's `noHeader` list;
  *   5. a brief says it is `done` and still sits in briefs/ (it goes to archive/<YYYY-MM>/).
  *
+ * The agents' inboxes (`QUEUE-for-<agent>.md`) are not briefs and none of 2, 4, 5 applies to them.
+ *
  * plans/ is gitignored: on a machine without it (CI) this passes and says so. The baseline of known stale briefs
  * lives beside the private files it names (plans/tools/plans-structure-baseline.json); it only shrinks.
  *
@@ -61,12 +63,13 @@ const dateOf = (file) => {
   catch { return null; }
 };
 const cutoff = new Date(Date.now() - MAX_AGE_DAYS * 86_400_000).toISOString().slice(0, 10);
-const stale = existsSync(path.join(PLANS, 'briefs'))
-  ? readdirSync(path.join(PLANS, 'briefs')).filter((f) => f.endsWith('.md')).filter((f) => { const d = dateOf(f); return d && d < cutoff; }).sort()
-  : [];
+// The agents' INBOXES (QUEUE-for-<agent>.md) sit in briefs/ but are not briefs: append-only logs that a watcher reads by
+// LINE NUMBER, so a status header would shift every bookmark, and they are rotated by hand, not retired by date.
+const INBOX = /^QUEUE-for-[a-z]+\.md$/;
 const briefs = existsSync(path.join(PLANS, 'briefs'))
-  ? readdirSync(path.join(PLANS, 'briefs')).filter((f) => f.endsWith('.md')).sort()
+  ? readdirSync(path.join(PLANS, 'briefs')).filter((f) => f.endsWith('.md') && !INBOX.test(f)).sort()
   : [];
+const stale = briefs.filter((f) => { const d = dateOf(f); return d && d < cutoff; });
 const headerOf = (f) => { try { return briefHeader(readFileSync(path.join(PLANS, 'briefs', f), 'utf8')); } catch { return null; } };
 const validHeader = (h) => !!(h && BRIEF_STATUSES.includes(h.status) && h.retireWhen);
 const withoutHeader = briefs.filter((f) => !validHeader(headerOf(f)));   // missing, or an older line that is not this one

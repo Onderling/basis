@@ -41,6 +41,10 @@ describe('lint-plans-structure', () => {
     expect(r.status).toBe(1);
     expect(r.stderr).toContain('status header');
   });
+  it('an agent inbox (QUEUE-for-<agent>.md) is not a brief: no header, no age, read by line number', () => {
+    const r = run(tree([['briefs/QUEUE-for-fable.md', '[Opus] (09:00 on 2020-01-01) PR #1 → you\n']]));
+    expect(r.status, r.stdout + r.stderr).toBe(0);
+  });
   it('FAILS on a status outside the four words', () => {
     const r = run(tree([[`briefs/BRIEF-${today()}.md`, '# x\n\n> **Status:** pending · **Retire when:** later.\n']]));
     expect(r.status).toBe(1);

@@ -161,9 +161,9 @@ export const STORAGE = Object.freeze({
   circleControllerKey:    row('cc.circle-controller-key', 'vault', [W, M], 'keep', 'sealed'),
   sealingIdentity:        row('cc.sealing-identity', 'vault', [W, M], 'keep', 'sealed'),
   screenGrant:            row('onderling-screen:', 'vault', [W], 'keep', 'not sealable: a screen\'s grant: a screen has no content key (its own key sits in the same storage)'),
-  vaultOwnerRootKey:      row('vault:owner-root', 'vault', [W, M, B], 'keep', 'not sealable: the owner root key itself (the content key is derived from it)'),
-  vaultContentKey:        row('vault:content-at-rest-key', 'vault', [W, M, B], 'keep', 'not sealable: the content key itself'),
-  vaultDelegationSeed:    row('vault:device-delegation-seed', 'vault', [W, M, B], 'keep', 'not sealable: the device\'s delegation seed itself (the content key is derived from it)'),
+  vaultOwnerRootKey:      row('vault:owner-root', 'vault', [W, M, B], 'keep', 'not sealable: the owner root key itself (the vault\'s at-rest key is derived from it)'),
+  vaultContentKey:        row('vault:content-at-rest-key', 'vault', [W, M, B], 'keep', 'not sealable: the content key itself; it is random, and rests inside the sealed device vault (sealed by the vault, not by itself)'),
+  vaultDelegationSeed:    row('vault:device-delegation-seed', 'vault', [W, M, B], 'keep', 'not sealable: the device\'s delegation seed itself (the vault\'s at-rest key is derived from it)'),
   vaultCustodyMode:       row('vault:custody-mode', 'vault', [W, M, B], 'keep', 'not sealable: read before the key: it says which key to derive'),
 });
 

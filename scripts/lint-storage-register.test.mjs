@@ -42,6 +42,11 @@ describe('lint-storage-register', () => {
       expect(run({ 'a.js': "localStorage.setItem(storageName('secret'), v);" })).toHaveLength(1);
       expect(run({ 'a.js': "const K = storageName('secret');\nAsyncStorage.setItem(K, v);" })).toHaveLength(1);
     });
+    it('multiSet and mergeItem are raw writes too (none exists today; a later one is seen)', () => {
+      expect(run({ 'a.js': "AsyncStorage.multiSet([[storageName('secret'), v]]);" })).toHaveLength(1);
+      expect(run({ 'a.js': "AsyncStorage.mergeItem(storageName('secret'), v);" })).toHaveLength(1);
+      expect(run({ 'a.js': "const kv = sealedKeyValue(s, {});\nkv.mergeItem(storageName('secret'), v);" })).toEqual([]);
+    });
     it('a raw write to a plain row, or a sealed write to a sealed row, is green', () => {
       expect(run({ 'a.js': "localStorage.setItem(storageName('flag'), '1');\nconst kv = sealedKeyValue(localStorage, {});\nkv.setItem(storageName('secret'), v);" })).toEqual([]);
     });

@@ -33,7 +33,7 @@
  * deployment that adds a new block type doesn't break older clients.
  */
 import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
-import { sealedKeyValue } from './localStoreSeal.js';
+import { sealedKeyValue, jsonKv } from './localStoreSeal.js';
 import { isFeatureEnabled } from './circlePolicy.js';
 
 /**
@@ -321,15 +321,13 @@ export function localCircleRecipeStore(storage = globalThis.localStorage) {
 /** localStorage-backed io.  Key: `cc.circleRecipe.<circleId>`. */
 export function localStorageRecipeIo(storage = globalThis.localStorage) {
   const key = (id) => `cc.circleRecipe.${id}`;
+  const kv = storage ? jsonKv(storage, { name: 'the circle recipe', kind: 'settings' }) : null;
   return {
     load: async (id) => {
-      try {
-        const s = await storage?.getItem(key(id));   // awaited: a sealed storage answers async
-        return s ? JSON.parse(s) : null;
-      } catch { return null; }
+      try { return kv ? await kv.getJson(key(id)) : null; } catch { return null; }   // not JSON = kept + refused + said
     },
     save: async (id, book) => {
-      try { await storage?.setItem(key(id), JSON.stringify(book)); } catch { /* quota / disabled / no content key yet */ }
+      try { await kv?.setItem(key(id), JSON.stringify(book)); } catch { /* quota / disabled / no content key yet */ }
     },
   };
 }

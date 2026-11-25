@@ -1,0 +1,38 @@
+{
+  "apps/basis/web/v2/circleApp.js": {
+    "count": 3,
+    "note": "harmless loss: the per-circle view mode (cc.circleViewMode, the alpha paints chat whatever it holds: alphaViewMode) read and written at :3918/:3928, and the nearby allows (basis.nearbyAllows, card/chat, :4493; a lost one is simply asked again)"
+  },
+  "apps/basis/src/v2/addressFallback.js": {
+    "count": 1,
+    "note": "harmless loss: the fallback offer state (cc.fallbackOffer), a remembered offer that may simply be offered again"
+  },
+  "apps/basis/src/v2/connectionPoints.js": {
+    "count": 1,
+    "note": "never saved over: the web's SYNC reader (read at boot, before any key: circleApp.js:1674) keeps the getJson rule inline: a value that does not parse sets `kept`, is said, and every save is refused; the phone's reader goes through jsonKv"
+  },
+  "apps/basis/src/v2/keptPicture.js": {
+    "count": 1,
+    "note": "harmless loss: the kept start picture (the launcher's last circles), a cache the first fold rebuilds"
+  },
+  "apps/basis/src/v2/screenBlocksCacheStorage.js": {
+    "count": 1,
+    "note": "harmless loss: the page blocks cache (sealedKeyValue overwritable), rebuilt from the circle when a page opens"
+  },
+  "apps/basis/src/v2/screenView.js": {
+    "count": 1,
+    "note": "harmless loss: the screen grant this browser kept for a bot's page; a torn one cannot be used, and the next pairing writes a new one"
+  },
+  "apps/basis-mobile/src/core/mappingsStoreRN.js": {
+    "count": 1,
+    "note": "never saved over: a value that does not parse is handed on as its raw bytes (`{ bytes: raw }`), never as nothing"
+  },
+  "apps/basis-mobile/src/core/nearbyAllowsStore.js": {
+    "count": 1,
+    "note": "harmless loss: the nearby allows (card/chat) on the phone; a lost one is simply asked again"
+  },
+  "apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js": {
+    "count": 2,
+    "note": "harmless loss: the per-circle view mode on the phone (cc.circleViewMode), read and written at :3902/:3916; the alpha paints chat whatever it holds"
+  }
+}

@@ -1,6 +1,6 @@
 # Architecture
 
-> **Last updated: 2026-11-22** — checked against the code on `development` that day. Every change to this file
+> **Last updated: 2026-11-25** — checked against the code on `development` that day. Every change to this file
 > moves this date (`scripts/lint-architecture-date.mjs` is red otherwise), so the date says how fresh the whole
 > file is, not one paragraph.
 
@@ -653,6 +653,21 @@ The web and the phone used to write the three household items at every start, so
 time; a real start now removes those copies once per device (only items whose author is the demo author and whose
 text is a demo text, deleted without a fan, since they never left the device), and a mark on the device's marker
 vault (`demo-seed-swept`) says it has run.
+
+**A store never saves over what it could not read.** Every store on a device reads what it holds through one of a few
+store kinds, and each kind does the same three things: it knows its format, it treats a value it cannot read (a newer
+build's shape, a torn write, a value that will not open) as **not readable** rather than as empty, and it **refuses
+every save over it** until a later read succeeds or a deliberate act replaces it (the person's start-over, an upgrade
+that knows the format). The kinds: a Map snapshot (`mapSnapshotGate` in `@onderling/local-store`, stamped `{v, data}`;
+a missing `v` reads as today's format), one key's JSON value (`getJson` on `sealedKeyValue` and its plain twin,
+`apps/basis/src/v2/localStoreSeal.js`), one versioned document (the device log gets no save; the outbox, the inbound
+record and the agent registry refuse their writes), and key material (never minted over a key that is there but
+unreadable). A value kept this way is **said to the person** through one register (`notReadableStores`) and one
+notice every shell shows (`apps/basis/src/v2/storeNotice.js`: the web and the phone on the circles launcher, the box in
+its log), naming what is affected as plain words (messages, lists, settings), never a store's name. The relay keeps a
+held row it cannot read until the hold window is past; the companion refuses its held-messages file rather than
+writing over it. `lint-store-reads` holds the rule: a stored value parsed by hand, or a persist adapter without the
+gate, is red.
 
 #### Where the runtime does NOT match this yet
 

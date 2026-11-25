@@ -60,9 +60,16 @@ export function makePeerRouter({
       : null;
     const ctx = to ? { to } : {};
     if (h) return _runSafe(h, from, payload, subtype, logger, ctx);
-    if (typeof defaultHandler === 'function') return _runSafe(defaultHandler, from, payload, 'default', logger, ctx);
+    // A NAMED subtype no handler takes (and the fallback, if any, refuses): this build does not understand it. The
+    // verdict says which, so the agent can answer the sender once instead of dropping it in silence (notUnderstood.js).
+    const named = typeof subtype === 'string' && subtype ? subtype : null;
+    const unknown = () => (named ? { ...NOT_TAKEN, notUnderstood: named } : NOT_TAKEN);
+    if (typeof defaultHandler === 'function') {
+      const v = _runSafe(defaultHandler, from, payload, 'default', logger, ctx);
+      return named ? v.then((r) => (r?.refused === true ? unknown() : r)) : v;
+    }
     logger.debug?.('[peer] unhandled subtype', subtype, 'from', from);
-    return Promise.resolve(NOT_TAKEN);
+    return Promise.resolve(unknown());
   };
 }
 

@@ -122,6 +122,8 @@ export function contactRowMeta(c, t) {
   // one side refuses the other's Basis version (the wire refusal): said on the row, in words, while it stands
   const wireKey = WIRE_ROW_WORDS[c?.wireRefusal?.side];
   if (wireKey) bits.push(t(wireKey, { name: c?.name ?? '' }));
+  // …or their Basis answered it could not receive something this device sent (an older build: notUnderstood.js)
+  else if (Array.isArray(c?.notUnderstood) && c.notUnderstood.length) bits.push(t('circle.contacts.not_understood', { name: c?.name ?? '' }));
   return bits.join(' · ');
 }
 
@@ -132,20 +134,26 @@ export const WIRE_ROW_WORDS = Object.freeze({
 });
 
 /**
- * Stamp each row with the wire refusal that stands for its address in this start (`agent.wireRefusal`), at the address
- * a send would go to (`writeTo`) or its own. A row without one is returned unchanged.
+ * Stamp each row with what this start knows about its peer's Basis version, at the address a send would go to (`writeTo`)
+ * or its own: the wire refusal that stands (`agent.wireRefusal`), and the subtypes it answered it could not receive
+ * (`agent.notUnderstoodBy`). A row with neither is returned unchanged.
  * @param {Array<object>} rows
- * @param {((address: string) => object|null)|null} wireRefusal
+ * @param {{wireRefusal?: Function, notUnderstoodBy?: Function}|null} agent
  */
-export function withWireRefusals(rows = [], wireRefusal = null) {
-  if (typeof wireRefusal !== 'function') return rows;
+export function withPeerNotices(rows = [], agent = null) {
+  const wireOf = typeof agent?.wireRefusal === 'function' ? (a) => agent.wireRefusal(a) : null;
+  const nuOf = typeof agent?.notUnderstoodBy === 'function' ? (a) => agent.notUnderstoodBy(a) : null;
+  if (!wireOf && !nuOf) return rows;
   return rows.map((r) => {
-    let found = null;
+    let wire = null;
+    let nu = [];
     for (const a of [r?.writeTo?.peerAddr, r?.peerAddr]) {
-      if (found || typeof a !== 'string' || !a) continue;
-      try { found = wireRefusal(a) ?? null; } catch { found = null; }
+      if (typeof a !== 'string' || !a) continue;
+      if (!wire && wireOf) { try { wire = wireOf(a) ?? null; } catch { wire = null; } }
+      if (!nu.length && nuOf) { try { const got = nuOf(a); nu = Array.isArray(got) ? got : []; } catch { nu = []; } }
     }
-    return found ? { ...r, wireRefusal: found } : r;
+    if (!wire && !nu.length) return r;
+    return { ...r, ...(wire ? { wireRefusal: wire } : {}), ...(nu.length ? { notUnderstood: nu } : {}) };
   });
 }
 
@@ -411,7 +419,7 @@ export async function loadContactRoster({ peerGraph = null, agent = null, callSk
     circleIds: async () => (await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [],
     membersOf,
   });
-  return withNameMarkers(withWireRefusals(routed, typeof agent?.wireRefusal === 'function' ? (a) => agent.wireRefusal(a) : null), names);
+  return withNameMarkers(withPeerNotices(routed, agent), names);
 }
 
 /**

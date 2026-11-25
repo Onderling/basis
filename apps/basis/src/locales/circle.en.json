@@ -6827,6 +6827,10 @@
       "text": "{{name}} uses an older Basis. Once it is updated you talk again",
       "doc": "On a contact's row while this device refuses their Basis version (the wire refusal): they are on the older one."
     },
+    "not_understood": {
+      "text": "{{name}} cannot receive everything you send yet (an older Basis)",
+      "doc": "On a contact's row when their device answered that it could not receive a kind of message this device sent (an older build: the not-understood answer)."
+    },
     "add_bot_confirm_host": {
       "text": "Add the bot at {{host}}?",
       "doc": "Before a bot is added from an address (nothing is fetched before the yes): the host named."

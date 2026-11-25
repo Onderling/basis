@@ -13,6 +13,7 @@
 import { NEARBY_ROOM_SUBTYPES } from './nearbyRoomBinding.js';
 import { SCREEN_NUDGE_SUBTYPE } from './screenNudge.js';
 import { SURFACE_NUDGE_SUBTYPE } from './surfaceNudge.js';
+import { NOT_UNDERSTOOD_SUBTYPE } from './notUnderstood.js';
 
 /** Direct contact: refused for a blocked sender (inbound) and to a blocked address (outbound). */
 export const DIRECT_SUBTYPES = Object.freeze([
@@ -65,6 +66,8 @@ const DIRECT_WIRE = Object.freeze([
   // the same room, direct contact)
   SCREEN_NUDGE_SUBTYPE, SURFACE_NUDGE_SUBTYPE,
   ...NEARBY_ROOM_SUBTYPES,
+  // the answer that this build could not receive a subtype (to the one sender): a blocked sender gets none
+  NOT_UNDERSTOOD_SUBTYPE,
 ]);
 
 /** Whether an outbound payload is DIRECT contact (its subtype, flat or inside the A2A data part). */

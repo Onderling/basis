@@ -82,7 +82,7 @@ describe('every peer handler says when it did not take a frame', () => {
     const r = makePeerRouter({ logger: quiet, handlers: { boom: () => { throw new Error('x'); }, nope: async () => { throw new Error('y'); }, ok: () => undefined, no: () => ({ refused: true }) } });
     expect(await r({ from: 'p', payload: { subtype: 'boom' } })).toBe(NOT_TAKEN);
     expect(await r({ from: 'p', payload: { subtype: 'nope' } })).toBe(NOT_TAKEN);
-    expect(await r({ from: 'p', payload: { subtype: 'unheard-of' } })).toBe(NOT_TAKEN);
+    expect(await r({ from: 'p', payload: { subtype: 'unheard-of' } })).toEqual({ ...NOT_TAKEN, notUnderstood: 'unheard-of' });   // not taken, and named: answered once (notUnderstood.js)
     expect(refused(await r({ from: 'p', payload: { subtype: 'ok' } }))).toBe(false);
     expect(refused(await r({ from: 'p', payload: { subtype: 'no' } }))).toBe(true);
   });

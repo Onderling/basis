@@ -31,6 +31,8 @@ export function storeNoticeView(stores, t) {
   const lines = [];
   if (newer.length) lines.push(t('circle.storeNotice.costAfterUpdate', { what: kindWords(newer, t) }));
   if (other.length) lines.push(t('circle.storeNotice.costNotSaved', { what: kindWords(other, t) }));
+  // the headline speaks of the update; the damaged part keeps its own way out
+  if (newer.length && other.length) lines.push(t('circle.storeNotice.reportHint'));
   return {
     reason,
     text: t(reason === 'version' ? 'circle.storeNotice.newer' : 'circle.storeNotice.unreadable'),

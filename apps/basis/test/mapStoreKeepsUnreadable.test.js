@@ -146,3 +146,20 @@ describe('a map store never saves over what it could not read', () => {
     });
   }
 });
+
+import { notReadableStores, resetNotReadableStores } from '@onderling/local-store';
+
+describe('an unclassed household-adapter store is "other data", never "lists"', () => {
+  it('no kind given → reported as data', async () => {
+    resetNotReadableStores();
+    const a = HOUSEHOLD['household file'](); await a.put(NEWER);
+    await buildHouseholdDataSource(a.args);
+    expect(notReadableStores().map((s) => s.kind)).toEqual(['data']);
+  });
+  it('kind lists given → reported as lists', async () => {
+    resetNotReadableStores();
+    const a = HOUSEHOLD['household file'](); await a.put(NEWER);
+    await buildHouseholdDataSource({ ...a.args, kind: 'lists' });
+    expect(notReadableStores().map((s) => s.kind)).toEqual(['lists']);
+  });
+});

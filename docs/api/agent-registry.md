@@ -46,7 +46,7 @@ pulling the pod copy over the local one), so its read-then-write cannot interlea
 **Kind:** function · **Import:** `createAgentRegistry` from `'@onderling/agent-registry'`
 
 ```js
-createAgentRegistry({ pseudoPod, anchorPodUri, deviceId, preferPodUri = false, resourceUri, maxRetries, onPersistentConflict, // identity step 2.5 — optional @onderling/versioning store. When supplied, every registry write // snapshots the resource, so the profile set gets history / undoable recovery (the registry // lives on the pseudo-pod, which is NOT a versioned circle pod, so it gets none for free). versionStore = null, now = () => new Date().toISOString(), } = {})
+createAgentRegistry({ pseudoPod, anchorPodUri, deviceId, preferPodUri = false, resourceUri, maxRetries, onPersistentConflict, // identity step 2.5 — optional @onderling/versioning store. When supplied, every registry write // snapshots the resource, so the profile set gets history / undoable recovery (the registry // lives on the pseudo-pod, which is NOT a versioned circle pod, so it gets none for free). versionStore = null, now = () => new Date().toISOString(), // a stored registry this build cannot read: said here (the shell hands in the device's one notice register), as // 'other data' — every write is refused meanwhile, so a change the person makes to their profiles is not kept onNotReadable = null, } = {})
 ```
 
 Build the live agent-registry handle over an injected pseudo-pod: etag-CAS reads/writes of the

@@ -2172,8 +2172,8 @@ person's Basis keeps its keys.
 
 **Status:** decided and built (2026-11-20). The stores and the small key-value stores of a person's content are
 sealed on every shell. Since 2026-11-25 the ruling sits on each row of the storage register (`seal`), held by
-`lint-storage-register` (it replaced `lint-sealed-key-value` and its baseline); the two trust-level vaults are named
-as debt. What stays readable is listed in `docs/architecture.md`, the Agent home.
+`lint-storage-register` (it replaced `lint-sealed-key-value` and its baseline); the two trust-level vaults, its
+last debt, are sealed since the same day (the key holder keeps them readable across a ceremony). What stays readable is listed in `docs/architecture.md`, the Agent home.
 
 **Context:** the agent's vaults and the shells' stores were sealed, but small key-value values the shells write
 (settings, caches, marks) were decided one by one, and one of them held the person's own model endpoint with its API

@@ -84,12 +84,32 @@ export class FileSealedInboxStore {
     this.#filePath = filePath;
   }
 
-  #load() {
-    try {
-      const obj = JSON.parse(readFileSync(this.#filePath, 'utf8'));
-      return (obj && typeof obj === 'object') ? obj : {};
-    } catch { return {}; }
+  /**
+   * A FILE THAT IS THERE BUT CANNOT BE READ IS NEVER WRITTEN OVER. Read as "empty", the next deposit wrote a file holding
+   * only itself and a drain listed nothing and cleared: every message held for every owner, gone. Now only a MISSING
+   * file is an empty inbox; one that does not parse, is not an object, or cannot be read refuses every read and write
+   * (INBOX_NOT_READABLE: a deposit fails, so the sender keeps its copy) and is said at start (`notReadable()`).
+   * @returns {{ obj: object|null, reason: null|'unparseable'|'shape'|'read-failed' }}
+   */
+  #read() {
+    let text;
+    try { text = readFileSync(this.#filePath, 'utf8'); }
+    catch (err) { return err?.code === 'ENOENT' ? { obj: {}, reason: null } : { obj: null, reason: 'read-failed' }; }
+    let obj;
+    try { obj = JSON.parse(text); } catch { return { obj: null, reason: 'unparseable' }; }
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return { obj: null, reason: 'shape' };
+    return { obj, reason: null };
   }
+  #load() {
+    const { obj, reason } = this.#read();
+    if (reason) {
+      throw Object.assign(new Error(`sealed inbox: ${this.#filePath} is not readable by this build (${reason}); nothing is written over it`),
+        { code: 'INBOX_NOT_READABLE', reason });
+    }
+    return obj;
+  }
+  /** null, or why the stored inbox cannot be read (said at start; every read and write is refused meanwhile). */
+  notReadable() { return this.#read().reason; }
   #save(obj) {
     try { mkdirSync(dirname(this.#filePath), { recursive: true }); } catch { /* exists */ }
     const tmp = `${this.#filePath}.tmp`;

@@ -175,3 +175,27 @@ describe('companion-node M2 — durable persistence (beyond the relay-queue TTL)
     expect(d).toEqual({ count: 4, topics: ['alerts', 'dm'] });
   });
 });
+
+describe('companion-node — an inbox file this build cannot read', () => {
+  it('a deposit and a drain are refused in plain words, the file stays, and the node says it at start', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'inbox-unreadable-'));
+    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
+    const file = join(dir, 'sealed-inbox.json');
+    const torn = '{"someone":[{"id":"m1"';
+    (await import('node:fs')).writeFileSync(file, torn);
+    const bobNet = await AgentIdentity.generate(new VaultMemory());
+    const host = await startCompanionNode({
+      identityVault: new VaultMemory(), gate: false,
+      inbox: true, inboxOwnerPubKey: bobNet.pubKey, inboxStore: new FileSealedInboxStore(file),
+    });
+    cleanups.push(() => host.stop());
+    expect(host.inboxUnreadable).toBe(true);
+    const ann = await makeDevice(host);
+    const dep = await dataOf(ann.invoke(host.agent.address, 'inbox.deposit', { sealed: seal('x', [generateKeypair().publicKey]) }));
+    expect(dep).toEqual({ ok: false, error: 'inbox-not-readable' });
+    const bob = await makeDevice(host, bobNet);
+    const drained = await dataOf(bob.invoke(host.agent.address, 'inbox.drain'));
+    expect(drained).toEqual({ ok: false, error: 'inbox-not-readable' });
+    expect((await import('node:fs')).readFileSync(file, 'utf8')).toBe(torn);
+  });
+});

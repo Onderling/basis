@@ -105,6 +105,12 @@ export function sealedPersist(persist, strategy, onWarn = null) {
       const stored = typeof v === 'string' ? v : JSON.stringify(v);
       try {
         const plain = strategy.open(stored);
+        // A PLAIN ROW ON A KEY NEWER THAN THE RULE is not content: it opened "as itself", so it was never sealed here,
+        // and anyone who can write the storage could otherwise put words in a person's lists that read as their own.
+        // Kept aside like a row that will not open (written back unchanged, said once). On an older key a plain row is
+        // what was stored before sealing, and reads as before (sealed at the next save). The same rule as the sealed
+        // key-value stores and the sealing backend (`plainRefused` on the strategy).
+        if (strategy.plainRefused === true && plain === stored) throw new Error('a plain value where only sealed ones are taken');
         out.set(k, plain);
         if (typeof plain === 'string' && plain !== stored) sealedOf.set(k, { plain, sealed: stored });
       }

@@ -34,5 +34,65 @@
   "apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js": {
     "count": 2,
     "note": "harmless loss: the per-circle view mode on the phone (cc.circleViewMode), read and written at :3902/:3916; the alpha paints chat whatever it holds"
+  },
+  "apps/basis/src/v2/boxStorage.js": {
+    "count": 3,
+    "note": "never saved over: the box's file backend (:35) lets a parse error THROW (never read as absent); the old single-file device log (:77) is left in place when it does not parse (ruled, no damage); the start-failures count (:210) is a counter whose loss only restarts the count"
+  },
+  "apps/basis/src/v2/eventLogPersistence.js": {
+    "count": 2,
+    "note": "never saved over: the box's key-value file (:236) throws on a file that does not parse, and the box's device log file (:261) throws with reason 'unparseable', so no save is attached (wireEventLogPersistence)"
+  },
+  "apps/basis/bin/device-runner.mjs": {
+    "count": 2,
+    "note": "never saved over: the export key file (:1221) throws on a value that does not parse (the key-material rule: never minted over); the placed toolbox files (:1486) are the operator's, only read, never written by the box"
+  },
+  "apps/basis/bin/export-key.mjs": {
+    "count": 1,
+    "note": "not a store: a command-line read of an export file the operator names; a parse error stops the command"
+  },
+  "apps/companion-node/src/identityVault.js": {
+    "count": 1,
+    "note": "never saved over: a vault file that does not parse is not converted; the open falls to VaultNodeFs, which throws"
+  },
+  "apps/companion-node/src/ownerClaim.js": {
+    "count": 1,
+    "note": "never saved over: owner.json that does not parse throws, and the companion is LOCKED (no code minted, every claim refused)"
+  },
+  "apps/companion-node/src/sealedInbox.js": {
+    "count": 1,
+    "note": "never saved over: the held-messages file that does not parse refuses every read and write (INBOX_NOT_READABLE), said at start"
+  },
+  "packages/kring-host/src/mappingsStore.js": {
+    "count": 1,
+    "note": "never saved over: a value that does not parse is handed on as its raw bytes"
+  },
+  "packages/kring-host/src/objectVersionsStorage.js": {
+    "count": 1,
+    "note": "never saved over: one record per version key; a corrupt one reads as absent, and a new version writes a new key (the versions list rule, ruled to stay)"
+  },
+  "packages/pod-client/src/tombstones/AsyncStorageTombstones.js": {
+    "count": 1,
+    "note": "never saved over: the list only reads each tombstone's age (a corrupt one reads as age 0), nothing is written back"
+  },
+  "packages/react-native/src/pseudo-pod-adapter/AsBackend.js": {
+    "count": 1,
+    "note": "never saved over: a record that does not parse is handed on as its raw bytes"
+  },
+  "packages/react-native/src/storage/bundleRegistry.js": {
+    "count": 1,
+    "note": "debt: a list that does not parse reads as [] and the next register writes over it; no shell composes createBundleRegistry today (unreached), to fix or remove when touched"
+  },
+  "packages/pod-client/src/tombstones/FileTombstones.js": {
+    "count": 1,
+    "note": "debt: a tombstone file that does not parse starts fresh and the next add writes over it (a deleted item could return from the pod); no Basis shell composes it (the box keeps its own link tombstones), to fix when touched"
+  },
+  "packages/pseudo-pod/src/NodeFsBackend.js": {
+    "count": 2,
+    "note": "debt: _readRecord (:145) reads a record that does not parse as absent, and the next put writes over it; folio's pod cache, not a Basis shell; the list (:246) only skips, never writes"
+  },
+  "packages/vault/src/VaultNodeFs.js": {
+    "count": 1,
+    "note": "never saved over: a vault file that does not parse throws at open"
   }
 }

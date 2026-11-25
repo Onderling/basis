@@ -12,6 +12,10 @@ describe('lint-store-reads', () => {
   it('sees it on a sealed store too (sealedKeyValue still offers getItem)', () => {
     expect(findingsIn("const kv = sealedKeyValue(s, {});\nconst t = await kv.getItem(K);\n\nreturn t ? JSON.parse(t) : null;").handParsed).toBe(1);
   });
+  it('sees a FILE store parsing by hand (readFile / readFileSync + JSON.parse)', () => {
+    expect(findingsIn("const raw = await readFile(p, 'utf8');\nreturn JSON.parse(raw);").handParsed).toBe(1);
+    expect(findingsIn("try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return {}; }").handParsed).toBe(1);
+  });
   it('sees the one-line form', () => {
     expect(findingsIn("load: () => { try { return JSON.parse(storage?.getItem(KEY) ?? '{}'); } catch { return {}; } },").handParsed).toBe(1);
   });

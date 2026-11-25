@@ -95,7 +95,7 @@ export function logHop({ kind, from, to, envelope, payload }) {
  * The privacy harness keeps the authoritative copy of this list
  * (`test/security/whatTheRelayMayLearn.js` → `ENVELOPE_HEADER_FIELDS`, plus `payload`), because
  * there it IS the claim: a circle id added to this header would be visible to every relay on
- * every path. `whatTheRelayLearns.test.js` asserts the two agree, so they cannot drift apart.
+ * every path. `whatTheRelayLearns.test.js` pins the two EQUAL ("the relay's own routing header and the claim agree").
  */
 export const ROUTING_HEADER_FIELDS = Object.freeze([
   '_v', '_p', '_id', '_re', '_from', '_to', '_topic', '_ts', '_sig',
@@ -103,6 +103,9 @@ export const ROUTING_HEADER_FIELDS = Object.freeze([
   // it (verification is end-to-end); it is listed so the sealing check does not mistake a routing
   // header field for readable content.
   '_signedBy',
+  // 2026-11-25 — the wire the sender's build speaks, inside its signature: the receiver refuses a wire below its own
+  // before opening anything. Header, not content.
+  '_w',
 ]);
 
 /** The one key a sealed payload carries: `SecurityLayer.encrypt` sets `payload = { _box }`. */

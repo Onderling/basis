@@ -36,7 +36,7 @@ import {
 } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { startRelay } from '../../src/server.js';
-import { setVerboseEnabled, findPlaintextLeak, logHop } from '../../src/verbose.js';
+import { setVerboseEnabled, findPlaintextLeak, logHop, ROUTING_HEADER_FIELDS } from '../../src/verbose.js';
 import {
   DERIVABLE_FACTS, WIRE_FRAMES, ENVELOPE_HEADER_FIELDS, SEALED_PAYLOAD_KEYS, KNOWN_HOLES,
 } from './whatTheRelayMayLearn.js';
@@ -541,5 +541,14 @@ describe('the blob gate is the one place a relay really does hold a roster', () 
 
     const hole = KNOWN_HOLES.find(h => h.id === 'blob-gate-acl');
     expect(hole, 'this leak must stay written down next to the claim it contradicts').toBeTruthy();
+  });
+});
+
+describe('the relay\'s own routing header and the claim agree', () => {
+  // Two layers hold the same fact: the claim's list (what a relay may learn) and the relay's own list (what its sealing
+  // check treats as header, not content). A field on one and not the other either goes unclaimed or flags every sealed
+  // envelope as readable. Pinned EQUAL, so a new header field is added to both or the suite is red.
+  it('ROUTING_HEADER_FIELDS is exactly ENVELOPE_HEADER_FIELDS without the payload', () => {
+    expect([...ROUTING_HEADER_FIELDS].sort()).toEqual(ENVELOPE_HEADER_FIELDS.filter((f) => f !== 'payload').sort());
   });
 });

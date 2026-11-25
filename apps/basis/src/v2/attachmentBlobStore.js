@@ -1,4 +1,5 @@
 import { storageName } from './storageRegister.js';   // every storage name from the one register
+import { sealedKeyValue, onShellContentSeal } from './localStoreSeal.js';
 /**
  * The attachment blob store — where a received file's BYTES live, which is never a snapshot.
  *
@@ -70,6 +71,36 @@ export function createAttachmentBlobStore({ indexedDB = globalThis.indexedDB } =
       if (!id) return null;
       try { return await tx(await db(), 'readonly', (os) => os.get(String(id))); }
       catch { return null; }
+    },
+  };
+}
+
+/**
+ * A blob store (this one on the web, `createAttachmentBlobStoreRN` on the phone) whose bytes are SEALED at rest with
+ * the device's content key. Both shells build their store through this: a received file is a person's content as
+ * much as the thread that points to it, which is sealed. The file's base64 is sealed as one value under its id, by
+ * the same strict rule as every sealed key-value store: a put before the key WAITS for it (nothing is written plain),
+ * and a stored file that will not open with this key reads as missing, never as its sealed text, and is not written
+ * over.
+ * @param {{put: Function, get: Function}} blobs
+ * @returns {{put: Function, get: Function}} the same two methods; a failure costs the bytes, never the message
+ */
+export function sealedBlobStore(blobs) {
+  const kv = sealedKeyValue({
+    getItem: (id) => blobs.get(id),
+    setItem: (id, v) => blobs.put(id, v),
+    removeItem: async () => {},
+  }, { name: storageName('attachmentBlobs'), strict: true, waitForKey: true, kind: 'messages' });
+  const keyArrives = () => new Promise((resolve) => { onShellContentSeal(resolve); });
+  return {
+    async put(id, dataB64) {
+      if (!id || typeof dataB64 !== 'string' || !dataB64) return;
+      try { await keyArrives(); await kv.setItem(String(id), dataB64); }
+      catch { /* the turn persists regardless; the card renders from its description */ }
+    },
+    async get(id) {
+      if (!id) return null;
+      try { return (await kv.getItem(String(id))) ?? null; } catch { return null; }
     },
   };
 }

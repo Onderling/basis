@@ -455,7 +455,7 @@ import { makeCircleLists } from '@onderling/kring-host/circleLists';  // composa
 // pod-layer, composed at the pod site below; the op logic itself is shared (web≡mobile) in circleShare.js.
 import { sealItem, memoryDataSource } from '@onderling/item-store';
 import { createContactDmStore } from '../../src/v2/contactDmStore.js';
-import { createAttachmentBlobStore } from '../../src/v2/attachmentBlobStore.js';
+import { createAttachmentBlobStore, sealedBlobStore } from '../../src/v2/attachmentBlobStore.js';
 import {
   outOfCircleShareOffered,
   shareItemAcrossCircles, shareItemToPublishedKey, shareFailureKey, listSharedResolved, revokeItemShare, adminOutboundShares, stopShareWords, memberRevokeWords, revokeAllForMember,
@@ -801,7 +801,7 @@ import { renderCircleScreen } from './circleScreen.js';
 import { renderRecipeEditor } from './circleRecipeEditor.js';
 // ε.6 — multi-offer catch-up chooser modal (opt-in via
 // policy.catchUpChooserMode === 'prompt').
-import { computeAdvice, makeTooBusyEvent } from '../../src/v2/circleAdvisor.js';
+import { computeAdvice, makeTooBusyEvent, advisorShownKey } from '../../src/v2/circleAdvisor.js';
 import { mergeOffering, normalizeOffering, offeringsMatchingEnabled } from '@onderling/kring-host/circleOfferings';
 import { buildCircleFiles, circleFilesFromListFiles } from '../../src/v2/circleFolio.js';
 import { myThingsFromListFiles } from '../../src/v2/folioMyThings.js';
@@ -2486,7 +2486,7 @@ function buildCircleBot(agent) {
   // A received file's BYTES go to IndexedDB under the file id (2026-09-03), never into the DM
   // thread's snapshot item. A snapshot store holds one serialised value; a photo inside it is what
   // takes the whole thread down on a device with a per-row read ceiling.
-  const circleAttachmentBlobs = createAttachmentBlobStore();
+  const circleAttachmentBlobs = sealedBlobStore(createAttachmentBlobStore());   // sealed at rest, like the thread
   // THE PAIR ROSTER (L105): the roster a contact lacks, made automatically on the first exchange from the circle
   // mechanics — the invite rides the turn, the join is the shared path, the founder is the webid that sorts first.
   circlePairRoster = createPairRoster({
@@ -9047,11 +9047,10 @@ async function showRules(id) {
 }
 
 // Advisor cooldown (≤1 card/month) persists per-circle in localStorage.
-const advisorSeenKey = (id) => `cc.advisorShown.${id}`;
 function showAdvisor(id) {
   const rerender = () => {
     let lastShownAt = null;
-    try { const s = localStorage.getItem(advisorSeenKey(id)); if (s) lastShownAt = Number(s); } catch { /* ignore */ }
+    try { const s = localStorage.getItem(advisorShownKey(id)); if (s) lastShownAt = Number(s); } catch { /* ignore */ }
     const advice = computeAdvice({
       events: eventLog.query({ excludeMuted: true }),
       circleId: id,
@@ -9062,7 +9061,7 @@ function showAdvisor(id) {
       t,
       onTooBusy: () => { eventLog.append(makeTooBusyEvent({ circleId: id })); rerender(); },
       onDismiss: () => {
-        try { localStorage.setItem(advisorSeenKey(id), String(Date.now())); } catch { /* ignore */ }
+        try { localStorage.setItem(advisorShownKey(id), String(Date.now())); } catch { /* ignore */ }
         rerender();
       },
       onBack: () => showDetail(id),

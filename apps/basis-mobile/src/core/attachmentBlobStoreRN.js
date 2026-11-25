@@ -48,7 +48,8 @@ export function createAttachmentBlobStoreRN({ fs = FileSystem } = {}) {
   let ready = null;
   const ensureDir = () => (ready ??= fs.makeDirectoryAsync(dir, { intermediates: true }).catch(() => {}));
   const pathFor = (id) => `${dir}${safeName(id)}`;
-  const encoding = fs.EncodingType?.Base64 ?? 'base64';
+  // the value is the SEALED text (sealedBlobStore), not the file's base64: written as text, never decoded
+  const encoding = fs.EncodingType?.UTF8 ?? 'utf8';
 
   return {
     async put(id, dataB64) {

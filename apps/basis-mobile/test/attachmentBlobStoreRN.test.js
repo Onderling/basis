@@ -10,7 +10,7 @@ function fakeFs({ documentDirectory = 'file:///docs/', fail = null } = {}) {
   return {
     files,
     documentDirectory,
-    EncodingType: { Base64: 'base64' },
+    EncodingType: { Base64: 'base64', UTF8: 'utf8' },
     makeDirectoryAsync: vi.fn(async () => {}),
     writeAsStringAsync: vi.fn(async (p, v) => { if (fail === 'write') throw new Error('disk full'); files.set(p, v); }),
     getInfoAsync: vi.fn(async (p) => ({ exists: files.has(p) })),
@@ -27,7 +27,7 @@ describe('createAttachmentBlobStoreRN', () => {
     const [path, value, opts] = fs.writeAsStringAsync.mock.calls[0];
     expect(path).toBe('file:///docs/attachments/f1');
     expect(value).toBe('QUJD');
-    expect(opts.encoding).toBe('base64');
+    expect(opts.encoding).toBe('utf8');   // the value is sealed text (sealedBlobStore), never decoded as base64
   });
 
   it('keeps a file id from escaping the directory', async () => {

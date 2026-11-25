@@ -19,7 +19,7 @@
  *   }
  */
 import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
-import { sealedKeyValue } from './localStoreSeal.js';
+import { sealedKeyValue, jsonKv } from './localStoreSeal.js';
 import {
   normalizeCirclePolicy, mergeCirclePolicy,
   normalizeMemberOverride, mergeMemberOverride,
@@ -184,9 +184,10 @@ const marksByStorage = new WeakMap();
 export function localPolicyPendingMarks(storage = globalThis.localStorage) {
   if (storage && typeof storage === 'object' && marksByStorage.has(storage)) return marksByStorage.get(storage);
   const key = (id) => `cc.circlePolicyPending.${id}`;
+  const kv = storage ? jsonKv(storage, { name: 'the policy pending marks', kind: 'settings' }) : null;
   const marks = {
-    load: async (id) => { if (!storage) throw new Error('no storage'); const s = await storage.getItem(key(id)); return s ? JSON.parse(s) : null; },
-    save: async (id, value) => { if (!storage) throw new Error('no storage'); await storage.setItem(key(id), JSON.stringify(value)); },
+    load: async (id) => { if (!storage) throw new Error('no storage'); return kv.getJson(key(id)); },   // not JSON = kept + refused + said
+    save: async (id, value) => { if (!storage) throw new Error('no storage'); await kv.setItem(key(id), JSON.stringify(value)); },
   };
   if (storage && typeof storage === 'object') marksByStorage.set(storage, marks);
   return marks;
@@ -195,17 +196,14 @@ export function localPolicyPendingMarks(storage = globalThis.localStorage) {
 /** localStorage-backed load/save (web). Key: `cc.circlePolicy.<circleId>`. */
 export function localStoragePolicyIo(storage = globalThis.localStorage) {
   const key = (id) => `cc.circlePolicy.${id}`;
+  const kv = storage ? jsonKv(storage, { name: 'the circle policy', kind: 'settings' }) : null;
   return {
     load: async (id) => {
-      try {
-        const s = await storage?.getItem(key(id));   // awaited: a file-backed store (the box) answers async
-        return s ? JSON.parse(s) : null;
-      } catch {
-        return null;
-      }
+      // awaited: a file-backed store (the box) answers async; not JSON = kept + refused + said
+      try { return kv ? await kv.getJson(key(id)) : null; } catch { return null; }
     },
     save: async (id, policy) => {
-      try { await storage?.setItem(key(id), JSON.stringify(policy)); } catch { /* ignore: quota, or no content key yet */ }
+      try { await kv?.setItem(key(id), JSON.stringify(policy)); } catch { /* ignore: quota, no content key yet, or a kept value */ }
     },
   };
 }
@@ -235,16 +233,11 @@ export function createMemberOverrideStore({ load, save } = {}) {
 /** localStorage-backed load/save for member overrides. Key: `cc.circleOverride.<circleId>`. */
 export function localStorageOverrideIo(storage = globalThis.localStorage) {
   // SEALED at rest (ledger L1083: per-member overrides), on web and phone alike
-  const kv = sealedKeyValue(storage, { name: 'the member overrides', strict: true, said: true, resealAtStart: ['cc.circleOverride.'] });
+  const kv = sealedKeyValue(storage, { name: 'the member overrides', kind: 'settings', strict: true, said: true, resealAtStart: ['cc.circleOverride.'] });
   const key = (id) => `cc.circleOverride.${id}`;
   return {
     load: async (id) => {
-      try {
-        const s = await kv.getItem(key(id));
-        return s ? JSON.parse(s) : null;
-      } catch {
-        return null;
-      }
+      try { return await kv.getJson(key(id)); } catch { return null; }   // not JSON = kept + refused + said
     },
     save: async (id, override) => {
       try { await kv.setItem(key(id), JSON.stringify(override)); } catch { /* ignore: quota, or no content key yet */ }

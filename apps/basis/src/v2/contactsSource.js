@@ -14,7 +14,7 @@
  */
 import { isPairCircleId } from './pairCircleId.js';
 import { personLabel, isKeyLike } from './personLabel.js';
-import { sealedKeyValue } from './localStoreSeal.js';
+import { sealedKeyValue, jsonKv } from './localStoreSeal.js';
 
 /** A peer is a bot/agent when it's an A2A/hybrid agent or exposes skills. */
 function isBot(peer) {
@@ -499,15 +499,16 @@ export const CONTACT_NAMES_KEY = 'cc.contactNames';
  * io (`localStorage` on web, AsyncStorage on mobile), exactly like `makeContactSeenStore`.
  */
 export function makeContactNameStore(io) {
+  // one store for reads and writes: a value that does not parse is kept, and the write after it refused
+  const kv = jsonKv(io, { name: 'the contact names', kind: 'messages' });
   async function read() {
     try {
-      const raw = await io.getItem(CONTACT_NAMES_KEY);
-      const v = raw ? JSON.parse(raw) : {};
+      const v = (await kv.getJson(CONTACT_NAMES_KEY)) ?? {};   // not JSON = kept + refused + said
       return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
     } catch { return {}; }
   }
   async function write(map) {
-    try { await io.setItem(CONTACT_NAMES_KEY, JSON.stringify(map)); } catch { /* quota / disabled: the marker simply does not show */ }
+    try { await kv.setItem(CONTACT_NAMES_KEY, JSON.stringify(map)); } catch { /* quota / disabled / kept: the marker simply does not show */ }
   }
   return {
     read,

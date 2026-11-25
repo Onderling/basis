@@ -13,6 +13,8 @@
  * What leaves on a call: the tool's id and its input (the words of the question), nothing about the person or circle.
  * The wire is `toolboxClient.js`. Pure composition: the store, the key reader and `fetch` are handed in.
  */
+import { jsonKv } from './localStoreSeal.js';
+import { reportNotReadable } from '@onderling/local-store';
 import { readToolboxCard, callTool, readItemList, fetchThumbs } from './toolboxClient.js';
 import { firstPartyFirstWords } from '@onderling/app-manifest';
 import { GATE_WORDS } from './gateWords.js';
@@ -93,7 +95,22 @@ const shownOf = (p) => JSON.stringify({ url: p.url, words: p.words, ...(p.ops ? 
 const originOf = (u) => { try { return new URL(u).origin; } catch { return null; } };
 
 export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch = globalThis.fetch, log = () => {}, takenWords = () => new Set(), appUrl = null } = {}) {
-  const readOn = async () => { try { const v = JSON.parse((await store.get(ON_KEY)) ?? '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } };
+  // THE SWITCHES ARE NEVER WRITTEN OVER WHEN THEY COULD NOT BE READ: a vault entry that will not decrypt, or a value
+  // that does not parse, reads as 'nothing on' for the gate, and every switch is refused until it reads again (said
+  // once, into the box's one notice). Before, the next switch wrote a one-toolbox map over every other yes.
+  const kv = jsonKv({ getItem: (k) => store.get(k), setItem: (k, v) => store.set(k, v) }, { name: 'the toolbox switches', kind: 'settings' });
+  let onUnreadable = null;
+  const readOn = async () => {
+    try {
+      const v = await kv.getJson(ON_KEY);
+      onUnreadable = null;
+      return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+    } catch {
+      onUnreadable = 'read-failed';
+      try { reportNotReadable({ name: 'the toolbox switches', kind: 'settings', reason: 'read-failed' }); } catch { /* never breaks a read */ }
+      return {};
+    }
+  };
   const placed = async () => { try { return (await placedOf() ?? []).map(readPlaced).filter(Boolean); } catch { return []; } };
   const keyFor = async (name) => { try { const k = await keyOf(name); return typeof k === 'string' && k.trim() ? k.trim() : null; } catch { return null; } };
   // the words of the toolboxes that are ON, held in memory for the deterministic gate (a rule answers synchronously)
@@ -103,7 +120,14 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
     // only a toolbox whose placed record is still what the admin's yes was shown (a changed one is off until a new yes)
     words = ps.filter((p) => onMap[p.name]?.shown === shownOf(p)).flatMap((p) => p.words.map((w) => ({ ...w, toolbox: p.name, title: onMap[p.name].title ?? p.name })));
   };
-  const writeOn = async (onMap) => { await store.set(ON_KEY, JSON.stringify(onMap)); await remember(onMap); };
+  /** Write the switches; false (nothing written) when the stored ones could not be read — the op says so. */
+  const writeOn = async (onMap) => {
+    if (onUnreadable) return false;
+    try { await kv.setItem(ON_KEY, JSON.stringify(onMap)); }   // refused while a value that does not parse is kept
+    catch (err) { if (err?.name === 'StoredValueUnreadable') return false; throw err; }
+    await remember(onMap);
+    return true;
+  };
 
   return {
     /** Read once at start, so the gate knows the words of what is on before the first switch of this run. */
@@ -159,7 +183,7 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
       if (!confirm) return { ok: true, pending: true, name: n, title: card.name || n, url: p.url, words: p.words, receives, ...(p.page ? { page: p.page } : {}), ...(p.pageOverHttp ? { pageOverHttp: p.pageOverHttp } : {}) };
       const onMap = await readOn();
       onMap[n] = { title: card.name || n, endpoint: card.endpoint, tools: card.tools.map((t) => ({ id: t.id, name: t.name })), shown: shownOf(p) };
-      await writeOn(onMap);
+      if (!(await writeOn(onMap))) return { ok: false, code: 'toolbox-switches-unreadable', name: n };
       return { ok: true, on: true, name: n, title: onMap[n].title };
     },
 
@@ -169,7 +193,7 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
       const onMap = await readOn();
       if (!onMap[n]) return { ok: false, code: 'toolbox-off', name: n };
       delete onMap[n];
-      await writeOn(onMap);
+      if (!(await writeOn(onMap))) return { ok: false, code: 'toolbox-switches-unreadable', name: n };
       return { ok: true, on: false, name: n };
     },
 
@@ -341,6 +365,7 @@ const REFUSAL_KEY = Object.freeze({
   'toolbox-error': 'toolbox_unreachable', 'toolbox-timeout': 'toolbox_timeout', 'tool-not-offered': 'toolbox_tool_not_offered', 'toolbox-word-taken': 'toolbox_word_taken',
   'tool-error': 'toolbox_tool_failed', 'toolbox-bad-answer': 'toolbox_failed',
   'toolbox-page-is-app-origin': 'toolbox_page_app_origin',
+  'toolbox-switches-unreadable': 'toolbox_switches_unreadable',
 });
 
 /**

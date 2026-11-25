@@ -51,7 +51,7 @@ describe('the two settings pull in opposite directions', () => {
     expect((await store.get()).allowFallback).toBe(false);
 
     await store.set({ allowFallback: true });
-    expect(createDeliverySettingsStore(io) && io.load()).toMatchObject({ allowFallback: true });
+    expect(createDeliverySettingsStore(io) && await io.load()).toMatchObject({ allowFallback: true });
 
     const mem2 = new Map();
     const rn = asyncStorageDeliveryIo({
@@ -63,7 +63,7 @@ describe('the two settings pull in opposite directions', () => {
 
   it('a corrupt store reads as defaults rather than throwing', async () => {
     const io = localStorageDeliveryIo({ getItem: () => 'not json', setItem: () => {} });
-    expect(io.load()).toEqual({});
+    expect(await io.load()).toEqual({});
     expect(await createDeliverySettingsStore(io).get()).toEqual({ sendReceipts: true, allowFallback: false });
   });
 

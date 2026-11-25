@@ -38,7 +38,7 @@ import {
 // basis package by relative path (Metro-friendly; same pattern
 // as podStorage above).
 import { asyncStorageObjectVersions } from './objectVersionsStorageRN.js';
-import { sealedKeyValue } from '../../../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
+import { sealedKeyValue, jsonKv } from '../../../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 // 5.4c — pod-writer build is also imported via relative path (Metro doesn't
 // honour package.json "exports" subpaths; same pattern as podPeerAddr.js).
 import {
@@ -48,13 +48,14 @@ import {
 
 /** Per-id AsyncStorage IO: key = `${prefix}${id}`. */
 export function asyncKeyedIo(prefix, storage) {
+  const kv = jsonKv(storage, { name: `the store ${prefix}`, kind: 'settings' });
   return {
     load: async (id) => {
-      try { const s = await storage.getItem(`${prefix}${id}`); return s ? JSON.parse(s) : null; }
+      try { return await kv.getJson(`${prefix}${id}`); }   // not JSON = kept + refused + said
       catch { return null; }
     },
     save: async (id, value) => {
-      try { await storage.setItem(`${prefix}${id}`, JSON.stringify(value)); }
+      try { await kv.setItem(`${prefix}${id}`, JSON.stringify(value)); }
       catch { /* ignore */ }
     },
   };
@@ -62,13 +63,14 @@ export function asyncKeyedIo(prefix, storage) {
 
 /** Single-key AsyncStorage IO (keyless store, e.g. cross-circle availability). */
 export function asyncFixedIo(key, storage) {
+  const kv = jsonKv(storage, { name: `the store ${key}`, kind: 'settings' });
   return {
     load: async () => {
-      try { const s = await storage.getItem(key); return s ? JSON.parse(s) : null; }
+      try { return await kv.getJson(key); }   // not JSON = kept + refused + said
       catch { return null; }
     },
     save: async (value) => {
-      try { await storage.setItem(key, JSON.stringify(value)); }
+      try { await kv.setItem(key, JSON.stringify(value)); }
       catch { /* ignore */ }
     },
   };
@@ -182,13 +184,14 @@ export function makeUserScreenStoreRN(storage) {
  * caller-supplied key through to AsyncStorage verbatim.
  */
 export function asyncRawIo(storage) {
+  const kv = jsonKv(storage, { name: 'the proposal store', kind: 'data' });
   return {
     load: async (key) => {
-      try { const s = await storage.getItem(key); return s ? JSON.parse(s) : null; }
+      try { return await kv.getJson(key); }   // not JSON = kept + refused + said
       catch { return null; }
     },
     save: async (key, value) => {
-      try { await storage.setItem(key, JSON.stringify(value)); }
+      try { await kv.setItem(key, JSON.stringify(value)); }
       catch { /* ignore */ }
     },
   };

@@ -6380,6 +6380,10 @@
       "text": "Het woord '{{word}}' van {{title}} gebruik ik al voor iets anders. Kies in het bestand op de box een ander woord.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
+    "toolbox_switches_unreadable": {
+      "text": "Ik kan niet lezen welke gereedschapskisten aan staan, dus ik verander er nu niets aan. Er is niets weg. Blijft dit staan, gebruik dan Meld een probleem.",
+      "doc": "The household bot's /toolbox door: the stored toolbox switches could not be read (a vault entry that will not decrypt, or a value that does not parse), so a switch on or off is refused and nothing is written over them."
+    },
     "toolbox_more_gone": {
       "text": "Die lijst is weg; zoek opnieuw.",
       "doc": "A \"meer\" tapped after its list of things was replaced or went old: nothing to page; search again (ledger L1035)."

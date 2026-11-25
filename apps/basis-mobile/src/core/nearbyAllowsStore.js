@@ -56,8 +56,8 @@ export function writeNearbySelf(id) {
 
 /** The Nearby first-use question's device mark, per self (`nearbyAskedKey`): was this self asked on this device? */
 export async function readNearbyAsked(selfId) {
-  try { return (await AsyncStorage.getItem(`cc.${nearbyAskedKey(selfId)}`)) === '1'; } catch { return true; }
+  try { return (await AsyncStorage.getItem(`${storageName('nearbyAskedPhone')}${selfId}`)) === '1'; } catch { return true; }
 }
 export function markNearbyAsked(selfId) {
-  AsyncStorage.setItem(`cc.${nearbyAskedKey(selfId)}`, '1').catch(() => {});
+  AsyncStorage.setItem(`${storageName('nearbyAskedPhone')}${selfId}`, '1').catch(() => {});
 }

@@ -25,6 +25,7 @@
  *
  * The governance fold ignores this kind (it branches on propose/vote/resolve): a policy-update is a carried fact.
  */
+import { storageName } from './storageRegister.js';   // every storage name from the one register
 import { judgePolicyChain, judgeWithProposals, proposalsOn } from './governanceReceiverGate.js';
 import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, mergeCirclePolicy } from './circlePolicy.js';
 import { processRefusalLog } from './refusalLog.js';
@@ -160,7 +161,7 @@ export function makePolicyUpdateEmitter({ rail, fan = null, membershipUpToFor = 
  * Where a device keeps the head of each circle's policy lane: the version it applied and the ORIGINAL statement.
  * Duck-typed io (`localStorage` on web, AsyncStorage on mobile), like the contact seen-marks.
  */
-export const POLICY_HEAD_KEY = (circleId) => `cc.circlePolicyHead.${circleId}`;
+export const POLICY_HEAD_KEY = (circleId) => `${storageName('circlePolicyHead')}${circleId}`;
 export function makePolicyHeadStore(io) {
   // one store for reads and writes: a head that does not parse is kept, the write after it refused, and said
   const kv = jsonKv(io, { name: 'the policy head', kind: 'settings' });

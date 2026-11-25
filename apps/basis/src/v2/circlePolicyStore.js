@@ -184,7 +184,7 @@ export function localCirclePolicyStore(storage = globalThis.localStorage) {
 const marksByStorage = new WeakMap();
 export function localPolicyPendingMarks(storage = globalThis.localStorage) {
   if (storage && typeof storage === 'object' && marksByStorage.has(storage)) return marksByStorage.get(storage);
-  const key = (id) => `cc.circlePolicyPending.${id}`;
+  const key = (id) => `${storageName('circlePolicyPending')}${id}`;
   const kv = storage ? jsonKv(storage, { name: 'the policy pending marks', kind: 'settings' }) : null;
   const marks = {
     load: async (id) => { if (!storage) throw new Error('no storage'); return kv.getJson(key(id)); },   // not JSON = kept + refused + said

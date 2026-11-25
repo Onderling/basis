@@ -9,6 +9,7 @@
  *   - a row's fields changed while its `v` stayed (an older build would read the new shape as the old one);
  *   - a row's `v` rose without WIRE_VERSION rising (protocol/wire.js) and without `additive: '<why an older build still
  *     reads it>'` on the row: a payload carries no per-subtype version, so a raised `v` alone is a number nobody reads;
+ *   - a row's home or block-list mark changed (it moves the kind on or off the block list) until --update records it;
  *   - a row is in one and not the other.
  * `node scripts/lint-wire-shapes.mjs --update` rewrites the committed copy, and refuses while any of the first two holds.
  */
@@ -20,9 +21,17 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.dirname(HERE);
 const COMMITTED = path.join(HERE, 'wire-shapes.json');
 
-/** The committed form of a row: its `v` and its fields as one sorted line. */
+/**
+ * The committed form of a row: its home, whether a blocked address is refused it, its `v`, and its fields as one sorted
+ * line. Home and the block-list mark are in it because moving a kind decides who may receive it: that is a review line.
+ */
 export function committedShapeOf(r) {
-  return { v: r.v, fields: Object.keys(r.fields).sort().map((k) => `${k}:${r.fields[k]}`).join(' ') };
+  return {
+    home: r.home ?? null,
+    ...(r.home === 'direct' ? { blockList: r.blockList !== false } : {}),
+    v: r.v,
+    fields: Object.keys(r.fields).sort().map((k) => `${k}:${r.fields[k]}`).join(' '),
+  };
 }
 
 /**
@@ -40,6 +49,8 @@ export function shapeProblems(register, committed, wireVersion) {
     const now = committedShapeOf(r);
     const before = was[name];
     if (!before) { out.push(`'${name}' is not in scripts/wire-shapes.json: run node scripts/lint-wire-shapes.mjs --update`); continue; }
+    if (before.home !== now.home) out.push(`'${name}': its home changed (${before.home} → ${now.home}), which moves it on or off the block list: run --update to record it`);
+    else if (before.blockList !== now.blockList) out.push(`'${name}': its block list mark changed (${before.blockList} → ${now.blockList}): run --update to record it`);
     const fieldsChanged = before.fields !== now.fields;
     if (fieldsChanged && now.v === before.v) {
       out.push(`'${name}': its fields changed (${before.fields} → ${now.fields}) while v stayed ${now.v}`);

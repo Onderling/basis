@@ -32,6 +32,8 @@ import { storageName } from './storageRegister.js';   // every storage name from
  * This is why `impactOfRemoving` still counts a standby point as "still reachable": switching to it is a
  * reconnect, not a re-join. But removing the ACTIVE one is a different event, and the report says that too.
  */
+import { reportNotReadable } from '@onderling/local-store';
+import { jsonKv } from './localStoreSeal.js';
 
 /** How a point came to be here. Kept because "I added this" and "a circle brought this" read differently. */
 export const POINT_SOURCE = Object.freeze({ JOIN: 'join', MANUAL: 'manual', SUGGESTED: 'suggested', CONTACT: 'contact' });
@@ -570,21 +572,35 @@ const POINTS_STORAGE_KEY = storageName('connectionPoints');
 
 /** localStorage-backed IO (web). Mirrors `relayPref.js` so both settings persist the same way. */
 export function localStorageConnectionPointsIo(storage = globalThis.localStorage) {
+  // SYNC on the web (read at boot, before any key): the same rule as `getJson`, inline — a value that does not parse
+  // is kept (every save refused) and said into the device's one notice; the defaults hold meanwhile
+  let kept = false;
   return {
-    load: () => { try { return JSON.parse(storage?.getItem(POINTS_STORAGE_KEY) ?? '{}'); } catch { return {}; } },
-    save: (v) => { try { storage?.setItem(POINTS_STORAGE_KEY, JSON.stringify(v ?? {})); } catch { /* ignore */ } },
+    load: () => {
+      let raw;
+      try { raw = storage?.getItem(POINTS_STORAGE_KEY); } catch { return {}; }
+      if (raw == null || raw === '') { kept = false; return {}; }
+      try { const v = JSON.parse(raw); kept = false; return v; }
+      catch {
+        kept = true;
+        try { reportNotReadable({ name: `the connection points: ${POINTS_STORAGE_KEY}`, kind: 'settings', reason: 'unparseable' }); } catch { /* never breaks a read */ }
+        return {};
+      }
+    },
+    save: (v) => { if (kept) return; try { storage?.setItem(POINTS_STORAGE_KEY, JSON.stringify(v ?? {})); } catch { /* ignore */ } },
   };
 }
 
 /** AsyncStorage-backed IO (mobile). */
 export function asyncStorageConnectionPointsIo(AsyncStorage) {
+  const kv = AsyncStorage ? jsonKv(AsyncStorage, { name: 'the connection points', kind: 'settings' }) : null;
   return {
     load: async () => {
-      try { return JSON.parse((await AsyncStorage?.getItem(POINTS_STORAGE_KEY)) ?? '{}'); }
+      try { return (kv ? await kv.getJson(POINTS_STORAGE_KEY) : null) ?? {}; }   // not JSON = kept + refused + said
       catch { return {}; }
     },
     save: async (v) => {
-      try { await AsyncStorage?.setItem(POINTS_STORAGE_KEY, JSON.stringify(v ?? {})); }
+      try { await kv?.setItem(POINTS_STORAGE_KEY, JSON.stringify(v ?? {})); }
       catch { /* ignore */ }
     },
   };

@@ -62,21 +62,6 @@ export function asyncKeyedIo(prefix, storage) {
   };
 }
 
-/** Single-key AsyncStorage IO (keyless store, e.g. cross-circle availability). */
-export function asyncFixedIo(key, storage) {
-  const kv = jsonKv(storage, { name: `the store ${key}`, kind: 'settings' });
-  return {
-    load: async () => {
-      try { return await kv.getJson(key); }   // not JSON = kept + refused + said
-      catch { return null; }
-    },
-    save: async (value) => {
-      try { await kv.setItem(key, JSON.stringify(value)); }
-      catch { /* ignore */ }
-    },
-  };
-}
-
 /**
  * 5.4a — `getPodWriter` is an optional thunk returning a podWriter (or null).
  * Defaults to `null` so behaviour is unchanged until 5.4b wires a session.
@@ -179,24 +164,6 @@ export function makeUserScreenStoreRN(storage) {
   return createUserScreenStore({ io: localStorageScreenIo(storage), versions: asyncStorageObjectVersions('screens', storage) });
 }
 
-/**
- * proposal store IO is `{ load(key), save(key, value) }` shaped
- * (different from the per-id stores); a small adapter passes the
- * caller-supplied key through to AsyncStorage verbatim.
- */
-export function asyncRawIo(storage) {
-  const kv = jsonKv(storage, { name: 'the proposal store', kind: 'data' });
-  return {
-    load: async (key) => {
-      try { return await kv.getJson(key); }   // not JSON = kept + refused + said
-      catch { return null; }
-    },
-    save: async (key, value) => {
-      try { await kv.setItem(key, JSON.stringify(value)); }
-      catch { /* ignore */ }
-    },
-  };
-}
 
 
 /** β.5 — per-user "pin to top" store (single key: `cc.circlePinned`), sealed at rest through the shared io (web ≡ mobile). */

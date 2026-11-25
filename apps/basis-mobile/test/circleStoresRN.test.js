@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { groupKeyStrategy } from '@onderling/pod-client';
 import { setShellContentSeal } from '../../basis/src/v2/localStoreSeal.js';
 import {
-  asyncKeyedIo, asyncFixedIo,
+  asyncKeyedIo,
   makeCirclePolicyStoreRN, makeMemberOverrideStoreRN, makeAvailabilityStoreRN,
 } from '../src/core/circleStoresRN.js';
 import { DEFAULT_CIRCLE_POLICY, DEFAULT_AVAILABILITY } from '@onderling-app/basis';
@@ -65,10 +65,8 @@ describe('M3 circleStoresRN', () => {
     expect(reloaded.holiday.until).toBe('2026-06-10');
   });
 
-  it('asyncKeyedIo / asyncFixedIo tolerate corrupt JSON (return null)', async () => {
+  it('asyncKeyedIo tolerates corrupt JSON (returns null)', async () => {
     storage.map.set('cc.circlePolicy.bad', '{not json');
-    storage.map.set('cc.availability', '}{');
     expect(await asyncKeyedIo('cc.circlePolicy.', storage).load('bad')).toBeNull();
-    expect(await asyncFixedIo('cc.availability', storage).load()).toBeNull();
   });
 });

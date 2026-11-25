@@ -103,6 +103,40 @@ export function createSettingsModule({
     }
   }
 
+  /**
+   * Read a settings file for a SAVE: `{ doc }` (null when absent), or `{ notReadable: true }` when it is there but does
+   * not parse or is not an object. A save never writes over a file it could not read, and keeps every field it does
+   * not know (a newer build's) exactly as it found it.
+   */
+  async function _readForSave(dataSource, path) {
+    let raw;
+    try { raw = await dataSource.read(path); } catch { return { notReadable: true }; }
+    if (raw == null) return { doc: null };
+    let doc = raw;
+    if (typeof raw === 'string') { try { doc = JSON.parse(raw); } catch { return { notReadable: true }; } }
+    if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return { notReadable: true };
+    return { doc };
+  }
+
+  const KNOWN_FIELDS = new Set(Object.keys(defaults));
+  const saidNotReadable = new Set();
+
+  /** Write `subset` to `path`, keeping the fields this build does not know; refused when the file is not readable. */
+  async function _writeKeeping(dataSource, path, subset) {
+    const r = await _readForSave(dataSource, path);
+    if (r.notReadable) {
+      if (!saidNotReadable.has(path)) {
+        saidNotReadable.add(path);
+        try { console.warn(`[settings] ${path}: stored settings not readable by this build — kept as they are, not saved over`); }
+        catch { /* a log failure never breaks a save */ }
+      }
+      return;
+    }
+    const kept = {};
+    for (const [k, v] of Object.entries(r.doc ?? {})) if (!KNOWN_FIELDS.has(k)) kept[k] = v;
+    await dataSource.write(path, JSON.stringify({ ...kept, ...subset }));
+  }
+
   function mergeWithDefaults(s) {
     if (!s || typeof s !== 'object') return { ...DEFAULT_SETTINGS };
     const out = {};
@@ -121,10 +155,8 @@ export function createSettingsModule({
     if (legacy != null) {
       const merged = mergeWithDefaults(legacy);
       await Promise.all([
-        dataSource.write(SHARED_PATH,
-          JSON.stringify(_partition(merged, SHARED_FIELDS))),
-        dataSource.write(devicePathFor(deviceId),
-          JSON.stringify(_partition(merged, DEVICE_FIELDS))),
+        _writeKeeping(dataSource, SHARED_PATH, _partition(merged, SHARED_FIELDS)),
+        _writeKeeping(dataSource, devicePathFor(deviceId), _partition(merged, DEVICE_FIELDS)),
       ]);
       if (typeof dataSource.delete === 'function') {
         try { await dataSource.delete(LEGACY_PATH); } catch { /* best-effort */ }
@@ -148,7 +180,7 @@ export function createSettingsModule({
     const merged = mergeWithDefaults(settings);
 
     if (!deviceId) {
-      await dataSource.write(LEGACY_PATH, JSON.stringify(merged));
+      await _writeKeeping(dataSource, LEGACY_PATH, merged);
       return merged;
     }
 
@@ -156,8 +188,8 @@ export function createSettingsModule({
     const deviceSubset = _partition(merged, DEVICE_FIELDS);
 
     await Promise.all([
-      dataSource.write(SHARED_PATH, JSON.stringify(sharedSubset)),
-      dataSource.write(devicePathFor(deviceId), JSON.stringify(deviceSubset)),
+      _writeKeeping(dataSource, SHARED_PATH, sharedSubset),
+      _writeKeeping(dataSource, devicePathFor(deviceId), deviceSubset),
     ]);
     return merged;
   }
@@ -165,15 +197,13 @@ export function createSettingsModule({
   async function _saveScoped({ dataSource, deviceId, settings, scope }) {
     const merged = mergeWithDefaults(settings);
     if (!deviceId) {
-      await dataSource.write(LEGACY_PATH, JSON.stringify(merged));
+      await _writeKeeping(dataSource, LEGACY_PATH, merged);
       return merged;
     }
     if (scope === 'device') {
-      await dataSource.write(devicePathFor(deviceId),
-        JSON.stringify(_partition(merged, DEVICE_FIELDS)));
+      await _writeKeeping(dataSource, devicePathFor(deviceId), _partition(merged, DEVICE_FIELDS));
     } else {
-      await dataSource.write(SHARED_PATH,
-        JSON.stringify(_partition(merged, SHARED_FIELDS)));
+      await _writeKeeping(dataSource, SHARED_PATH, _partition(merged, SHARED_FIELDS));
     }
     return merged;
   }

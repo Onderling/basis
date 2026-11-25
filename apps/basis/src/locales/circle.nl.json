@@ -643,6 +643,14 @@
     "paste_placeholder": {
       "text": "Plak een code, een link of een claimregel",
       "doc": "Me → Scan on web (no camera): the paste prompt."
+    },
+    "botlink_for_chat": {
+      "text": "Deze code is voor de chat met je bot: plak hem daar.",
+      "doc": "A scanned or pasted bot-link offer (onderling-koppel:): the app made it for the chat with the person's bot, so the scanner says where it goes and opens nothing."
+    },
+    "not_for_here": {
+      "text": "Deze code hoort hier niet. Scan hem vanuit Scannen, of open waar hij voor is.",
+      "doc": "A scanner opened for one purpose (connecting a screen) read a code of another kind: it routes only its own kind and says so."
     }
   },
   "membercard_close": {

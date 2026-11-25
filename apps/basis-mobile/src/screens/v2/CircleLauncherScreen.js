@@ -846,6 +846,8 @@ export default function CircleLauncherScreen({
   // the assistant panel's tab last chosen (Gesprek / Maken), remembered on this device (web twin: showVandaagPlus)
   const [assistantTab, setAssistantTab] = useState(null);
   useEffect(() => { AsyncStorage.getItem(storageName('assistantTab')).then((v) => { if (v) setAssistantTab(v); }).catch(() => {}); }, []);
+  // a screen's connect code scanned on Me: handed to 'connect a screen' on Apparaten once (web twin: showMyData screenOffer)
+  const [scannedScreenOffer, setScannedScreenOffer] = useState(null);
   const [plusDialOpen, setPlusDialOpen] = useState(false);   // THE "+" in the bar, opened into its round buttons
   const [plusEdit, setPlusEdit] = useState(null);     // …opened on an own row: `{ act, id, values, asSelf }` (shared `plusEditFor`)
   // …and, when its act shares, the contacts it can go to (the shared `plusShareTargets`; read when the sheet opens on it)
@@ -2084,6 +2086,8 @@ export default function CircleLauncherScreen({
     'claim-companion': (needs) => setScanTask({ id: 'claim-companion', needs }),
     // the code names the address; the circle is the person's pick (none asked with one circle)
     pairCirclePeer:    (needs) => runOpFromScan({ app: 'household', id: 'pairCirclePeer' }, needs),
+    // a screen's connect code: Apparaten opens with the offer in 'connect a screen' (the code pick follows there)
+    screenPairing:     (needs) => { setScannedScreenOffer(needs.offer); setSettingsGroupId(settingsGroupForAction({ kind: 'connect-screen' })); setView('settingsGroup'); },
   };
   const onScan = (res) => {
     setJoinScanOpen(false);
@@ -2660,7 +2664,7 @@ export default function CircleLauncherScreen({
   // My data, and a settings group's screen: ONE element with every section's handlers — a group passes `only`,
   // `groupTitle` and its own back (the gear's home), and paints just its declared sections.
   const myDataScreen = (extra = {}) => (
-    <CircleMyDataScreen selvesOn={selvesOn} showBotActions={botActionsShown} frequent={usageRows(actionFrequency.snapshot(), { names: { ...Object.fromEntries((circles ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t, labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; } })} onClearFrequent={() => { actionFrequency.clear(); setFrequencyTick((n) => n + 1); }} callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('settingsHome')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
+    <CircleMyDataScreen screenOffer={scannedScreenOffer} onScreenOfferTaken={() => setScannedScreenOffer(null)} selvesOn={selvesOn} showBotActions={botActionsShown} frequent={usageRows(actionFrequency.snapshot(), { names: { ...Object.fromEntries((circles ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t, labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; } })} onClearFrequent={() => { actionFrequency.clear(); setFrequencyTick((n) => n + 1); }} callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('settingsHome')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
           doors={{ points: () => setView('points') }}
           personClock={personClockRef.current} selfSet={{ held: heldSelves, on: selvesOn }} {...extra} />
   );

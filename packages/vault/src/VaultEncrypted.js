@@ -19,6 +19,7 @@
  * secret and must be told so, not handed a null that reads as "no such entry".
  */
 import nacl from 'tweetnacl';
+import { isKeyHolder } from './keyHolder.js';
 import { Vault } from './Vault.js';
 
 const PREFIX = 'enc1:';
@@ -55,14 +56,15 @@ export class VaultEncrypted extends Vault {
   /**
    * @param {object} o
    * @param {Vault}      o.backing  the persistent vault being decorated.
-   * @param {Uint8Array} o.key      32-byte symmetric key (secretbox key length).
+   * @param {Uint8Array|object} o.key  32-byte symmetric key (secretbox key length), or a key HOLDER (`createKeyHolder`)
+   *   whose key is read at each call — the one a ceremony switches when it reseals the backings.
    */
   constructor({ backing, key } = {}) {
     super();
     if (!backing || typeof backing.get !== 'function') {
       throw new Error('VaultEncrypted: a backing vault is required');
     }
-    if (!(key instanceof Uint8Array) || key.length !== nacl.secretbox.keyLength) {
+    if (!isKeyHolder(key) && (!(key instanceof Uint8Array) || key.length !== nacl.secretbox.keyLength)) {
       throw new Error(`VaultEncrypted: key must be a ${nacl.secretbox.keyLength}-byte Uint8Array`);
     }
     this.#backing = backing;
@@ -74,16 +76,21 @@ export class VaultEncrypted extends Vault {
     return typeof v === 'string' && v.startsWith(PREFIX);
   }
 
-  #seal(value) {
+  /** Run `fn(key)` with the key in force: a holder's, inside its window; or the bytes given. */
+  #with(fn) {
+    return isKeyHolder(this.#key) ? this.#key.use(fn) : fn(this.#key);
+  }
+
+  #seal(value, k) {
     const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
-    const box = nacl.secretbox(te.encode(String(value)), nonce, this.#key);
+    const box = nacl.secretbox(te.encode(String(value)), nonce, k);
     return `${PREFIX}${b64u(nonce)}:${b64u(box)}`;
   }
 
-  #open(stored, key) {
+  #open(stored, key, k) {
     const parts = stored.slice(PREFIX.length).split(':');
     if (parts.length !== 2) throw new Error(`VaultEncrypted: malformed entry "${key}"`);
-    const plain = nacl.secretbox.open(unb64u(parts[1]), unb64u(parts[0]), this.#key);
+    const plain = nacl.secretbox.open(unb64u(parts[1]), unb64u(parts[0]), k);
     if (!plain) {
       throw new Error(`VaultEncrypted: decryption failed for "${key}" — wrong unlock secret, or the entry was corrupted`);
     }
@@ -91,6 +98,7 @@ export class VaultEncrypted extends Vault {
   }
 
   async get(key) {
+    return this.#with(async (k) => {
     const stored = await this.#backing.get(key);
     if (stored == null) return null;
     if (!VaultEncrypted.isEncryptedValue(stored)) {
@@ -99,11 +107,12 @@ export class VaultEncrypted extends Vault {
         + '(run migrateVaultToEncrypted before reading through the encrypted vault)',
       );
     }
-    return this.#open(stored, key);
+    return this.#open(stored, key, k);
+    });
   }
 
   async set(key, value) {
-    await this.#backing.set(key, this.#seal(value));
+    await this.#with((k) => this.#backing.set(key, this.#seal(value, k)));
   }
 
   async delete(key) { await this.#backing.delete(key); }

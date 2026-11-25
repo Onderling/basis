@@ -42,6 +42,7 @@ export {
 } from './src/RootKeyStore.js';
 export { RootKeyStoreWebCrypto } from './src/RootKeyStoreWebCrypto.js';
 export { VaultMemory }          from './src/VaultMemory.js';
+export { createKeyHolder, isKeyHolder } from './src/keyHolder.js';
 export { VaultLocalStorage }    from './src/VaultLocalStorage.js';
 export { VaultIndexedDB }       from './src/VaultIndexedDB.js';
 export { VaultNodeFs }          from './src/VaultNodeFs.js';

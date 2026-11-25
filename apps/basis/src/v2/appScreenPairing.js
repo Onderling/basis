@@ -13,19 +13,13 @@
  *                       per pick); `{ok: false, reason: 'nothing-picked'}` for ticks that grant nothing;
  *   cancel()          → drop the pending offer and the pick.
  */
-import { parsePairingOffer, CONNECT_SCHEME } from './connectionPairing.js';
+import { parsePairingOffer } from './connectionPairing.js';
 import { compileConnectionGrant } from './connections.js';
 import { createScreenDoor, memoryUsedNonces, SCREEN_PAIRING_REFUSAL_CODES } from './screenDoor.js';
 
 /** The reasons a shell words as `circle.mydata.connection_offer_<reason>`: anything else is said as 'grant-failed'. */
 const WORDED = new Set([...SCREEN_PAIRING_REFUSAL_CODES, 'pairing-no-pick', 'nothing-picked', 'grant-failed', 'not-a-connect-uri', 'unreadable', 'wrong-version', 'incomplete', 'toolbox-page']);
 const worded = (reason) => (WORDED.has(reason) ? reason : 'grant-failed');
-
-/** What the phone's scanner reads on 'Apparaten & sleutels' → connect a screen: a screen's offer only (Me → Scan does not
- *  route it: a screen is connected from here, where the code pick follows). */
-export const SCREEN_OFFER_CLASSIFIERS = Object.freeze([
-  { kind: 'connect', classify: (t) => (typeof t === 'string' && t.trim().startsWith(CONNECT_SCHEME) ? t.trim() : null) },
-]);
 
 const OWNER = 'app';   // the app pairs for this device: one pending offer at a time
 

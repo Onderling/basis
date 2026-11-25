@@ -84,9 +84,7 @@ describe('FITNESS: something actually RECEIVES an incoming link', () => {
   it('…and it routes them through the same classifier the scanner uses', () => {
     // Scanned and linked payloads must not be able to diverge — same classifier, same handler.
     const chat = readFileSync(path.join(here, '..', 'src', 'screens', 'ChatScreen.js'), 'utf-8');
-    expect(chat).toContain('getBasisClassifiers');
-    // Either shape: the classifier's result handed straight in, or classified into `res` (so the link
-    // path can say what it decided) and THAT handed in — never a second classifier, never a second handler.
-    expect(chat).toMatch(/onQrScanResult\(classifyQrPayload\(|const res = classifyQrPayload\([^;]*;[\s\S]{0,600}?onQrScanResult\(res\)/);
+    // the ONE router (scanRoute.js): routed into `r`, what opens nothing said in words, the rest handed to the one handler
+    expect(chat).toMatch(/const r = routeScan\([^;]*;[\s\S]{0,600}?onQrScanResult\(\{ kind: r\.kind, payload: r\.payload \}\)/);
   });
 });

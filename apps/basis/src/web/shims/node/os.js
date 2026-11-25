@@ -2,13 +2,8 @@
  * Browser-safe shim for `node:os`.
  *
  * Aliased via vite.config.js → resolve.alias.  Static imports come from
- * pod-client's `FileTombstones` (which is re-exported from pod-client's
- * index.js and so leaks into any build graph that touches pod-client) and
  * folio's CLI/service paths (already cut off by other aliases or by not
- * being imported from browser entry points).
- *
- * Browser code never executes these: FileTombstones is the Node tombstone
- * adapter; the browser uses IndexedDBTombstones (passed via opts).
+ * being imported from browser entry points). Browser code never executes these.
  */
 
 const browserStub = (name) => () => {

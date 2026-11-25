@@ -11,7 +11,7 @@
  * Key-value shape: uri → { at: number }   (unix-ms timestamp).
  *
  * Implementations: MemoryTombstones (tests), IndexedDBTombstones (web),
- * AsyncStorageTombstones (RN), FileTombstones (Node).
+ * AsyncStorageTombstones (RN).
  */
 export class TombstoneStore {
   /**

@@ -14,10 +14,12 @@
  *      register: storageName('<id>');
  *   2. a register row nothing opens is red: its id is never passed to storageName(...) in the shipped files, and it is
  *      not in OPENED_ELSEWHERE below with the place that opens it and why.
-   3. how a row sits on the disk is ruled on the row (`seal`): `'sealed'`, or a reason under one head (`not content:` ·
+ *   3. how a row sits on the disk is ruled on the row (`seal`): `'sealed'`, or a reason under one head (`not content:` ·
  *      `not sealable:` · `unwritten:` · `debt: L<n>`). A RAW write (`.setItem(` on localStorage, AsyncStorage or a
  *      handed storage, not through a sealed store) must name a row, by `storageName('<id>')` on the line or through a
- *      const (of any shell file) holding one, and that row must not be `'sealed'`. A file whose writes go through a
+ *      const holding one (the nearest above the line, or an exported one the file imports), and that row must not be
+ *      `'sealed'`. A store is judged by its DEFINITION in the file (`sealedKeyValue` sealed, `jsonKv(x)` as sealed as
+ *      `x`), never by its name. A file whose writes go through a
  *      storage AND a key its caller hands it is listed in WRITES_FOR_ITS_CALLER with the row(s) and who seals.
  *      This rule replaces lint-sealed-key-value and its baseline: the decision now sits on the row, once.
  * NOT_STORAGE lists the few hand-written names rule 1 sees that are not a device-level storage name (a key inside a
@@ -55,6 +57,15 @@ export const OPENED_ELSEWHERE = Object.freeze({
 export const WRITES_FOR_ITS_CALLER = Object.freeze({
   'apps/basis/src/household/persist.js': 'the persist adapter of every household-shaped store; sealedPersist wraps it in buildHouseholdDataSource when a strategy is given (lint-sealed-at-rest holds the shells to one)',
   'apps/basis/src/v2/circleRules.js': "circleRules ('sealed'): localCircleRulesStore hands the IO sealedKeyValue; the IO has no default storage",
+  'apps/basis/src/v2/circlePolicyStore.js': "circlePolicy ('sealed'): localCirclePolicyStore and the web shell hand the IO sealedKeyValue; circlePolicyPending ('not content') through plain storage",
+  'apps/basis/src/v2/circleRecipe.js': "circleRecipe ('sealed'): localCircleRecipeStore hands the IO sealedKeyValue; the IO has no default storage",
+  'apps/basis/src/v2/contactUnread.js': "contactSeenAt ('sealed'): sealedContactSeenStore, the one both shells use, hands sealedKeyValue",
+  'apps/basis/src/v2/contactsSource.js': "contactNames ('sealed'): sealedContactNameStore, the one both shells use, hands sealedKeyValue",
+  'apps/basis/src/v2/deliverySettings.js': "delivery ('not content'): the shells hand it plain storage",
+  'apps/basis/src/v2/keptPicture.js': "keptCircles ('sealed'): both shells hand createKeptCircles sealedKeyValue (strict)",
+  'apps/basis/src/v2/policyUpdateLane.js': "circlePolicyHead ('sealed'): sealedPolicyHeadStore, the one both shells use, hands sealedKeyValue",
+  'apps/basis/src/v2/toolboxes.js': "the box's toolbox switches ('tools.on', NOT_STORAGE): a key inside the box's own vault",
+  'apps/basis-mobile/src/core/circleStoresRN.js': "circlePolicy / circleRecipe / circleRules ('sealed'): every caller of asyncKeyedIo in the file hands sealedKeyValue",
   'apps/basis/src/v2/addressFallback.js': "fallbackOffer ('sealed'): both shells hand fallbackOfferStateIo sealedKeyValue",
   'apps/basis/src/v2/enrolForgets.js': "vaultOwnerRoot ('not sealable'): the plain marker vault (forget-pending beside restore-pending)",
   'apps/basis/src/v2/onboardingFlags.js': "the first-run flags ('not content'): helpCircleProvisioned, onboardingDone, mnemonicAck, keyCardSnoozedUntil, firstOpenSeen, introCardSeen",
@@ -66,7 +77,27 @@ export const WRITES_FOR_ITS_CALLER = Object.freeze({
 
 export const SEAL_HEADS = Object.freeze(['not content:', 'not sealable:', 'unwritten:', 'debt:']);
 const RAW_WRITE = /\.setItem\s*(\?\.)?\s*\(/;
-const VIA_SEAL = /\b(?:kv|sealed)\??\.setItem\b|\bsealedIn\([^)]*\)\.setItem/;
+// a write through `sealedIn(storage)` (nativeCalendar: wraps in sealedKeyValue) is sealed by construction
+const VIA_SEALED_IN = /\bsealedIn\([^)]*\)\.setItem/;
+const RECEIVER = /\b([A-Za-z_$][\w$]*)\s*\??\.setItem\s*(?:\?\.)?\s*\(/;
+// a store DEFINED in the file: `const kv = sealedKeyValue(…)` · `const kv = cond ? jsonKv(storage, …) : null`
+const STORE_DEF = /\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:[^;=]*\?\s*)?(sealedKeyValue|jsonKv)\s*\(\s*([A-Za-z_$][\w$]*)?/;
+
+/**
+ * Whether the store a write goes through is sealed, judged by its DEFINITION, never by its name: the nearest
+ * definition of that name above the line (names repeat per function). `sealedKeyValue(…)` is sealed; `jsonKv(x)` is as
+ * sealed as `x` is; a name with no definition in the file (a parameter, a handed store) is not.
+ */
+function sealedAt(lines, lineIdx, name, depth = 0) {
+  if (!name || depth > 4) return false;
+  for (let j = lineIdx; j >= 0; j -= 1) {
+    const m = lines[j].match(STORE_DEF);
+    if (!m || m[1] !== name) continue;
+    if (m[2] === 'sealedKeyValue') return true;
+    return sealedAt(lines, j - 1, m[3], depth + 1);   // jsonKv: as sealed as what it wraps
+  }
+  return false;
+}
 const NAMED = /setItem\s*(?:\?\.)?\s*\(\s*`?\$?\{?storageName\('(\w+)'\)/;
 const BY_CONST = /setItem\s*(?:\?\.)?\s*\(\s*`?\$?\{?([A-Za-z_][A-Za-z0-9_]*)/;
 const CONST_DEF = /\b(?:export\s+)?const\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?:\([^)]*\)\s*=>\s*)?`?\$?\{?storageName\('(\w+)'\)/g;
@@ -90,13 +121,17 @@ export function sealProblems(STORAGE, texts) {
   }
   const callerFilesSeen = new Set();
   for (const [rel, text] of Object.entries(texts)) {
-    const own = new Map([...text.matchAll(CONST_DEF)].map((m) => [m[1], m[2]]));
+    const lines = text.split('\n');
+    const ONE_CONST = new RegExp(CONST_DEF.source);
+    // the nearest definition of the name above the line (a `key` helper is defined once per function), else an import
+    const own = (name, at) => { for (let j = at; j >= 0; j -= 1) { const m = lines[j].match(ONE_CONST); if (m && m[1] === name) return m[2]; } return undefined; };
     const imported = (name) => new RegExp(`import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}`).test(text);
-    const resolve = (name) => (name ? (own.get(name) ?? (imported(name) ? exported.get(name) : undefined)) : undefined);
-    text.split('\n').forEach((l, i) => {
-      if (/^\s*(\/\/|\*)/.test(l) || !RAW_WRITE.test(l) || VIA_SEAL.test(l)) return;
+    const resolve = (name, at) => (name ? (own(name, at) ?? (imported(name) ? exported.get(name) : undefined)) : undefined);
+    lines.forEach((l, i) => {
+      if (/^\s*(\/\/|\*)/.test(l) || !RAW_WRITE.test(l) || VIA_SEALED_IN.test(l)) return;
+      if (sealedAt(lines, i, (l.match(RECEIVER) ?? [])[1])) return;   // through a store this file seals
       if (WRITES_FOR_ITS_CALLER[rel]) { callerFilesSeen.add(rel); return; }   // the caller's storage decides
-      const id = (l.match(NAMED) ?? [])[1] ?? resolve((l.match(BY_CONST) ?? [])[1]);
+      const id = (l.match(NAMED) ?? [])[1] ?? resolve((l.match(BY_CONST) ?? [])[1], i);
       if (!id) {
         problems.push(`${rel}:${i + 1} writes raw under a key that names no register row — take the key from the register, or seal the write`);
         return;

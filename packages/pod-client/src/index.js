@@ -110,4 +110,3 @@ export { TombstoneStore }         from './TombstoneStore.js';
 export { MemoryTombstones }       from './tombstones/MemoryTombstones.js';
 export { IndexedDBTombstones }    from './tombstones/IndexedDBTombstones.js';
 export { AsyncStorageTombstones } from './tombstones/AsyncStorageTombstones.js';
-export { FileTombstones }         from './tombstones/FileTombstones.js';

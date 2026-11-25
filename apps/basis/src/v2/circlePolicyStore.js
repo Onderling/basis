@@ -195,7 +195,7 @@ export function localPolicyPendingMarks(storage = globalThis.localStorage) {
 }
 
 /** localStorage-backed load/save (web). Key: `cc.circlePolicy.<circleId>`. */
-export function localStoragePolicyIo(storage = globalThis.localStorage) {
+export function localStoragePolicyIo(storage) {   // no default: a raw localStorage would write the policy plain
   const key = (id) => `${storageName('circlePolicy')}${id}`;
   const kv = storage ? jsonKv(storage, { name: 'the circle policy', kind: 'settings' }) : null;
   return {

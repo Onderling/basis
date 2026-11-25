@@ -1,13 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { classifyQrPayload } from '@onderling/react-native/qr';
 import { encodeEnrollOffer, enrollOfferLink } from '../../basis/src/v2/enrollOffer.js';
-import { getBasisClassifiers } from '../src/core/qrClassifiers.js';
+import { routeScan } from '../../basis/src/v2/scanRoute.js';   // the one router the phone's scanner calls
 
-const CL = getBasisClassifiers();
 
-describe('basis-mobile QR classifiers', () => {
+describe('the phone\'s scanner, through the one router', () => {
   it('classifies a onderling-contact:// URL as kind:contact', () => {
-    const r = classifyQrPayload('onderling-contact://eyJ3ZWJpZCI6Imh0dHBzOi8vYS5leGFtcGxlIn0', CL);
+    const r = routeScan('onderling-contact://eyJ3ZWJpZCI6Imh0dHBzOi8vYS5leGFtcGxlIn0');
     expect(r.kind).toBe('contact');
     expect(r.payload).toMatch(/^onderling-contact:\/\//);
   });
@@ -15,53 +13,53 @@ describe('basis-mobile QR classifiers', () => {
   it('classifies the contact LINK the web app shares (…#contact=<card>) as kind:contact — the card itself (2026-09-19)', () => {
     // Mij → "Mijn contact delen" hands out a link beside the QR; tapped on a phone it must add the contact
     // exactly as the scanned code does — one decoder (`contactCardFromLink`), shared with web's boot.
-    const r = classifyQrPayload('https://onderling.org/basis/#contact=eyJ3ZWJpZCI6Imh0dHBzOi8vYS5leGFtcGxlIn0', CL);
+    const r = routeScan('https://onderling.org/basis/#contact=eyJ3ZWJpZCI6Imh0dHBzOi8vYS5leGFtcGxlIn0');
     expect(r.kind).toBe('contact');
     expect(r.payload).toBe('onderling-contact://eyJ3ZWJpZCI6Imh0dHBzOi8vYS5leGFtcGxlIn0');
-    expect(classifyQrPayload('https://onderling.org/basis/#enroll=abc', CL).kind).not.toBe('contact');
+    expect(routeScan('https://onderling.org/basis/#enroll=abc').kind).not.toBe('contact');
   });
 
   it('classifies a onderling-invite:// URL as kind:invite', () => {
-    const r = classifyQrPayload('onderling-invite://eyJncm91cElkIjoidGVzdCJ9', CL);
+    const r = routeScan('onderling-invite://eyJncm91cElkIjoidGVzdCJ9');
     expect(r.kind).toBe('invite');
     expect(r.payload).toMatch(/^onderling-invite:\/\//);
   });
 
   it('classifies a ?invite= query URL as kind:invite', () => {
-    const r = classifyQrPayload('https://example/onboard?invite=%7B%22groupId%22%3A%22x%22%7D', CL);
+    const r = routeScan('https://example/onboard?invite=%7B%22groupId%22%3A%22x%22%7D');
     expect(r.kind).toBe('invite');
   });
 
   it('classifies the app’s OWN deep link (?join=…&relay=…) and hands back the invite + its relay', () => {
     // 2026-09-08: the hosted app's invite QR is `…?join=<enc>&relay=<ws url>`. The scanner matched
     // `?invite=` only, so scanning the app's own QR with the app did nothing at all.
-    const r = classifyQrPayload('https://onderling.org/basis/?join=onderling-invite%3A%2F%2Fabc&relay=wss%3A%2F%2Frelay.test', CL);
+    const r = routeScan('https://onderling.org/basis/?join=onderling-invite%3A%2F%2Fabc&relay=wss%3A%2F%2Frelay.test');
     expect(r.kind).toBe('invite');
     expect(r.payload).toEqual({ inviteUri: 'onderling-invite://abc', relayUrl: 'wss://relay.test' });
   });
 
   it('a scheme URI still comes back as the bare string the wizard has always decoded', () => {
-    expect(classifyQrPayload('onderling-invite://eyJ4IjoxfQ', CL).payload).toBe('onderling-invite://eyJ4IjoxfQ');
+    expect(routeScan('onderling-invite://eyJ4IjoxfQ').payload).toBe('onderling-invite://eyJ4IjoxfQ');
   });
 
   it('returns kind:unknown for an unrelated string', () => {
-    const r = classifyQrPayload('https://example.com/random', CL);
+    const r = routeScan('https://example.com/random');
     expect(r.kind).toBe('unknown');
   });
 
   it('classifies an onderling-pair:// URL as kind:pair', () => {
-    const r = classifyQrPayload('onderling-pair://abc123?name=Phone', CL);
+    const r = routeScan('onderling-pair://abc123?name=Phone');
     expect(r.kind).toBe('pair');
     expect(r.payload).toMatch(/^onderling-pair:\/\//);
   });
 
   it('still classifies the LEGACY onderling-pair:// spelling (old QRs keep working; never minted)', () => {
-    const r = classifyQrPayload('onderling-pair://abc123?name=Phone', CL);
+    const r = routeScan('onderling-pair://abc123?name=Phone');
     expect(r.kind).toBe('pair');
   });
 
   it('returns kind:unknown for empty input', () => {
-    expect(classifyQrPayload('', CL).kind).toBe('unknown');
+    expect(routeScan('').kind).toBe('unknown');
   });
 
   // Adding a device of your OWN — until 2026-09-09 both carriers fell to 'unknown' here, so a scanned
@@ -71,24 +69,24 @@ describe('basis-mobile QR classifiers', () => {
     const OFFER = encodeEnrollOffer({ relays: ['wss://relay.example'], circles: [{ id: 'c1', handle: 'anna', address: 'addr-1' }] });
 
     it('classifies the scanned CODE as kind:enroll and hands back the offer URI', () => {
-      const r = classifyQrPayload(OFFER, CL);
+      const r = routeScan(OFFER);
       expect(r.kind).toBe('enroll');
       expect(r.payload).toBe(OFFER);
     });
 
     it('classifies the clickable LINK form the same way — one payload, two carriers', () => {
       const { link } = enrollOfferLink('https://onderling.org/basis', OFFER);
-      const r = classifyQrPayload(link, CL);
+      const r = routeScan(link);
       expect(r.kind).toBe('enroll');
       expect(r.payload, 'the link must resolve to the same offer the code carries').toBe(OFFER);
     });
 
     it('does not swallow a circle invite, which is a different act entirely', () => {
-      expect(classifyQrPayload('onderling-invite://eyJ4IjoxfQ', CL).kind).toBe('invite');
+      expect(routeScan('onderling-invite://eyJ4IjoxfQ').kind).toBe('invite');
     });
 
     it('refuses a malformed offer rather than classifying it', () => {
-      expect(classifyQrPayload('onderling-enroll://not-base64url-at-all!!', CL).kind).toBe('unknown');
+      expect(routeScan('onderling-enroll://not-base64url-at-all!!').kind).toBe('unknown');
     });
   });
 });

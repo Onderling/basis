@@ -7,9 +7,16 @@
  *   enroll  → add THIS device          (`onderling-enroll://…` / its link — a distinct scheme on purpose: the others
  *                                       make a CONNECTION, this one makes a DEVICE)
  *   claim   → claim a companion        (`ABCD-EFGH@<node>`, with or without "Claim:")
+ *   screen  → connect a screen         (`onderling-connect://…`: the screen pairing opens with the offer in it)
+ *   botlink → deliberately not routed  (`onderling-koppel:…`: the app makes it for the bot's chat; the scanner says so)
  *
- * The classifier list moved here from mobile's `core/qrClassifiers.js` (which now re-exports it), unchanged in what it
- * reads and in its order, so the native scanner and the router cannot disagree. Pure JS, no camera.
+ * Frits's three rules (2026-11-20): every code Basis makes is routed the same way (a classifier and a declared target in
+ * the one table) or named as deliberately not (`SCAN_SCHEMES`, held by `lint-scan-schemes`); no scanner reads a code
+ * outside this router; and a scanner called FOR one purpose routes only that kind and says so for anything else
+ * (`routeScan(text, { for })`).
+ *
+ * The phone's scanner (`QrScannerModal`) and its link path call this router; there is no second classifier list.
+ * Pure JS, no camera.
  */
 import { classifyQrPayload } from '@onderling/qr';
 import { parseInviteDeepLink } from './inviteDeepLink.js';
@@ -17,6 +24,9 @@ import { enrollOfferFromLink } from './enrollOffer.js';
 import { contactCardFromLink } from './contactCardLink.js';
 import { parseCompanionClaim } from './companionClaim.js';
 import { QR_PAIR_SCHEME } from '../core/qrSchemes.js';
+import { CONNECT_SCHEME } from './connectionPairing.js';
+import { LINK_OFFER_SCHEME } from './identityLink.js';
+import { ENROLL_SCHEME } from './enrollOffer.js';
 
 const CONTACT_SCHEME = 'onderling-contact://';
 const INVITE_SCHEME  = 'onderling-invite://';
@@ -28,7 +38,23 @@ export const SCAN_CLASSIFIERS = Object.freeze([
   { kind: 'pair',    classify: (t) => (typeof t === 'string' && t.startsWith(QR_PAIR_SCHEME) ? t : null) },
   { kind: 'enroll',  classify: classifyEnroll },
   { kind: 'claim',   classify: (t) => (typeof t === 'string' ? parseCompanionClaim(t) : null) },
+  { kind: 'screen',  classify: (t) => (typeof t === 'string' && t.startsWith(CONNECT_SCHEME) ? t : null) },
+  { kind: 'botlink', classify: (t) => (typeof t === 'string' && t.startsWith(LINK_OFFER_SCHEME) ? t : null) },
 ]);
+
+/**
+ * EVERY SCHEME BASIS MAKES, and where its code goes: a routed kind, or `not: <why>`. `lint-scan-schemes` is red on a
+ * scheme constant or an `onderling-…://` literal in the app that is not here, so a new code cannot go around the router.
+ */
+export const SCAN_SCHEMES = Object.freeze({
+  [CONTACT_SCHEME]:    'contact',
+  [INVITE_SCHEME]:     'invite',
+  [QR_PAIR_SCHEME]:    'pair',
+  [ENROLL_SCHEME]:     'enroll',
+  [CONNECT_SCHEME]:    'screen',
+  [LINK_OFFER_SCHEME]: 'botlink',
+  'basis://':          'not: the app\'s own deep link (the sign-in callback); never a code to scan',
+});
 
 /**
  * WHERE each kind goes — a TABLE of DECLARED targets, never a shell callback: the router is a projector from a
@@ -46,6 +72,10 @@ export const SCAN_TARGETS = Object.freeze({
   enroll:  { kind: 'flow', app: 'household', id: 'enroll-device',   needs: (payload) => ({ offer: payload }) },
   claim:   { kind: 'flow', app: 'household', id: 'claim-companion', needs: (payload) => ({ claim: `${payload.code}@${payload.node}` }) },
   pair:    { kind: 'op',   app: 'household', id: 'pairCirclePeer',  needs: (payload) => ({ addr: payload }) },
+  // the START of a screen's pairing has no op (offer → pick a code → ticks); its end is `grantSurface`: a view (Fable 2026-11-25)
+  screen:  { kind: 'view', app: 'basis',     id: 'screenPairing',   needs: (payload) => ({ offer: payload }) },
+  // the app made this for the bot's chat: the scanner says where it goes, it never opens anything here
+  botlink: { kind: 'not',  app: 'basis',     id: 'botlink',         sayKey: 'circle.scan.botlink_for_chat', needs: () => ({}) },
 });
 
 /**
@@ -64,15 +94,29 @@ export function scanOpResultWords(reply) {
 /**
  * What a scanned (or pasted) text is, what it carries, and the declared target it goes to.
  * @param {unknown} text
- * @returns {{kind: string, payload: unknown, target?: {kind: 'flow'|'op', app: string, id: string}, needs?: object}}
+ * @param {{for?: string|null}} [o]  `for`: the scanner was called for ONE kind (a screen's pairing): any other kind is
+ *   refused (`refused: 'not-for-here'`, no target), so a scanner opened for one purpose cannot be steered into another flow
+ * @returns {{kind: string, payload: unknown, target?: {kind: 'flow'|'op'|'view'|'not', app: string, id: string}, needs?: object, refused?: string, for?: string}}
  */
-export function routeScan(text) {
+export function routeScan(text, { for: forKind = null } = {}) {
   const s = typeof text === 'string' ? text.trim() : '';
-  // the one first-match loop (the phone's scanner calls the same one)
+  // the one first-match loop (the phone's scanner calls this router)
   const hit = s ? classifyQrPayload(s, SCAN_CLASSIFIERS) : { kind: 'unknown' };
   const t = SCAN_TARGETS[hit.kind];
   if (!t) return { kind: 'unknown', payload: s };
+  if (forKind && hit.kind !== forKind) return { kind: hit.kind, payload: hit.payload, refused: 'not-for-here', for: forKind };
   return { kind: hit.kind, payload: hit.payload, target: { kind: t.kind, app: t.app, id: t.id }, needs: t.needs(hit.payload) };
+}
+
+/**
+ * The words for a scan that opens nothing: an unreadable code, a code for somewhere else (`not`), or one a scanner called
+ * for another purpose refuses. Null when the route opens something. One answer both shells say.
+ */
+export function scanSayKey(r) {
+  if (!r || r.kind === 'unknown') return 'scan_qr.scan_unknown';
+  if (r.refused) return 'circle.scan.not_for_here';
+  if (r.target?.kind === 'not') return SCAN_TARGETS[r.kind]?.sayKey ?? 'scan_qr.scan_unknown';
+  return null;
 }
 
 function classifyContact(text) {

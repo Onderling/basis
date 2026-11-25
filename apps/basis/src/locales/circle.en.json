@@ -643,6 +643,14 @@
     "paste_placeholder": {
       "text": "Paste a code, a link or a claim line",
       "doc": "Me → Scan on web (no camera): the paste prompt."
+    },
+    "botlink_for_chat": {
+      "text": "This code is for the chat with your bot: paste it there.",
+      "doc": "A scanned or pasted bot-link offer (onderling-koppel:): the app made it for the chat with the person's bot, so the scanner says where it goes and opens nothing."
+    },
+    "not_for_here": {
+      "text": "This code does not belong here. Scan it from Scan, or open what it is for.",
+      "doc": "A scanner opened for one purpose (connecting a screen) read a code of another kind: it routes only its own kind and says so."
     }
   },
   "membercard_close": {

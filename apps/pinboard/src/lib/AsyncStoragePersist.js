@@ -49,6 +49,7 @@ export class AsyncStoragePersist {
   /** Most recent saved snapshot (for diffing / no-op skip). */
   #lastSerialised = null;
   #gate = null;
+  #kind;
 
   /**
    * @param {object} args
@@ -58,7 +59,8 @@ export class AsyncStoragePersist {
    * @param {object}  [args.asyncStorage]       injectable mock; defaults to
    *                                            @react-native-async-storage/async-storage
    */
-  constructor({ dbName, prefix = DEFAULT_PREFIX, saveDelayMs = 200, asyncStorage } = {}) {
+  constructor({ kind = 'posts', dbName, prefix = DEFAULT_PREFIX, saveDelayMs = 200, asyncStorage } = {}) {
+    this.#kind = kind;   // what it holds as a person names it, for the not-readable notice
     if (typeof dbName !== 'string' || !dbName) {
       throw new TypeError('AsyncStoragePersist: dbName required');
     }
@@ -108,7 +110,7 @@ export class AsyncStoragePersist {
   }
 
   /** The snapshot's format and the refusal to save over one this build could not read (`mapSnapshotGate`). */
-  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#key)); }
+  #gateOf() { return (this.#gate ??= mapSnapshotGate(this.#key, { kind: this.#kind })); }
 
   /**
    * Write a Map to AsyncStorage.  Single-key replace.

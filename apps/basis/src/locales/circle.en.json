@@ -10214,6 +10214,54 @@
       "doc": "The bar's one action: reload the page to get the newer build."
     }
   },
+  "storeNotice": {
+    "newer": {
+      "text": "Part of what this device keeps was made by a newer version of Basis and cannot be read here. Nothing was changed. Update the app.",
+      "doc": "The notice at the top when a store on this device holds data a NEWER build wrote (its format is unknown here). Nothing was changed or saved over."
+    },
+    "unreadable": {
+      "text": "Part of what this device keeps cannot be read. Nothing was changed. If this stays, use Report a problem.",
+      "doc": "The notice at the top when a store on this device holds data that does not parse or could not be read (not a newer version). Nothing was changed or saved over."
+    },
+    "costAfterUpdate": {
+      "text": "What you change here now in {{what}} is only saved after the update.",
+      "doc": "Second line under the newer-version notice. what = the kinds of stores affected as plain words (circle.storeNotice.kind.*), joined."
+    },
+    "costNotSaved": {
+      "text": "What you change here now in {{what}} is not saved.",
+      "doc": "Second line under the not-readable notice (no update fixes it). what = the kinds of stores affected as plain words, joined."
+    },
+    "and": {
+      "text": " and ",
+      "doc": "Joins the last two kind words in the cost line ('berichten en lijsten')."
+    },
+    "kind": {
+      "messages": {
+        "text": "messages",
+        "doc": "A store kind as a person names it: messages (chats, the outbox)."
+      },
+      "lists": {
+        "text": "lists",
+        "doc": "A store kind: lists (a circle's lists, the household)."
+      },
+      "tasks": {
+        "text": "tasks",
+        "doc": "A store kind: tasks."
+      },
+      "posts": {
+        "text": "the pinboard",
+        "doc": "A store kind: the pinboard's posts."
+      },
+      "settings": {
+        "text": "settings",
+        "doc": "A store kind: settings."
+      },
+      "data": {
+        "text": "other data",
+        "doc": "A store kind nobody classed: other data on this device."
+      }
+    }
+  },
   "shareContact": {
     "title": {
       "text": "Share my card",

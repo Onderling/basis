@@ -858,12 +858,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The outbox (held messages + the dead-address verdict) on a DEVICE-LOCAL store, so neither resets
     // on every launch. Same builder as the settings store; never the pod — a held message is this
     // device's promise to try again, not the person's data.
-    holdStore:    opts.outboxPersistDb ? await buildHouseholdDataSource(opts.outboxPersistDb, { strategy: contentSeal }) : undefined,
+    holdStore:    opts.outboxPersistDb ? await buildHouseholdDataSource({ ...opts.outboxPersistDb, kind: 'messages' }, { strategy: contentSeal }) : undefined,
     holdStoreUri: 'mem://basis/outbox.json',
     // What this device has already TAKEN (a repeat lands once, also after a restart): beside the outbox on the same
     // device-local medium, in a store of its OWN — on a phone one store is one storage row, and the outbox and this
     // record each stay small only apart. Never the pod: it is this device's memory of its own inbox.
-    seenInboundStore: opts.outboxPersistDb ? await buildHouseholdDataSource(besidePersistDb(opts.outboxPersistDb, 'seen-inbound'), { strategy: contentSeal }) : undefined,
+    seenInboundStore: opts.outboxPersistDb ? await buildHouseholdDataSource({ ...besidePersistDb(opts.outboxPersistDb, 'seen-inbound'), kind: 'messages' }, { strategy: contentSeal }) : undefined,
     seenInboundUri:   'mem://basis/seen-inbound.json',
     // onPeerMessage + nknLib supplied later via setPeerWiring().
     // Pass-through for extra factory opts (tests + future ops):
@@ -1075,7 +1075,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // `opts.settingsDataSource` (a pod-backed store, or a SHARED one across a user's devices in a journey);
   // else in-memory (tests / transient).
   const settingsDataSource = opts.settingsDataSource
-    ?? (opts.settingsPersistDb ? await buildHouseholdDataSource(opts.settingsPersistDb, { strategy: contentSeal }) : memoryDataSource());
+    ?? (opts.settingsPersistDb ? await buildHouseholdDataSource({ ...opts.settingsPersistDb, kind: 'settings' }, { strategy: contentSeal }) : memoryDataSource());
   // Pod-sync the settings store. The settings `CachingDataSource` starts LOCAL; when the shell can reach the
   // signed-in pod it hands a pod-backed inner (a self-sealed pod DataSource over the settings container) via
   // `opts.provisionSettingsMedium` — EXACT mirror of `opts.provisionCircleMedium` for circle stores. `attachInner`
@@ -7156,7 +7156,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     persistDb:  opts.pinboardPersistDb,   // browser IDB; opt-in via caller
     // Push subscriptions on their own medium: sealed, device-local, never in the pinboard store (which can reach a
     // pod) and never carried to a sibling — a subscription lets its holder wake this device.
-    pushStore:  opts.pinboardPushPersistDb ? await buildHouseholdDataSource(opts.pinboardPushPersistDb, { strategy: contentSeal }).catch(() => null) : null,
+    pushStore:  opts.pinboardPushPersistDb ? await buildHouseholdDataSource({ ...opts.pinboardPushPersistDb, kind: 'settings' }, { strategy: contentSeal }).catch(() => null) : null,
     contentSeal,                       // its posts are content too — sealed on the way to disk
     // S4 — per-circle control-agent router: redeem→addMember / leave→removeMember route
     // to the joined circle's sealed-pod producer (multi-member sealing). Opt-in; absent

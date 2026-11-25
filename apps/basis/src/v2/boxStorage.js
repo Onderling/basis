@@ -117,16 +117,16 @@ export function boxStores(dataDir) {
     // the policy heads in the same file, through the shells' own store: strict, resealed at the start (web ≡ phone)
     policyHeadStore: sealedPolicyHeadStore(fileKeyValueStorage(paths.circlePolicy)),
     // Built after the agent booted (the key exists), like every other content store.
-    contactDmSource: () => buildHouseholdDataSource({ path: paths.contactDm }, { strategy: shellContentSeal() }),
+    contactDmSource: () => buildHouseholdDataSource({ path: paths.contactDm, kind: 'messages' }, { strategy: shellContentSeal() }),
     // The door's thread rows (memory mode, language, a pending ask) — the turns themselves are on the device log.
-    botThreadsSource: () => buildHouseholdDataSource({ path: paths.botThreads }, { strategy: shellContentSeal() }),
+    botThreadsSource: () => buildHouseholdDataSource({ path: paths.botThreads, kind: 'messages' }, { strategy: shellContentSeal() }),
     // Who may start talking to the door: the open cohort and the hashes of spent codes (never a code).
-    botAdmissionSource: () => buildHouseholdDataSource({ path: paths.botAdmission }, { strategy: shellContentSeal() }),
+    botAdmissionSource: () => buildHouseholdDataSource({ path: paths.botAdmission, kind: 'data' }, { strategy: shellContentSeal() }),
     // The circles a household bot joined on its admin's word (`/kring`): their ids and names, when, on whose word.
-    botCirclesSource: () => buildHouseholdDataSource({ path: paths.botCircles }, { strategy: shellContentSeal() }),
+    botCirclesSource: () => buildHouseholdDataSource({ path: paths.botCircles, kind: 'data' }, { strategy: shellContentSeal() }),
     // The host's own typed items (the own-devices store): the bot's planned work and that of the people it is the
     // device for — never a circle's.
-    ownDevicesSource: () => buildHouseholdDataSource({ path: paths.ownDevices }, { strategy: shellContentSeal() }),
+    ownDevicesSource: () => buildHouseholdDataSource({ path: paths.ownDevices, kind: 'data' }, { strategy: shellContentSeal() }),
   };
 }
 

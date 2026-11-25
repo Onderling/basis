@@ -17,10 +17,20 @@ import { EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, UNLOCK_FOR_MS } from './householdEx
  * @param {object} [a.argonOpts]  tests only
  */
 export function createExportKeyFile({ files, now = Date.now, argonOpts } = {}) {
-  const readKey = () => { try { return JSON.parse(files.read(EXPORT_KEY_FILE) ?? 'null'); } catch { return null; } };
+  // A key file that is there but does not parse (written by a newer build, cut off on disk) is NOT "no key": taken for
+  // absent, the set would report a first key over it and an unlock would say none is set.
+  const UNREADABLE = Symbol('unreadable');
+  const readKey = () => {
+    const text = files.read(EXPORT_KEY_FILE);
+    if (text == null) return null;
+    try { return JSON.parse(text) ?? UNREADABLE; } catch { return UNREADABLE; }
+  };
   return {
-    /** Is a key set on this box? */
-    exists: () => Boolean(readKey()),
+    /** Is a key file on this box (readable or not)? */
+    exists: () => readKey() !== null,
+
+    /** Is the key file there but unreadable? A new key from `set` is then the only way on. */
+    unreadable: () => readKey() === UNREADABLE,
 
     /**
      * A new key from the passphrase; an open old key closes. Files sealed with an old key keep needing ITS passphrase.
@@ -28,7 +38,7 @@ export function createExportKeyFile({ files, now = Date.now, argonOpts } = {}) {
      */
     async set(passphrase) {
       if (typeof passphrase !== 'string' || passphrase.length < MIN_PASSPHRASE) return { ok: false, reason: 'too-short' };
-      const replaced = Boolean(readKey());
+      const replaced = readKey() !== null;
       files.remove(UNLOCKED_KEY_FILE);
       const key = await createExportKey({ passphrase, ...(argonOpts ? { argonOpts } : {}) });
       files.write(EXPORT_KEY_FILE, JSON.stringify(key, null, 1));
@@ -37,11 +47,12 @@ export function createExportKeyFile({ files, now = Date.now, argonOpts } = {}) {
 
     /**
      * Open the key for the next `/import`, for an hour: the box's key, or the one a sealed file carries (`source`).
-     * @returns {Promise<{ok: true, until: number}|{ok: false, reason: 'no-key'|'wrong-passphrase'}>}
+     * @returns {Promise<{ok: true, until: number}|{ok: false, reason: 'no-key'|'key-unreadable'|'wrong-passphrase'}>}
      */
     async unlock(passphrase, { source = null } = {}) {
       const key = source ?? readKey();
       if (!key) return { ok: false, reason: 'no-key' };
+      if (key === UNREADABLE) return { ok: false, reason: 'key-unreadable' };
       let secretKey;
       try { secretKey = await unlockExportKey({ key, passphrase, ...(argonOpts ? { argonOpts } : {}) }); }
       catch (e) { if (e?.message === 'wrong-passphrase') return { ok: false, reason: 'wrong-passphrase' }; throw e; }

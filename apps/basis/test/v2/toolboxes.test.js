@@ -9,7 +9,7 @@
  * tool id or a key. `addToolbox {name}` shows the card first and switches the toolbox on only when confirmed.
  */
 import { describe, it, expect } from 'vitest';
-import { makeToolboxOps, toolboxGateRule } from '../../src/v2/toolboxes.js';
+import { makeToolboxOps, toolboxGateRule, toolboxRefusalText } from '../../src/v2/toolboxes.js';
 
 const KEY = 'geheime-sleutel-123';
 const CARD = { name: 'Boodschappen', supportedInterfaces: [{ url: 'http://boodschappen:3000/a2a', protocolBinding: 'JSONRPC', protocolVersion: '1.0' }],
@@ -28,7 +28,7 @@ function harness({ keys = { boodschappen: KEY }, placed = [PLACED], answer = { o
     return { ok: true, status: 200, json: async () => ({ jsonrpc: '2.0', id: 1, result: { message: { parts: [{ data: answer }] } } }) };
   };
   const ops = makeToolboxOps({ store, placedOf: async () => placed, keyOf: async (name) => keys[name] ?? null, fetch, log: (...a) => logs.push(JSON.stringify(a)) });
-  return { ops, calls, logs, vault, keys, placed };
+  return { ops, calls, logs, vault, keys, placed, fetch };
 }
 const all = (...xs) => JSON.stringify(xs);
 const on = async (h) => { await h.ops.load(); return h.ops.addToolbox({ name: 'boodschappen', confirm: true }); };
@@ -245,5 +245,33 @@ describe('a toolbox page on plain http in the home network, as the operator\'s e
     expect(card).toMatchObject({ ok: true, pending: true, page: 'http://192.168.1.5:8710/', pageOverHttp: 'home-network' });
     const https = harness({ placed: [{ ...PLACED, page: 'https://box.example/' }] });
     expect((await https.ops.addToolbox({ name: 'boodschappen' })).pageOverHttp).toBeUndefined();
+  });
+});
+
+/**
+ * A TOOLBOX'S PAGE IS NEVER ON THE WEB APP'S OWN ORIGIN (ledger L1041 b): a page served from the app's origin shares
+ * everything the app keeps in the browser (its storage, its key door), so switching on a toolbox whose placed page has
+ * the app's origin is refused, in words, and nothing is switched on. Another path on the same host and port is the same
+ * origin; another port is not.
+ */
+describe('a toolbox page on the web app\'s own origin', () => {
+  const APP = 'https://onderling.org/basis/';
+  const withApp = (page) => {
+    const h = harness({ placed: [{ ...PLACED, page }] });
+    const ops = makeToolboxOps({ store: { get: async () => null, set: async () => {} }, placedOf: async () => [{ ...PLACED, page }], keyOf: async () => KEY, fetch: h.fetch, appUrl: APP });
+    return ops;
+  };
+  it('the same origin (any path) is refused at the switch, with a code the door says', async () => {
+    for (const page of ['https://onderling.org/boodschappen/', 'https://onderling.org/basis/pagina', 'https://ONDERLING.org:443/x']) {
+      const ops = withApp(page); await ops.load();
+      expect(await ops.addToolbox({ name: 'boodschappen' }), page).toMatchObject({ ok: false, code: 'toolbox-page-is-app-origin' });
+      expect(toolboxRefusalText({ ok: false, code: 'toolbox-page-is-app-origin', name: 'boodschappen' }, (k) => k)).toBe('circle.bot.toolbox_page_app_origin');
+    }
+  });
+  it('another origin (host or port) is not refused for that', async () => {
+    for (const page of ['https://boodschappen.onderling.org/', 'https://onderling.org:8443/x', 'http://127.0.0.1:8710/']) {
+      const ops = withApp(page); await ops.load();
+      expect((await ops.addToolbox({ name: 'boodschappen' })).code, page).not.toBe('toolbox-page-is-app-origin');
+    }
   });
 });

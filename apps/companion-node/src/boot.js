@@ -78,7 +78,9 @@ console.log('  ─────────────────────�
 console.log(`  Host agent:   ${node.agent.address}`);
 console.log(`  Relay:        ${node.relayUrl}${node.relay ? '  (booted in-process)' : '  (shared, connected as client)'}`);
 console.log(`  Capabilities: ${node.capabilities.join(', ')}`);
-console.log(`  Management:   ${node.managementOwnerRoot ? `claimed (owner root ${node.managementOwnerRoot.slice(0, 12)}…)` : 'unclaimed — waiting for its owner'}`);
+console.log(`  Management:   ${node.managementOwnerRoot ? `claimed (owner root ${node.managementOwnerRoot.slice(0, 12)}…)`
+  : node.managementOwnerUnreadable ? 'LOCKED — owner.json in the config dir cannot be read; nothing can claim or manage this node until it is mended (or removed on purpose, which makes the node claimable again)'
+  : 'unclaimed — waiting for its owner'}`);
 if (node.manageUrl) console.log(`  Manage web:   ${node.manageUrl}  (owner-paired; front with Caddy /manage)`);
 // this node as a contact (public: its address, its relay, where its links are served) — what its owner's app adds it by
 console.log(`  Card:         ${node.card}`);

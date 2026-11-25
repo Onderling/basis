@@ -6176,6 +6176,8 @@
     "secret_check_limit": "Note: the language model provider refuses: a limit or credit (status {{status}}). Free-text questions get no answer until that is sorted; commands and buttons still work.",
     "secret_check_refused": "Note: the language model provider refuses (status {{status}}). Free-text questions get no answer until that is sorted; commands and buttons still work.",
     "stepup_export_key_replaces": "A key is set already: files sealed with it open only with the old passphrase.",
+    "stepup_export_key_replaces_unreadable": "The key on the box cannot be read (made by a newer version, or damaged): a new key replaces it. Files sealed with the old key still open with their own passphrase.",
+    "export_key_unreadable": "The key on the box cannot be read (made by a newer version, or damaged). Nothing changed: set a new key, or open the key a file carries.",
     "export_key_too_short": "The passphrase needs at least {{n}} characters. Nothing asked, nothing changed.",
     "export_key_none": "No export key is set on the box yet.",
     "export_key_set": "The export key is set: each night the export is sealed with it. Keep the passphrase off the box.",
@@ -6292,6 +6294,10 @@
     "toolbox_page_over_http": {
       "text": "Note: the page at {{page}} arrives over plain http within the home network. What page and bot say to each other stays encrypted, but someone on the same network can change the page itself while it loads and then read and change your lists with this page's rights. Only turn this on on your own, secured wifi network.",
       "doc": "The /toolbox card when the placed page is on plain http in the home network (the operator's pageOverHttp choice): the risk, said before the yes. {{page}}: the page address."
+    },
+    "toolbox_page_app_origin": {
+      "text": "I won't turn {{name}} on: its page is on the same address as the Basis web app, and could then read everything Basis keeps in that browser. Put the page on an address of its own (another domain or another port).",
+      "doc": "The /toolbox door refuses to switch on a toolbox whose placed page has the web app's own origin (L1041 b). {{name}}: the toolbox."
     },
     "toolbox_receives_list": {
       "text": "It receives the words of a question, and when a price is asked the marks of the things on a list; nothing about who asks.",
@@ -11590,6 +11596,10 @@
       "text": "Just continue",
       "doc": "The first open: three doors the first time the app opens on a device (src/v2/firstOpen.js)."
     }
+  },
+  "framed_refused": {
+    "text": "Basis opens only in a window of its own, not inside another page. Open it directly at its own address.",
+    "doc": "Shown instead of the app when another page has put it in a frame: the app refuses to run there (a framing page could drive it or steer clicks). Ledger L1041."
   },
   "persona_button": {
     "settings": {

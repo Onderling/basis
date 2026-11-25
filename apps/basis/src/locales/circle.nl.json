@@ -6181,6 +6181,8 @@
     "secret_check_limit": "Let op: de aanbieder van het taalmodel weigert: limiet of saldo (status {{status}}). Vrije vragen krijgen geen antwoord tot dat is opgelost; opdrachten en knoppen werken.",
     "secret_check_refused": "Let op: de aanbieder van het taalmodel weigert (status {{status}}). Vrije vragen krijgen geen antwoord tot dat is opgelost; opdrachten en knoppen werken.",
     "stepup_export_key_replaces": "Er is al een sleutel: bestanden die daarmee zijn verzegeld, gaan alleen open met het oude wachtwoord.",
+    "stepup_export_key_replaces_unreadable": "De sleutel op de box is niet te lezen (gemaakt door een nieuwere versie, of beschadigd): een nieuwe sleutel vervangt hem. Bestanden die met de oude sleutel zijn verzegeld, gaan nog open met hun eigen wachtwoord.",
+    "export_key_unreadable": "De sleutel op de box is niet te lezen (gemaakt door een nieuwere versie, of beschadigd). Er is niets veranderd: stel een nieuwe sleutel in, of open de sleutel die een bestand meedraagt.",
     "export_key_too_short": "Het wachtwoord moet minstens {{n}} tekens hebben. Niets gevraagd, niets veranderd.",
     "export_key_none": "Er staat nog geen exportsleutel op de box.",
     "export_key_set": "De exportsleutel staat erop: elke nacht wordt de export ermee verzegeld. Bewaar het wachtwoord buiten de box.",
@@ -6297,6 +6299,10 @@
     "toolbox_page_over_http": {
       "text": "Let op: de pagina op {{page}} komt over gewoon http binnen het thuisnetwerk. Wat pagina en bot elkaar zeggen blijft versleuteld, maar iemand op hetzelfde netwerk kan de pagina zelf veranderen terwijl ze laadt en dan met de rechten van deze pagina je lijsten lezen en wijzigen. Zet dit alleen aan op een eigen, beveiligd wifi-netwerk.",
       "doc": "The /toolbox card when the placed page is on plain http in the home network (the operator's pageOverHttp choice): the risk, said before the yes. {{page}}: the page address."
+    },
+    "toolbox_page_app_origin": {
+      "text": "Ik zet {{name}} niet aan: zijn pagina staat op hetzelfde adres als de Basis-web-app, en kon dan alles lezen wat Basis in die browser bewaart. Zet de pagina op een eigen adres (een ander domein of een andere poort).",
+      "doc": "The /toolbox door refuses to switch on a toolbox whose placed page has the web app's own origin (L1041 b). {{name}}: the toolbox."
     },
     "toolbox_receives_list": {
       "text": "Hij krijgt de woorden van een vraag, en bij een vraag naar de prijs de kenmerken van de dingen op een lijst; niets over wie het vraagt.",
@@ -11587,6 +11593,9 @@
       "text": "Gewoon doorgaan",
       "doc": "The first open: three doors the first time the app opens on a device (src/v2/firstOpen.js)."
     }
+  },
+  "framed_refused": {
+    "text": "Basis opent alleen in een eigen venster, niet binnen een andere pagina. Open het direct op zijn eigen adres."
   },
   "persona_button": {
     "settings": {

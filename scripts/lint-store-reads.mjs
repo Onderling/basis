@@ -9,9 +9,10 @@
  *     apps/basis/src/v2/localStoreSeal.js): a value that does not parse is kept, every write to it refused, and said;
  *   • a store's Map snapshot is read through `mapSnapshotGate` (@onderling/local-store): stamped, and never saved over
  *     when it could not be read.
- * Two text rules hold them, over the shells and the shared code:
- *   1. a `getItem(` with a `JSON.parse(` within the next few lines is red — on raw storage AND on a sealed store (it
- *      still offers `getItem`): read the value through `getJson`;
+ * Two text rules hold them, over the shells, the shared code, the companion and every package:
+ *   1. a `getItem(` — or a file store's `readFile(` / `readFileSync(` — with a `JSON.parse(` within the next few lines is
+ *      red, on raw storage AND on a sealed store (it still offers `getItem`): read the value through `getJson`, or
+ *      keep what does not parse (a file store throws, or refuses its writes) and declare it;
  *   2. a persist adapter class (`class …Persist`) that does not use `mapSnapshotGate` is red.
  * A known exception goes in scripts/store-reads-baseline.json with a note that starts with one of:
  *   • "not a store:"   — the parsed text is not a stored value (a URL query, a clipboard, a network answer);
@@ -27,7 +28,9 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ROOTS = ['apps/basis/web', 'apps/basis/src', 'apps/basis/bin', 'apps/basis-mobile/src', 'apps/basis-mobile/App.js',
-  'apps/pinboard/src', 'apps/tasks-v0/src'];
+  'apps/pinboard/src', 'apps/tasks-v0/src', 'apps/companion-node/src',
+  // the substrates hold half of the stores (the outbox, the registry, the relay's queues, the local-store adapters)
+  ...readdirSync(path.join(ROOT, 'packages')).map((p) => `packages/${p}/src`)];
 const THE_WRAPPERS = new Set(['apps/basis/src/v2/localStoreSeal.js']);
 const BASELINE = path.join(ROOT, 'scripts/store-reads-baseline.json');
 const WINDOW = 4;   // lines after a getItem( in which a JSON.parse( counts as "parsed by hand"
@@ -53,7 +56,8 @@ export function findingsIn(text) {
   const lines = text.split('\n');
   let handParsed = 0;
   for (let i = 0; i < lines.length; i += 1) {
-    if (!/\bgetItem\s*\??\.?\s*\(/.test(lines[i])) continue;
+    // a stored value read: from a key-value store, or a FILE store's read (the companion's inbox, the relay's files)
+    if (!/\bgetItem\s*\??\.?\s*\(|\breadFile(?:Sync)?\s*\(/.test(lines[i])) continue;
     if (/^\s*(\/\/|\*)/.test(lines[i])) continue;   // a comment
     for (let j = i; j < Math.min(lines.length, i + WINDOW); j += 1) {
       if (/JSON\.parse\s*\(/.test(lines[j]) && !/^\s*(\/\/|\*)/.test(lines[j])) { handParsed += 1; break; }

@@ -357,3 +357,31 @@ AES-256-GCM under a scrypt-derived key; without one the file is plaintext (dev/C
 built-ins load lazily on first use, so the module itself is safe to load in a browser.
 
 **Methods:** `get()` · `set()` · `delete()` · `has()` · `list()`
+
+## `src/keyHolder.js`
+
+### `createKeyHolder`
+
+**Kind:** function · **Import:** `createKeyHolder` from `'@onderling/vault'`
+
+```js
+createKeyHolder(initialKey)
+```
+
+A holder for the at-rest key every sealed vault reads at each call; `rotate` switches it in one window.
+
+**Parameters**
+
+- `initialKey` `Uint8Array` — the 32-byte key in force now
+
+**Returns:** `{ current(): Uint8Array, use<T>(fn: (key: Uint8Array) => Promise<T>|T): Promise<T>, rotate(fn: (oldKey: Uint8Array) => Promise<Uint8Array>|Uint8Array): Promise<Uint8Array> }`
+
+### `isKeyHolder`
+
+**Kind:** function · **Import:** `isKeyHolder` from `'@onderling/vault'`
+
+```js
+isKeyHolder(k)
+```
+
+Whether a value is a key holder (it reads the key at each call) rather than a key's bytes.

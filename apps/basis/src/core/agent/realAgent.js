@@ -154,7 +154,7 @@ import { SURFACE_NUDGE_SUBTYPE } from '../../v2/surfaceNudge.js'; // the reading
 import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';
 import { COMPANION_GRANT_OUTCOMES } from '../../v2/companionGrant.js';   // the words a grant to a node's agent ends on   // pairing: how the grant reaches the view that asked for it
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
-import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, seedFromString, seedToString } from '@onderling/vault';
+import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, seedFromString, seedToString, createKeyHolder } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
 import { createSecureMeshAgent, samePoint } from '@onderling/secure-agent';
 import { createBrowserMultiCircleTasksAgent } from '@onderling-app/tasks/browser';
@@ -534,21 +534,25 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The one-time migration seals a pre-cutover install's plaintext in place; the sentinel is
   // bound to this root's fingerprint, so restoring a DIFFERENT phrase starts those vaults
   // clean rather than leaving the previous person's sealed entries around undecryptable.
-  // Non-secret vaults (trust levels, audit log) deliberately stay plain — sealing them buys
-  // no secrecy and widens the failure surface of an unlock problem.
+  // The trust-level vaults are sealed too (2026-11-25): who is trusted at which tier is metadata about people, and
+  // both are read after the key; the key holder below keeps them readable across a ceremony's reseal.
   const atRestKey = ownerRoot ? ownerRoot.deriveVaultAtRestKey() : deriveVaultAtRestKeyFrom(custodySeed);
   const rootFingerprint = ownerRoot ? ownerRoot.fingerprint() : (custody.fingerprint ?? 'delegation');
   // Every sealed backing is RECORDED: the self-enroll migration (a root-custody device's ceremony
   // cutting over to delegation custody) must reseal them ALL old-key→new-key — missing one would
   // strand its entries under a key the next boot no longer derives.
   const sealedBackings = [];
+  // THE ONE KEY HOLDER every sealed vault reads at each call. A ceremony that reseals the backings switches it inside
+  // `rotate`, so a vault opened at boot (a trust registry, the grants) keeps working after the reseal in the same session,
+  // and no read or write crosses the switch. Nothing inside a rotation may read a sealed vault (it would wait on itself).
+  const atRestHolder = createKeyHolder(atRestKey);
   const sealedVault = async (backing) => {
     // the sentinel's read is the boot's first read of a sealed vault: a storage error there is the same "could not read"
     // as a key's, said with the same words (L1115), never the generic failure
-    try { await migrateVaultToEncrypted({ backing, key: atRestKey, fingerprint: rootFingerprint }); }
+    try { await migrateVaultToEncrypted({ backing, key: atRestHolder.current(), fingerprint: rootFingerprint }); }
     catch (err) { throw new KeyUnreadable('vault-sentinel', err); }
     sealedBackings.push(backing);
-    return new VaultEncrypted({ backing, key: atRestKey });
+    return new VaultEncrypted({ backing, key: atRestHolder });
   };
 
   // The settings-restore CONTEXT — retained past the boot block so the restore-settings FLOW's ops
@@ -899,7 +903,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // becomes undecryptable — safe (an unreadable tier falls closed to the lowest) but lossy, and it
     // surfaced as a decryption error the moment a walk did a ceremony and a grant in one account.
     // Mirrors the host gate, which already keeps `cc-host-trust:` separate.
-    trustRegistry: { vault: opts.peerTrustVault ?? pickVault(storageName('vaultPeerTrust')) },
+    // SEALED like the key vaults: who is trusted at which tier is metadata about people, and it is read after the key
+    trustRegistry: { vault: await sealedVault(opts.peerTrustVault ?? pickVault(storageName('vaultPeerTrust'))) },
     // RATE LIMIT ON (the R1 go-live line, 2026-08-21) — the flood defence at the receive boundary,
     // WITH the catch-up exemption that made turning it on safe: a reconnect replay legitimately
     // serves up to 1000 items in one burst, which the chat-pace buckets would silently discard
@@ -5088,9 +5093,12 @@ export async function createRealHouseholdAgent(opts = {}) {
           // The last snapshot of who this device knows, written under the key the reseal below will
           // carry over — and no write after it (see `freezePeerBindings`).
           await freezePeerBindings();
-          for (const backing of sealedBackings) {
-            await resealVault({ backing, oldKey: atRestKey, newKey });
-          }
+          await atRestHolder.rotate(async (oldKey) => {
+            for (const backing of sealedBackings) {
+              await resealVault({ backing, oldKey, newKey });
+            }
+            return newKey;
+          });
           const selfRecord = signDeviceDelegation(root.deriveProfileAuthority('default'), {
             profileId: 'default', deviceId: selfDeviceId, pubKey: deviceDelegationPubKey(selfSeed),
           });
@@ -5825,11 +5833,19 @@ export async function createRealHouseholdAgent(opts = {}) {
       const resealed = [];
       try {
         await freezePeerBindings();
-        for (const backing of sealedBackings) { await resealVault({ backing, oldKey: atRestKey, newKey }); resealed.push(backing); }
+        // one rotation: the reseal and the key door move together; a failure reseals back and keeps the key in force
+        await atRestHolder.rotate(async (oldKey) => {
+          try {
+        for (const backing of sealedBackings) { await resealVault({ backing, oldKey, newKey }); resealed.push(backing); }
         const moved = await cutoverToDelegation({ rootKeyStore, markerVault: ownerRootVault, delegationSeed: nextSeed, deviceId: nrt.enrolledDevice.deviceId, profileId: next, fingerprint: custody.fingerprint ?? undefined });
         if (!moved) throw new Error('the key door did not take the next self\'s seed');
+            return newKey;
+          } catch (err) {
+            for (const backing of resealed) { try { await resealVault({ backing, oldKey: newKey, newKey: oldKey }); } catch { /* the phrase restores */ } }
+            throw err;
+          }
+        });
       } catch (err) {
-        for (const backing of resealed) { try { await resealVault({ backing, oldKey: newKey, newKey: atRestKey }); } catch { /* the phrase restores */ } }
         console.warn(`[remove-persona] the re-key failed — the next start asks for the recovery phrase: ${err?.message ?? err}`);
         return [DataPart({ ok: false, error: 'storage', rekeyFailed: true })];
       }
@@ -5902,7 +5918,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const picked = (Array.isArray(parts?.[0]?.data?.personas) ? parts[0].data.personas : []).filter((id) => typeof id === 'string' && /^p-[0-9a-f]{12}$/.test(id));
     try {
       const held = await handPersonasInto({
-        root: proof.root, chatVault: chatVaultBacking, atRestKey, internalId: persona.internalDeviceId,
+        root: proof.root, chatVault: chatVaultBacking, atRestKey: atRestHolder.current(), internalId: persona.internalDeviceId,
         label: persona.enrolledDevice?.label ?? null, personas: picked,
         // a persona removed here before is handed under its next generation: the old id's record is a tombstone
         isTombstoned: async (pid, wire) => { try { return deviceDelegationOf(await agentsRegistryRef?.lookup?.(pid), wire)?.revoked === true; } catch { return false; } },
@@ -5984,7 +6000,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * a failure leaves the gate absent (prior behaviour) — never breaks boot. */
   try {
     // Vault-backed TrustRegistry: unknown peers → 'authenticated'; the owner's chat identity → 'private' (self).
-    hostTrustRegistry = new TrustRegistry(opts.hostTrustVault ?? pickVault(storageName('vaultHostTrust')));
+    hostTrustRegistry = new TrustRegistry(await sealedVault(opts.hostTrustVault ?? pickVault(storageName('vaultHostTrust'))));   // sealed: trust levels are metadata about people
     hostAgent.policyEngine = new PolicyEngine({
       trustRegistry: hostTrustRegistry,
       skillRegistry: hostAgent.skills,

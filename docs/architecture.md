@@ -688,7 +688,7 @@ the honest tail is named below the table rather than dropped.
 | The **inbound handler map** (which subtype goes to which handler) is one shared composition (`src/v2/inboundWiring.js`) | ◐ MOBILE ONLY — the phone composes it; web (`circleApp.js`) and the box still build their own through `makePeerRouter`. That they route the same subtypes is pinned by `shellsRouteTheSameSubtypes`, not by construction |
 | Every peer send leaves through the one send gate | ◐ ONE DECLARED EXCEPTION — the screen view (a granted screen on another device) runs its own secure agent and sends outside `peerSend`; `oneSendGate.test.js` names it as the only exception |
 | A member removed from a circle stops being that circle's address at once | ◐ LAGS ONE READ — the gate's circle-address index (`createCircleAddressIndex`) drops a removed member's address at that circle's next non-empty roster read, not at the removal |
-| Everything a shell writes to the device is **sealed with the content key** (`localStoreSeal.js`) | ✅ ENFORCED (2026-11-20) — the stores and the small key-value stores of a person's content are sealed on every shell; what stays readable is named with its reason on its row of the storage register (`lint-storage-register`); the two trust-level vaults are its debt (the Agent home lists it) |
+| Everything a shell writes to the device is **sealed with the content key** (`localStoreSeal.js`) | ✅ ENFORCED (2026-11-20) — the stores and the small key-value stores of a person's content are sealed on every shell; what stays readable is named with its reason on its row of the storage register (`lint-storage-register`); none of it as debt (the Agent home lists it) |
 | The circle engine (`apps/pinboard`) keeps a **second physical store**, one pile for every circle tagged by circle id | ◐ PARTLY — noticeboard POSTS live in their circle's own store and ride its lane: pinboard is handed the host's circles (`hostCircles`) and writes and reads posts there (`apps/pinboard/src/lib/routedStore.js`); the copy into the circle store and the bridge back are gone. Who answered a post is the poster's own and stays on the poster's device. The pile still holds the circle engine's other rows (membership codes and redemptions, rules and their acceptances, the circle-chat mirror, reports), each tagged by circle id — the shared pile this section forbids, for those rows |
 
 **The honest tail, so the table is not read as "finished":** the mirror OBJECT and the peer-roster machinery
@@ -1535,8 +1535,9 @@ preferences, the Nearby switches). The ruling sits on each row of the storage re
 its `seal`): `'sealed'`, or a reason under `not content:`, `not sealable:` (a key itself, or read before one exists),
 `unwritten:` or `debt: L<n>`. `lint-storage-register` holds it: a raw `.setItem(` in the shells and the shared code must
 name a register row that is not `'sealed'`, and a helper that writes under a key its caller hands it is listed with who
-seals. Debt today: the two trust-level vaults (`cc-host-trust:`, `cc-peer-trust:`), written plain on purpose since
-before this rule and read after the key, so sealable.
+seals. No row is debt today. The two trust-level vaults were until 2026-11-25: a ceremony reseals every sealed backing
+under a new key, and a vault opened at boot kept the old one; now every sealed vault reads the key from one key holder
+(`createKeyHolder`, `@onderling/vault`) that the ceremony switches inside one window, so they are sealed too.
 
 **Seen-marks are "not known" until they are loaded** (`src/v2/circleSeenMarks.js`, one holder for both shells). The
 circle marks are sealed, so a shell loads them once the content key exists. Until then `current()` is `null`, and the

@@ -20,7 +20,9 @@
  * @param {Function} opts.Database           the better-sqlite3 constructor
  */
 export class SqliteForwardStore {
-  #db; #addStmt; #delStmt; #delAddrStmt; #loadStmt;
+  #db; #addStmt; #delStmt; #delAddrStmt; #loadStmt; #idsForAddrStmt;
+  /** ids of rows `load` could not read: kept on disk, never handed out, never deleted by a drain */
+  #kept = new Set();
 
   constructor({ path = ':memory:', Database } = {}) {
     if (typeof Database !== 'function') {
@@ -46,6 +48,7 @@ export class SqliteForwardStore {
     this.#delStmt = this.#db.prepare('DELETE FROM held WHERE id = ?');
     this.#delAddrStmt = this.#db.prepare('DELETE FROM held WHERE address = ?');
     this.#loadStmt = this.#db.prepare('SELECT id, address, topic, envelope, at FROM held ORDER BY id');
+    this.#idsForAddrStmt = this.#db.prepare('SELECT id FROM held WHERE address = ?');
   }
 
   /** Keep one held envelope. @returns {number} its id, which `remove` takes */
@@ -56,15 +59,40 @@ export class SqliteForwardStore {
   /** Forget one entry (delivered in a drain, given up on, or evicted). Idempotent. */
   remove(id) { if (id != null) this.#delStmt.run(id); }
 
-  /** Forget everything held for an address (its buffer was drained). */
-  removeAddress(address) { this.#delAddrStmt.run(address); }
+  /** Forget everything held for an address (its buffer was drained) — except the rows `load` could not read. */
+  removeAddress(address) {
+    if (this.#kept.size === 0) { this.#delAddrStmt.run(address); return; }
+    for (const { id } of this.#idsForAddrStmt.all(address)) if (!this.#kept.has(id)) this.#delStmt.run(id);
+  }
 
-  /** Everything held, oldest first — read once at boot. An unreadable row is skipped, never fatal. */
-  load() {
+  /** How many rows the last `load` could not read and kept on disk. */
+  get unreadable() { return this.#kept.size; }
+
+  /**
+   * Everything held, oldest first — read once at boot.
+   *
+   * A row whose envelope does not parse (a newer relay's shape, a torn write) is NOT deleted: it stays on disk
+   * untouched, is counted (`unreadable`) and said once in the log (a count, never content), so a later build or an
+   * operator can still read it. It is dropped only once its `at` is past the hold window (`ttlMs`), when the hold
+   * would have dropped it readable or not. No `ttlMs` → never dropped.
+   *
+   * @param {object} [opts]
+   * @param {number|null} [opts.ttlMs=null]  the hold window (`ForwardQueue` passes its own)
+   * @param {number} [opts.now=Date.now()]
+   */
+  load({ ttlMs = null, now = Date.now() } = {}) {
     const out = [];
+    this.#kept.clear();
     for (const r of this.#loadStmt.all()) {
       try { out.push({ id: r.id, address: r.address, topic: r.topic, envelope: JSON.parse(r.envelope), at: r.at }); }
-      catch { this.#delStmt.run(r.id); }
+      catch {
+        if (ttlMs != null && (now - r.at) >= ttlMs) this.#delStmt.run(r.id);
+        else this.#kept.add(r.id);
+      }
+    }
+    if (this.#kept.size > 0) {
+      console.warn(`[relay] forward store: ${this.#kept.size} held row(s) not readable by this build — kept on disk, `
+        + 'not delivered, dropped once past the hold window');
     }
     return out;
   }

@@ -3,7 +3,7 @@
  * lint-content-classification — every durable STORE a shell builds is classified in `enrolForgets.js`.
  *
  * A freshly enrolled device forgets what its throwaway self wrote, and the list of what that means lives in one
- * place. The list is the whole deliverable: the shells never had one, which is why they never swept, and a list
+ * place: the storage register's `forget` column (`enrolForgets.js` derives its lists from it). The list is the whole deliverable: the shells never had one, which is why they never swept, and a list
  * assembled by reading the code rots the first time someone adds a store — silently, because nothing fails when
  * a store is merely forgotten. This is the something that fails.
  *
@@ -39,16 +39,10 @@ const SITES = [
 /** Scopes that are not durable stores: an in-memory partition name, a sync selector, a vault prefix. */
 const NOT_A_STORE = new Set(['all', 'self', 'circle', 'items', 'outbox']);
 
-const list = read('apps/basis/src/v2/enrolForgets.js');
-const block = (name) => {
-  const m = list.match(new RegExp(`${name}:\\s*Object\\.freeze\\(\\[([\\s\\S]*?)\\]\\)`));
-  return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : [];
-};
-const classified = new Set([...block('stores'), ...block('keys'), ...block('keep')]);
-if (classified.size === 0) {
-  console.error('\n✖ lint-content-classification: could not read the lists out of src/v2/enrolForgets.js — has its shape changed?\n');
-  process.exit(1);
-}
+// The classification is the storage register's `forget` column: a row ruled `throwaway` or `keep` is said; an
+// unruled name is not, so a shell that builds a store the register lacks is red here.
+const { STORAGE } = await import(path.join(ROOT, 'apps/basis/src/v2/storageRegister.js'));
+const classified = new Set(Object.values(STORAGE).filter((r) => r.forget !== 'undecided').map((r) => r.name));
 
 const unsaid = [];
 for (const site of SITES) {
@@ -65,10 +59,10 @@ for (const site of SITES) {
 }
 
 if (unsaid.length) {
-  console.error(`\n✖ lint-content-classification: ${unsaid.length} durable store(s) a shell builds but src/v2/enrolForgets.js does not classify:`);
+  console.error(`\n✖ lint-content-classification: ${unsaid.length} durable store(s) a shell builds but the storage register does not classify:`);
   for (const u of unsaid) console.error(`   • '${u.name}'  — built in ${u.file}`);
   console.error('\nA freshly enrolled device must know whether each of these is the THROWAWAY self\'s content or this');
-  console.error('device\'s own. Add it to `stores` (it goes) or to `keep` (it stays) in src/v2/enrolForgets.js —');
+  console.error('device\'s own. Give it a row in src/v2/storageRegister.js with `forget: throwaway` (it goes) or `keep` (it stays) —');
   console.error('and say why in a comment, because the next reader has to be able to check your answer.\n');
   process.exit(1);
 }

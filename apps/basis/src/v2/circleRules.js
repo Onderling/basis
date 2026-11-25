@@ -15,7 +15,7 @@
  * follow-on so those shared wizards stay stable.
  */
 import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
-import { sealedKeyValue } from './localStoreSeal.js';
+import { sealedKeyValue, jsonKv } from './localStoreSeal.js';
 
 /** The seven aspects stored in the rules document. */
 export const RULES_FIELDS = [
@@ -150,14 +150,10 @@ export function localCircleRulesStore(storage = globalThis.localStorage) {
 /** localStorage-backed load/save (web). Key: `cc.circleRules.<circleId>`. */
 export function localStorageRulesIo(storage = globalThis.localStorage) {
   const key = (id) => `cc.circleRules.${id}`;
+  const kv = storage ? jsonKv(storage, { name: 'the circle rules', kind: 'settings' }) : null;
   return {
     load: async (id) => {
-      try {
-        const s = await storage?.getItem(key(id));   // awaited: a sealed storage answers async
-        return s ? JSON.parse(s) : null;
-      } catch {
-        return null;
-      }
+      try { return kv ? await kv.getJson(key(id)) : null; } catch { return null; }   // not JSON = kept + refused + said
     },
     save: async (id, doc) => {
       try { await storage?.setItem(key(id), JSON.stringify(doc)); } catch { /* quota / disabled / no content key yet */ }

@@ -313,12 +313,11 @@ export function localStorageScreenIo(storage = globalThis.localStorage) {
   // SEALED at rest (ledger L1083: the person's own pages). A read before the content key WAITS for it: a book that
   // cannot be opened yet is "not read yet", never an empty book — an empty one would have the first-run seeding
   // (`ensureVandaagBook`) write a fresh book over the person's own.
-  const kv = sealedKeyValue(storage, { name: 'the page book', strict: true, waitForKey: true, said: true, resealAtStart: [KEY] });
+  const kv = sealedKeyValue(storage, { name: 'the page book', kind: 'settings', strict: true, waitForKey: true, said: true, resealAtStart: [KEY] });
   return {
     load: async () => {
       try {
-        const s = await kv.getItem(KEY);
-        return s ? JSON.parse(s) : null;
+        return await kv.getJson(KEY);   // not JSON = kept + refused + said
       } catch { return null; }
     },
     save: async (book) => {

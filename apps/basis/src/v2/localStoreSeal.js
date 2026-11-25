@@ -16,6 +16,7 @@
  * local value, because a test process routinely boots several agents and a shared holder would hand the
  * second one's key to the first one's stores. Shells never do that; test processes always do.
  */
+import { reportNotReadable, clearNotReadable } from '@onderling/local-store';   // the device's one not-readable notice
 import { createSealingBackend } from '@onderling/pseudo-pod';
 
 let current = null;
@@ -205,9 +206,10 @@ export function sealedNamedBackend(name, open) {
  * first READ, and a value nothing reads in a start stays plain (the upgrade walk, 2026-11-20: two policy heads and the
  * availability). So once the content key is there, the store's own keys are listed once and each is read: a plain one
  * is written back sealed, a sealed one writes nothing, one that will not open is kept (the read's own rules).
- * @param {{name?: string, strict?: boolean, waitForKey?: boolean, resealAtStart?: string[]}} [o]
+ * @param {{name?: string, strict?: boolean, waitForKey?: boolean, resealAtStart?: string[], kind?: string}} [o]
+ *   `kind`: what the store holds as a person names it (local-store `STORE_KINDS`), for the not-readable notice
  */
-export function sealedKeyValue(storage, { name = 'a store', strict = false, waitForKey = false, said = false, overwritable = false, resealAtStart = null } = {}) {
+export function sealedKeyValue(storage, { name = 'a store', strict = false, waitForKey = false, said = false, overwritable = false, resealAtStart = null, kind = 'data' } = {}) {
   // EVERY mode keeps what it could not open (L1115): a value that will not open is marked, and a write to it is refused
   // until a read of it opens. `overwritable: true` only for a store whose loss is harmless, its reason at the call site
   // (a cache rebuilt from elsewhere, a remembered "no" that may simply be asked again).
@@ -217,6 +219,11 @@ export function sealedKeyValue(storage, { name = 'a store', strict = false, wait
     return s;
   };
   const keyArrives = () => new Promise((resolve) => { onShellContentSeal(resolve); });
+  // never the value: the store's name and the key (a path-like name, not shown to the person: the notice speaks of the kind)
+  const sayNotReadable = (key, reason) => {
+    if (overwritable) return;   // a store whose loss is harmless says nothing
+    try { reportNotReadable({ name: `${name}: ${key}`, kind, reason }); } catch { /* a report never breaks a read */ }
+  };
   const kv = {
     async getItem(key) {
       const v = await storage.getItem(key);
@@ -256,6 +263,34 @@ export function sealedKeyValue(storage, { name = 'a store', strict = false, wait
       if (!overwritable && unopened.get(storage)?.has(key)) throw refuse(name, key, said);
       await storage.setItem(key, strategy().seal(bindToKey(key, String(value))));
     },
+    /**
+     * A KEY'S VALUE AS JSON — the one read a store's callers share, so a value that OPENS but does not parse is not taken
+     * for "nothing" either (a newer build's shape, a torn write). Such a value is marked kept like one that will not
+     * open: every write to the key is refused until a read of it parses. Both are said once into the device's one
+     * notice (`reportNotReadable`, under this store's `kind`). Nothing stored → null, no refusal. A storage error, and
+     * (non-strict) a value that will not open, come through as `getItem` lets them.
+     */
+    async getJson(key) {
+      let raw;
+      try { raw = await kv.getItem(key); }
+      catch (err) {
+        if (unopened.get(storage)?.has(key)) sayNotReadable(key, 'read-failed');
+        throw err;
+      }
+      if (raw == null || raw === '') {
+        if (unopened.get(storage)?.has(key)) sayNotReadable(key, 'read-failed');   // strict: kept, not opened
+        return null;
+      }
+      try {
+        const v = JSON.parse(raw);
+        clearNotReadable(`${name}: ${key}`);
+        return v;
+      } catch {
+        if (!overwritable) unopenedOf(storage).add(key);
+        sayNotReadable(key, 'unparseable');
+        return null;
+      }
+    },
     // a remove does NOT lift the refusal: remove-then-set is a common save, and would write over the value just the same
     // (Fable's review, L1115). The mark lives this session; a later start that finds nothing there writes freely.
     async removeItem(key) { await storage.removeItem(key); },
@@ -269,6 +304,46 @@ export function sealedKeyValue(storage, { name = 'a store', strict = false, wait
     onShellContentSeal(() => { setTimeout(() => { resealOwnKeys(storage, kv, resealAtStart).catch(() => {}); }, 0); });
   }
   return kv;
+}
+
+/**
+ * THE PLAIN TWIN of `sealedKeyValue` for the few keys that are declared plain (device flags, the box's toolbox
+ * switches, delivery settings): the same `getJson` and the same refusal. A value that does not parse is kept: every
+ * write to that key is refused until a read of it parses, and it is said into the device's one notice. Nothing is
+ * sealed here; a key that holds content belongs in `sealedKeyValue`.
+ * @param {{getItem: Function, setItem: Function, removeItem?: Function}} storage  sync or async
+ * @param {{name?: string, kind?: string}} [o]
+ */
+export function plainKeyValue(storage, { name = 'a plain store', kind = 'data' } = {}) {
+  const kept = new Set();
+  const kv = {
+    async getItem(key) { return storage.getItem(key); },
+    async getJson(key) {
+      const raw = await storage.getItem(key);   // a storage error comes through
+      if (raw == null || raw === '') { kept.delete(key); return null; }
+      try {
+        const v = JSON.parse(raw);
+        kept.delete(key);
+        clearNotReadable(`${name}: ${key}`);
+        return v;
+      } catch {
+        kept.add(key);
+        try { reportNotReadable({ name: `${name}: ${key}`, kind, reason: 'unparseable' }); } catch { /* never breaks a read */ }
+        return null;
+      }
+    },
+    async setItem(key, value) {
+      if (kept.has(key)) throw refuse(name, key, false);
+      await storage.setItem(key, String(value));
+    },
+    async removeItem(key) { await storage.removeItem?.(key); },   // as sealed: a remove does not lift the refusal
+  };
+  return kv;
+}
+
+/** A store that answers `getJson`: the one given (a sealed or plain key-value store), or the plain twin over raw storage. */
+export function jsonKv(storage, o = {}) {
+  return typeof storage?.getJson === 'function' ? storage : plainKeyValue(storage, o);
 }
 
 /** Every key of `storage` that is one of `owned` or starts with one; '' when the storage cannot list. */
@@ -389,14 +464,13 @@ export function sealedLocalVault(vault) {
  * THROWS when the storage read itself failed, or there is no content key yet (not known: do not write).
  * @param {object} storage  `getItem` / `setItem` / `removeItem` (sync or async)
  */
-export function sealedJsonIo(storage, { waitForKey = false, name = 'a sealed value', said = false } = {}) {
-  const kv = sealedKeyValue(storage, { name, strict: true, waitForKey, said });
+export function sealedJsonIo(storage, { waitForKey = false, name = 'a sealed value', said = false, kind = 'data' } = {}) {
+  const kv = sealedKeyValue(storage, { name, strict: true, waitForKey, said, kind });
   async function loadOrThrow(key) {
     if (!waitForKey && !shellContentSeal()) throw new Error('sealedJsonIo: no content key yet — the value is not known');
-    const raw = await kv.getItem(key);   // a storage error comes through; a value this key cannot open is null
-    if (raw == null || raw === '') return null;
-    // a value that OPENS but is not JSON is not readable either: kept, and not written over (L1115)
-    try { return JSON.parse(raw); } catch { unopenedOf(storage).add(key); return null; }
+    // a storage error comes through; a value this key cannot open, or that opens but is not JSON, is null — kept, not
+    // written over (L1115), and said (`kv.getJson`)
+    return kv.getJson(key);
   }
   return {
     async load(key) {

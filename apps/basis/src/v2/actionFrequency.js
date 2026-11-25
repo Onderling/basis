@@ -167,9 +167,9 @@ export const ACTION_FREQ_KEY = 'cc.actionFrequency';
  * key exists (`onShellContentSeal`) and `merge` it in, and `save` is refused until then.
  */
 export function actionFrequencyIo(storage) {
-  const kv = sealedKeyValue(storage, { name: 'the action frequency', strict: true, resealAtStart: [ACTION_FREQ_KEY] });
+  const kv = sealedKeyValue(storage, { name: 'the action frequency', kind: 'data', strict: true, resealAtStart: [ACTION_FREQ_KEY] });
   return {
-    load: async () => { try { const s = await kv.getItem(ACTION_FREQ_KEY); return s ? JSON.parse(s) : null; } catch { return null; } },
+    load: async () => { try { return await kv.getJson(ACTION_FREQ_KEY); } catch { return null; } },   // not JSON = kept + refused + said
     save: async (snap) => { try { await kv.setItem(ACTION_FREQ_KEY, JSON.stringify(snap)); } catch { /* no content key yet */ } },
   };
 }

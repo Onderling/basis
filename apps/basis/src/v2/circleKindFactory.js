@@ -160,12 +160,11 @@ export function createCircleKindPendingStore({ load, save, remove } = {}) {
  */
 export function makeCircleKindPendingLocalIo(keyPrefix, storage = globalThis.localStorage) {
   // SEALED at rest (ledger L1083: an incoming circle recipe or rules document), on web and phone alike
-  const kv = sealedKeyValue(storage, { name: `the pending ${keyPrefix}`, strict: true });
+  const kv = sealedKeyValue(storage, { name: `the pending ${keyPrefix}`, kind: 'settings', strict: true });
   return {
     load: async (circleId) => {
       try {
-        const raw = await kv.getItem(keyPrefix + circleId);
-        return raw ? JSON.parse(raw) : null;
+        return await kv.getJson(keyPrefix + circleId);   // not JSON = kept + refused + said
       } catch { return null; }
     },
     save: async (circleId, doc) => {

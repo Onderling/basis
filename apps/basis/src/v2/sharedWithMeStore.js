@@ -61,12 +61,11 @@ export function createSharedWithMeStore({ load, save } = {}) {
 export function localStorageSharedWithMeIo(storage = globalThis.localStorage) {
   const KEY = 'cc.sharedWithMe';
   // SEALED at rest (ledger L1083: what others shared with the person), on web and phone alike
-  const kv = sealedKeyValue(storage, { name: 'shared with me', strict: true, resealAtStart: [KEY] });
+  const kv = sealedKeyValue(storage, { name: 'shared with me', kind: 'data', strict: true, resealAtStart: [KEY] });
   return {
     load: async () => {
       try {
-        const s = await kv.getItem(KEY);
-        return s ? JSON.parse(s) : null;
+        return await kv.getJson(KEY);   // not JSON = kept + refused + said
       } catch {
         return null;
       }

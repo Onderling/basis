@@ -275,3 +275,28 @@ describe('a toolbox page on the web app\'s own origin', () => {
     }
   });
 });
+
+describe('the toolbox switches are never written over when they could not be read', () => {
+  const opsOver = (get, vault) => makeToolboxOps({
+    store: { get, set: async (k, v) => { vault.set(k, v); } },
+    placedOf: async () => [PLACED], keyOf: async () => KEY,
+    fetch: async () => ({ ok: true, status: 200, json: async () => CARD }),
+  });
+  it('a vault entry that will not decrypt: a switch is refused in words, nothing is written', async () => {
+    const vault = new Map();
+    const ops = opsOver(async () => { throw new Error('decrypt failed'); }, vault);
+    await ops.load();
+    const r = await ops.addToolbox({ name: 'boodschappen', confirm: true });
+    expect(r).toEqual({ ok: false, code: 'toolbox-switches-unreadable', name: 'boodschappen' });
+    expect(vault.size, 'the switches were written over').toBe(0);
+    expect(toolboxRefusalText(r, (k) => k)).toContain('toolbox_switches_unreadable');
+  });
+  it('a value that does not parse: kept, the switch refused', async () => {
+    const vault = new Map([['tools.on', '{"boodschappen": {"tit']]);
+    const ops = opsOver(async (k) => vault.get(k) ?? null, vault);
+    await ops.load();
+    const r = await ops.addToolbox({ name: 'boodschappen', confirm: true });
+    expect(r.code).toBe('toolbox-switches-unreadable');
+    expect(vault.get('tools.on')).toBe('{"boodschappen": {"tit');
+  });
+});

@@ -3,6 +3,8 @@
 Project-wide rules every contributor follows. Read the ones relevant to what you're touching **before** you
 author code — several are load-bearing invariants, not style preferences.
 
+- **[working-lessons.md](./working-lessons.md)** — the rules in `CLAUDE.md` in their long form: the worked examples,
+  what each mistake cost, the dates. `CLAUDE.md` keeps one or two lines per rule and points here.
 - **[verification-ladder.md](./verification-ladder.md)** — which check runs when, from a keystroke to `live`:
   the one red-first test → the package suite + guards → the cheapest real thing → the CI gate (merge) → the
   browser tail (after the merge; gates the release) → `npm run release:check` → the release. When the quick

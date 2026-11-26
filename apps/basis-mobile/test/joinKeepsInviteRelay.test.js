@@ -23,7 +23,7 @@ function fakeAsyncStorage(store = new Map()) {
 describe("a join keeps the invite's relay for the next start", () => {
   it("the launcher's join hook records the invite's relay; the next boot connects to it", { timeout: 120_000 }, async () => {
     const bundle = await bootAgentBundle({ asyncStorage: fakeAsyncStorage() });
-    const RELAY = `ws://relay-${Date.now().toString(36)}.example:8787`;
+    const RELAY = `wss://relay-${Date.now().toString(36)}.example:8787`;
     await bundle.onCircleJoined({ circleId: 'werk', invite: { relayUrl: RELAY, groupId: 'werk' } });
     expect(await resolveBootRelayUrls()).toContain(RELAY);
     try { await bundle.agent.stop?.(); } catch { /* */ }

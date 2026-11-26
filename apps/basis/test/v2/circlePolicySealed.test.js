@@ -9,7 +9,6 @@ import { groupKeyStrategy } from '@onderling/pod-client';
 import { setShellContentSeal, sealedKeyValue } from '../../src/v2/localStoreSeal.js';
 import { localCirclePolicyStore } from '../../src/v2/circlePolicyStore.js';
 import { localCircleRecipeStore, addRecipe } from '../../src/v2/circleRecipe.js';
-import { localCircleRulesStore, RULES_FIELDS } from '../../src/v2/circleRules.js';
 import { makeCirclePolicyStoreRN, makeCircleRecipeStoreRN } from '../../../basis-mobile/src/core/circleStoresRN.js';
 
 const KEY = 'A'.repeat(43);
@@ -62,14 +61,6 @@ describe('a circle\'s policy at rest', () => {
       expect(allRaw(s)).not.toMatch(/geheim-recept|recipes/);
       expect((await recipe(s).get('c1')).recipes[0].name).toBe('geheim-recept');
     }
-  });
-
-  it('the rules beside it: sealed on web, read back', async () => {
-    const field = RULES_FIELDS[0];
-    const s = webStorage();
-    await localCircleRulesStore(s).update('c1', { [field]: 'geheime-regel' });
-    expect(allRaw(s)).not.toMatch(/geheime-regel/);
-    expect((await localCircleRulesStore(s).get('c1'))[field]).toBe('geheime-regel');
   });
 
   it('a plain value written before sealing still reads; before the key exists nothing is written in the clear', async () => {

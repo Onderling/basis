@@ -9078,8 +9078,7 @@ function showFolio(id) {
   loadCaps();   // resolve the capability matrix, then re-render.
 }
 
-// Circle rules document (boards 3B/3C) — editor persists per circle
-// (cc.circleRules.<id>); "preview" shows the Agree/Decline consent screen.
+// Circle rules document: "preview" shows the Agree/Decline consent screen.
 // Threading the consent into the real join flow is the follow-on.
 // THE CIRCLE'S RULES: the screen reads the circle's rules head (what the invite carries and a joiner agrees to) and
 // saves through the circle's rule for changing them (governanceDoors.js): where any admin may, written at once and

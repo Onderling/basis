@@ -14,9 +14,6 @@
  * this into the existing createGroup/joinGroup wizard state machines is a
  * follow-on so those shared wizards stay stable.
  */
-import { storageName } from './storageRegister.js';   // every storage name from the one register
-import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
-import { sealedKeyValue, jsonKv } from './localStoreSeal.js';
 
 /** The seven aspects stored in the rules document. */
 export const RULES_FIELDS = [
@@ -73,91 +70,4 @@ export function isRulesComplete(doc) {
 export function isRulesEmpty(doc) {
   const d = normalizeRulesDoc(doc);
   return RULES_FIELDS.every((k) => d[k].trim() === '');
-}
-
-/* ─────────────────────────────────────────────────────────────────────── */
-/* Storage adapter — γ.2 (Phase 9) introduces a store factory so version  */
-/* capture has a single hook point for the rules blob (was inline         */
-/* localStorage / AsyncStorage in the launcher up to β).                  */
-/* ─────────────────────────────────────────────────────────────────────── */
-
-/**
- * Per-circle Rules document store.  Mirrors `createCirclePolicyStore`:
- * injectable `{load, save}` adapter so the host wires the storage tier
- * (localStorage on web, AsyncStorage on mobile, pod-io later).
- *
- * γ.2 — optional `versions` adapter snapshots each save into a per-
- * circle history slot.  Additive: legacy callers (no adapter) keep the
- * pre-γ.2 behaviour.
- *
- *   const store = createCircleRulesStore({ load, save });
- *   const doc   = await store.get(circleId);
- *   await store.update(circleId, { purpose: 'updated' });
- */
-export function createCircleRulesStore({ load, save, versions } = {}) {
-  return {
-    async get(circleId) {
-      let raw = null;
-      try { raw = typeof load === 'function' ? await load(circleId) : null; }
-      catch { raw = null; }
-      return normalizeRulesDoc(raw);
-    },
-    async set(circleId, doc) {
-      const next = normalizeRulesDoc(doc);
-      if (versions && typeof versions.capture === 'function') {
-        try { await versions.capture(circleId, next); } catch { /* best-effort */ }
-      }
-      if (typeof save === 'function') await save(circleId, next);
-      return next;
-    },
-    /** Shallow-merge a field patch onto the current doc (every field a string). */
-    async update(circleId, patch) {
-      const current = await this.get(circleId);
-      const next = normalizeRulesDoc({ ...current, ...(patch && typeof patch === 'object' ? patch : {}) });
-      if (versions && typeof versions.capture === 'function') {
-        try { await versions.capture(circleId, next); } catch { /* best-effort */ }
-      }
-      if (typeof save === 'function') await save(circleId, next);
-      return next;
-    },
-    /** γ.2 — newest-first history; `[]` when no adapter or no history. */
-    async listVersions(circleId) {
-      if (!versions || typeof versions.list !== 'function') return [];
-      try { return await versions.list(circleId); } catch { return []; }
-    },
-    /**
-     * Restore the rules doc snapshotted at `ts` (a `ts` from `listVersions`).
-     * The adapter only READS history; persisting goes through this store's
-     * own `set` path (capture + save), so the restore is itself in history
-     * (undoable). Returns the persisted doc, or `null` when no adapter /
-     * no such snapshot.
-     */
-    async restoreVersion(circleId, ts) {
-      if (!versions || typeof versions.restore !== 'function') return null;
-      let restored = null;
-      try { restored = await versions.restore(circleId, ts); } catch { restored = null; }
-      if (restored == null) return null;
-      return this.set(circleId, restored);
-    },
-  };
-}
-
-/** A device's own circle-rules store, SEALED at rest (the rules and their versions) — what the web shell composes. */
-export function localCircleRulesStore(storage = globalThis.localStorage) {
-  const sealed = sealedKeyValue(storage, { name: 'the circle rules' });
-  return createCircleRulesStore({ ...localStorageRulesIo(sealed), versions: localStorageObjectVersions('rules', sealed) });
-}
-
-/** localStorage-backed load/save (web). Key: `cc.circleRules.<circleId>`. */
-export function localStorageRulesIo(storage) {   // no default: a raw localStorage would write the rules plain
-  const key = (id) => `${storageName('circleRules')}${id}`;
-  const kv = storage ? jsonKv(storage, { name: 'the circle rules', kind: 'settings' }) : null;
-  return {
-    load: async (id) => {
-      try { return kv ? await kv.getJson(key(id)) : null; } catch { return null; }   // not JSON = kept + refused + said
-    },
-    save: async (id, doc) => {
-      try { await storage?.setItem(key(id), JSON.stringify(doc)); } catch { /* quota / disabled / no content key yet */ }
-    },
-  };
 }

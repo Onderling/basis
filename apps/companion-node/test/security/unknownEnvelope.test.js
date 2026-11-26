@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * WHAT A KEY THE COMPANION HAS NEVER SEEN CAN MAKE IT DO, with a correctly signed envelope over the real relay.
  *

@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A refused token is told to the shell's log: the agent hands its `onTokenDenied` the op, the reason, whether the grants
  * lane had folded, and the time since boot — never the token, a key, or the args (L196: a screen's "Token has been

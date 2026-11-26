@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * embedChips — normalize an item's cross-object embeds into display chips.
  */

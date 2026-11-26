@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * EVERY route to a toolbox's tool on the box passes the egress gate (ledger L1035).
  *

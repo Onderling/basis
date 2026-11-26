@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The relay holds a message for as long as the app does.
  *

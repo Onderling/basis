@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A FRAME THE RELAY REFUSED, OR NEVER ANSWERED, IS NEITHER HELD FOR EVER NOR LOST IN SILENCE (the independent read of
  * 2026-11-20, findings 6 and 7).

@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 // @vitest-environment happy-dom
 /**
  * Your own message carries no name — on BOTH shells, by one decision.

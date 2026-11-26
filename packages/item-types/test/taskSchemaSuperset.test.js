@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * G-DICT — the dictionary stays a superset of the runtime (the homes plan, Part III).
  *

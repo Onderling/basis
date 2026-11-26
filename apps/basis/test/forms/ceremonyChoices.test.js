@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A ceremony step is consent: its picks offer their choices, but a ceremony step NEVER fills itself — not even with
  * one choice (that rule, `opFormOrRun`'s, is for an op a scan reached, never a ceremony). The submit tap stays the

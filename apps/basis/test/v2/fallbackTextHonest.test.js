@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * THE FALLBACK TEXT SAYS WHAT THE SETTING DOES. The address-fallback setting is per person and OFF by default
  * (`deliverySettings.js`); off means a member is reached at their per-circle address or not at all, on means the main

@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The circle's ⋯ menu tells a member the truth about admin-only entries.
  *

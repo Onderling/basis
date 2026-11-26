@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A thread opened from a notice is the person Contacten shows, and nothing lies over its header.
  *

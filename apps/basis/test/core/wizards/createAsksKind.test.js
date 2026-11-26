@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * MAKING A CIRCLE ASKS ITS KIND AND ITS PURPOSE (walk rows 14/15/19/33, 2026-11): the short path used to make every
  * circle a Household "Running our home together" without asking — a street became a home, and the joiners read that

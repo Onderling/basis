@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A bot skill re-dispatches into a tasks skill by handler reference (`callUnderlying`), past the door gate. On a host
  * that carries every app's ops, a handler reference could name any of them — so the ids it names are pinned: each a

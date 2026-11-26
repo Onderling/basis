@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The push knob has TWO boot doors — the CLI (`bin/relay.js`) and the PaaS entrypoint
  * (`deploy/relay/entrypoint.mjs`) — and one operator memory. This pins the AGREEMENT: both

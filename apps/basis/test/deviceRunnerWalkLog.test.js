@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * THE BOX'S WALK LOG IS WRITTEN — to a directory, with the directory made.
  *

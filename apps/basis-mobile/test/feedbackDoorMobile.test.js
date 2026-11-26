@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The feedback door on the phone (web parity: circleApp's createLocalBuiltins): the op's seams are composed — the
  * thread opener, the build's card, its version, the screen named — the thread starts with the draft in its composer,

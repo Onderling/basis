@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * ui.test.js — Folio.B1.ui tests (lean strategy).
  *

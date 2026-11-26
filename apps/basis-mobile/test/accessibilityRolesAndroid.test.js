@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * FITNESS — every accessibility role the phone paints is one Android accepts.
  *

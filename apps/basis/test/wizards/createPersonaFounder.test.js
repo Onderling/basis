@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * WHICH PERSONA FOUNDS A CIRCLE YOU MAKE — the create wizard asks, the default preselected (Frits 2026-09-24).
  *

@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * Me → Scan / `/scan-qr`: the route table names DECLARED targets (`SCAN_TARGETS`); each shell's per-id painter map
  * (`SCAN_PAINTERS`) — the one shell-side piece, composition — must name every one of them, so a new declared target

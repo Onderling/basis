@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * GUARD — ask whether the native module is THERE before importing the JS that requires it.
  *

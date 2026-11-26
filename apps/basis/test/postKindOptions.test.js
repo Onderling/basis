@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The post kinds a shell offers come from ONE place: the noticeboard's declared intents. The web offered
  * ask / offer / lend and the phone ask / offer / announce — two lists, one of them inventing a kind the

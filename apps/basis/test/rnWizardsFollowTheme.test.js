@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * Every phone wizard built on the kit follows the app's theme. The kit's primitives (steps, fields, radio groups)
  * read their colours from `WizardTheme`; a wizard that does not wrap itself in it paints them LIGHT on a dark

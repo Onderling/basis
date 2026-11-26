@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * Dismissing a half-filled join asks first — and the question is decided in ONE place.
  *

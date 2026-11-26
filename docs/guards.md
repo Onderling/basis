@@ -79,6 +79,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `screen-sections` | — | a hand-painted screen whose sections are DECLARED (`apps/basis/src/v2/screenSections.js`) is |
 | `sealed-at-rest` | — | every local store a shell builds is sealed on the way to disk |
 | `searchable-sources` | — | every source file must be findable by search |
+| `shapes` | — | a declared shape does not change without its version, and a version does not rise without a reader |
 | `sheet-cap` | — | A PHONE SHEET IS CAPPED IN WINDOW PIXELS, NEVER A PERCENTAGE. A card capped with `maxHeight: '85%'` did not… |
 | `shell-reaches-waist` | — | a shell may COMPOSE the substrate, never CALL it |
 | `shell-seams` | — | web ≡ mobile ≡ box: every shell composes every seam (`shell-seams.mjs` declares them) |
@@ -98,7 +99,6 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `unstyled-buttons` | — | every web button wears the one button family (`.cc-btn` in web/v2/circle.css) or a |
 | `untrusted-json` | — | JSON that someone else wrote is parsed with `parseUntrustedJson` (@onderling/core) |
 | `web-buttons` | — | no bare <button> in the web shell |
-| `wire-shapes` | — | a peer message's declared shape does not change without its version, and its version does not |
 
 ## Named design guards (`G-*`, in fitness tests) · 31
 

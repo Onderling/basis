@@ -1124,8 +1124,8 @@ export function renderCircleMyData(container, {
       state.textContent = tr(appLock.on ? 'circle.lock.state_on' : 'circle.lock.state_off');
       const sw = document.createElement('button');
       sw.type = 'button';
-      sw.className = 'cc-mydata__switch';
-      sw.setAttribute('role', 'switch');
+      sw.className = 'cc-mydata__app-lock-switch cc-switch';
+      sw.setAttribute('role', 'switch');   // sets: device:key-door-lock — this browser's lock on the key door
       sw.setAttribute('aria-checked', appLock.on ? 'true' : 'false');
       sw.setAttribute('data-testid', 'app-lock-switch');
       sw.textContent = tr('circle.lock.switch_label');

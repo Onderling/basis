@@ -21,6 +21,7 @@
  * @param {object}  opts.identity               — AgentIdentity (needs `.pubKey`)
  * @param {object}  [opts.enable]               — { ble, mdns, relay } booleans, all default true
  * @param {string}  [opts.relayUrl]             — ws://|wss:// relay URL (relay built only when set)
+ * @param {boolean} [opts.relayPeerDiscovery]   — take the relay's peer list (default false: dropped, as the relay's own default)
  * @param {number}  [opts.mdnsTimeoutMs=6000]   — mDNS pre-connect timeout
  * @param {string}  [opts.hostnamePrefix='dw']  — mDNS hostname prefix (`<prefix>-<LAN key[0..8]>`)
  * @param {object}  [opts.permissions]          — pre-fetched perms (skips a second prompt); else requested here
@@ -53,6 +54,7 @@ export async function buildMeshTransports({
   identity,
   enable = {},
   relayUrl = null,
+  relayPeerDiscovery = false,
   mdnsTimeoutMs = 6_000,
   hostnamePrefix = 'dw',
   permissions,
@@ -119,7 +121,7 @@ export async function buildMeshTransports({
   let relay = null;
   if (enableRelay && relayUrl) {
     try {
-      relay = new RelayTransport({ relayUrl, identity });
+      relay = new RelayTransport({ relayUrl, identity, peerDiscovery: relayPeerDiscovery === true });
     } catch (e) {
       _warn('RelayTransport init failed:', e);
     }

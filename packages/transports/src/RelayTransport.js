@@ -99,6 +99,9 @@ export const RELAY_SEND_RATE = Object.freeze({ perSec: RELAY_SEND_PER_SEC, burst
 export class RelayTransport extends Transport {
   #ws        = null;
   #relayUrl;
+  /** Did THIS client turn the relay's peer discovery on? Off (the default, as on the relay) = a peer list is not asked
+   *  for, and one that arrives anyway is the relay's word only: dropped, never turned into found peers. */
+  #peerDiscovery = false;
   #backoffMs = 1_000;
   #stopped   = false;
   #connectPromise = Promise.resolve();  // starts resolved; reset on close
@@ -182,6 +185,7 @@ export class RelayTransport extends Transport {
     }
     super({ address: opts.identity.pubKey, identity: opts.identity });
     this.#relayUrl = opts.relayUrl;
+    this.#peerDiscovery = opts.peerDiscovery === true;
     // THE PRIMARY REGISTRATION (sync-policy §12): is THIS device the one the person chose for direct messages? Read
     // at every socket open (a function, so the choice can move without a new transport) and sent on the socket's
     // own `register` as `primary: true`; the relay then delivers to this socket while it lives, and a plain
@@ -742,7 +746,7 @@ export class RelayTransport extends Transport {
    */
   forgetPeer(address) {
     this.#knownPeers.delete(address);
-    if (this.#ws?.readyState === 1) {
+    if (this.#peerDiscovery && this.#ws?.readyState === 1) {
       try { this.#ws.send(JSON.stringify({ type: 'peer-list' })); } catch {}
     }
   }
@@ -828,13 +832,14 @@ export class RelayTransport extends Transport {
         return;
       }
       // peer-joined: individual join event (forward-compat, not sent by current relay)
+      // Both peer frames are taken only when this client turned discovery on (`peerDiscovery`); otherwise dropped.
       if (msg.type === 'peer-joined' && msg.address) {
-        this.#discoverPeer(msg.address);
+        if (this.#peerDiscovery) this.#discoverPeer(msg.address);
         return;
       }
       // peer-list: full broadcast sent by relay on every connect/disconnect
       if (msg.type === 'peer-list' && Array.isArray(msg.peers)) {
-        for (const addr of msg.peers) this.#discoverPeer(addr);
+        if (this.#peerDiscovery) for (const addr of msg.peers) this.#discoverPeer(addr);
         return;
       }
       if (msg.type === 'message' && msg.envelope) {

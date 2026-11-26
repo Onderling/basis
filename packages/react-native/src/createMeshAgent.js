@@ -45,6 +45,7 @@ import { loadRendezvousRtcLib }  from './transport/rendezvousRtcLib.js';
  * @param {object}  [opts]
  * @param {string}  [opts.label]              — display label on the agent
  * @param {string}  [opts.relayUrl]           — ws:// or wss:// URL of a relay server
+ * @param {boolean} [opts.relayPeerDiscovery] — take the relay's peer list (only with a relay that has discovery on)
  * @param {object}  [opts.vault]              — custom Vault; defaults to KeychainVault({ service: 'mesh' })
  * @param {object}  [opts.transports]         — { ble, mdns, relay } booleans, all default true
  * @param {string}  [opts.peerGraphPrefix]    — AsyncStorage key prefix (default 'mesh:peers:')
@@ -72,6 +73,7 @@ export async function createMeshAgent(opts = {}) {
   const {
     label,
     relayUrl,
+    relayPeerDiscovery = false,
     vault,
     transports:       transportEnabled = {},
     peerGraphPrefix   = 'mesh:peers:',
@@ -103,6 +105,7 @@ export async function createMeshAgent(opts = {}) {
     identity,
     enable:         transportEnabled,
     relayUrl,
+    relayPeerDiscovery,
     mdnsTimeoutMs,
     hostnamePrefix: 'dw',
     ...(discoverability ? { discoverability } : {}),

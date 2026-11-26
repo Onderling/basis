@@ -57,8 +57,10 @@ const SALT_LEN         = 16;
 const NONCE_LEN        = 24;     // nacl.secretbox.nonceLength
 const KEY_LEN          = 32;     // nacl.secretbox.keyLength
 
-// Production Argon2id cost parameters (m=64MB, t=3, p=1). Also the key door's passphrase slot's default
-// (`@onderling/vault` RootKeyStoreWebCrypto takes `derivePassphraseKey` and these as its `kdf` option).
+/**
+ * The backup's Argon2id cost (m in KiB = 64 MiB, t 3, p 1), for `derivePassphraseKey`. The browser's key door uses
+ * a lower cost of its own (`@onderling/vault` PASSPHRASE_SLOT_PARAMS), since it runs at every open of the app.
+ */
 export const PROD_ARGON_OPTS = Object.freeze({ m: 64 * 1024, t: 3, p: 1 });
 
 const utf8encode = (s) => new TextEncoder().encode(s);

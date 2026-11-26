@@ -37,6 +37,7 @@ export class RootKeyStore {
   async status()       { return (await this.getSeed()) ? 'unlocked' : 'empty'; }
 }
 
+/** The code a `KeyLocked` carries, for a caller that tells it apart by code (also through a wrapping error's `cause`). */
 export const KEY_LOCKED = 'key-locked';
 
 /**

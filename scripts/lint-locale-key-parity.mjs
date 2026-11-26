@@ -21,6 +21,7 @@
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { lineOf, lineOfKey } from './guard-where.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOC = 'docs/conventions/web-mobile-exceptions.md';
@@ -28,6 +29,7 @@ const BASELINE = 'scripts/locale-key-parity.baseline.json';
 const WEB = ['apps/basis/web', 'apps/basis/src/web'];
 const MOBILE = ['apps/basis-mobile/src', 'apps/basis/src/rn'];
 const SHARED = 'apps/basis/src';
+const LOCALE = 'apps/basis/src/locales/circle.nl.json';
 
 /** The `circle.*` keys a file's text names: any quoted string that IS a key of the locale (`known`) — a key reaches a
  *  screen through `t('…')`, but also as a `labelKey`, in a map, or as an argument; all of those are what it shows. */
@@ -78,7 +80,7 @@ function walk(dir, acc = []) {
 }
 let KNOWN = null;
 const known = () => (KNOWN ??= (() => {
-  const b = JSON.parse(readFileSync(path.join(ROOT, 'apps/basis/src/locales/circle.nl.json'), 'utf8'));
+  const b = JSON.parse(readFileSync(path.join(ROOT, LOCALE), 'utf8'));
   const keys = localeKeys(b);
   // the bundle may or may not carry its `circle` root: keys are `circle.*` either way
   return new Set([...keys].map((k) => (k.startsWith('circle.') ? k : `circle.${k}`)));
@@ -105,6 +107,28 @@ export function oneSided() {
   };
 }
 
+/** The red message: each problem (`{kind: 'new'|'stale', side, key}`) with what is wrong, where (`file:line`) and a
+ *  `Fix:` line. `texts` holds the locale file's text (`locale`) and the baseline file's text (`baseline`). */
+export function redMessage(problems, texts = {}) {
+  // the bundle may or may not carry its `circle` root (see `known`): look the key up both ways
+  const keyLine = (k) => {
+    const l = lineOfKey(texts.locale ?? '', k);
+    return l > 1 ? l : lineOfKey(texts.locale ?? '', k.replace(/^circle\./, ''));
+  };
+  const out = ['✖ lint-locale-key-parity — a key one shell says and the other does not:'];
+  for (const { kind, side, key } of problems) {
+    if (kind === 'new') {
+      const other = side === 'web' ? 'mobile' : 'web';
+      out.push(`  • ${LOCALE}:${keyLine(key)}: \`${key}\` is said by the ${side} shell only (new, not in the baseline)`);
+      out.push(`    Fix: paint it on the ${other} shell too, or declare it one-sided in a row of ${DOC} ("Current listed exceptions").`);
+    } else {
+      out.push(`  • ${BASELINE}:${lineOf(texts.baseline ?? '', `"${key}"`)}: stale baseline entry \`${key}\` (${side}): it is no longer one-sided, or it is declared now`);
+      out.push(`    Fix: delete that line from ${BASELINE} (the baseline only shrinks).`);
+    }
+  }
+  return out.join('\n');
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const sides = oneSided();
   const declared = declaredKeys(readFileSync(path.join(ROOT, DOC), 'utf8'));
@@ -118,12 +142,14 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   const base = existsSync(path.join(ROOT, BASELINE)) ? JSON.parse(readFileSync(path.join(ROOT, BASELINE), 'utf8')) : { web: [], mobile: [] };
   const problems = [];
   for (const side of ['web', 'mobile']) {
-    for (const k of now[side]) if (!base[side].includes(k)) problems.push(`NEW ${side}-only key \`${k}\` — paint it on the other shell, or declare it in ${DOC}`);
-    for (const k of base[side]) if (!now[side].includes(k)) problems.push(`stale baseline entry \`${k}\` (${side}) — it is no longer one-sided or now declared: remove it from ${BASELINE}`);
+    for (const k of now[side]) if (!base[side].includes(k)) problems.push({ kind: 'new', side, key: k });
+    for (const k of base[side]) if (!now[side].includes(k)) problems.push({ kind: 'stale', side, key: k });
   }
   if (problems.length) {
-    console.error('lint-locale-key-parity:');
-    for (const p of problems) console.error(`  • ${p}`);
+    console.error(redMessage(problems, {
+      locale: readFileSync(path.join(ROOT, LOCALE), 'utf8'),
+      baseline: existsSync(path.join(ROOT, BASELINE)) ? readFileSync(path.join(ROOT, BASELINE), 'utf8') : '',
+    }));
     process.exit(1);
   }
   console.log(`lint-locale-key-parity: ${sides.both} keys on both shells; one-sided and undeclared, baselined: ${now.web.length} web · ${now.mobile.length} mobile (only shrinks)`);

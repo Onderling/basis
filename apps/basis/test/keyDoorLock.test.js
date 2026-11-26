@@ -11,7 +11,7 @@
  */
 import 'fake-indexeddb/auto';
 import { describe, it, expect } from 'vitest';
-import { RootKeyStoreWebCrypto, KeyLocked, KEY_LOCKED, RootKeyStoreMemory } from '@onderling/vault';
+import { RootKeyStoreWebCrypto, KeyLocked, KEY_LOCKED, RootKeyStoreMemory, SECRET_EMPTY } from '@onderling/vault';
 import { derivePassphraseKey } from '@onderling/core';
 
 const CHEAP = Object.freeze({ m: 8, t: 1, p: 1 });
@@ -111,6 +111,24 @@ describe('the key door\'s lock', () => {
     // a second lock over the first is refused (a new secret is: switch off, switch on), and the first still opens
     await expect(d.setLock('5678')).rejects.toThrow(/switch it off first/);
     d.lock(); expect(await d.unlock('1234')).toBe(true);
+  });
+
+  it('an empty secret is no code: refused by name, the door unchanged', async () => {
+    const name = fresh(); const d = door(name); const seed = seedOf();
+    await d.setSeed(seed);
+    const err = await d.setLock('').then(() => null, (e) => e);
+    expect(err?.code).toBe(SECRET_EMPTY);
+    expect(await d.status()).toBe('open');
+    expect(same(await d.getSeed(), seed)).toBe(true);
+  });
+
+  it('the same passphrase with a composed or a decomposed accent opens the same door (normalised once, NFC)', async () => {
+    const name = fresh(); const d = door(name);
+    const composed = 'café'; const decomposed = 'café';
+    expect(composed).not.toBe(decomposed);
+    await d.setSeed(seedOf()); await d.setLock(composed);
+    const again = door(name);
+    expect(await again.unlock(decomposed)).toBe(true);
   });
 
   it('5. clearLock: back to open, the seed unchanged, no slot left', async () => {

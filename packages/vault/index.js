@@ -42,7 +42,7 @@ export {
   KeyLocked,
   KEY_LOCKED,
 } from './src/RootKeyStore.js';
-export { RootKeyStoreWebCrypto, PASSPHRASE_SLOT_PARAMS } from './src/RootKeyStoreWebCrypto.js';
+export { RootKeyStoreWebCrypto, PASSPHRASE_SLOT_PARAMS, SecretEmpty, SECRET_EMPTY } from './src/RootKeyStoreWebCrypto.js';
 export { VaultMemory }          from './src/VaultMemory.js';
 export { createKeyHolder, isKeyHolder } from './src/keyHolder.js';
 export { VaultLocalStorage }    from './src/VaultLocalStorage.js';

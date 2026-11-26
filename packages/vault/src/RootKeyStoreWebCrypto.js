@@ -40,6 +40,24 @@ const SALT_LEN    = 16;
  */
 export const PASSPHRASE_SLOT_PARAMS = Object.freeze({ m: 46 * 1024, t: 2, p: 1 });
 
+/** The code a `SecretEmpty` carries. */
+export const SECRET_EMPTY = 'secret-empty';
+
+/** A lock was asked for with no secret at all: a short code is allowed, nothing is not a code. */
+export class SecretEmpty extends Error {
+  constructor() {
+    super('A lock needs a code or a passphrase; an empty one is not');
+    this.name = 'SecretEmpty';
+    this.code = SECRET_EMPTY;
+  }
+}
+
+/**
+ * The secret as it is derived, in ONE place for setting and opening alike: text in Unicode NFC, so the same passphrase
+ * typed with a composed or a decomposed accent (one keyboard or another) opens the same door.
+ */
+const secretOf = (secret) => String(secret ?? '').normalize('NFC');
+
 const aesKey = (raw, usages) => crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, usages);
 const seal = async (key, bytes) => { const iv = crypto.getRandomValues(new Uint8Array(12)); return { iv, blob: await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, bytes) }; };
 const open = async (key, sealed) => new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: sealed.iv }, key, sealed.blob));
@@ -124,7 +142,7 @@ export class RootKeyStoreWebCrypto extends RootKeyStore {
   async #makeSlot(secret, doorKeyBytes) {
     const kdf = this.#derive();
     const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
-    const slotKey = await aesKey(kdf.derive(String(secret), salt, kdf.params), ['encrypt']);
+    const slotKey = await aesKey(kdf.derive(secretOf(secret), salt, kdf.params), ['encrypt']);
     const { iv, blob } = await seal(slotKey, doorKeyBytes);
     return { kind: 'passphrase', kdf: { name: kdf.name, salt, params: { ...kdf.params } }, iv, wrapped: blob };
   }
@@ -132,7 +150,7 @@ export class RootKeyStoreWebCrypto extends RootKeyStore {
   /** The door key from a slot and a secret, or null when the secret is not the one (the unwrap fails). */
   async #openSlot(slot, secret) {
     const derive = this.#derive().derive;
-    const slotKey = await aesKey(derive(String(secret), slot.kdf.salt, slot.kdf.params), ['decrypt']);
+    const slotKey = await aesKey(derive(secretOf(secret), slot.kdf.salt, slot.kdf.params), ['decrypt']);
     let bytes;
     try { bytes = await open(slotKey, { iv: slot.iv, blob: slot.wrapped }); } catch { return null; }
     if (bytes.length !== ROOT_SEED_LEN) return null;
@@ -205,6 +223,7 @@ export class RootKeyStoreWebCrypto extends RootKeyStore {
     const shape = await this.#shape();
     if (shape.kind === 'empty') throw new Error('RootKeyStoreWebCrypto.setLock: there is no seed to lock');
     if (shape.kind === 'lock') throw new Error('RootKeyStoreWebCrypto.setLock: the door has a lock already; switch it off first');
+    if (secretOf(secret) === '') throw new SecretEmpty();
     const seed = await this.getSeed();
     const doorKeyBytes = crypto.getRandomValues(new Uint8Array(ROOT_SEED_LEN));
     const doorKey = await aesKey(doorKeyBytes, ['encrypt', 'decrypt']);

@@ -77,6 +77,8 @@ export function projectAgentCard(entry, { owner, circleId = null } = {}) {
       expiresAt:  g?.expiresAt  ?? null,
     }))),
     status:   entry.revokedAt ? 'revoked' : 'active',
+    // the card is re-signed only when it changes (a start that changes nothing writes nothing), so `lastSeen` means
+    // "last changed", not "last started"
     lastSeen: entry.signedAt ?? null,
     created:  entry.signedAt ?? null,
   });

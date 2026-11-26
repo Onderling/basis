@@ -13,6 +13,7 @@ import { renderA2A } from '@onderling/app-manifest';
 import { MAX_ENVELOPE_BYTES } from '@onderling/core';
 import { scopeCatalogueToRole } from './botOpMap.js';
 import { synthesizeGenericOps } from '../genericOpSynth.js';
+import { readItemList, thumbIdsInOrder } from './toolboxClient.js';
 
 /** The bot's ops a screen never reaches, whatever token it holds: restoring an export, or pairing more screens. */
 export const BOT_SCREEN_NEVER = Object.freeze([
@@ -57,15 +58,32 @@ export const SCREEN_NO_BUTTON = Object.freeze([
 /**
  * A screen's answer as it may travel: one relay envelope holds `MAX_ENVELOPE_BYTES` AFTER sealing (the JSON grows ~4/3 in
  * base64, plus the envelope around it), so an answer above ~70% of it is refused with a clear code, never cut: the page
- * asks for less (fewer things, details in smaller groups). Everything else passes unchanged.
+ * asks for less (fewer things, details in smaller groups). Pictures beside an answer (`thumbs`, a tool's answer to a
+ * screen) are the one thing left out instead: the last first (in the answer's own picture order, the cards' first), until it fits;
+ * only an answer too large without any picture is refused. Everything else passes unchanged.
  * @param {object} result
  * @returns {object}
  */
 export function screenAnswerFits(result) {
+  const size = (x) => new TextEncoder().encode(JSON.stringify(x ?? null)).length;
   let bytes = 0;
-  try { bytes = new TextEncoder().encode(JSON.stringify(result ?? null)).length; } catch { return result; }
+  try { bytes = size(result); } catch { return result; }
   const limit = Math.floor(MAX_ENVELOPE_BYTES * 0.7);
-  return bytes > limit ? { ok: false, code: 'answer-too-large', error: 'answer-too-large', bytes, limit } : result;
+  if (bytes <= limit) return result;
+  const all = result?.thumbs && typeof result.thumbs === 'object' ? result.thumbs : {};
+  // the picture order is the answer's own list (`thumbIdsInOrder` over its output, as the map was built), never the
+  // map's key order: an object lists whole-number identifiers first, ascending. A key the list does not name goes first.
+  const listed = readItemList(result?.output);
+  const inOrder = (listed.ok ? thumbIdsInOrder(listed.items) : []).filter((id) => Object.hasOwn(all, id));
+  const keep = [...inOrder, ...Object.keys(all).filter((id) => !inOrder.includes(id))];
+  while (keep.length) {
+    keep.pop();
+    const { thumbs: _all, ...rest } = result;
+    const fewer = keep.length ? { ...rest, thumbs: Object.fromEntries(keep.map((id) => [id, all[id]])) } : rest;
+    bytes = size(fewer);
+    if (bytes <= limit) return fewer;
+  }
+  return { ok: false, code: 'answer-too-large', error: 'answer-too-large', bytes, limit };
 }
 
 /**

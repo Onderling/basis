@@ -124,7 +124,7 @@ import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '.
 import { listsGateRules } from '../src/v2/circleGate.js';
 import { opDescription } from '../src/v2/opDescriptions.js';
 import { createPageEntries, createToolboxPages, TOOLBOX_PAGE_PORT } from '../src/v2/toolboxPages.js';
-import { makeToolboxOps, toolboxListLine, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords, makeChoiceKeeper, toolChoicesReply, makePickThing, makeMoreThings, toolChoiceGateRule, choiceThreadOf } from '../src/v2/toolboxes.js';
+import { makeToolboxOps, toolPicturesFor, toolboxListLine,toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords, makeChoiceKeeper, toolChoicesReply, makePickThing, makeMoreThings, toolChoiceGateRule, choiceThreadOf } from '../src/v2/toolboxes.js';
 import { wrapCallSkillWithEgressGate, isExternalEgressOp } from '../src/core/agent/egressGate.js';   // what leaves for a toolbox, and its record   // a circle's toolboxes (L1035): the key from the operator's config
 import { toolsManifest } from '../src/v2/toolsManifest.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -1527,12 +1527,13 @@ if (tgToken || inboxDoor.bridge) {
   agent.mountAppOps('tools', {
     // a refusal or an empty answer told in the person's own language (`ctx.lang`): the sentence, never the key or an address
     useTool: async (args, ctx) => {
-      // pictures only for a door that shows them (Telegram); the in-app thread paints words, so nothing is fetched for it
-      // a screen (a toolbox's own page) calls only ITS toolbox, the one its grant names (L1049)
+      // pictures only for a door that shows them (Telegram) or a screen that asks; the in-app thread paints words, so
+      // nothing is fetched for it. A screen (a toolbox's own page) calls only ITS toolbox, the one its grant names (L1049)
       const notYours = screenToolboxRefusal(ctx, args);
       if (notYours) return { ...notYours, error: { code: notYours.code, message: t('circle.bot.toolbox_not_yours', { toolbox: String(args?.toolbox ?? '') }, ctx?.lang ?? undefined) } };
-      // a screen (a toolbox's own page) gets the toolbox's raw output too; a chat door only the rows
-      const r = await toolboxes.useTool(args, { pictures: doorBridge?.canSendPhoto?.(ctx?.chatId) === true, forScreen: ctx?.via === 'screen' });
+      // a screen (a toolbox's own page) gets the toolbox's raw output too, and its pictures when it asks; a chat door only
+      // the rows, with pictures when it shows photos
+      const r = await toolboxes.useTool(args, { pictures: toolPicturesFor(args, ctx, (id) => doorBridge?.canSendPhoto?.(id)), forScreen: ctx?.via === 'screen' });
       const tp = (k, p) => t(k, p, ctx?.lang ?? undefined);
       if (!r.ok) return { ...r, error: { code: r.code, message: toolboxRefusalText(r, tp) } };
       if (Array.isArray(r.items) && !r.items.length) return { ...r, message: tp('circle.bot.toolbox_none_found', { title: r.title ?? r.name }) };

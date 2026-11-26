@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * FITNESS: every property-key constant this package defines (`export const …_KEY`) is either the registry's own —
  * refused by the person-facing property ops — or named as person-settable. A new machine key that is in neither list

@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The screens under Me: a way back, clear of the status bar, saying where back goes — and the developer tool hidden.
  *

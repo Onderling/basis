@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * THE KEPT PICTURE ON THE WEB (phone parity, keptPicture.js): Today's landing paints through the shared rule with the
  * web's own "circles read" answer, and only a caught-up state is kept (Today's cache, the kept circles list). Reads the

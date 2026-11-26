@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A Dutch circle chat said "11:22 PM" (exploratory walk, 2026-10-08): the web bubble formatted its time with the
  * BROWSER's locale (`toLocaleTimeString([])`), not the app's — an English browser painted 12-hour times into a Dutch

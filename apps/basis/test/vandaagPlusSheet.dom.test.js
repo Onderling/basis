@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * Vandaag's "+" sheet makes things: a button beside the free line reads it (Enter does too), each own act carries its
  * ☆ inside its own row, "Klaar" is the way out (not one of the acts), and Share my card / Scan are not here — they live

@@ -42,6 +42,20 @@ describe('guard-index', () => {
     expect(reversed).toBe(plain);
   });
 
+  // Nor on the machine's locale: localeCompare follows it, and CI's locale is not a laptop's.
+  it('the index is the same whatever the locale orders', async () => {
+    vi.resetModules();
+    const plain = (await import('./guard-index.mjs')).generate();
+    const orig = String.prototype.localeCompare;
+    String.prototype.localeCompare = function inverted(other) { return -orig.call(this, other); };
+    try {
+      vi.resetModules();
+      expect((await import('./guard-index.mjs')).generate()).toBe(plain);
+    } finally {
+      String.prototype.localeCompare = orig;
+    }
+  });
+
   it('cleanClaim strips the id + leading separators', () => {
     expect(cleanClaim('G-C1 — one store per circle', 'G-C1')).toBe('one store per circle');
   });

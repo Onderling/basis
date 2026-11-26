@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * doctorCmd.test.js — unit + spawn tests for `folio doctor`.
  *

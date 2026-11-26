@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * THE RULES SCREEN CHANGES THE CIRCLE'S RULES, THROUGH THE CIRCLE'S RULE FOR CHANGING THEM.
  *

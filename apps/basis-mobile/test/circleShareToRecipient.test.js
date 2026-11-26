@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * circleShareScreen — the out-of-circle recipient share (objective L · Phase 2 · invariant #2 web≡mobile).
  * Vitest can't render RN components, so this exercises the PORTABLE model behind CircleShareScreen and proves:

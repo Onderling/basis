@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The create wizard's Review promises "After you create it you get a one-time membership code to share" — and on mobile
  * the wizard closed straight to the launcher with no code (walk 2026-10-09, current build): the launcher's onDispatched

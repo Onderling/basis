@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * How much of a persona a member card reveals — "Zichtbaar: profiel" — said the same on both shells: one words
  * function, both paint its output. The phone's member card had no badge at all (web had it): a person's own

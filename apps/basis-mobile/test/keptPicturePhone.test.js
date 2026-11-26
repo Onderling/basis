@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * THE KEPT PICTURE ON THE PHONE (the cold start, 2026-11-22): Today's kept blocks were replaced at ~3 s by a read made
  * before the circles were known ("nothing planned") until the real one landed at ~13 s, and that early read was written

@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * EVERY PEER HANDLER SAYS WHEN IT DID NOT TAKE A FRAME. The secure agent keeps a durable record of the messages this
  * device has taken (per sender and message id) and drops a repeat of one before any handler. It records a message

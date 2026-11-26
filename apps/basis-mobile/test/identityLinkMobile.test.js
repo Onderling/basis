@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The identity link on the phone (`/koppel`): the same shared pieces web composes, painted here.
  *

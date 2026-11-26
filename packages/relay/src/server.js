@@ -248,6 +248,13 @@ function createTokenBucket({ perSec, burst }) {
   };
 }
 
+/**
+ * The script policy every static file goes out with (the hostile-relay read, before the alpha): scripts only from the
+ * relay's own origin, no plugins, no foreign base, and no framing by another site. A page that needs an inline script
+ * (the Basis web app's hashed theme script) is not served from here: the web app has its own host and its own policy.
+ */
+export const STATIC_SCRIPT_POLICY = "script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'";
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js':   'application/javascript; charset=utf-8',
@@ -446,10 +453,12 @@ export async function startRelay(opts = {}) {
       if (s.isDirectory()) { res.writeHead(404); res.end('Not a file'); return; }
       const data = await readFile(real);
       const mime = MIME[extname(filePath)] ?? 'application/octet-stream';
+      // No CORS header: a page reads these files only from the relay's own origin, never from any site that asks.
       res.writeHead(200, {
-        'Content-Type':                mime,
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control':               'no-cache',
+        'Content-Type':            mime,
+        'Content-Security-Policy': STATIC_SCRIPT_POLICY,
+        'X-Content-Type-Options':  'nosniff',
+        'Cache-Control':           'no-cache',
       });
       res.end(data);
     } catch {

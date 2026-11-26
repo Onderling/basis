@@ -40,7 +40,7 @@ const openLockSection = async (page) => {
 };
 const lockScreen = (page) => page.locator('[data-testid="lock-screen"]');
 
-test('the lock: switch on, reload asks, a wrong code stays locked, the right one opens the same person; lock now; forgot leads to the phrase', async ({ page }) => {
+test('the lock: switch on, reload asks, a wrong code stays locked, the right one opens the same person; lock now; forgot leads to the phrase', async ({ page, context }) => {
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('/');
@@ -51,11 +51,18 @@ test('the lock: switch on, reload asks, a wrong code stays locked, the right one
   const { phrase, none } = await phraseOf(page);
   expect(phrase, `the phrase can be read (${none ?? ''})`).toBeTruthy();
 
-  // 1 · SWITCH ON: the code twice; a mismatch is said and nothing is set
+  // a SECOND TAB of the same browser, open before the lock: the lock is for someone else at this computer, and a tab
+  // left open must not be their way in
+  const other = await context.newPage();
+  await other.goto('/');
+  await expect(other.locator('.cc-persona-button__button')).toBeVisible({ timeout: 60_000 });
+
+  // 1 · SWITCH ON: the code twice; a mismatch is said and nothing is set. The browser is not asked to save it.
   await openLockSection(page);
   const sw = page.locator('[data-testid="app-lock-switch"]');
   await expect(sw).toHaveAttribute('aria-checked', 'false');
   await sw.click();
+  for (const id of ['app-lock-field', 'app-lock-again']) await expect(page.locator(`[data-testid="${id}"]`), `${id}: no password saving`).toHaveAttribute('autocomplete', 'off');
   await page.locator('[data-testid="app-lock-field"]').fill(CODE);
   await page.locator('[data-testid="app-lock-again"]').fill(`${CODE}x`);
   await page.locator('[data-testid="app-lock-go"]').click();
@@ -65,10 +72,12 @@ test('the lock: switch on, reload asks, a wrong code stays locked, the right one
   await page.locator('[data-testid="app-lock-go"]').click();
   await expect(page.locator('[data-testid="app-lock-switch"]'), 'the section repaints with the lock on').toHaveAttribute('aria-checked', 'true', { timeout: 30_000 });
   await expect(page.locator('[data-testid="app-lock-now"]')).toBeVisible();
+  await expect(lockScreen(other), 'the other tab is told and reloads onto the lock screen').toBeVisible({ timeout: 30_000 });
 
   // 2 · RELOAD: the lock screen, before the agent exists
   await page.reload();
   await expect(lockScreen(page)).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('[data-testid="lock-field"]'), 'no password saving').toHaveAttribute('autocomplete', 'off');
   await expect(lockScreen(page), 'the lock screen speaks words, not locale keys').not.toContainText('circle.lock.');
   // `onderlingCall` is installed at the module's load and answers `callSkill-not-ready` until the boot: behind the
   // lock the waist names nobody
@@ -88,6 +97,10 @@ test('the lock: switch on, reload asks, a wrong code stays locked, the right one
   await expect(lockScreen(page)).toHaveCount(0, { timeout: 30_000 });
   await expect(page.locator('.cc-persona-button__button')).toBeVisible({ timeout: 60_000 });
   expect(await whoAmI(page), 'the same person behind the lock').toEqual({ webid: who.webid });
+  // the other tab opens with the code too
+  await other.locator('[data-testid="lock-field"]').fill(CODE);
+  await other.locator('[data-testid="lock-open"]').click();
+  await expect(other.locator('.cc-persona-button__button')).toBeVisible({ timeout: 60_000 });
 
   // 5 · SWITCH OFF WITH A WRONG CODE: checked on a second door object, says so, the lock stays on and this tab's
   // door stays open (lock now below still works). Then LOCK NOW: back to the lock screen
@@ -102,6 +115,9 @@ test('the lock: switch on, reload asks, a wrong code stays locked, the right one
   expect(await whoAmI(page), 'this tab is still open after a wrong code').toEqual({ webid: who.webid });
   await page.locator('[data-testid="app-lock-now"]').click();
   await expect(lockScreen(page), 'lock now reloads onto the lock screen').toBeVisible({ timeout: 30_000 });
+  await expect(lockScreen(other), 'lock now locks the other tab too').toBeVisible({ timeout: 30_000 });
+  // the start-over below deletes the databases, which an open tab would block
+  await other.close();
 
   // 6 · FORGOT: the start-over page, from a LOCKED door, and the phrase brings back the same person
   await page.locator('[data-testid="lock-forgot"]').click();

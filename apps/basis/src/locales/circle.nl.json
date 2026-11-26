@@ -9853,7 +9853,7 @@
       "doc": "Web settings: the second field when the lock is switched on."
     },
     "plain_line": {
-      "text": "Een code houdt iemand achter deze computer tegen. Iemand die de bestanden van deze browser kopieert, houdt hij niet tegen. Vergeet je hem, dan begin je opnieuw met je herstelzin.",
+      "text": "Een code houdt iemand achter deze computer tegen. Iemand die de bestanden van deze browser kopieert, houdt hij niet tegen. Vergeet je hem, dan begin je opnieuw met je herstelzin. Laat de browser deze code niet bewaren.",
       "doc": "Web settings: what the lock does and does not stop, shown before it is switched on."
     },
     "empty": {

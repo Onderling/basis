@@ -1135,7 +1135,8 @@ export function renderCircleMyData(container, {
       const field = (labelKey, testid) => {
         const input = document.createElement('input');
         input.type = 'password';
-        input.autocomplete = appLock.on ? 'current-password' : 'new-password';
+        // off, not current/new-password: a browser that saves the code fills it in for whoever opens the app (best effort)
+        input.autocomplete = 'off';
         input.setAttribute('aria-label', tr(labelKey));
         input.setAttribute('data-testid', testid);
         return input;

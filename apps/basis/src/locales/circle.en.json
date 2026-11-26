@@ -9856,7 +9856,7 @@
       "doc": "Web settings: the second field when the lock is switched on."
     },
     "plain_line": {
-      "text": "A code stops someone at this computer. It does not stop someone who copies this browser's files. If you forget it, you start over with your recovery phrase.",
+      "text": "A code stops someone at this computer. It does not stop someone who copies this browser's files. If you forget it, you start over with your recovery phrase. Do not let the browser save this code.",
       "doc": "Web settings: what the lock does and does not stop, shown before it is switched on."
     },
     "empty": {

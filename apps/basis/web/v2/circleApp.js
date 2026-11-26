@@ -894,6 +894,25 @@ import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../../src/v2/circ
 // `appLockOn`: whether the person's lock is on (read at the start, changed by the settings switch)
 let keyDoor = null;
 let appLockOn = false;
+// THE OTHER TABS of this browser: a door key opened in one tab lives in that tab only, so "lock now", or the lock
+// switched on, in one tab tells the others; each drops its door key and reloads onto the lock screen. The lock is for
+// someone else at the same computer, and a second tab left open would be their way in. No channel: this tab only.
+// ONE channel object per tab: a message reaches every OTHER object of the same name, this tab's own included.
+let keyDoorTabs = null;
+const tabsChannel = () => { try { keyDoorTabs ??= new BroadcastChannel('onderling-key-door'); } catch { /* none */ } return keyDoorTabs; };
+function tellOtherTabsLocked() {
+  try { tabsChannel()?.postMessage('locked'); } catch { /* this tab only */ }
+}
+function listenForOtherTabsLocking() {
+  try {
+    const c = tabsChannel();
+    if (c) c.onmessage = (e) => {
+      if (e?.data !== 'locked') return;
+      try { keyDoor?.lock?.(); } catch { /* reloading anyway */ }
+      window.location.reload();
+    };
+  } catch { /* this tab only */ }
+}
 
 // actor label stamped on local chat-message events. Real WebID/
 // peer-display wiring lands with peer broadcast.
@@ -5562,6 +5581,8 @@ async function showMyData(opts) {
       on: appLockOn,
       set: async (code) => {
         try { await keyDoor.setLock(code); } catch { return { ok: false, code: 'failed' }; }
+        // another open tab holds the door's old shape: it reloads onto the lock screen
+        tellOtherTabsLocked();
         appLockOn = true; again(); return { ok: true };
       },
       clear: async (code) => {
@@ -5571,8 +5592,8 @@ async function showMyData(opts) {
         try { await keyDoor.clearLock(); } catch { return { ok: false, code: 'failed' }; }
         appLockOn = false; again(); return { ok: true };
       },
-      // the door key leaves this tab's memory, and the reload opens on the lock screen
-      lockNow: () => { keyDoor.lock(); window.location.reload(); },
+      // the door key leaves this tab's memory, and every other tab's; the reload opens on the lock screen
+      lockNow: () => { tellOtherTabsLocked(); keyDoor.lock(); window.location.reload(); },
     } : null,
     onSignIn, podIssuerDefault: podAuth.resolveIssuer()?.url ?? null, podIssuers: podAuth.KNOWN_ISSUERS, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, thisDeviceId: circleHouseholdAgent?.myDeviceId?.() ?? null, deviceName: browserDeviceName(globalThis.navigator?.userAgent), onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
@@ -9695,7 +9716,8 @@ function keyDoorLockScreen() {
   const root = document.getElementById('circle-root') ?? document.body;
   const el = (tag, attrs = {}, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); n.append(...kids); return n; };
   const said = el('p', { role: 'alert', class: 'lock-screen__said', 'data-testid': 'lock-said' });
-  const field = el('input', { type: 'password', class: 'lock-screen__field', autocomplete: 'current-password', 'aria-label': t('circle.lock.field'), 'data-testid': 'lock-field' });
+  // autocomplete off (best effort, browsers differ): a code the browser saved and fills in undoes the lock
+  const field = el('input', { type: 'password', class: 'lock-screen__field', autocomplete: 'off', 'aria-label': t('circle.lock.field'), 'data-testid': 'lock-field' });
   const open = el('button', { type: 'submit', class: 'cc-btn cc-btn--primary', 'data-testid': 'lock-open' }, t('circle.lock.open'));
   const forgot = el('button', { type: 'button', class: 'cc-btn cc-btn--link', 'data-testid': 'lock-forgot' }, t('circle.lock.forgot'));
   forgot.addEventListener('click', () => openStartOverPage());
@@ -9818,6 +9840,7 @@ async function boot() {
       screen.close();
     }
     appLockOn = (await keyDoor.status()) === 'unlocked' && typeof keyDoor.setLock === 'function';
+    listenForOtherTabsLocking();
   } catch (e) { console.warn(`[key door] could not be asked at the start: ${e?.message ?? e}`); }
   // THE SIGNATURE CHECK: WebCrypto's batch behind the one strict rule, after its self-test (the vectors, an honest and a
   // tampered signature); a browser without Ed25519 in WebCrypto keeps tweetnacl. Reads then check ahead in one batch.

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { runPool, selfTestsNeeded, byteCompare } from './guard-run.mjs';
+import { readFileSync } from 'node:fs';
+import { runPool, selfTestsNeeded, byteCompare, ALWAYS_STEPS } from './guard-run.mjs';
 
 describe('guard-run', () => {
   it('runPool never runs more than the limit at once and keeps the order', async () => {
@@ -28,6 +29,15 @@ describe('guard-run', () => {
 
   it('when the changed files cannot be read they run (the safe side)', () => {
     expect(selfTestsNeeded({ ci: false, all: false, changed: null }).run).toBe(true);
+  });
+
+  it('guard-index --check is an always-step, and guards.mjs runs the always-steps outside the self-test skip', () => {
+    expect(ALWAYS_STEPS).toContainEqual({ name: 'guard-index-fresh', script: 'guard-index.mjs', args: ['--check'] });
+    const src = readFileSync(new URL('guards.mjs', import.meta.url), 'utf8');
+    const always = src.indexOf('ALWAYS_STEPS.map');
+    const skip = src.indexOf('if (plan.run)');
+    expect(always).toBeGreaterThan(-1);
+    expect(always).toBeLessThan(skip);
   });
 
   it('byteCompare orders by code unit, not by locale', () => {

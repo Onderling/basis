@@ -35,5 +35,14 @@ export function selfTestsNeeded({ ci, all, changed }) {
   return { run: false, why: 'nothing under scripts/ differs from the base (CI runs them; --all forces them)' };
 }
 
+/**
+ * Checks that run on EVERY guards run, beside the lints, whether or not the self-tests run. guard-index reads test
+ * files across the whole repo, so a branch that touches only apps/ can make docs/guards.md stale: with the self-tests
+ * skipped, only this step catches it before the merge queue does.
+ */
+export const ALWAYS_STEPS = [
+  { name: 'guard-index-fresh', script: 'guard-index.mjs', args: ['--check'] },
+];
+
 /** Byte-order compare: the same on every machine, unlike localeCompare, which follows the machine's locale. */
 export const byteCompare = (a, b) => (a < b ? -1 : a > b ? 1 : 0);

@@ -11,7 +11,7 @@
  */
 import { execSync, spawn, spawnSync } from 'node:child_process';
 import { untrackedSource } from './untracked-source.mjs';
-import { runPool, selfTestsNeeded, byteCompare } from './guard-run.mjs';
+import { runPool, selfTestsNeeded, byteCompare, ALWAYS_STEPS } from './guard-run.mjs';
 import { readdirSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import path from 'node:path';
@@ -23,14 +23,18 @@ const ROOT = path.dirname(HERE);
 const lints = readdirSync(HERE).filter((f) => /^lint-.*\.mjs$/.test(f) && !f.endsWith('.test.mjs')).sort(byteCompare);
 
 // The lints in parallel, at most one per CPU: each is a read-only scan (none is passed --update here).
-const runLint = (f) => () => new Promise((resolve) => {
-  const child = spawn(process.execPath, [path.join(HERE, f)], { cwd: ROOT });
+const runScript = (name, file, args = []) => () => new Promise((resolve) => {
+  const child = spawn(process.execPath, [path.join(HERE, file), ...args], { cwd: ROOT });
   let out = '';
   child.stdout.on('data', (d) => { out += d; });
   child.stderr.on('data', (d) => { out += d; });
-  child.on('close', (code) => resolve({ name: f.replace(/^lint-|\.mjs$/g, ''), ok: code === 0, out: out.trim() }));
+  child.on('close', (code) => resolve({ name, ok: code === 0, out: out.trim() }));
 });
-const results = await runPool(lints.map(runLint), availableParallelism());
+// The always-steps (guard-run.mjs ALWAYS_STEPS) run with the lints, never behind the self-test skip.
+const results = await runPool([
+  ...lints.map((f) => runScript(f.replace(/^lint-|\.mjs$/g, ''), f)),
+  ...ALWAYS_STEPS.map((s) => runScript(s.name, s.script, s.args)),
+], availableParallelism());
 
 // The guards' own self-tests — a guard whose test is red is not a guard. Locally only when something under scripts/
 // differs from the branch's base (committed or not); CI and `--all` always run them.

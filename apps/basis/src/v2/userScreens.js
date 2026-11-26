@@ -302,7 +302,7 @@ export const SCREEN_VERSIONS_KEY = 'device';
 /** A device's own screen book with its versions (each change kept, so it can be undone) — what the web shell composes. */
 export function localUserScreenStore(storage = globalThis.localStorage) {
   // the versions sealed too (they hold earlier books)
-  return createUserScreenStore({ io: localStorageScreenIo(storage), versions: localStorageObjectVersions('screens', sealedKeyValue(storage, { name: 'the page book versions', strict: true })) });
+  return createUserScreenStore({ io: localStorageScreenIo(storage), versions: localStorageObjectVersions('screens', sealedKeyValue(storage, { name: 'the page book versions', strict: true }), undefined, { versionsPrefix: storageName('objectVersionKeys') }) });
 }
 
 /**

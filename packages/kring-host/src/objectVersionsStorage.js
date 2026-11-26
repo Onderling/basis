@@ -15,7 +15,7 @@
  *
  * Storage layout (v2 — one record per version, versionStore's native shape):
  *
- *   `basis.versions.<storeName>/<encodeURIComponent(circleId)>/<ts>`
+ *   `<prefix><storeName>/…` (the app hands the prefix; default `onderling.versions.`): `onderling.versions.<storeName>/<encodeURIComponent(circleId)>/<ts>`
  *     → { ts, sha256, size, content } where `content` is the JSON string
  *       of the captured value.
  *
@@ -63,7 +63,9 @@ export function fingerprintHex(s) {
 }
 
 /** Key prefix for one store's version series (exported for tests/tooling). */
-export const versionsRootFor = (storeName) => `basis.versions.${storeName}/`;
+export const DEFAULT_VERSIONS_PREFIX = 'onderling.versions.';
+/** The package's own default; an app passes its own prefix (`versionsPrefix`). */
+export const versionsRootFor = (storeName, prefix = DEFAULT_VERSIONS_PREFIX) => `${prefix}${storeName}/`;
 
 /**
  * Build a `{capture, list, restore}` versions adapter over a real
@@ -78,7 +80,7 @@ export const versionsRootFor = (storeName) => `basis.versions.${storeName}/`;
  * @param {()=>number} [args.now]  clock seam (tests)
  * @returns {{ capture: Function, list: Function, restore: Function }}
  */
-export function createObjectVersionsAdapter({ storeName, backend, retention, now } = {}) {
+export function createObjectVersionsAdapter({ storeName, backend, retention, now, versionsPrefix } = {}) {
   if (typeof storeName !== 'string' || !storeName) {
     throw new TypeError('createObjectVersionsAdapter: storeName required');
   }
@@ -94,7 +96,7 @@ export function createObjectVersionsAdapter({ storeName, backend, retention, now
     // Same fingerprint the retired objectVersions substrate used, over the
     // same string (`JSON.stringify(value)` — capture serialises below).
     hash: async (content) => fingerprintHex(String(content)),
-    versionsRoot: versionsRootFor(storeName),
+    versionsRoot: versionsRootFor(storeName, versionsPrefix),
     retention: {
       ...(Number.isFinite(cap) && cap > 0 ? { perSeries: Math.floor(cap) } : {}),
       // "identical-sha vs newest always dedups, no time window" — see the
@@ -197,10 +199,11 @@ export function localStorageBackend(storage = globalThis.localStorage) {
  * store (policy / recipe / rules).  Signature unchanged across the
  * @onderling/versioning consolidation.
  */
-export function localStorageObjectVersions(storeName, storage = globalThis.localStorage, retention) {
+export function localStorageObjectVersions(storeName, storage = globalThis.localStorage, retention, { versionsPrefix } = {}) {
   return createObjectVersionsAdapter({
     storeName,
     backend: localStorageBackend(storage),
     retention,
+    versionsPrefix,
   });
 }

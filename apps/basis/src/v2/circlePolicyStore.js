@@ -172,7 +172,7 @@ export function createCirclePolicyStore({ load, save, versions, marks = null, on
  */
 export function localCirclePolicyStore(storage = globalThis.localStorage) {
   const sealed = sealedKeyValue(storage, { name: 'the circle policy' });
-  return createCirclePolicyStore({ ...localStoragePolicyIo(sealed), versions: localStorageObjectVersions('policy', sealed), marks: localPolicyPendingMarks(storage) });
+  return createCirclePolicyStore({ ...localStoragePolicyIo(sealed), versions: localStorageObjectVersions('policy', sealed, undefined, { versionsPrefix: storageName('objectVersionKeys') }), marks: localPolicyPendingMarks(storage) });
 }
 
 /**

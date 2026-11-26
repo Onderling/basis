@@ -41,5 +41,6 @@ export function asyncStorageObjectVersions(storeName, storage, retention) {
     storeName,
     backend: sealedLocalBackend(createAsBackend({ AsyncStorage: storage, scope: VERSIONS_AS_SCOPE }), { scope: VERSIONS_AS_SCOPE }),
     retention,
+    versionsPrefix: storageName('objectVersionKeys'),
   });
 }

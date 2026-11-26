@@ -145,7 +145,7 @@ export function createCircleRulesStore({ load, save, versions } = {}) {
 /** A device's own circle-rules store, SEALED at rest (the rules and their versions) — what the web shell composes. */
 export function localCircleRulesStore(storage = globalThis.localStorage) {
   const sealed = sealedKeyValue(storage, { name: 'the circle rules' });
-  return createCircleRulesStore({ ...localStorageRulesIo(sealed), versions: localStorageObjectVersions('rules', sealed) });
+  return createCircleRulesStore({ ...localStorageRulesIo(sealed), versions: localStorageObjectVersions('rules', sealed, undefined, { versionsPrefix: storageName('objectVersionKeys') }) });
 }
 
 /** localStorage-backed load/save (web). Key: `basis.circleRules.<circleId>`. */

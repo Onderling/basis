@@ -35,8 +35,6 @@ const REGISTER = 'apps/basis/src/v2/storageRegister.js';
 
 /** Rows opened somewhere rule 2 cannot see by id: the place, and why. */
 export const OPENED_ELSEWHERE = Object.freeze({
-  rootKeyDb: 'by its package: @onderling/vault RootKeyStoreWebCrypto opens it under its own default name',
-  objectVersionsWeb: 'by its package: @onderling/kring-host objectVersionsStorage writes under versionsRootFor (the web stores pass it the sealed localStorage)',
   helpCircleStore: "by the per-circle name (circleStorageName) for the help circle, whose id is the literal 'cc-help'",
   helpCircleCache: "by the per-circle cache name (circleStorageName) for the help circle, whose id is the literal 'cc-help'",
   vaultOwnerRootKey: "a key inside the device vault ('owner-root', ownerRootRestore.js / personaRuntime.js); the vault adds the prefix",

@@ -69,8 +69,9 @@ export const STORAGE = Object.freeze({
   circleRag:              row('basis.circle-rag', 'store', [W, M], 'throwaway', 'sealed', ROWS),
   // the phone's object-version snapshots (a circle's policy, rules and recipe as they were): the throwaway self's too
   objectVersionsPhone:    row('basis.object-versions', 'store', [M], 'throwaway', 'sealed', ROWS),
-  // the web's object-version snapshots, a key family in the sealed localStorage (kring-host's versionsRootFor)
-  objectVersionsWeb:      row('basis.versions.', 'prefix', [W], 'throwaway', 'sealed', ROWS),
+  // the object-version snapshots' key family (kring-host's versionsRootFor, handed this prefix): in the sealed
+  // localStorage on the web, inside the phone's object-versions scope
+  objectVersionKeys:      row('basis.versions.', 'prefix', [W, M], 'throwaway', 'sealed', ROWS),
   // The help circle's own stores, named explicitly. Its id is the literal `cc-help`, so the throwaway self and the
   // enrolled person share its store NAME: the one database where two identities' sealed rows sit together. A
   // throwaway self that never provisioned it is not in the registry either, so the per-circle route would skip it.
@@ -102,6 +103,8 @@ export const STORAGE = Object.freeze({
   advisorShown:           row('basis.advisorShown.', 'prefix', [W, M], 'throwaway', 'not content: when the advisor card was last shown', k('string')),
   screenClient:           row('basis.screen.', 'prefix', [W], 'keep', 'not sealable: a screen\'s own storage: a screen has no content key (its own key sits in the same storage)', k('json')),
   mappings:               row('basis.mappings:', 'prefix', [M], 'throwaway', 'not sealable: read before a key exists: bootAgentBundle loads the extension mappings at its start, before the content key', k('json')),
+  // the web's extension mappings, sealed (the phone's, above, are read before the key)
+  mappingsWeb:            row('basis.mappings-web:', 'prefix', [W], 'throwaway', 'sealed', k('json')),
 
   // ── single keys ──
   // The help circle's two flags go TOGETHER: clear one and keep the other and the enrolled person gets a help

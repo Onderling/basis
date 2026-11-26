@@ -12,12 +12,13 @@
  * the web pod layer (3.3c) lands is a one-line change at the call site.
  */
 
-const PREFIX = 'basis.mappings:';   // localStorage namespace; we store JSON under PREFIX + <uri>
+/** The package's own default namespace; an app passes its own name (`{ prefix }`). JSON is stored under prefix + <uri>. */
+export const DEFAULT_MAPPINGS_PREFIX = 'onderling.mappings:';
 
 /** The fixed V0 device id for web mappings (app-scoped; no real pod yet). */
 export const WEB_MAPPINGS_DEVICE = 'web';
 
-export function localStorageMappingsStore(storage = globalThis.localStorage) {
+export function localStorageMappingsStore(storage = globalThis.localStorage, { prefix: PREFIX = DEFAULT_MAPPINGS_PREFIX } = {}) {
   const keyFor = (uri) => PREFIX + uri;
   return {
     // awaited: the web hands a SEALED storage (ledger L1083), which answers async

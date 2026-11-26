@@ -2374,7 +2374,7 @@ function buildCircleBot(agent) {
   // scoping — DEFAULT_CIRCLE_ORIGINS alone would drop them. (V0: treat all accepted mappings as app-scoped;
   // per-circle scope is a later refinement.)
   let mappingOrigins = [];
-  const mappingsStore = localStorageMappingsStore(sealedKeyValue(globalThis.localStorage, { name: 'the extension mappings', strict: true }));   // V0 web store, sealed at rest; swap for a pseudo-pod at 3.3c
+  const mappingsStore = localStorageMappingsStore(sealedKeyValue(globalThis.localStorage, { name: 'the extension mappings', strict: true }), { prefix: storageName('mappingsWeb') });   // V0 web store, sealed at rest; swap for a pseudo-pod at 3.3c
   // S6.C deep — base scope = the 5 circle apps (+ accepted extension mappings); the
   // active circle's policy.apps narrows it further (intersection), so a circle can
   // compose only the apps it uses. null/empty policy.apps → all (no dead circles).

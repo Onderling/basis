@@ -156,7 +156,7 @@ artifact the product promises exists only in their hands.
 
 ```js
 class RootKeyStoreWebCrypto extends RootKeyStore
-new RootKeyStoreWebCrypto()
+new RootKeyStoreWebCrypto({ dbName = DEFAULT_ROOT_KEY_DB } = {})
 ```
 
 The browser's root-key store: the seed in IndexedDB, AES-GCM-sealed under a non-extractable WebCrypto key (see the file header).

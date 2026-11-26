@@ -19,6 +19,7 @@
 import { Bootstrap } from '@onderling/core';
 import { RootKeyStoreVault, RootKeyStoreWebCrypto } from '@onderling/vault';
 import { KeyUnreadable } from './keyUnreadable.js';
+import { storageName } from '../../v2/storageRegister.js';   // every storage name from the one register
 
 /** The vault key the PRE-CUTOVER cleartext phrase lived under (migration source only). */
 export const LEGACY_OWNER_PHRASE_KEY = 'owner-phrase';
@@ -39,7 +40,7 @@ export function pickRootKeyStore({ fallbackVault } = {}) {
   // installed globally (every agent would read the first one's seed and become the same person).
   if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined'
     && typeof crypto !== 'undefined' && crypto.subtle) {
-    try { return new RootKeyStoreWebCrypto(); } catch { /* fall through */ }
+    try { return new RootKeyStoreWebCrypto({ dbName: storageName('rootKeyDb') }); } catch { /* fall through */ }
   }
   return new RootKeyStoreVault({ vault: fallbackVault });
 }

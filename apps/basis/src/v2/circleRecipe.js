@@ -316,7 +316,7 @@ export function createCircleRecipeStore({ io = {}, versions } = {}) {
 /** A device's own circle-recipe store, SEALED at rest (the recipe and its versions) — what the web shell composes. */
 export function localCircleRecipeStore(storage = globalThis.localStorage) {
   const sealed = sealedKeyValue(storage, { name: 'the circle recipe' });
-  return createCircleRecipeStore({ io: localStorageRecipeIo(sealed), versions: localStorageObjectVersions('recipe', sealed) });
+  return createCircleRecipeStore({ io: localStorageRecipeIo(sealed), versions: localStorageObjectVersions('recipe', sealed, undefined, { versionsPrefix: storageName('objectVersionKeys') }) });
 }
 
 /** localStorage-backed io.  Key: `basis.circleRecipe.<circleId>`. */

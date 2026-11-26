@@ -17,7 +17,8 @@
  */
 import { RootKeyStore, assertSeed } from './RootKeyStore.js';
 
-const DB_NAME    = 'basis.root-key';
+/** The package's own default database name; an app passes its own (`{ dbName }`). */
+export const DEFAULT_ROOT_KEY_DB = 'onderling-root-key';
 const STORE      = 'keys';
 const K_WRAP     = 'wrap-key';
 const K_SEED     = 'sealed-seed';
@@ -25,9 +26,12 @@ const K_SEED     = 'sealed-seed';
 /** The browser's root-key store: the seed in IndexedDB, AES-GCM-sealed under a non-extractable WebCrypto key (see the file header). */
 export class RootKeyStoreWebCrypto extends RootKeyStore {
   #db = null;
+  #dbName;
 
-  constructor() {
+  /** @param {{dbName?: string}} [opts] */
+  constructor({ dbName = DEFAULT_ROOT_KEY_DB } = {}) {
     super();
+    this.#dbName = dbName;
     if (typeof indexedDB === 'undefined' || typeof crypto === 'undefined' || !crypto.subtle) {
       throw new Error('RootKeyStoreWebCrypto requires IndexedDB + WebCrypto (browser only)');
     }
@@ -36,7 +40,7 @@ export class RootKeyStoreWebCrypto extends RootKeyStore {
   async #open() {
     if (this.#db) return;
     this.#db = await new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, 1);
+      const req = indexedDB.open(this.#dbName, 1);
       req.onupgradeneeded = (e) => { e.target.result.createObjectStore(STORE); };
       req.onsuccess = (e) => resolve(e.target.result);
       req.onerror   = (e) => reject(e.target.error);

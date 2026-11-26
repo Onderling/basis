@@ -15,6 +15,7 @@
 import { test, expect } from '@playwright/test';
 import { bootPeer, teardown, gotoCircles, createCircle } from './peerHarness.js';
 import { isBasisStorageKey, isBasisDatabase } from '../src/v2/basisStorageNames.js';
+import { storageName } from '../src/v2/storageRegister.js';
 
 const call = (page, app, op, args = {}) => page.evaluate(([a, o, g]) => window.onderlingCall(a, o, g), [app, op, args]);
 const MARK = 'basis.owner-root:start-over-pending';
@@ -53,6 +54,8 @@ test.describe('start this device over from your phrase', () => {
     const before = await storageNow(A.page);
     expect(before.keys.filter((k) => !isBasisStorageKey(k)), 'every storage key a real boot writes is Basis\'s by name').toEqual([]);
     expect(before.dbs.filter((n) => !isBasisDatabase(n)), 'every database a real boot opens is Basis\'s by name').toEqual([]);
+    // the key door the boot opened is the register's row, not the vault package's own default name
+    expect(before.dbs, 'the key door is opened under the register\'s name').toContain(storageName('rootKeyDb'));
 
     // the rest of the origin: the public site's key and a toolbox screen page's pairing
     await A.page.evaluate((f) => { for (const [k, v] of Object.entries(f)) window.localStorage.setItem(k, v); }, FOREIGN);

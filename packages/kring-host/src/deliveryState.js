@@ -130,6 +130,13 @@ export function createDeliveryStateMap() {
   // receipts would show who has receipts off. Fed by the log (`rehydrateDeliveryState` follows it).
   /** @type {Map<string, {sent: number, of: number}>} */
   const waiting = new Map();
+  // THE RELAY GAVE UP ON IT: a side fact beside the state, never a rung and never a reason (docs/decisions.md 2026-07-29,
+  // "The delivery ladder admits doubt", its addition of 2026-11-26). A relay's give-up (its TTL, a cap, an over-rate
+  // give-up) is the relay's word, not this device's knowledge, so it may offer a retry but never moves the ladder: the
+  // bubble keeps its rung and gets a hint beside it. This device's own view only: never synced, never logged. It clears
+  // when the state moves on (a real receipt) and when the person retries (a `pending` set with no reason: an act).
+  /** @type {Map<string, string>} */
+  const relayGaveUp = new Map();
   /** @type {Set<(msgId: string, state: DeliveryState) => void>} */
   const subs = new Set();
 
@@ -148,6 +155,7 @@ export function createDeliveryStateMap() {
       if (typeof msgId !== 'string' || msgId === '') return;
       if (state == null) {
         reasons.delete(msgId);
+        relayGaveUp.delete(msgId);
         if (!map.has(msgId)) return;
         map.delete(msgId);
         notify(msgId, null);
@@ -161,8 +169,12 @@ export function createDeliveryStateMap() {
       const reasonBefore = reasons.get(msgId) ?? null;
       if (REASON_STATES.includes(next) && typeof reason === 'string' && reason) reasons.set(msgId, reason);
       else if (next !== current) reasons.delete(msgId);
-      // the same state with a new reason is news too: the words a screen shows come from the reason
-      if (next === current) { if ((reasons.get(msgId) ?? null) !== reasonBefore) notify(msgId, next); return; }
+      // the relay's give-up hint goes when the state moves on, or when the person retries (a reasonless `pending`; the
+      // app map's own waiting timer always names a reason, so it never clears the hint)
+      const hintGone = relayGaveUp.has(msgId) && (next !== current || (state === DELIVERY.PENDING && !reason))
+        && relayGaveUp.delete(msgId);
+      // the same state with a new reason, or without the hint, is news too: the words a screen shows come from them
+      if (next === current) { if (hintGone || (reasons.get(msgId) ?? null) !== reasonBefore) notify(msgId, next); return; }
       map.set(msgId, next);
       notify(msgId, next);
     },
@@ -178,6 +190,24 @@ export function createDeliveryStateMap() {
     waitingOf(msgId) {
       return (typeof msgId === 'string' && waiting.get(msgId)) || null;
     },
+    /**
+     * The relay gave up on a message this map knows (see above): `reason` is the relay's word ('expired', 'over-rate',
+     * …), null clears it. Ignored for a message the map does not know (lane traffic has no bubble) and for one already
+     * `stored` (a receipt outranks a relay's word). Notifies when it changes.
+     */
+    setRelayGaveUp(msgId, reason = null) {
+      if (typeof msgId !== 'string' || msgId === '') return;
+      const before = relayGaveUp.get(msgId) ?? null;
+      const state = map.get(msgId) ?? null;
+      const next = reason == null || state == null || state === DELIVERY.STORED ? null : (String(reason) || 'unknown');
+      if (before === next) return;
+      if (next) relayGaveUp.set(msgId, next); else relayGaveUp.delete(msgId);
+      notify(msgId, state);
+    },
+    /** The relay's give-up reason beside this message, or null. */
+    relayGaveUpOf(msgId) {
+      return (typeof msgId === 'string' && relayGaveUp.get(msgId)) || null;
+    },
     /** The reason beside a failed/undeliverable/pending state, or null. */
     reasonOf(msgId) {
       return (typeof msgId === 'string' && reasons.get(msgId)) || null;
@@ -186,6 +216,7 @@ export function createDeliveryStateMap() {
       if (typeof msgId !== 'string' || msgId === '') return false;
       reasons.delete(msgId);
       waiting.delete(msgId);
+      relayGaveUp.delete(msgId);
       if (!map.has(msgId)) return false;
       map.delete(msgId);
       notify(msgId, null);
@@ -204,6 +235,7 @@ export function createDeliveryStateMap() {
       }
       for (const id of toClear) {
         map.delete(id);
+        relayGaveUp.delete(id);
         notify(id, null);
       }
       return toClear.length;

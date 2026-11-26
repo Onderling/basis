@@ -388,6 +388,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
               <DeliveryChip
                 state={deliveryStateMap.get?.(m.messageId) ?? null}
                 reason={deliveryStateMap.reasonOf?.(m.messageId) ?? null}
+                relayGaveUp={deliveryStateMap.relayGaveUpOf?.(m.messageId) ?? null}
                 rowId={m.messageId}
                 onRetry={onRetryDelivery}
                 testIDPrefix="contact-delivery"

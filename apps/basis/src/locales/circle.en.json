@@ -691,6 +691,10 @@
       }
     },
     "delivery": {
+      "relay_gave_up_hint": {
+        "text": "The connection point stopped trying · tap to send again",
+        "doc": "Beside a message's own delivery words: the connection point (relay) it waited at gave up on it (its time limit or a cap). That is the connection point's word, not proof it failed, so the message keeps its state; tapping sends it again under the same id, and a confirmation clears this line."
+      },
       "on_its_way": {
         "text": "Sent to {{reached}} of {{of}}; the rest follows",
         "doc": "A circle line went to the members whose address this device knew; the others had none yet. It goes to each of them by itself when their address arrives, and this line then returns to the usual words. {{reached}} counts sends, never confirmations."

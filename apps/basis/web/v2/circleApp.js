@@ -3676,10 +3676,10 @@ async function showContactThread(contactId, { draft = '' } = {}) {
     // self-cleaning: once this thread is no longer the one on screen (a tab, another thread), the subscription ends itself
     if (_activeContactThread?.leave !== unsubscribeDelivery) { unsubscribeDelivery(); return; }
     if (!thread.messages.some((x) => x.messageId === msgId)) return;
-    paintDeliveryChip(rootEl, msgId, state, { tr: t, onRetryDelivery, reason: deliveryStateMap.reasonOf(msgId), bubbleClass: 'cc-cthread__bubble', metaClass: 'cc-cthread__meta' });
+    paintDeliveryChip(rootEl, msgId, state, { tr: t, onRetryDelivery, reason: deliveryStateMap.reasonOf(msgId), relayGaveUp: deliveryStateMap.relayGaveUpOf(msgId), bubbleClass: 'cc-cthread__bubble', metaClass: 'cc-cthread__meta' });
   });
   const rerender = () => renderContactThread(rootEl, {
-    deliveryStateFor, deliveryReasonFor, onRetryDelivery,
+    deliveryStateFor, deliveryReasonFor, deliveryRelayGaveUpFor: (msgId) => deliveryStateMap.relayGaveUpOf(msgId), onRetryDelivery,
     cannotWrite: !!thread.sendTo?.blocked,
     attachMenu: contactAttach, onAttachCommand: onContactAttach,
     // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
@@ -8442,6 +8442,7 @@ function showCircle(id, circle, policy) {
       deliveryStateFor: (msgId) => deliveryStateMap.get(msgId),
       deliveryReasonFor: (msgId) => deliveryStateMap.reasonOf(msgId),
       deliveryWaitingFor: (msgId) => deliveryStateMap.waitingOf?.(msgId) ?? null,
+      deliveryRelayGaveUpFor: (msgId) => deliveryStateMap.relayGaveUpOf(msgId),
       localActor: LOCAL_ACTOR,
       // δ.2 — retry on the failed icon tap.  Re-fires the SAME msgId
       // (idempotent receiver-side dedup).  Looks up the original text
@@ -8730,6 +8731,7 @@ function showCircle(id, circle, policy) {
       tr: t,
       reason: deliveryStateMap.reasonOf(msgId),
       waiting: deliveryStateMap.waitingOf?.(msgId) ?? null,
+      relayGaveUp: deliveryStateMap.relayGaveUpOf(msgId),
       onRetryDelivery: (retryId) => {
         const evt = eventLog.query({ excludeMuted: true }).find((e) => e.id === retryId);
         const text = evt?.payload?.text;

@@ -65,6 +65,12 @@ export const DELIVERY_WAITING_ENTRY = 'on-its-way';
 /** Its words on the bubble, in place of the rung's while someone waits: `{{reached}}` sent of `{{of}}`. */
 export const DELIVERY_WAITING_LABEL = 'circle.chat.delivery.on_its_way';
 
+/**
+ * The words BESIDE the rung when the relay gave up on a message (the map's `relayGaveUpOf`): a retry hint, not a rung,
+ * not a reason, never synced. The rung keeps its own words; a tap on the hint re-sends under the same id.
+ */
+export const DELIVERY_RELAY_GAVE_UP_HINT = 'circle.chat.delivery.relay_gave_up_hint';
+
 /** How long a message may say "sending" before it says it is waiting for a connection. */
 export const PENDING_SAYS_WAITING_MS = param({ key: 'delivery.pendingSaysWaitingMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });
 

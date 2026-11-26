@@ -117,6 +117,9 @@ export function renderCircleView(container, {
   // `deliveryWaitingFor(msgId)` — `{ sent, of }` while a circle line still waits for members without an address (the
   // delivery map's `waitingOf`): the chip says how many it was sent to, in place of the rung's words
   deliveryWaitingFor = null,
+  // `deliveryRelayGaveUpFor(msgId)` — the relay's give-up reason, or null (the map's `relayGaveUpOf`): a retry hint
+  // beside the rung, never a rung of its own
+  deliveryRelayGaveUpFor = null,
   localActor = null,
   onRetryDelivery = null,
   // Mandate ("entrust" / toevertrouwen) — the viewer's identity signals decide
@@ -412,7 +415,7 @@ export function renderCircleView(container, {
       }
       body.appendChild(renderBubble(row, {
         tr, onAction,
-        deliveryStateFor, deliveryReasonFor, deliveryWaitingFor, localActor, onRetryDelivery,
+        deliveryStateFor, deliveryReasonFor, deliveryWaitingFor, deliveryRelayGaveUpFor, localActor, onRetryDelivery,
         onEmbedButton, onEmbedOpen,
         media,
         viewerWebid, viewerIsAdmin, availability,
@@ -875,16 +878,25 @@ function renderLedenTab(body, { members = null, unreachable = null, selfWebid = 
  * Exported since the contact thread's own bubbles carry the same state (the two-phone walk's rows 9 and 11): one
  * builder, one set of classes, so a DM and a circle message can never word or shape the same fact differently.
  */
-export function buildDeliveryChip(state, { tr, onRetryDelivery = null, rowId = null, reason = null, waiting = null } = {}) {
-  const p = deliveryPresentation(state, { reason, waiting });
+export function buildDeliveryChip(state, { tr, onRetryDelivery = null, rowId = null, reason = null, waiting = null, relayGaveUp = null } = {}) {
+  const p = deliveryPresentation(state, { reason, waiting, relayGaveUp });
   if (!p) return null;
   const label = tr(p.labelKey, p.labelVars);
+  // the relay's give-up: its words BESIDE the rung's, shown, and the chip a retry (the shared presentation decides)
+  const hint = p.hintKey ? tr(p.hintKey) : null;
   const el = document.createElement(p.retryable ? 'button' : 'span');
   el.className = `circle-view__bubble-delivery circle-view__bubble-delivery--${p.state}`;
   el.dataset.deliveryState = p.state;
-  el.setAttribute('aria-label', label);
-  el.title = label;
+  el.setAttribute('aria-label', hint ? `${label} · ${hint}` : label);
+  el.title = hint ? `${label} · ${hint}` : label;
   el.textContent = p.glyph;
+  if (hint) {
+    el.dataset.deliveryHint = 'relay-gave-up';
+    const words = document.createElement('span');
+    words.className = 'circle-view__bubble-delivery-hint';
+    words.textContent = ` ${hint}`;
+    el.appendChild(words);
+  }
   if (p.retryable) {
     el.type = 'button';
     el.addEventListener('click', () => { if (typeof onRetryDelivery === 'function') onRetryDelivery(rowId); });
@@ -918,7 +930,7 @@ export function buildDeliveryChip(state, { tr, onRetryDelivery = null, rowId = n
  * @returns {boolean} whether a chip was found or placed
  */
 export function paintDeliveryChip(root, rowId, state, {
-  tr, onRetryDelivery = null, reason = null, waiting = null,
+  tr, onRetryDelivery = null, reason = null, waiting = null, relayGaveUp = null,
   // the contact thread's bubbles carry the same chip under their own class names (`cc-cthread__*`)
   bubbleClass = 'circle-view__bubble', metaClass = 'circle-view__bubble-meta',
 } = {}) {
@@ -926,7 +938,7 @@ export function paintDeliveryChip(root, rowId, state, {
   const bubble = root.querySelector(`.${bubbleClass}[data-row-id="${CSS.escape(String(rowId))}"]`);
   if (!bubble) return false;
   const existing = bubble.querySelector('.circle-view__bubble-delivery');
-  const next = buildDeliveryChip(state, { tr, onRetryDelivery, rowId, reason, waiting });
+  const next = buildDeliveryChip(state, { tr, onRetryDelivery, rowId, reason, waiting, relayGaveUp });
   if (!next) { existing?.remove(); return true; }   // a state that shows nothing must CLEAR the old chip
   if (existing) existing.replaceWith(next);
   else {
@@ -941,7 +953,8 @@ export function paintDeliveryChip(root, rowId, state, {
 function renderBubble(row, {
   tr, onAction,
   // δ.2 — delivery-icon plumbing; all three are optional.
-  deliveryStateFor = null, deliveryReasonFor = null, deliveryWaitingFor = null, localActor = null, onRetryDelivery = null,
+  deliveryStateFor = null, deliveryReasonFor = null, deliveryWaitingFor = null, deliveryRelayGaveUpFor = null,
+  localActor = null, onRetryDelivery = null,
   // S6.A — manifest-driven inline buttons carried on the bot event (payload.buttons).
   onEmbedButton = null,
   // tap a "See also" embed chip → open the referenced item's screen.
@@ -1202,6 +1215,7 @@ function renderBubble(row, {
       tr, onRetryDelivery, rowId: row.id,
       reason: typeof deliveryReasonFor === 'function' ? deliveryReasonFor(row.id) : null,
       waiting: typeof deliveryWaitingFor === 'function' ? deliveryWaitingFor(row.id) : null,
+      relayGaveUp: typeof deliveryRelayGaveUpFor === 'function' ? deliveryRelayGaveUpFor(row.id) : null,
     });
   }
 

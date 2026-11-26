@@ -8,7 +8,7 @@
 // is recorded rather than forgotten.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -24,15 +24,9 @@ afterEach(() => rmSync(root, { recursive: true, force: true }));
 
 /** Run the guard against the fixture tree; return {code, out}. */
 function run(args = []) {
-  try {
-    const out = execFileSync('node', [GUARD, ...args], {
-      encoding: 'utf8',
-      env: { ...process.env, LEDGER_LINT_ROOT: root },
-    });
-    return { code: 0, out };
-  } catch (e) {
-    return { code: e.status, out: `${e.stdout || ''}${e.stderr || ''}` };
-  }
+  // stdout AND stderr on success too: the guard's warnings go to stderr, and a test may read them.
+  const r = spawnSync('node', [GUARD, ...args], { encoding: 'utf8', env: { ...process.env, LEDGER_LINT_ROOT: root } });
+  return { code: r.status, out: `${r.stdout || ''}${r.stderr || ''}` };
 }
 
 const ledger = (open, answered = '') => `# Some other section
@@ -249,5 +243,63 @@ describe('the archive of closed rows', () => {
     archive('2026-10', '1. **[L9] ✅ CLOSED — the highest id lives in the archive.**\n');
     expect(run(['--next', 'odd']).out.trim()).toBe('L11');
     expect(run(['--next', 'even']).out.trim()).toBe('L10');
+  });
+});
+
+// The row rules agreed after the retro of 2026-11-25: a question to Frits carries the asker's recommendation and what
+// happens meanwhile, a new row says when it was asked, and an open row stays short once the long ones were trimmed.
+// Rows from L1206 on are held; older rows only warn, so the history is not rewritten by a lint.
+describe('the row rules for new rows', () => {
+  const nf = (id, extra = '') => `1. **[L${id}] asked 2026-11-26 — a question.** ? Needs Frits ${extra}`;
+
+  it('a new `? Needs Frits` row without Recommend: and Meanwhile: is red', () => {
+    write('REMAINING-WORK.md', ledger(nf(1206)));
+    const { code, out } = run();
+    expect(code).toBe(1);
+    expect(out).toMatch(/L1206.*Recommend:.*Meanwhile:/s);
+  });
+
+  it('with both it is green', () => {
+    write('REMAINING-WORK.md', ledger(nf(1206, 'Recommend: yes. Meanwhile: the default.')));
+    expect(run().code).toBe(0);
+  });
+
+  it('an old `? Needs Frits` row without them only warns, naming the id', () => {
+    write('REMAINING-WORK.md', ledger('1. **[L1100] a question.** ? Needs Frits'));
+    const { code, out } = run();
+    expect(code).toBe(0);
+    expect(out).toMatch(/L1100/);
+  });
+
+  it('a new row without `asked <date>` is red; an old one is not', () => {
+    write('REMAINING-WORK.md', ledger('1. **[L1206] a new row.**\n2. **[L1100] an old row.**'));
+    const { code, out } = run();
+    expect(code).toBe(1);
+    expect(out).toMatch(/L1206.*asked/s);
+    expect(out).not.toMatch(/L1100.*asked/);
+  });
+
+  it('a closed row is not held to the question rule', () => {
+    write('REMAINING-WORK.md', ledger('1. ✅ CLOSED 2026-11-26 **[L1206] asked 2026-11-26 — done.** ? Needs Frits was asked'));
+    expect(run().code).toBe(0);
+  });
+
+  it('an open row over the limit is red only once the baseline says the trim ran', () => {
+    const long = `1. **[L1100] ${'x'.repeat(1600)}**`;
+    write('REMAINING-WORK.md', ledger(long));
+    expect(run().code).toBe(0);
+    write('plans/ledger-marker-baseline.json', JSON.stringify({ markerSites: [], highWaterMark: 1100, knownIds: [1100], rowLengthLimit: 1500 }));
+    const { code, out } = run();
+    expect(code).toBe(1);
+    expect(out).toMatch(/L1100.*1500/s);
+  });
+
+  it('--update keeps the row-length limit once it is set', () => {
+    write('REMAINING-WORK.md', ledger('1. **[L1100] short.**'));
+    write('plans/ledger-marker-baseline.json', JSON.stringify({ markerSites: [], highWaterMark: 1100, knownIds: [1100], rowLengthLimit: 1500 }));
+    baseline();
+    const long = `1. **[L1100] ${'x'.repeat(1600)}**`;
+    write('REMAINING-WORK.md', ledger(long));
+    expect(run().code).toBe(1);
   });
 });

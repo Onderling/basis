@@ -71,7 +71,7 @@ import { alphaViewMode, isAlphaTab, ALPHA_FALLBACK_TAB } from '../../src/v2/alph
 import { runPendingForget, markerVaultOver, circleIdsFrom } from '../../src/v2/enrolForgets.js';
 import { checkPhraseForThisDevice, startDeviceOver, readStartOverMark, cancelStartOver, cancelStartOverAsks, wipeKeyValueStorage, deleteDatabases, restorePhraseWithoutAgent, START_OVER_PENDING_KEY } from '../../src/v2/startOver.js';
 import { isBasisStorageKey, isBasisDatabase, BASIS_DB_NAMES } from '../../src/v2/basisStorageNames.js';
-import { pickRootKeyStore } from '../../src/core/agent/ownerRootCustody.js';
+import { pickRootKeyStore, openKeyDoorAtBoot } from '../../src/core/agent/ownerRootCustody.js';
 import { makeBrowserVault } from '@onderling/secure-agent';
 import { DEFAULT_PERSONA } from '../../src/v2/contactPersona.js';
 import { contactAddSheetModel, addContactAs, contactLensModel, changeContactLens, contactThreadSelfFor } from '../../src/v2/contactLens.js';
@@ -889,6 +889,9 @@ import { makeGiveUpConsumers } from '../../src/v2/deliveryGiveUp.js';
 // The SHARED security-status report — the same function mobile reaches through the builtins table.
 import { securityStatus } from '../../src/core/localBuiltins.js';
 import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../../src/v2/circleMembrane.js';
+
+// the key door this tab built at its start (the browser lock): one object, so an opened door stays open in this tab
+let keyDoor = null;
 
 // actor label stamped on local chat-message events. Real WebID/
 // peer-display wiring lands with peer broadcast.
@@ -9663,6 +9666,41 @@ function openStartOverPage() {
   try { window.sessionStorage.setItem(START_OVER_PAGE_KEY, '1'); } catch { /* the page opens on this load only */ }
   window.location.reload();
 }
+
+// THE LOCK SCREEN (the browser lock): painted at an open when the person locked their Basis in this browser, before
+// the agent exists, so nothing of theirs is behind it. One field, the wrong-code line, and the way out of a forgotten
+// code (the start-over page). The shell paints and passes what was typed; `openKeyDoorAtBoot` asks, the door decides.
+// "Opening" is painted, and the browser given a frame to show it, BEFORE the slow derivation blocks the page.
+function keyDoorLockScreen() {
+  const root = document.getElementById('circle-root') ?? document.body;
+  const el = (tag, attrs = {}, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); n.append(...kids); return n; };
+  const said = el('p', { role: 'alert', class: 'lock-screen__said', 'data-testid': 'lock-said' });
+  const field = el('input', { type: 'password', class: 'lock-screen__field', autocomplete: 'current-password', 'aria-label': t('circle.lock.field'), 'data-testid': 'lock-field' });
+  const open = el('button', { type: 'submit', class: 'cc-btn cc-btn--primary', 'data-testid': 'lock-open' }, t('circle.lock.open'));
+  const forgot = el('button', { type: 'button', class: 'cc-btn cc-btn--link', 'data-testid': 'lock-forgot' }, t('circle.lock.forgot'));
+  forgot.addEventListener('click', () => openStartOverPage());
+  const form = el('form', { class: 'lock-screen__form' }, el('label', {}, t('circle.lock.field'), field), open, said);
+  const page = el('section', { class: 'lock-screen', 'data-testid': 'lock-screen' }, el('h2', {}, t('circle.lock.title')), form, forgot);
+  let answer = null;
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!answer) return;
+    const give = answer; answer = null;
+    open.disabled = true; said.textContent = t('circle.lock.opening');
+    const typed = field.value;
+    requestAnimationFrame(() => setTimeout(() => give(typed), 0));
+  });
+  root.replaceChildren(page);
+  return {
+    ask: ({ wrong }) => new Promise((resolve) => {
+      answer = resolve; open.disabled = false;
+      said.textContent = wrong ? t('circle.lock.wrong') : '';
+      if (wrong) field.value = '';
+      field.focus();
+    }),
+    close: () => page.remove(),
+  };
+}
 // The clear takes only what is Basis's by name (basisStorageNames.js): the origin is shared with the public site and the
 // toolbox screen pages. A delete another tab blocks fails the start-over with 'blocked' ("close the other tabs").
 async function wipeThisBrowser() {
@@ -9748,6 +9786,18 @@ async function boot() {
     try { asked = window.sessionStorage.getItem(START_OVER_PAGE_KEY) === '1'; window.sessionStorage.removeItem(START_OVER_PAGE_KEY); } catch { /* no page asked */ }
     if (mark || asked) { await initAppLocale().catch(() => {}); showStartOver({ mark }); return; }
   } catch { /* the ordinary boot */ }
+  // THE KEY DOOR, next (the browser lock): built ONCE here and asked before anything else starts. A locked door paints
+  // the lock screen and the boot waits for the person's secret: no relay socket, no sync, no store opened before it.
+  // The same door, open, is the agent's (an opened door's key lives in that one object).
+  keyDoor = pickRootKeyStore({ fallbackVault: makeBrowserVault(storageName('vaultOwnerRoot')) });
+  try {
+    if ((await keyDoor.status()) === 'locked') {
+      await initAppLocale().catch(() => {});
+      const screen = keyDoorLockScreen();
+      await openKeyDoorAtBoot(keyDoor, { askSecret: screen.ask });
+      screen.close();
+    }
+  } catch (e) { console.warn(`[key door] could not be asked at the start: ${e?.message ?? e}`); }
   // THE SIGNATURE CHECK: WebCrypto's batch behind the one strict rule, after its self-test (the vectors, an honest and a
   // tampered signature); a browser without Ed25519 in WebCrypto keeps tweetnacl. Reads then check ahead in one batch.
   try { const eq = await installWebSignatureEquation(globalThis.crypto?.subtle); console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`); } catch { /* tweetnacl stays */ }
@@ -9839,6 +9889,8 @@ async function boot() {
 
   try {
     const agent = await createRealHouseholdAgent({
+      // the key door the boot asked (and, when locked, opened with the person's secret): the agent reads THIS one
+      rootKeyStore: keyDoor,
       // the person's one availability record: away matches no offering (the post matcher, on this device)
       availability: () => availabilityStore.get(),
       // the agent's own lines (list and calendar defaults, task confirmations, a paused circle) in the person's language

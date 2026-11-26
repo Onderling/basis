@@ -9807,6 +9807,32 @@
     "text": "Oké",
     "doc": "Launcher (ledger L1115): dismisses the refused-save notice; it is said once a session."
   },
+  "lock": {
+    "title": {
+      "text": "Basis is op slot",
+      "doc": "Web: the lock screen at an open, when the person locked their Basis in this browser (the browser lock)."
+    },
+    "field": {
+      "text": "Je code of wachtzin",
+      "doc": "Web: the lock screen's one field."
+    },
+    "open": {
+      "text": "Openen",
+      "doc": "Web: the lock screen's button."
+    },
+    "opening": {
+      "text": "Bezig met openen",
+      "doc": "Web: painted before the slow opening of the lock starts (about a second)."
+    },
+    "wrong": {
+      "text": "Dat is niet de code. Probeer het nog eens.",
+      "doc": "Web: the lock screen after a wrong code or passphrase."
+    },
+    "forgot": {
+      "text": "Vergeten? Begin dit apparaat opnieuw met je herstelzin.",
+      "doc": "Web: the lock screen's way out of a forgotten code: the existing start-over page."
+    }
+  },
   "start_over": {
     "lede": {
       "text": "Typ je herstelzin (24 woorden). Er wordt niets verwijderd voordat hij is gecontroleerd en jij bevestigt.",

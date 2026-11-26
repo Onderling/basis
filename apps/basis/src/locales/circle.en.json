@@ -9810,6 +9810,32 @@
     "text": "OK",
     "doc": "Launcher (ledger L1115): dismisses the refused-save notice; it is said once a session."
   },
+  "lock": {
+    "title": {
+      "text": "Basis is locked",
+      "doc": "Web: the lock screen at an open, when the person locked their Basis in this browser (the browser lock)."
+    },
+    "field": {
+      "text": "Your code or passphrase",
+      "doc": "Web: the lock screen's one field."
+    },
+    "open": {
+      "text": "Open",
+      "doc": "Web: the lock screen's button."
+    },
+    "opening": {
+      "text": "Opening",
+      "doc": "Web: painted before the slow opening of the lock starts (about a second)."
+    },
+    "wrong": {
+      "text": "That is not the code. Try again.",
+      "doc": "Web: the lock screen after a wrong code or passphrase."
+    },
+    "forgot": {
+      "text": "Forgot it? Start this device over with your recovery phrase.",
+      "doc": "Web: the lock screen's way out of a forgotten code: the existing start-over page."
+    }
+  },
   "start_over": {
     "lede": {
       "text": "Type your recovery phrase (24 words). Nothing is removed until it is checked and you confirm.",

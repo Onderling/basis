@@ -28,7 +28,7 @@ import { withAnswers, RSVP_TYPE, rosterAnswerRule } from '../../v2/rsvpItems.js'
 import { THREAD_LANGS } from '../../v2/threadLangs.js';
 import { TRANSPORT_MODES } from '../../v2/circleSettingsControls.js';
 import {
-  Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry, CapabilityToken,
+  Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry, CapabilityToken, WIRE_VERSION,
   PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed, wireDeviceId,
   signDeviceRevocation, verifyDeviceRevocation, signDeviceStatement, STATEMENT_DOMAINS,
@@ -45,7 +45,8 @@ import {
   useCircleSigningIdentity, installCircleSigningIdentities,
 } from '../../v2/circleSigningIdentity.js';
 import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleSenderAuthorization.js';
-import { createCircleAddressIndex, decidePeerSend, sendDecisionFields, personAllowedBy, createInviteExchange, exchangeKindOf, createHeldSends, HELD_SEND_RECHECK_MS } from '../../v2/peerSendGate.js';
+import { createCircleAddressIndex, decidePeerSend, sendDecisionFields, personAllowedBy, createInviteExchange, exchangeKindOf, createHeldSends, HELD_SEND_RECHECK_MS, wireRefusedSend } from '../../v2/peerSendGate.js';
+import { createNotUnderstood, isNotUnderstood } from '../../v2/notUnderstood.js';
 import { log as structuredLog } from '@onderling/logger';
 import { createRosterReadCache, isRosterRead } from '../../v2/rosterReadCache.js';
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../v2/addressSharing.js';
@@ -113,6 +114,7 @@ import { makeContactTurnFan, makeContactTurnPeerHandler, CONTACT_TURN_BROADCAST 
 import { makeSiblingCarry } from '../../v2/siblingCarry.js';
 import { createPersonKeySync, routePersonKeySync, PERSON_KEY_CARRY, PERSON_KEY_SELF_REVEAL } from '../../v2/personKeySync.js';
 import { circleSendRoute } from '../../v2/circleSendRoute.js';
+import { runWireShapeCheck } from '../../v2/wireRegister.js';   // the shape check under test, at the one wire call
 import { createPrimaryDeviceChoice, SPINE_POINT_VAULT_KEY, SPINE_POINT_SUBTYPES } from '../../v2/primaryDevice.js';
 import { pairRouteFor } from '../../v2/pairRoster.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
@@ -1203,6 +1205,8 @@ export async function createRealHouseholdAgent(opts = {}) {
    * one chosen, and the outcome. Every emulator or phone failure then names its branch without a new instrument.
    */
   async function wireSend(to, payload, sendOpts = {}, decision = null) {
+    // UNDER TEST ONLY: the wire register's shape check (wireRegister.js; installed by the test setup, never by a shell)
+    runWireShapeCheck(payload);
     // the route the send TOOK, reported by the send itself; the candidates are explained only when nothing took it (a
     // recomputed route beside a delivered send could name a branch the send did not take)
     let taken = null;
@@ -4068,6 +4072,15 @@ export async function createRealHouseholdAgent(opts = {}) {
   // person whose greeting reached one device and whose message reached another simply saw nothing
   // arrive. Counted per reason, so a diagnostic can read it; warned once per pair, so a log stays
   // readable under a storm.
+  // A WIRE REFUSAL, either side, said in the log once per peer and side per start (the core agent emits it once); the
+  // words a person reads are on that peer's contact row (`contactRowMeta`) and on the refused send's bubble.
+  sa.agent.on?.('wire-refused', ({ address, side, wire }) => {
+    try { structuredLog.warn('agent', 'wire.refused', { side, wire, peer: typeof address === 'string' ? address.slice(0, 12) : '?' }); } catch { /* the log never breaks */ }
+  });
+  // what each peer could not receive and what this device answered it could not (notUnderstood.js), per start
+  const notUnderstood = createNotUnderstood();
+  // the wire this device speaks (the kernel layer's stamp), for the not-understood answer and the comparison with a peer's
+  const ourWire = () => (Number.isInteger(sa.agent?.security?.wire) ? sa.agent.security.wire : WIRE_VERSION);
   const refusedInbound = new Map();
   const refusedInboundWarned = new Set();
   sa.agent.on?.('security-error', (err, raw) => {
@@ -5996,9 +6009,10 @@ export async function createRealHouseholdAgent(opts = {}) {
    * enrolment, device retirement, recovery, surface grants) are 'private': SELF only, never granted — a
    * household bot's admin at 'trusted' reaches none of them. hostAgent is IN-PROCESS ONLY (InternalTransport;
    * no external peer can reach it), so the sole caller is the chat agent — the owner — named SELF below.
-   * Reads stay 'authenticated'. Revocation feeds from the issuer-side agentsTokenRegistry. Best-effort:
-   * a failure leaves the gate absent (prior behaviour) — never breaks boot. */
-  try {
+   * Reads stay 'authenticated'. Revocation feeds from the issuer-side agentsTokenRegistry. NO GATE, NO HOST: a
+   * failure here (its sealed trust vault will not read, a tier will not write) stops the boot like the other sealed
+   * vaults do. It used to be caught and warned, which left the gate absent, and the 'private' ops are what it guards. */
+  {
     // Vault-backed TrustRegistry: unknown peers → 'authenticated'; the owner's chat identity → 'private' (self).
     hostTrustRegistry = new TrustRegistry(await sealedVault(opts.hostTrustVault ?? pickVault(storageName('vaultHostTrust'))));   // sealed: trust levels are metadata about people
     hostAgent.policyEngine = new PolicyEngine({
@@ -6025,7 +6039,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     await hostTrustRegistry.setTier(hostId.pubKey, 'private');
     // The in-process chat caller is the owner's device — it is self, so it clears the 'private' host ops.
     await hostTrustRegistry.setTier(chatId.pubKey, 'private');
-  } catch (e) { console.warn('[realAgent] hostAgent PolicyEngine attach skipped:', e?.message ?? e); }
+  }
 
   await Promise.all([
     hostAgent.start(),
@@ -6956,6 +6970,14 @@ export async function createRealHouseholdAgent(opts = {}) {
    */
   async function peerSend(to, payload, sendOpts = {}, { heldSince = null, settle = null } = {}) {
     const o = sendOpts ?? {};
+    // A PEER REFUSED FOR ITS WIRE (protocol/wire.js: our receive gate refused its envelopes, or it answered ours with a
+    // refusal frame) gets nothing at all, of any kind, until an envelope with an accepted wire arrives from it.
+    const wireStop = wireRefusedSend(sa.agent?.wireRefusal?.(to) ?? null);
+    if (wireStop) {
+      const refused = { held: false, delivered: false, msgId: payload?.msgId ?? payload?.id ?? null, ...wireStop };
+      try { structuredLog.warn('agent', 'send.decision', { reason: wireStop.reason, outcome: 'refused' }); } catch { /* the log never breaks a send */ }
+      return refused;
+    }
     // A BLOCKED ADDRESS gets no DIRECT contact from this device (Frits 2026-11-12: a block is about direct contact; the
     // secure agent enforces nothing): a direct payload (directDoors.js) to it is refused with the reason, nothing on the
     // wire. Circle traffic goes on regardless, so every member's device folds the same.
@@ -10428,7 +10450,25 @@ export async function createRealHouseholdAgent(opts = {}) {
           inboundRefused['old-envelope'] = (inboundRefused['old-envelope'] ?? 0) + 1;
           return { refused: true };
         }
-        return onPeerMessage?.(env);
+        // A PEER'S ANSWER that it could not receive a subtype of ours (notUnderstood.js): kept per peer (the words on its
+        // row), logged once, never answered and never handed to the shell router (so it can never be "unknown" itself).
+        if (isNotUnderstood(env?.payload)) {
+          const kind = notUnderstood.noteAnswer(env?.from, env.payload, ourWire());
+          // an older build: kept for its row; the SAME wire: two current builds disagree, a gap in one of our shells
+          if (kind) {
+            try { structuredLog.warn('agent', kind === 'older' ? 'peer.not-understood' : 'peer.not-understood.same-wire', { of: env.payload.of, wire: env.payload.wire ?? null, peer: String(env?.from ?? '?').slice(0, 12) }); } catch { /* the log never breaks */ }
+          }
+          return undefined;
+        }
+        const verdict = onPeerMessage?.(env);
+        // …and a NAMED subtype the shell router did not take: answered ONCE per peer and subtype per start, through the
+        // send gate (a blocked peer gets nothing; the answer is direct contact). Only a verified sender reaches here.
+        Promise.resolve(verdict).then((v) => {
+          const answer = notUnderstood.answerFor(env?.from, v?.notUnderstood, ourWire());
+          if (answer) return peerSend(env.from, answer);
+          return null;
+        }).catch(() => {});
+        return verdict;
       };
       // THE RELAY NEVER WAITS ON NKN (2026-09-18). This used to `await` NKN first and dial the relay after
       // — so an unreachable NKN network (its fallback chain is minutes long, then it throws) meant the relay,
@@ -10951,6 +10991,21 @@ export async function createRealHouseholdAgent(opts = {}) {
      * @param {string} address
      * @returns {string} the canonical identity key, or `address` unchanged
      */
+    /**
+     * Does one side refuse this peer's wire in this start (`{side: 'we-refused'|'they-refused', wire}`), or null. The
+     * contact row reads it for its words; the send gate reads the same mark (`peerSend`).
+     * @param {string} address
+     */
+    /**
+     * The subtypes this peer answered it could not receive, in this start (its build is older): the words on its row.
+     * @param {string} address
+     * @returns {string[]}
+     */
+    notUnderstoodBy: (address) => (typeof address === 'string' && address ? notUnderstood.toldBy(address) : []),
+    wireRefusal: (address) => {
+      if (typeof address !== 'string' || !address) return null;
+      try { return sa.agent?.wireRefusal?.(address) ?? null; } catch { return null; }
+    },
     identityOfAddress: (address) => {
       if (typeof address !== 'string' || !address) return address;
       try { return sa.resolver?.pubKeyForAddr?.(address) || address; }

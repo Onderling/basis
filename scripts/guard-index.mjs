@@ -68,7 +68,9 @@ function testFiles() {
   const out = [];
   const skip = new Set(['node_modules', 'dist', 'build', '.git', '_archive', 'coverage']);
   const walk = (dir) => {
-    let names; try { names = readdirSync(dir); } catch { return; }
+    // Sorted: the file system's own listing order differs between machines, and the first file to declare a
+    // guard wins below, so an unsorted walk makes the index fresh on one machine and stale on another.
+    let names; try { names = readdirSync(dir).sort(); } catch { return; }
     for (const n of names) {
       if (skip.has(n)) continue;
       const full = path.join(dir, n);
@@ -111,7 +113,9 @@ function namedGuards() {
       for (const im of text.matchAll(/\bG-[A-Z][A-Za-z0-9-]*\b/g)) add(im[0], cleanClaim(text, im[0]), rel);
     }
   }
-  return [...byKey.values()].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  // Every guard without an id shares the id '—': break that tie on file, then claim, never on walk order.
+  return [...byKey.values()].sort((a, b) =>
+    String(a.id).localeCompare(String(b.id)) || a.file.localeCompare(b.file) || a.claim.localeCompare(b.claim));
 }
 
 /** Trim a describe string to the CLAIM: drop the id + a leading separator, cap length. */

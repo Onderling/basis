@@ -50,6 +50,10 @@ export const DELIVERY_REASON_LABELS = Object.freeze({
   'unknown-address': 'circle.chat.delivery.unknown_address',
   // still sending after a while, for no reason anyone named (`createAppDeliveryMap`): waiting, not failed
   'waiting-for-connection': 'circle.chat.delivery.waiting_for_connection',
+  // refused at the send gate for the wire: the other side refused this build's Basis version (this device is older) …
+  'wire-older': 'circle.chat.delivery.wire_older',
+  // … or this device refused theirs (they are older): nothing goes until they update
+  'wire-peer-older': 'circle.chat.delivery.wire_peer_older',
 });
 
 /**

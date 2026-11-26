@@ -28,7 +28,7 @@ describe('a screen\'s connect code and a bot-link offer, routed by the one table
 
   it('the classifier list and the target table hold the same kinds', () => {
     expect(Object.keys(SCAN_TARGETS).sort()).toEqual(SCAN_CLASSIFIERS.map((c) => c.kind).sort());
-    expect(SCAN_CLASSIFIERS.map((c) => c.kind)).toEqual(['contact', 'invite', 'pair', 'enroll', 'claim', 'screen', 'botlink']);
+    expect(SCAN_CLASSIFIERS.map((c) => c.kind)).toEqual(['contact', 'invite', 'pair', 'enroll', 'claim', 'screen', 'botlink', 'bot']);
   });
 });
 

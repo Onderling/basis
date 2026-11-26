@@ -62,6 +62,20 @@ export const PERSON_ALLOWLIST = Object.freeze([
 ]);
 
 /**
+ * THE WIRE REFUSAL at the send gate: a peer one side refused for its wire (the core agent's `wireRefusal(address)`, set by
+ * its receive gate or by the peer's refusal frame) gets NOTHING from this device until an envelope with an accepted wire
+ * arrives from it, which clears the mark. The reason names which side is older, so the bubble says the right thing.
+ * @param {{side: 'we-refused'|'they-refused', wire?: number|null}|null} refusal
+ * @returns {null|{refused: 'wire', reason: 'wire-peer-older'|'wire-older'}}
+ */
+export function wireRefusedSend(refusal) {
+  if (!refusal || typeof refusal !== 'object') return null;
+  if (refusal.side === 'we-refused') return { refused: 'wire', reason: 'wire-peer-older' };
+  if (refusal.side === 'they-refused') return { refused: 'wire', reason: 'wire-older' };
+  return null;
+}
+
+/**
  * Which allowlist entry lets a person-key send through, from the facts the agent holds about `to`.
  * @param {{inviteExchange?: 'joiner'|'answer'|null, contact?: object|null, addressFallback?: boolean}} [facts]
  * @returns {{allowedBy: string, origin?: string, side?: string}}

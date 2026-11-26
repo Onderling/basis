@@ -27,9 +27,10 @@ import { reportNotReadable, clearNotReadable } from './notReadableStores.js';
 /**
  * Read stored text into a Map.
  * @param {string|null|undefined} raw  the stored text; null/undefined/'' = nothing stored
+ * @param {number} [v=MAP_SNAPSHOT_V]  the stamp this store is written and read with (its storage register row's `v`)
  * @returns {{ map: Map<string, any>, notReadable: null | 'unparseable' | 'shape' | 'version' }}
  */
-export function readMapSnapshot(raw) {
+export function readMapSnapshot(raw, v = MAP_SNAPSHOT_V) {
   if (raw == null || raw === '') return { map: new Map(), notReadable: null };
   if (typeof raw !== 'string') return { map: new Map(), notReadable: 'shape' };
   let parsed;
@@ -42,15 +43,15 @@ export function readMapSnapshot(raw) {
   if (!(own('v') && own('data'))) {
     return { map: new Map(Object.entries(parsed)), notReadable: null };   // before the stamp: today's format
   }
-  if (parsed.v !== MAP_SNAPSHOT_V) return { map: new Map(), notReadable: 'version' };
+  if (parsed.v !== v) return { map: new Map(), notReadable: 'version' };
   const data = parsed.data;
   if (!data || typeof data !== 'object' || Array.isArray(data)) return { map: new Map(), notReadable: 'shape' };
   return { map: new Map(Object.entries(data)), notReadable: null };
 }
 
-/** The text a Map is stored as. */
-export function writeMapSnapshot(map) {
-  return JSON.stringify({ v: MAP_SNAPSHOT_V, data: Object.fromEntries(map ?? []) });
+/** The text a Map is stored as, stamped with `v`. */
+export function writeMapSnapshot(map, v = MAP_SNAPSHOT_V) {
+  return JSON.stringify({ v, data: Object.fromEntries(map ?? []) });
 }
 
 /**
@@ -59,9 +60,10 @@ export function writeMapSnapshot(map) {
  * @param {string} name  the store's name for the one log line (a path or db name; never content, never shown)
  * @param {object} [opts]
  * @param {string} [opts.kind='data']  what the store holds as a person names it (`STORE_KINDS`): the notice says it
+ * @param {number} [opts.v=MAP_SNAPSHOT_V]  the stamp it writes and accepts (the store's storage register row's `v`)
  * @param {(msg: string) => void} [opts.warn]
  */
-export function mapSnapshotGate(name, { kind = 'data', warn = (m) => console.warn(m) } = {}) {
+export function mapSnapshotGate(name, { kind = 'data', v = MAP_SNAPSHOT_V, warn = (m) => console.warn(m) } = {}) {
   let notReadable = null;
   let said = false;
   const settle = () => {
@@ -71,7 +73,7 @@ export function mapSnapshotGate(name, { kind = 'data', warn = (m) => console.war
   return {
     /** The stored text (or null when nothing is stored) → the Map for the cache. */
     read(raw) {
-      const r = readMapSnapshot(raw);
+      const r = readMapSnapshot(raw, v);
       notReadable = r.notReadable;
       settle();
       return r.map;
@@ -88,7 +90,7 @@ export function mapSnapshotGate(name, { kind = 'data', warn = (m) => console.war
         }
         return null;
       }
-      return writeMapSnapshot(map);
+      return writeMapSnapshot(map, v);
     },
     /** null, or why the stored snapshot was not readable. */
     get notReadable() { return notReadable; },

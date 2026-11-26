@@ -69,6 +69,7 @@ import { SENDER_KEY_FIELD, senderCredential, resolveSenderKey, carriedSenderCred
 import { askSenderAuthorizer }                       from './senderAuthorization.js';
 import { param, PARAM_SCOPE, PARAM_KIND }            from '../params.js';
 import { parseUntrustedJson } from './untrustedJson.js';
+import { WIRE_VERSION, MIN_WIRE, WIRE_FIELD, wireAccepted } from '../protocol/wire.js';
 
 // Parameter register (#36) — the anti-replay window + dedup TTL. scope:device, kind:INTERNAL is load-bearing
 // here: these are SECURITY bounds, and kind:internal makes them immutable by construction — a user can never
@@ -101,6 +102,10 @@ export const SEC = Object.freeze({
   // The authorizer cannot vouch for the sender YET (its snapshot may be behind): the error carries the authorizer's
   // opaque `bucket`, and the envelope's dedup entry is released, so the host may hold it and judge it once more.
   SENDER_STALE:           'SENDER_STALE',
+  // A genuinely signed envelope whose wire (`_w`, inside the signature) is missing or below this build's lowest accepted
+  // wire. The error carries `from`, `to`, `envelopeId` and `peerWire`, so the agent can mark the peer and answer ONE
+  // refusal frame (protocol/wire.js).
+  WIRE_REFUSED:           'WIRE_REFUSED',
 });
 
 /**
@@ -189,6 +194,9 @@ export class SecurityLayer {
    * reader runs microseconds later in the same handler, so anything old here is already dead weight.
    */
   #establishedBy = new Map();
+  /** The wire this layer stamps, and the lowest it accepts (protocol/wire.js; options only so a test can be two builds). */
+  #wire = WIRE_VERSION;
+  #minWire = MIN_WIRE;
   static #ESTABLISHED_MAX = 256;
 
   /**
@@ -197,8 +205,10 @@ export class SecurityLayer {
    * @param {Function} [opts.authorizeSender]  the roster-authorize port (see `setSenderAuthorizer`)
    * @param {Function} [opts.senderKeyLookup]  the L1 key-id resolver (see `senderKey.js`)
    */
-  constructor({ identity, authorizeSender = null, senderKeyLookup = null }) {
+  constructor({ identity, authorizeSender = null, senderKeyLookup = null, wire = WIRE_VERSION, minWire = MIN_WIRE }) {
     this.#identity = identity;
+    this.#wire = wire;
+    this.#minWire = minWire;
     // Auto-register self so outbound HI sigs are verifiable in loopback tests.
     this.#peers.set(identity.pubKey, identity.pubKey);
     this.setSenderAuthorizer(authorizeSender);
@@ -589,6 +599,14 @@ export class SecurityLayer {
       throw new SecurityError(SEC.BAD_SIG, `Invalid signature on envelope ${env._id}`);
     }
 
+    // 4b. THE WIRE GATE — the wire the sender speaks, read from inside the signature it just passed (so nobody on the
+    // path lowered or stripped it). Missing or below ours = refused, before anything is registered or opened. A HIGHER
+    // wire is not refused here: the newer side decides. Read HERE, refused AFTER 5a and 5b: until then this key is
+    // nobody in particular, and a refusal marks the address it names and answers it. An envelope that 5a or 5b refuses
+    // is refused for that, silently, whatever its wire (a throwaway key naming a contact must not cut both sides off,
+    // and a stranger must not get a signed answer from a circle address).
+    const wireOk = wireAccepted(env[WIRE_FIELD], this.#minWire);
+
     // ── Everything below runs ONLY on an envelope that is internally consistent. Nothing above
     //    touched `#peers`, so a rejection up to here leaves no trace at all — the rollback the
     //    07-31 fix needed is gone because the mutations it undid no longer happen.
@@ -660,6 +678,18 @@ export class SecurityLayer {
           + 'Install one with setSenderAuthorizer(fn). This warning appears once per SecurityLayer.',
         );
       }
+    }
+
+    // 5b'. The wire refusal, for an envelope that 5a and 5b let through. It is ANSWERABLE (marked, one frame back) only
+    // when it would have been accepted had its wire been current: a key we already hold for that address, or a hello
+    // (first contact, which 5c would establish). Anything else is refused silently, and nothing is registered either way.
+    if (!wireOk) {
+      const peerWire = Number.isInteger(env[WIRE_FIELD]) ? env[WIRE_FIELD] : null;
+      const answerable = held !== undefined || env._p === P.HI;
+      throw Object.assign(new SecurityError(
+        SEC.WIRE_REFUSED,
+        `Envelope ${env._id} speaks wire ${peerWire ?? 'none'}; this build accepts ${this.#minWire} and up`,
+      ), { from: env._from, to: typeof env._to === 'string' ? env._to : null, envelopeId: env._id, peerWire, answerable });
     }
 
     // 5c. First contact. An address we hold no key for may have one ESTABLISHED by a hello — that
@@ -740,11 +770,15 @@ export class SecurityLayer {
    * it must re-sign, which is the whole point — the pair (key, signature) is self-consistent or it
    * is nothing. It buys no trust on its own; `decryptAndVerify` step 5 is where trust happens.
    */
+  /** The wire this layer speaks (what its envelopes carry). */
+  get wire() { return this.#wire; }
+
   #sign(env, signer = this.#identity) {
     const credential = senderCredential(signer);
     const unsigned   = {
       ...env,
       ...(credential ? { [SENDER_KEY_FIELD]: credential } : {}),
+      [WIRE_FIELD]: this.#wire,   // inside the signed bytes: the receive gate reads a wire nobody could lower
       _sig: null,
     };
     const sig = signer.sign(canonicalize(unsigned));

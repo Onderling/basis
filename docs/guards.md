@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 87
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 88
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -79,6 +79,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `screen-sections` | — | a hand-painted screen whose sections are DECLARED (`apps/basis/src/v2/screenSections.js`) is |
 | `sealed-at-rest` | — | every local store a shell builds is sealed on the way to disk |
 | `searchable-sources` | — | every source file must be findable by search |
+| `shapes` | — | a declared shape does not change without its version, and a version does not rise without a reader |
 | `sheet-cap` | — | A PHONE SHEET IS CAPPED IN WINDOW PIXELS, NEVER A PERCENTAGE. A card capped with `maxHeight: '85%'` did not… |
 | `shell-reaches-waist` | — | a shell may COMPOSE the substrate, never CALL it |
 | `shell-seams` | — | web ≡ mobile ≡ box: every shell composes every seam (`shell-seams.mjs` declares them) |
@@ -110,8 +111,8 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | — | an entry added on A arrives on B | `apps/basis/test/appListFanTwoDevice.test.js` |
 | — | sa.audit and the agent trail read their AUDIT retention window from ONE shared table | `apps/basis/test/auditRetentionAgreement.test.js` |
 | — | what leaves for a toolbox is exactly the tool and its input; a toolbox that is not on is refused before the call; eve… | `apps/basis/test/egressToolbox.test.js` |
-| — | an entry added with a ref and a quantity on A arrives on B with both (the item travels whole) | `apps/basis/test/entryRefQuantity.test.js` |
 | — | a second add of the same thing raises the quantity, never a second entry; the reply says so | `apps/basis/test/entryRefQuantity.test.js` |
+| — | an entry added with a ref and a quantity on A arrives on B with both (the item travels whole) | `apps/basis/test/entryRefQuantity.test.js` |
 | — | list never learns what the thing is: nothing branches on the reference's type | `apps/basis/test/entryRefQuantity.test.js` |
 | — | every call, in either shell, of an op the circle's capability check would gate names a person door, or is on the decl… | `apps/basis/test/fitness/tapsNameTheirDoor.test.js` |
 | — | a param declared `form: false` (a thing's reference, filled by a toolbox's choice) is not a field of any form built f… | `apps/basis/test/forms/buildFormSpecProgramOnly.test.js` |
@@ -124,11 +125,11 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | — | a toolbox's list of things gets one /kies button per thing, and the tap adds THAT thing (its reference, quantity 1) t… | `apps/basis/test/v2/toolboxChoices.test.js` |
 | — | a tool call speaks the recorded wire (card, SendMessage, A2A-Version 1.0, bearer) and every failure ends in ONE code,… | `apps/basis/test/v2/toolboxClient.test.js` |
 | — | a toolbox is switched on only after the admin's yes in their own private chat, never from a group chat, and no line o… | `apps/basis/test/v2/toolboxDoor.test.js` |
+| — | a placed toolbox is off until the admin's yes; one that is off is refused before any call leaves, and its words reach… | `apps/basis/test/v2/toolboxes.test.js` |
+| — | a toolbox's key never appears in a reply, a refusal, a log line or the list of tools, and a toolbox with no key on th… | `apps/basis/test/v2/toolboxes.test.js` |
 | — | Telegram door and a screen's kernel skill both reach tools.useTool through the gated call, so both write the tool-cal… | `apps/basis/test/v2/toolboxEveryRoute.test.js` |
 | — | toolbox wire is crossed for real: a socket, an HTTP server, the client's own fetch | `apps/basis/test/v2/toolboxOverHttp.test.js` |
 | — | a toolbox word's slot phrase is taken off the line only as whole words at its start or end (longest first, any case),… | `apps/basis/test/v2/toolboxSlots.test.js` |
-| — | a toolbox's key never appears in a reply, a refusal, a log line or the list of tools, and a toolbox with no key on th… | `apps/basis/test/v2/toolboxes.test.js` |
-| — | a placed toolbox is off until the admin's yes; one that is off is refused before any call leaves, and its words reach… | `apps/basis/test/v2/toolboxes.test.js` |
 | — | framed by another page, the web app's main shell refuses to start and a screen address starts (its entry asks before … | `apps/basis/test/web/ownWindow.test.js` |
 | — | web app's page loads no script, stylesheet or frame from another origin, and the NKN library it runs is the installed… | `apps/basis/test/webOwnOrigin.test.js` |
 | — | subtask-spawn gate bites — only an authorized actor can spawn under a parent | `packages/item-store/test/spawnSubtask.test.js` |

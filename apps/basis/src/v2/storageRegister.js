@@ -20,153 +20,171 @@
  *             one head: `not content:` (a device flag or view state) · `not sealable:` (read before a key exists, or a
  *             key itself) · `unwritten:` (nothing writes under it today) · `debt: L<n>` (should be sealed; its ledger
  *             row). `lint-storage-register` holds a raw write to a `'sealed'` row red.
+ *  - `shape`  what is stored and the version a later build reads it by (below, at SNAP).
  *
  * The names keep today's spelling. The move to one prefix (`basis.`) lands in the alpha build, together with the
  * choice between a fresh start and a one-time rewrite: renaming without a migration would empty a live device's
  * identity and data.
  */
 
-const row = (name, kind, shells, forget, seal) => Object.freeze({ name, kind, shells: Object.freeze(shells), forget, seal });
+const row = (name, kind, shells, forget, seal, shape) => Object.freeze({ name, kind, shells: Object.freeze(shells), forget, seal, shape });
 const W = 'web', M = 'mobile', B = 'box';
+
+/**
+ * `shape`: what is stored under the name, and the version a later build reads it by (`lint-shapes` compares it with
+ * `scripts/stored-shapes.json`). A `v` is only ever one a reader sees:
+ *  - SNAP  a Map written through the snapshot gate (`mapSnapshotGate`, local-store): `v` is the stamp the gate writes and
+ *          checks. A fitness test pins it to MAP_SNAPSHOT_V until the store passes its own `v` to its gate;
+ *  - LOG   the device log's segmented manifest (`backendSnapshotIo`, eventLogPersistence.js), which carries its own `v`;
+ *  - ROWS  a backend of one row per key (a per-circle store, the peer graph, a blob store): no stamp, `v: 'none'`;
+ *  - k(…)  a single value under a key or a key family: no carrier, so `v: 'none'`; its kind changes under a NEW key,
+ *          never in place (`flag` a marker such as '1' · `string` a plain text value · `json` an object or a list);
+ *  - OPAQUE  a vault value, a key, a container this build does not read as a shape, or a name nothing writes today.
+ */
+const SNAP = Object.freeze({ v: 1, carrier: 'snapshot' });
+const LOG = Object.freeze({ v: 1, carrier: 'device-log manifest' });
+const ROWS = Object.freeze({ v: 'none', value: 'rows' });
+const k = (value) => Object.freeze({ v: 'none', value });
+const OPAQUE = 'opaque';
 
 export const STORAGE = Object.freeze({
   // ── stores: an IndexedDB database (web), an AsyncStorage scope (phone), a file (box) ──
-  agentRegistry:          row('cc-agent-registry', 'store', [W, M], 'throwaway', 'sealed'),
-  deviceLog:              row('cc-device-log', 'store', [W, M, B], 'throwaway', 'sealed'),
-  contactDms:             row('cc-contact-dm-state', 'store', [W, M], 'throwaway', 'sealed'),
-  ownDevices:             row('cc-own-devices', 'store', [W, M], 'throwaway', 'sealed'),
-  outboxWeb:              row('cc-outbox-state', 'store', [W], 'throwaway', 'sealed'),
-  outboxPhone:            row('cc-outbox-cache', 'store', [M], 'throwaway', 'sealed'),
+  agentRegistry:          row('cc-agent-registry', 'store', [W, M], 'throwaway', 'sealed', ROWS),
+  deviceLog:              row('cc-device-log', 'store', [W, M, B], 'throwaway', 'sealed', LOG),
+  contactDms:             row('cc-contact-dm-state', 'store', [W, M], 'throwaway', 'sealed', SNAP),
+  ownDevices:             row('cc-own-devices', 'store', [W, M], 'throwaway', 'sealed', SNAP),
+  outboxWeb:              row('cc-outbox-state', 'store', [W], 'throwaway', 'sealed', SNAP),
+  outboxPhone:            row('cc-outbox-cache', 'store', [M], 'throwaway', 'sealed', SNAP),
   // what the former self had already taken (the inbound repeat record), kept BESIDE each outbox under a derived
   // name (`besidePersistDb`)
-  outboxSeenWeb:          row('cc-outbox-state-seen-inbound', 'store', [W], 'throwaway', 'sealed'),
-  outboxSeenPhone:        row('cc-outbox-cache-seen-inbound', 'store', [M], 'throwaway', 'sealed'),
-  pushDevice:             row('cc-push-device', 'store', [W, M], 'throwaway', 'sealed'),
+  outboxSeenWeb:          row('cc-outbox-state-seen-inbound', 'store', [W], 'throwaway', 'sealed', SNAP),
+  outboxSeenPhone:        row('cc-outbox-cache-seen-inbound', 'store', [M], 'throwaway', 'sealed', SNAP),
+  pushDevice:             row('cc-push-device', 'store', [W, M], 'throwaway', 'sealed', SNAP),
   // Settings, the pinboard and the household: each shell names its own, and the two sets are NOT the same words.
-  settingsWeb:            row('cc-settings-state', 'store', [W], 'throwaway', 'sealed'),
-  settingsPhone:          row('cc-settings-cache', 'store', [M], 'throwaway', 'sealed'),
-  pinboardWeb:            row('cc-pinboard-state', 'store', [W, B], 'throwaway', 'sealed'),
-  pinboardPhone:          row('cc-pinboard-cache', 'store', [M, B], 'throwaway', 'sealed'),
-  householdWeb:           row('cc-household-state', 'store', [W], 'throwaway', 'sealed'),
-  householdPhone:         row('cc-household-cache', 'store', [M], 'throwaway', 'sealed'),
-  tasksPhone:             row('cc-tasks-cache', 'store', [M], 'throwaway', 'sealed'),
-  tasksWeb:               row('cc-tasks-state', 'store', [W], 'throwaway', 'unwritten: left by an earlier build; the web keeps its tasks in the per-circle stores'),
-  circleLists:            row('cc-circle-lists-state', 'store', [M], 'throwaway', 'sealed'),
-  circleRag:              row('cc-circle-rag', 'store', [W, M], 'throwaway', 'sealed'),
+  settingsWeb:            row('cc-settings-state', 'store', [W], 'throwaway', 'sealed', SNAP),
+  settingsPhone:          row('cc-settings-cache', 'store', [M], 'throwaway', 'sealed', SNAP),
+  pinboardWeb:            row('cc-pinboard-state', 'store', [W, B], 'throwaway', 'sealed', SNAP),
+  pinboardPhone:          row('cc-pinboard-cache', 'store', [M, B], 'throwaway', 'sealed', SNAP),
+  householdWeb:           row('cc-household-state', 'store', [W], 'throwaway', 'sealed', SNAP),
+  householdPhone:         row('cc-household-cache', 'store', [M], 'throwaway', 'sealed', SNAP),
+  tasksPhone:             row('cc-tasks-cache', 'store', [M], 'throwaway', 'sealed', SNAP),
+  tasksWeb:               row('cc-tasks-state', 'store', [W], 'throwaway', 'unwritten: left by an earlier build; the web keeps its tasks in the per-circle stores', OPAQUE),
+  circleLists:            row('cc-circle-lists-state', 'store', [M], 'throwaway', 'sealed', SNAP),
+  circleRag:              row('cc-circle-rag', 'store', [W, M], 'throwaway', 'sealed', ROWS),
   // the phone's object-version snapshots (a circle's policy, rules and recipe as they were): the throwaway self's too
-  objectVersionsPhone:    row('ccv', 'store', [M], 'throwaway', 'sealed'),
+  objectVersionsPhone:    row('ccv', 'store', [M], 'throwaway', 'sealed', ROWS),
   // The help circle's own stores, named explicitly. Its id is the literal `cc-help`, so the throwaway self and the
   // enrolled person share its store NAME: the one database where two identities' sealed rows sit together. A
   // throwaway self that never provisioned it is not in the registry either, so the per-circle route would skip it.
-  helpCircleStore:        row('cc-circle-cc-help', 'store', [W, M], 'throwaway', 'sealed'),
-  helpCircleCache:        row('cc-circle-cache-cc-help', 'store', [W, M], 'throwaway', 'sealed'),
-  attachmentBlobs:        row('cc-attachment-blobs', 'store', [W], 'throwaway', 'sealed'),
-  circlePodVault:         row('cc-circle-pod', 'store', [W], 'keep', 'sealed'),
-  peerGraph:              row('cc-peers:', 'prefix', [W, M], 'throwaway', 'sealed'),
-  basisDb:                row('basis', 'store', [W], 'throwaway', 'unwritten: nothing writes it today; listed so a start-over removes it'),
-  vaultDb:                row('dwag-vault', 'store', [W], 'keep', 'not sealable: the device vault\'s container: what it holds is ruled per vault row below (sealed by the vault, or a key itself)'),
-  rootKeyDb:              row('onderling-root-key', 'store', [W], 'keep', 'not sealable: holds the non-extractable WebCrypto root key itself: it is what the seal is made from'),
-  pseudoPodDb:            row('onderling-pseudo-pod', 'store', [W], 'throwaway', 'unwritten: the package default name; every shell store passes its own name (pickWebBackend)'),
-  podClientDb:            row('onderling-pod-client', 'store', [W], 'throwaway', 'unwritten: the package default name; IndexedDBTombstones is not constructed by any shell'),
+  helpCircleStore:        row('cc-circle-cc-help', 'store', [W, M], 'throwaway', 'sealed', ROWS),
+  helpCircleCache:        row('cc-circle-cache-cc-help', 'store', [W, M], 'throwaway', 'sealed', ROWS),
+  attachmentBlobs:        row('cc-attachment-blobs', 'store', [W], 'throwaway', 'sealed', ROWS),
+  circlePodVault:         row('cc-circle-pod', 'store', [W], 'keep', 'sealed', OPAQUE),
+  peerGraph:              row('cc-peers:', 'prefix', [W, M], 'throwaway', 'sealed', ROWS),
+  basisDb:                row('basis', 'store', [W], 'throwaway', 'unwritten: nothing writes it today; listed so a start-over removes it', OPAQUE),
+  vaultDb:                row('dwag-vault', 'store', [W], 'keep', 'not sealable: the device vault\'s container: what it holds is ruled per vault row below (sealed by the vault, or a key itself)', OPAQUE),
+  rootKeyDb:              row('onderling-root-key', 'store', [W], 'keep', 'not sealable: holds the non-extractable WebCrypto root key itself: it is what the seal is made from', OPAQUE),
+  pseudoPodDb:            row('onderling-pseudo-pod', 'store', [W], 'throwaway', 'unwritten: the package default name; every shell store passes its own name (pickWebBackend)', OPAQUE),
+  podClientDb:            row('onderling-pod-client', 'store', [W], 'throwaway', 'unwritten: the package default name; IndexedDBTombstones is not constructed by any shell', OPAQUE),
 
   // ── key families (the suffix is a circle, a persona or a screen) ──
   // what was last shared with a circle, keyed `<persona>::<circle>` with no identity in it: on `cc-help` the two
   // selves collide exactly and a stale memo would answer "unchanged" to a real first disclosure
-  sharedDisclosure:       row('cc.sharedDisclosure.', 'prefix', [W, M], 'throwaway', 'sealed'),
-  circlePolicy:           row('cc.circlePolicy.', 'prefix', [W, M], 'throwaway', 'sealed'),
-  circlePolicyHead:       row('cc.circlePolicyHead.', 'prefix', [W, M], 'throwaway', 'sealed'),
-  circlePolicyPending:    row('cc.circlePolicyPending.', 'prefix', [W, M], 'throwaway', 'not content: a pending flag ({pending: bool}) per circle'),
-  circleRules:            row('cc.circleRules.', 'prefix', [W, M], 'throwaway', 'sealed'),
-  circleRulesPending:     row('cc.circleRulesPending.', 'prefix', [W, M], 'throwaway', 'sealed'),
-  circleRecipe:           row('cc.circleRecipe.', 'prefix', [W, M], 'throwaway', 'sealed'),
-  circleRecipePending:    row('cc.circleRecipePending.', 'prefix', [W, M], 'throwaway', 'sealed'),
-  circleOverride:         row('cc.circleOverride.', 'prefix', [W, M], 'throwaway', 'sealed'),
-  screenBlocksCache:      row('cc.screenBlocksCache.', 'prefix', [W, M], 'throwaway', 'sealed'),
-  keptCircles:            row('basis.keptCircles', 'prefix', [W, M], 'throwaway', 'sealed'),
-  nearbyAskedWeb:         row('basis.nearby-asked:', 'prefix', [W], 'throwaway', 'not content: whether Nearby was asked about, per circle'),
-  nearbyAskedPhone:       row('cc.nearby-asked:', 'prefix', [M], 'throwaway', 'not content: whether Nearby was asked about, per circle'),
+  sharedDisclosure:       row('cc.sharedDisclosure.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
+  circlePolicy:           row('cc.circlePolicy.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
+  circlePolicyHead:       row('cc.circlePolicyHead.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
+  circlePolicyPending:    row('cc.circlePolicyPending.', 'prefix', [W, M], 'throwaway', 'not content: a pending flag ({pending: bool}) per circle', k('json')),
+  circleRules:            row('cc.circleRules.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
+  circleRulesPending:     row('cc.circleRulesPending.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
+  circleRecipe:           row('cc.circleRecipe.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
+  circleRecipePending:    row('cc.circleRecipePending.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
+  circleOverride:         row('cc.circleOverride.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
+  screenBlocksCache:      row('cc.screenBlocksCache.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
+  keptCircles:            row('basis.keptCircles', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
+  nearbyAskedWeb:         row('basis.nearby-asked:', 'prefix', [W], 'throwaway', 'not content: whether Nearby was asked about, per circle', k('flag')),
+  nearbyAskedPhone:       row('cc.nearby-asked:', 'prefix', [M], 'throwaway', 'not content: whether Nearby was asked about, per circle', k('flag')),
   // when the circle advisor card was last shown, per circle
-  advisorShown:           row('cc.advisorShown.', 'prefix', [W, M], 'throwaway', 'not content: when the advisor card was last shown'),
-  screenClient:           row('onderling.screen.', 'prefix', [W], 'keep', 'not sealable: a screen\'s own storage: a screen has no content key (its own key sits in the same storage)'),
-  mappings:               row('onderling.mappings:', 'prefix', [M], 'throwaway', 'not sealable: read before a key exists: bootAgentBundle loads the extension mappings at its start, before the content key'),
+  advisorShown:           row('cc.advisorShown.', 'prefix', [W, M], 'throwaway', 'not content: when the advisor card was last shown', k('string')),
+  screenClient:           row('onderling.screen.', 'prefix', [W], 'keep', 'not sealable: a screen\'s own storage: a screen has no content key (its own key sits in the same storage)', k('json')),
+  mappings:               row('onderling.mappings:', 'prefix', [M], 'throwaway', 'not sealable: read before a key exists: bootAgentBundle loads the extension mappings at its start, before the content key', k('json')),
 
   // ── single keys ──
   // The help circle's two flags go TOGETHER: clear one and keep the other and the enrolled person gets a help
   // circle that never says anything.
-  helpCircleProvisioned:  row('cc.helpCircleProvisioned', 'key', [W, M], 'throwaway', 'not content: a first-run flag'),
-  onboardingDone:         row('cc.onboardingDone', 'key', [W, M], 'throwaway', 'not content: a first-run flag'),
+  helpCircleProvisioned:  row('cc.helpCircleProvisioned', 'key', [W, M], 'throwaway', 'not content: a first-run flag', k('flag')),
+  onboardingDone:         row('cc.onboardingDone', 'key', [W, M], 'throwaway', 'not content: a first-run flag', k('flag')),
   // set for the THROWAWAY identity's phrase; the enrolled person typed a different one, so a kept flag would be a
   // safety record making a false claim
-  mnemonicAck:            row('cc.mnemonicAck', 'key', [W, M], 'throwaway', 'not content: a first-run flag'),
-  keyCardSnoozedUntil:    row('cc.keyCardSnoozedUntil', 'key', [W, M], 'throwaway', 'not content: when the key card may show again'),
-  contactNames:           row('cc.contactNames', 'key', [W, M], 'throwaway', 'sealed'),
-  contactSeenAt:          row('cc.contactSeenAt', 'key', [W, M], 'throwaway', 'sealed'),
+  mnemonicAck:            row('cc.mnemonicAck', 'key', [W, M], 'throwaway', 'not content: a first-run flag', k('flag')),
+  keyCardSnoozedUntil:    row('cc.keyCardSnoozedUntil', 'key', [W, M], 'throwaway', 'not content: when the key card may show again', k('string')),
+  contactNames:           row('cc.contactNames', 'key', [W, M], 'throwaway', 'sealed', k('json')),
+  contactSeenAt:          row('cc.contactSeenAt', 'key', [W, M], 'throwaway', 'sealed', k('json')),
   // kept, every thread of the former self would open already-read
-  circleSeenAt:           row('cc.circleSeenAt', 'key', [W, M], 'throwaway', 'sealed'),
-  circlePinned:           row('cc.circlePinned', 'key', [W, M], 'throwaway', 'sealed'),
-  activeCircle:           row('cc.activeCircle', 'key', [W, M], 'throwaway', 'not content: which circle is open (web sessionStorage, view state)'),
-  circleViewMode:         row('cc.circleViewMode', 'key', [W, M], 'throwaway', 'not content: view state'),
-  connectionPoints:       row('cc.connectionPoints', 'key', [W, M], 'throwaway', 'not sealable: read at module load on the web, before the agent and its key (the boot relay); sealed by its caller on the phone'),
-  delivery:               row('cc.delivery', 'key', [W, M], 'throwaway', 'not content: the person\'s delivery-receipt preferences'),
-  availability:           row('cc.availability', 'key', [W, M], 'throwaway', 'sealed'),
-  agentRequests:          row('cc.agentRequests', 'key', [W, M], 'throwaway', 'unwritten: only the default name the one caller overrides'),
-  agentRequestQueue:      row('cc.agentRequestQueue', 'key', [W], 'throwaway', 'sealed'),
-  reciprocityQueue:       row('cc.reciprocityQueue', 'key', [W, M], 'throwaway', 'unwritten: createMessageQueue has no consumer'),
-  sharedWithMe:           row('cc.sharedWithMe', 'key', [W, M], 'throwaway', 'sealed'),
-  userScreens:            row('cc.userScreens', 'key', [W, M], 'throwaway', 'sealed'),
-  actionFrequency:        row('cc.actionFrequency', 'key', [W, M], 'throwaway', 'sealed'),
-  firstBootSeeded:        row('cc.firstBootSeeded.v1', 'key', [M], 'throwaway', 'not content: a first-boot flag'),
-  nearbyAllowsWeb:        row('basis.nearbyAllows', 'key', [W], 'throwaway', 'not content: Nearby consent switches'),
-  nearbyAllowsPhone:      row('cc.nearbyAllows', 'key', [M], 'throwaway', 'not content: Nearby consent switches'),
-  nearbyMineSeenWeb:      row('basis.nearbyMineSeen', 'key', [W], 'throwaway', 'unwritten: left by an earlier build'),
-  nearbyMineSeenPhone:    row('cc.nearbyMineSeen', 'key', [M], 'throwaway', 'unwritten: left by an earlier build'),
-  nearbySelfWeb:          row('basis.nearbySelf', 'key', [W], 'throwaway', 'not content: which self enters the room'),
-  nearbySelfPhone:        row('cc.nearbySelf', 'key', [M], 'throwaway', 'not content: which self enters the room'),
-  nearbyRadio:            row('cc.nearbyRadio', 'key', [M], 'keep', 'not content: the radio switch'),
-  askMatchSkips:          row('cc.askMatchSkips', 'key', [W, M], 'throwaway', 'sealed'),
-  fallbackOffer:          row('cc.fallbackOffer', 'key', [W, M], 'keep', 'sealed'),
-  firstOpenSeen:          row('cc.firstOpenSeen', 'key', [W, M], 'keep', 'not content: a first-run flag'),
-  introCardSeen:          row('cc.introCardSeen', 'key', [W, M], 'keep', 'not content: a first-run flag'),
-  lastTab:                row('cc.lastTab', 'key', [W, M], 'keep', 'not content: view state'),
+  circleSeenAt:           row('cc.circleSeenAt', 'key', [W, M], 'throwaway', 'sealed', k('json')),
+  circlePinned:           row('cc.circlePinned', 'key', [W, M], 'throwaway', 'sealed', k('json')),
+  activeCircle:           row('cc.activeCircle', 'key', [W, M], 'throwaway', 'not content: which circle is open (web sessionStorage, view state)', k('string')),
+  circleViewMode:         row('cc.circleViewMode', 'key', [W, M], 'throwaway', 'not content: view state', k('json')),
+  connectionPoints:       row('cc.connectionPoints', 'key', [W, M], 'throwaway', 'not sealable: read at module load on the web, before the agent and its key (the boot relay); sealed by its caller on the phone', k('json')),
+  delivery:               row('cc.delivery', 'key', [W, M], 'throwaway', 'not content: the person\'s delivery-receipt preferences', k('json')),
+  availability:           row('cc.availability', 'key', [W, M], 'throwaway', 'sealed', k('json')),
+  agentRequests:          row('cc.agentRequests', 'key', [W, M], 'throwaway', 'unwritten: only the default name the one caller overrides', OPAQUE),
+  agentRequestQueue:      row('cc.agentRequestQueue', 'key', [W], 'throwaway', 'sealed', k('json')),
+  reciprocityQueue:       row('cc.reciprocityQueue', 'key', [W, M], 'throwaway', 'unwritten: createMessageQueue has no consumer', OPAQUE),
+  sharedWithMe:           row('cc.sharedWithMe', 'key', [W, M], 'throwaway', 'sealed', k('json')),
+  userScreens:            row('cc.userScreens', 'key', [W, M], 'throwaway', 'sealed', k('json')),
+  actionFrequency:        row('cc.actionFrequency', 'key', [W, M], 'throwaway', 'sealed', k('json')),
+  firstBootSeeded:        row('cc.firstBootSeeded.v1', 'key', [M], 'throwaway', 'not content: a first-boot flag', k('flag')),
+  nearbyAllowsWeb:        row('basis.nearbyAllows', 'key', [W], 'throwaway', 'not content: Nearby consent switches', k('json')),
+  nearbyAllowsPhone:      row('cc.nearbyAllows', 'key', [M], 'throwaway', 'not content: Nearby consent switches', k('json')),
+  nearbyMineSeenWeb:      row('basis.nearbyMineSeen', 'key', [W], 'throwaway', 'unwritten: left by an earlier build', OPAQUE),
+  nearbyMineSeenPhone:    row('cc.nearbyMineSeen', 'key', [M], 'throwaway', 'unwritten: left by an earlier build', OPAQUE),
+  nearbySelfWeb:          row('basis.nearbySelf', 'key', [W], 'throwaway', 'not content: which self enters the room', k('string')),
+  nearbySelfPhone:        row('cc.nearbySelf', 'key', [M], 'throwaway', 'not content: which self enters the room', k('string')),
+  nearbyRadio:            row('cc.nearbyRadio', 'key', [M], 'keep', 'not content: the radio switch', k('string')),
+  askMatchSkips:          row('cc.askMatchSkips', 'key', [W, M], 'throwaway', 'sealed', k('json')),
+  fallbackOffer:          row('cc.fallbackOffer', 'key', [W, M], 'keep', 'sealed', k('json')),
+  firstOpenSeen:          row('cc.firstOpenSeen', 'key', [W, M], 'keep', 'not content: a first-run flag', k('flag')),
+  introCardSeen:          row('cc.introCardSeen', 'key', [W, M], 'keep', 'not content: a first-run flag', k('flag')),
+  lastTab:                row('cc.lastTab', 'key', [W, M], 'keep', 'not content: view state', k('string')),
   // which tab of the assistant panel was last chosen (Gesprek / Maken)
-  assistantTab:           row('cc.assistantTab', 'key', [W, M], 'keep', 'not content: which assistant panel tab was last chosen (view state)'),
-  nativeCalendarIds:      row('cc.nativeCalendar.eventIdMap', 'key', [M], 'throwaway', 'sealed'),
-  inFlightFlows:          row('cc-in-flight-flows', 'key', [W, M], 'throwaway', 'unwritten: an exported constant nothing writes under'),
-  wakeNudges:             row('cc-wake-nudges', 'key', [M], 'throwaway', 'unwritten: the switch lives in the parameter register (settings, sealed)'),
-  startOverPage:          row('basis.startOverPage', 'key', [W], 'keep', 'not content: a one-load flag that opens the start-over page (web sessionStorage)'),
+  assistantTab:           row('cc.assistantTab', 'key', [W, M], 'keep', 'not content: which assistant panel tab was last chosen (view state)', k('string')),
+  nativeCalendarIds:      row('cc.nativeCalendar.eventIdMap', 'key', [M], 'throwaway', 'sealed', k('json')),
+  inFlightFlows:          row('cc-in-flight-flows', 'key', [W, M], 'throwaway', 'unwritten: an exported constant nothing writes under', OPAQUE),
+  wakeNudges:             row('cc-wake-nudges', 'key', [M], 'throwaway', 'unwritten: the switch lives in the parameter register (settings, sealed)', OPAQUE),
+  startOverPage:          row('basis.startOverPage', 'key', [W], 'keep', 'not content: a one-load flag that opens the start-over page (web sessionStorage)', k('flag')),
   // the offer stash: the next start joins the circles it names; a device that forgets it comes back enrolled and
   // in no circle (the box keeps it explicitly)
-  enrollOffer:            row('onderling.enrollOffer', 'key', [W, M, B], 'keep', 'not sealable: stashed under the throwaway self\'s key and read after the enrol ceremony, across the key change (realAgent.js)'),
-  relayUrl:               row('cc.relayUrl', 'key', [W, M], 'keep', 'not sealable: read at module load, before the agent and its key (circleApp.js boot relay; the phone at boot)'),
-  userLlmDefault:         row('cc.userLlmDefault', 'key', [W, M], 'keep', 'sealed'),
-  theme:                  row('basis.theme', 'key', [W, M], 'keep', 'not content: the theme'),
-  language:               row('circle.app.lang', 'key', [W, M], 'keep', 'not content: the app language'),
-  welcomed:               row('cc.welcomed', 'key', [M], 'keep', 'not content: a first-run flag'),
+  enrollOffer:            row('onderling.enrollOffer', 'key', [W, M, B], 'keep', 'not sealable: stashed under the throwaway self\'s key and read after the enrol ceremony, across the key change (realAgent.js)', k('string')),
+  relayUrl:               row('cc.relayUrl', 'key', [W, M], 'keep', 'not sealable: read at module load, before the agent and its key (circleApp.js boot relay; the phone at boot)', k('string')),
+  userLlmDefault:         row('cc.userLlmDefault', 'key', [W, M], 'keep', 'sealed', k('json')),
+  theme:                  row('basis.theme', 'key', [W, M], 'keep', 'not content: the theme', k('string')),
+  language:               row('circle.app.lang', 'key', [W, M], 'keep', 'not content: the app language', k('string')),
+  welcomed:               row('cc.welcomed', 'key', [M], 'keep', 'not content: a first-run flag', k('flag')),
 
   // ── vault key prefixes: the device's identity and keys (the ceremony has just written them) ──
   // the ceremony has JUST written these; a key sweep cannot reach them, but an unsaid survivor is the failure
   // this register exists to prevent, so they are said
-  vaultChatId:            row('cc-chat-id:', 'vault', [W, M], 'keep', 'sealed'),
-  vaultOwnerRoot:         row('cc-owner-root:', 'vault', [W, M], 'keep', 'not sealable: the marker vault: the root\'s own store and the plain markers (forget / restore / start-over pending), read before the key'),
-  vaultOwnerRootSeed:     row('cc-owner-root-seed', 'vault', [M], 'keep', 'not sealable: the root seed itself, in the OS secure store'),
-  vaultHostId:            row('cc-host-id:', 'vault', [W, M], 'keep', 'sealed'),
-  vaultHostGrants:        row('cc-host-grants:', 'vault', [W, M], 'keep', 'sealed'),
-  vaultHostTrust:         row('cc-host-trust:', 'vault', [W, M], 'keep', 'sealed'),
-  vaultPeerTrust:         row('cc-peer-trust:', 'vault', [W, M], 'keep', 'sealed'),
-  vaultHistoryKeys:       row('cc-history-keys:', 'vault', [W, M], 'keep', 'sealed'),
-  vaultAgentTokens:       row('cc-agent-tokens:', 'vault', [W, M], 'keep', 'sealed'),
-  vaultPinboardId:        row('cc-pinboard-id:', 'vault', [W, M], 'keep', 'sealed'),
-  vaultTasksId:           row('cc-tasks-id:', 'vault', [W, M], 'keep', 'sealed'),
-  vaultCirclePod:         row('cc-circle-pod:', 'vault', [M], 'keep', 'sealed'),
-  vaultRelayUrl:          row('cc-relay-url', 'vault', [W, M], 'keep', 'sealed'),
-  circleGroupKey:         row('cc.circle-groupkey', 'vault', [W, M], 'keep', 'sealed'),
-  circleControllerKey:    row('cc.circle-controller-key', 'vault', [W, M], 'keep', 'sealed'),
-  sealingIdentity:        row('cc.sealing-identity', 'vault', [W, M], 'keep', 'sealed'),
-  screenGrant:            row('onderling-screen:', 'vault', [W], 'keep', 'not sealable: a screen\'s grant: a screen has no content key (its own key sits in the same storage)'),
-  vaultOwnerRootKey:      row('vault:owner-root', 'vault', [W, M, B], 'keep', 'not sealable: the owner root key itself (the content key is derived from it)'),
-  vaultContentKey:        row('vault:content-at-rest-key', 'vault', [W, M, B], 'keep', 'not sealable: the content key itself'),
-  vaultDelegationSeed:    row('vault:device-delegation-seed', 'vault', [W, M, B], 'keep', 'not sealable: the device\'s delegation seed itself (the content key is derived from it)'),
-  vaultCustodyMode:       row('vault:custody-mode', 'vault', [W, M, B], 'keep', 'not sealable: read before the key: it says which key to derive'),
+  vaultChatId:            row('cc-chat-id:', 'vault', [W, M], 'keep', 'sealed', OPAQUE),
+  vaultOwnerRoot:         row('cc-owner-root:', 'vault', [W, M], 'keep', 'not sealable: the marker vault: the root\'s own store and the plain markers (forget / restore / start-over pending), read before the key', OPAQUE),
+  vaultOwnerRootSeed:     row('cc-owner-root-seed', 'vault', [M], 'keep', 'not sealable: the root seed itself, in the OS secure store', OPAQUE),
+  vaultHostId:            row('cc-host-id:', 'vault', [W, M], 'keep', 'sealed', OPAQUE),
+  vaultHostGrants:        row('cc-host-grants:', 'vault', [W, M], 'keep', 'sealed', OPAQUE),
+  vaultHostTrust:         row('cc-host-trust:', 'vault', [W, M], 'keep', 'sealed', OPAQUE),
+  vaultPeerTrust:         row('cc-peer-trust:', 'vault', [W, M], 'keep', 'sealed', OPAQUE),
+  vaultHistoryKeys:       row('cc-history-keys:', 'vault', [W, M], 'keep', 'sealed', OPAQUE),
+  vaultAgentTokens:       row('cc-agent-tokens:', 'vault', [W, M], 'keep', 'sealed', OPAQUE),
+  vaultPinboardId:        row('cc-pinboard-id:', 'vault', [W, M], 'keep', 'sealed', OPAQUE),
+  vaultTasksId:           row('cc-tasks-id:', 'vault', [W, M], 'keep', 'sealed', OPAQUE),
+  vaultCirclePod:         row('cc-circle-pod:', 'vault', [M], 'keep', 'sealed', OPAQUE),
+  vaultRelayUrl:          row('cc-relay-url', 'vault', [W, M], 'keep', 'sealed', OPAQUE),
+  circleGroupKey:         row('cc.circle-groupkey', 'vault', [W, M], 'keep', 'sealed', OPAQUE),
+  circleControllerKey:    row('cc.circle-controller-key', 'vault', [W, M], 'keep', 'sealed', OPAQUE),
+  sealingIdentity:        row('cc.sealing-identity', 'vault', [W, M], 'keep', 'sealed', OPAQUE),
+  screenGrant:            row('onderling-screen:', 'vault', [W], 'keep', 'not sealable: a screen\'s grant: a screen has no content key (its own key sits in the same storage)', OPAQUE),
+  vaultOwnerRootKey:      row('vault:owner-root', 'vault', [W, M, B], 'keep', 'not sealable: the owner root key itself (the vault\'s at-rest key is derived from it)', OPAQUE),
+  vaultContentKey:        row('vault:content-at-rest-key', 'vault', [W, M, B], 'keep', 'not sealable: the content key itself; it is random, and rests inside the sealed device vault (sealed by the vault, not by itself)', OPAQUE),
+  vaultDelegationSeed:    row('vault:device-delegation-seed', 'vault', [W, M, B], 'keep', 'not sealable: the device\'s delegation seed itself (the vault\'s at-rest key is derived from it)', OPAQUE),
+  vaultCustodyMode:       row('vault:custody-mode', 'vault', [W, M, B], 'keep', 'not sealable: read before the key: it says which key to derive', OPAQUE),
 });
 
 /**

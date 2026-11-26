@@ -9,6 +9,8 @@
  *   claim   → claim a companion        (`ABCD-EFGH@<node>`, with or without "Claim:")
  *   screen  → connect a screen         (`onderling-connect://…`: the screen pairing opens with the offer in it)
  *   botlink → deliberately not routed  (`onderling-koppel:…`: the app makes it for the bot's chat; the scanner says so)
+ *   bot     → add a bot (LAST)         (a peer address, `addr` or `addr|Name`, everywhere; a bare https URL only in the
+ *                                       Contacts add field, `for: 'contacts-add'`; nothing is fetched before a confirm)
  *
  * Frits's three rules (2026-11-20): every code Basis makes is routed the same way (a classifier and a declared target in
  * the one table) or named as deliberately not (`SCAN_SCHEMES`, held by `lint-scan-schemes`); no scanner reads a code
@@ -40,7 +42,31 @@ export const SCAN_CLASSIFIERS = Object.freeze([
   { kind: 'claim',   classify: (t) => (typeof t === 'string' ? parseCompanionClaim(t) : null) },
   { kind: 'screen',  classify: (t) => (typeof t === 'string' && t.startsWith(CONNECT_SCHEME) ? t : null) },
   { kind: 'botlink', classify: (t) => (typeof t === 'string' && t.startsWith(LINK_OFFER_SCHEME) ? t : null) },
+  // LAST, after every scheme: a peer address is not a link, so it is a bot wherever it is scanned or pasted
+  { kind: 'bot',     classify: (t) => (isPeerAddress(t) ? t : null) },
 ]);
+
+/**
+ * A peer address as a person pastes it: an Ed25519 key (43 base64url characters) or an NKN address (an optional
+ * identifier, a dot, 64 hex characters), optionally followed by `|Name`. Nothing else: a word or a sentence is not one.
+ */
+export function isPeerAddress(text) {
+  if (typeof text !== 'string') return false;
+  const addr = text.split('|')[0].trim();
+  return /^[A-Za-z0-9_-]{43}$/.test(addr) || /^(?:[A-Za-z0-9_-]+\.)?[0-9a-f]{64}$/.test(addr);
+}
+
+/**
+ * WHAT A SCANNER OPENED FOR ONE PURPOSE TAKES. Its other kinds are refused in words. The Contacts add field takes a
+ * person's card, an invite and a bot, and there alone a bare https URL counts as a bot (an agent card's address).
+ */
+export const SCAN_PURPOSES = Object.freeze({
+  'contacts-add': Object.freeze(['contact', 'invite', 'bot']),
+  screen:         Object.freeze(['screen']),
+  pair:           Object.freeze(['pair']),
+});
+/** The purposes where a bare https URL is read as a bot's address (everywhere else it stays unknown, never opened). */
+const URL_BOT_PURPOSES = new Set(['contacts-add']);
 
 /**
  * EVERY SCHEME BASIS MAKES, and where its code goes: a routed kind, or `not: <why>`. `lint-scan-schemes` is red on a
@@ -76,7 +102,27 @@ export const SCAN_TARGETS = Object.freeze({
   screen:  { kind: 'view', app: 'basis',     id: 'screenPairing',   needs: (payload) => ({ offer: payload }) },
   // the app made this for the bot's chat: the scanner says where it goes, it never opens anything here
   botlink: { kind: 'not',  app: 'basis',     id: 'botlink',         sayKey: 'circle.scan.botlink_for_chat', needs: () => ({}) },
+  // no op adds a bot: the shared add (`addBotToGraph`) runs in the shell AFTER the person confirms (`botAddConfirm`),
+  // so nothing is fetched from an address before they said yes (Fable 2026-11-25)
+  bot:     { kind: 'view', app: 'basis',     id: 'addBot',          reason: 'the shared addBotToGraph, after a confirm that names the host or the address', needs: (payload) => ({ input: payload }) },
 });
+
+/**
+ * The question before a bot is added (nothing is fetched before the yes): a URL by its host, an address by its name or
+ * its first characters. One answer both shells say.
+ * @returns {{key: string, params: object}}
+ */
+export function botAddConfirm(payload) {
+  const s = String(payload ?? '').trim();
+  if (/^https?:\/\//i.test(s)) {
+    let host = s;
+    try { host = new URL(s).host; } catch { /* the text as it is */ }
+    return { key: 'circle.contacts.add_bot_confirm_host', params: { host } };
+  }
+  const [addr, ...rest] = s.split('|');
+  const name = rest.join('|').trim();
+  return { key: 'circle.contacts.add_bot_confirm_addr', params: { addr: name || `${addr.trim().slice(0, 8)}…` } };
+}
 
 /**
  * The words for what a scanned code's OP answered (an op target: pairing): done, refused because the circle is not mine,
@@ -94,17 +140,20 @@ export function scanOpResultWords(reply) {
 /**
  * What a scanned (or pasted) text is, what it carries, and the declared target it goes to.
  * @param {unknown} text
- * @param {{for?: string|null}} [o]  `for`: the scanner was called for ONE kind (a screen's pairing): any other kind is
+ * @param {{for?: string|null}} [o]  `for`: the PURPOSE the scanner was called for (`SCAN_PURPOSES`): any other kind is
  *   refused (`refused: 'not-for-here'`, no target), so a scanner opened for one purpose cannot be steered into another flow
  * @returns {{kind: string, payload: unknown, target?: {kind: 'flow'|'op'|'view'|'not', app: string, id: string}, needs?: object, refused?: string, for?: string}}
  */
 export function routeScan(text, { for: forKind = null } = {}) {
   const s = typeof text === 'string' ? text.trim() : '';
   // the one first-match loop (the phone's scanner calls this router)
-  const hit = s ? classifyQrPayload(s, SCAN_CLASSIFIERS) : { kind: 'unknown' };
+  let hit = s ? classifyQrPayload(s, SCAN_CLASSIFIERS) : { kind: 'unknown' };
+  // a bare https URL is a bot's address only where the purpose says so (the Contacts add field)
+  if (hit.kind === 'unknown' && URL_BOT_PURPOSES.has(forKind) && /^https:\/\/\S+$/i.test(s)) hit = { kind: 'bot', payload: s };
   const t = SCAN_TARGETS[hit.kind];
   if (!t) return { kind: 'unknown', payload: s };
-  if (forKind && hit.kind !== forKind) return { kind: hit.kind, payload: hit.payload, refused: 'not-for-here', for: forKind };
+  const takes = forKind ? (SCAN_PURPOSES[forKind] ?? [forKind]) : null;
+  if (takes && !takes.includes(hit.kind)) return { kind: hit.kind, payload: hit.payload, refused: 'not-for-here', for: forKind };
   return { kind: hit.kind, payload: hit.payload, target: { kind: t.kind, app: t.app, id: t.id }, needs: t.needs(hit.payload) };
 }
 

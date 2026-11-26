@@ -206,7 +206,8 @@ import QrScannerModal from '../../rn/QrScannerModal.js';
 import EnrollDeviceModal from './EnrollDeviceModal.js';
 import CeremonyFlowModal from './CeremonyFlowModal.js';
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
-import { SCAN_TARGETS, scanOpResultWords } from '../../../../basis/src/v2/scanRoute.js';
+import { SCAN_TARGETS, scanOpResultWords, botAddConfirm } from '../../../../basis/src/v2/scanRoute.js';
+import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
 import { opFormOrRun } from '../../../../basis/src/forms/opFormOrRun.js';
 import { makePickerFetcher } from '../../../../basis/src/forms/pickerChoices.js';
 import { contactPointAdopter, useRelayQuestion, relayQuestion } from './RelayQuestionModal.js';
@@ -2088,6 +2089,17 @@ export default function CircleLauncherScreen({
     pairCirclePeer:    (needs) => runOpFromScan({ app: 'household', id: 'pairCirclePeer' }, needs),
     // a screen's connect code: Apparaten opens with the offer in 'connect a screen' (the code pick follows there)
     screenPairing:     (needs) => { setScannedScreenOffer(needs.offer); setSettingsGroupId(settingsGroupForAction({ kind: 'connect-screen' })); setView('settingsGroup'); },
+    // a bot: asked first (its host or address named), nothing fetched before the yes; then the shared add (web twin)
+    addBot:            (needs) => {
+      const q = botAddConfirm(needs.input);
+      Alert.alert('', t(q.key, q.params), [
+        { text: t('circle.confirm.cancel'), style: 'cancel' },
+        { text: t('circle.contacts.add_sheet.add'), onPress: () => {
+          addBotToGraph({ input: needs.input, peerGraph: bundle?.peerGraph, coreAgent: bundle?.coreAgent, discover: bundle?.discoverA2A })
+            .catch(() => Alert.alert('', t('circle.contacts.add_failed')));
+        } },
+      ]);
+    },
   };
   const onScan = (res) => {
     setJoinScanOpen(false);
@@ -2747,7 +2759,7 @@ export default function CircleLauncherScreen({
           helpAvailable={circles.some((c) => c.id === HELP_CIRCLE_ID)}
           onOpen={(c) => { const target = contactOpenTarget(c); if (target.kind === 'circle') { const hc = circles.find((x) => x.id === target.circleId); if (hc) openCircle(hc); } else openContactThread(c); }}
           resolvePictureFor={(c) => circlePictureResolver(c?.pairCircleId)}
-          onAddPerson={() => onMeAction('scan')} onBlocked={() => setView('blocked')}
+          onRouted={onScan} onBlocked={() => setView('blocked')}
           keep={heldSelves.length > 1 ? (list) => contactsInSet(list, selvesOn, profileIdOfCircle) : null} />
       </WithTabBar>
     );

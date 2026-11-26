@@ -31,6 +31,7 @@
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { lineOf } from './guard-where.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -226,9 +227,11 @@ function main() {
   if (newViolations.length) {
     console.error(`\n✖ lint:deps: ${newViolations.length} NEW cross-package boundary violation(s):`);
     for (const v of newViolations) {
-      console.error(`   - ${v.file}`);
+      let src = '';
+      try { src = readFileSync(join(REPO_ROOT, v.file), 'utf8'); } catch { /* gone: point at its top */ }
+      console.error(`   - ${v.file}:${lineOf(src, v.specifier)}`);
       console.error(`       reaches into ${v.reachesInto} raw src via  ${v.specifier}`);
-      console.error(`       fix: import from \`${v.reachesInto}\` (barrel) or add a \`${v.reachesInto}/<subpath>\` export`);
+      console.error(`       Fix: import from \`${v.reachesInto}\` (barrel) instead, or add a \`${v.reachesInto}/<subpath>\` export and import that.`);
     }
     console.error(`\nInvariant #5: apps → packages/{substrates} → packages/core, always through the ` +
       `\`@onderling/<pkg>\` public surface — never another package's raw src/.\n`);

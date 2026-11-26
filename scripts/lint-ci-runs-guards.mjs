@@ -45,11 +45,12 @@ const all = files.map((f) => readFileSync(path.join(DIR, f), 'utf8')).join('\n')
 const code = (t) => t.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
 
 if (!/npm run guards/.test(code(all))) {
-  problems.push('no workflow runs `npm run guards` — every structural guard in this repo is then advisory only');
+  problems.push('.github/workflows/: no workflow runs `npm run guards` — every structural guard in this repo is then advisory only.\n    Fix: add a step `npm run guards` to the workflow that gates a merge.');
 }
 
 for (const f of files) {
-  const text = code(readFileSync(path.join(DIR, f), 'utf8'));
+  const raw = readFileSync(path.join(DIR, f), 'utf8');
+  const text = code(raw);
   const jobsAt = text.indexOf('\njobs:');
   if (jobsAt === -1) continue;
   // Split the jobs block on its 2-space-indented keys: `\n  <name>:`
@@ -57,21 +58,23 @@ for (const f of files) {
   const marks = [...body.matchAll(/\n {2}([A-Za-z0-9_-]+):/g)];
   for (let i = 0; i < marks.length; i++) {
     const name = marks[i][1];
+    // where: the job's key line in the file as written (comments stripped above would shift the count)
+    const at = `.github/workflows/${f}:${raw.split('\n').findIndex((l) => l === `  ${name}:` || l.startsWith(`  ${name}: `)) + 1}`;
     const block = body.slice(marks[i].index, i + 1 < marks.length ? marks[i + 1].index : undefined);
     const runsSomething = /npm test|vitest|run\.mjs|test:integration/.test(block);
     if (!runsSomething) continue;
     if (!/pnpm install/.test(block)) {
-      problems.push(`${f} · job "${name}" runs a suite without \`pnpm install\` — it cannot have installed this workspace`);
+      problems.push(`${at}: job "${name}" runs a suite without \`pnpm install\` — it cannot have installed this workspace.\n    Fix: add a \`pnpm install\` step, then \`node scripts/relink-workspace.mjs\`, before the step that runs the suite.`);
     }
     if (!/relink-workspace/.test(block)) {
-      problems.push(`${f} · job "${name}" installs but never runs \`node scripts/relink-workspace.mjs\` — installing this repo is TWO commands (see docs/architecture.md § "How the monorepo resolves"); without it the tree is missing workspace symlinks a developer's tree has`);
+      problems.push(`${at}: job "${name}" installs but never runs \`node scripts/relink-workspace.mjs\` — installing this repo is TWO commands (see docs/architecture.md § "How the monorepo resolves"); without it the tree is missing workspace symlinks a developer's tree has.\n    Fix: add a step \`node scripts/relink-workspace.mjs\` right after \`pnpm install\`.`);
     }
   }
 }
 
 if (problems.length) {
   console.error(`✖ lint:ci — ${problems.length} problem(s):\n`);
-  for (const p of problems) console.error(`  • ${p}`);
+  for (const p of problems) console.error(`  ${p}`);
   console.error('\nCI is what turns a guard from a convention into a check. A guard nothing runs is a wish.');
   process.exit(1);
 }

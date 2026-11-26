@@ -95,3 +95,16 @@ describe('asked-frits — the open-questions table is a projection, not a list',
     expect(twice.match(/\*\*(\d+) open\*\*/)[1], 'the count does not grow by re-reading its own rows').toBe('1');
   });
 });
+
+describe('asked-frits --check names where the stale table is and what to run', () => {
+  it('points at the block line in the roadmap and says to regenerate it', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'asked-frits-'));
+    const file = path.join(dir, 'REMAINING-WORK.md');
+    writeFileSync(file, BODY);
+    let stderr = '';
+    try { execFileSync(process.execPath, [SCRIPT, '--check'], { encoding: 'utf8', env: { ...process.env, ASKED_FRITS_FILE: file }, stdio: 'pipe' }); }
+    catch (err) { stderr = String(err.stderr ?? ''); }
+    expect(stderr).toMatch(/REMAINING-WORK\.md:2\b/);
+    expect(stderr).toMatch(/Fix: run `node scripts\/asked-frits\.mjs`/);
+  });
+});

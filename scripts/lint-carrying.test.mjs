@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkCarrying, findCarriers, parseIndex, keysOf } from './carrying.mjs';
+import { checkCarrying, findCarriers, parseIndex, keysOf, carryingMessages } from './carrying.mjs';
 
 const INDEX = `# x
 ## Between people
@@ -50,5 +50,18 @@ describe('lint-carrying — the carrying index held to the code', () => {
     expect(findCarriers("'/manage/pair/start' '/manage'", /['`](\/[a-z][a-z0-9_.-]*)/g)).toEqual(['/manage']);
     expect(keysOf('`@onderling/blob-gateway` `linkSeal.js` (`sealForLink`)')).toEqual(['blob-gateway', 'linkSeal', 'sealForLink']);
     expect(parseIndex(INDEX).map((r) => [r.first, r.inert])).toEqual([['serve a file at a link', false], ['stream an answer', true]]);
+  });
+});
+
+describe('lint-carrying — each red line says where and what to do instead', () => {
+  it('names the route, the carrier and the row as file:line, each with a Fix', () => {
+    const t = tree({ 'apps/c/src/server.js': "if (p.startsWith('/feed/')) {}\nif (p === '/files') {}", 'apps/a/src/consumer.js': 'nothing here' });
+    const r = run(t, [{ id: '/feed', row: 'a row that is gone' }]);
+    const read = (rel) => t[rel] ?? "CARRIERS = [\n  { id: '/feed', row: 'a row that is gone' },\n]";
+    const msg = carryingMessages(r, { read, indexPath: 'index.md', carriersPath: 'scripts/carrying.mjs' }).join('\n');
+    expect(msg).toMatch(/apps\/c\/src\/server\.js:2: route \/files/);
+    expect(msg).toMatch(/scripts\/carrying\.mjs:2: \/feed/);
+    expect(msg).toMatch(/index\.md:\d+: "serve a file at a link"/);
+    expect(msg.match(/Fix: /g).length).toBe(3);
   });
 });

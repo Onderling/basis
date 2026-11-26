@@ -28,6 +28,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { lineAt, lineOf, linesMatching, whereInSelf } from './guard-where.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FILE = 'apps/basis/src/core/agent/realAgent.js';
@@ -52,17 +53,28 @@ export function constructions(text) {
   };
 }
 
-/** Every difference from the baselines, as messages. */
+const KIND_RE = { 'new Agent({': /\bnew Agent\(\{/g, 'createBrowser…Agent(': /\bcreateBrowser\w*Agent\(\{/g, 'new InternalTransport(bus': /\bnew InternalTransport\(bus\b/g };
+
+/** Every difference from the baselines, as messages: what is wrong, where (file:line), and what to do instead. */
 export function agentCountProblems(text, adoptedBaseline = ADOPTED_BASELINE, constructionBaseline = CONSTRUCTION_BASELINE) {
   const out = [];
-  const adopted = adoptions(text);
-  for (const a of adopted) if (!adoptedBaseline.includes(a)) out.push(`a NEW in-process agent is adopted: ${a} — fold it into an existing one instead`);
-  for (const a of adoptedBaseline) if (!adopted.includes(a)) out.push(`${a} is no longer adopted — remove it from ADOPTED_BASELINE (the list only shrinks)`);
+  const t = String(text);
+  const adoptedAt = [...t.matchAll(/(?<!const\s)\badoptInProcess\(\s*([\w.]+)\s*\)/g)].map((m) => ({ name: m[1], line: lineAt(t, m.index) }));
+  const adopted = adoptedAt.map((a) => a.name);
+  for (const a of adoptedAt) {
+    if (!adoptedBaseline.includes(a.name)) out.push(`${FILE}:${a.line}: a NEW in-process agent is adopted: ${a.name}.\n    Fix: fold it into an existing in-process agent instead of adopting another (one agent per service-context).`);
+  }
+  for (const a of adoptedBaseline) {
+    if (!adopted.includes(a)) out.push(`${whereInSelf(import.meta.url, 'export const ADOPTED_BASELINE')}: ${a} is no longer adopted — remove it.\n    Fix: remove it from ADOPTED_BASELINE (the list only shrinks), and from the agents marker in ${DOC}.`);
+  }
   const counts = constructions(text);
   for (const [kind, n] of Object.entries(counts)) {
     const allowed = constructionBaseline[kind] ?? 0;
-    if (n > allowed) out.push(`${n} × ${kind} (baseline ${allowed}) — a new in-process agent is built`);
-    if (n < allowed) out.push(`${n} × ${kind} (baseline ${allowed}) — lower CONSTRUCTION_BASELINE (it only shrinks)`);
+    if (n > allowed) {
+      const at = linesMatching(t, KIND_RE[kind]).map((l) => `${FILE}:${l}`).join(', ');
+      out.push(`${n} × ${kind} (baseline ${allowed}) — a new in-process agent is built; the new one is among ${at}.\n    Fix: give the skills to an existing in-process agent instead of building another.`);
+    }
+    if (n < allowed) out.push(`${whereInSelf(import.meta.url, 'export const CONSTRUCTION_BASELINE')}: ${n} × ${kind} (baseline ${allowed}).\n    Fix: lower CONSTRUCTION_BASELINE['${kind}'] to ${n} (it only shrinks).`);
   }
   return out;
 }
@@ -78,10 +90,11 @@ export function docNamedAgents(docText) {
 /** Differences between the doc's marked sentence and the baseline, as messages. */
 export function docAgreementProblems(docText, adoptedBaseline = ADOPTED_BASELINE) {
   const named = docNamedAgents(docText);
-  if (!named) return [`${DOC} has no "<!-- lint-agent-count: in-process = … -->" marker — the Agent home must name the in-process agents`];
+  const at = `${DOC}:${lineOf(docText, 'lint-agent-count:')}`;
+  if (!named) return [`${at}: no "<!-- lint-agent-count: in-process = … -->" marker — the Agent home must name the in-process agents.\n    Fix: add the marker to the Agent home's agents paragraph, listing ${adoptedBaseline.join(', ')}.`];
   const out = [];
-  for (const a of adoptedBaseline) if (!named.includes(a)) out.push(`${DOC} does not name ${a} — the Agent home's agents paragraph is stale`);
-  for (const a of named) if (!adoptedBaseline.includes(a)) out.push(`${DOC} names ${a}, which is no longer adopted — update the Agent home's agents paragraph`);
+  for (const a of adoptedBaseline) if (!named.includes(a)) out.push(`${at}: does not name ${a} — the Agent home's agents paragraph is stale.\n    Fix: add ${a} to the marker and to the paragraph.`);
+  for (const a of named) if (!adoptedBaseline.includes(a)) out.push(`${at}: names ${a}, which is no longer adopted.\n    Fix: remove ${a} from the marker and the Agent home's agents paragraph.`);
   return out;
 }
 
@@ -89,7 +102,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   const problems = agentCountProblems(readFileSync(path.join(ROOT, FILE), 'utf8'))
     .concat(docAgreementProblems(readFileSync(path.join(ROOT, DOC), 'utf8')));
   if (problems.length) {
-    console.error(`lint-agent-count (${FILE}, ${DOC}):`);
+    console.error(`✖ lint-agent-count (${FILE}, ${DOC}):`);
     for (const p of problems) console.error(`  • ${p}`);
     process.exit(1);
   }

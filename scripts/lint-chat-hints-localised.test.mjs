@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { auditHints } from './lint-chat-hints-localised.mjs';
+import { hintMessages } from './lint-chat-hints-localised.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const m = { app: 'lists', operations: [{ id: 'createList', surfaces: { chat: { hint: 'Start a list.' } } }, { id: 'silent', surfaces: {} }] };
@@ -27,5 +28,16 @@ describe('lint-chat-hints-localised', () => {
     const r = spawnSync(process.execPath, [path.join(HERE, 'lint-chat-hints-localised.mjs')], { encoding: 'utf8' });
     expect(r.stdout + r.stderr).toMatch(/Dutch hint/);
     expect(r.status).toBe(0);
+  });
+});
+
+describe('chat-hints red lines say where and what to do instead', () => {
+  it('a bad shape names its json line, a stale allowance its guard line, and each kind has a Fix', () => {
+    const nlText = '{\n  "tasks": {\n    "addTask": "plain string"\n  }\n}\n';
+    const selfText = "export const ALLOW = new Set([\n  'tasks:addTask',\n]);";
+    const msg = hintMessages({ missing: ['lists:addItem'], badShape: ['tasks:addTask'], stale: ['tasks:addTask'] }, { nlText, selfText }).join('\n');
+    expect(msg).toMatch(/apps\/basis\/src\/locales\/chat-hints\.nl\.json:3: tasks:addTask/);
+    expect(msg).toMatch(/scripts\/lint-chat-hints-localised\.mjs:2: tasks:addTask/);
+    expect(msg.match(/Fix: /g).length).toBe(3);
   });
 });

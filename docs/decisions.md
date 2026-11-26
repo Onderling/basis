@@ -826,6 +826,17 @@ What it costs: a sender never learns from the ladder that a message actually arr
 exists, and still arrives — but only from a peer who chose to send receipts. That is the honest position:
 the only positive evidence we have is evidence somebody chose to give us.
 
+**Addition, 2026-11-26: a relay's give-up never moves the ladder.** A relay that drops a message it held (its
+time limit, a cap, or the over-rate resends running out) reports it to the sender, and the app used to answer with
+`failed`. But that report is the relay's word, not this device's knowledge: the message may have reached the other
+side some other way, and `failed` under-claims exactly as `sent` over-claimed. So the relay's report never changes the
+delivery state. The bubble keeps the rung it had and gets a retry hint beside it, a side fact on the delivery map
+(`relayGaveUpOf`). It is not a rung, not a reason, never synced and not logged: it is this device's own view. Both
+shells paint it from the one shared presentation (`deliveryPresentation`). The box has no bubble, so it only logs the
+report. A later real receipt moves the bubble on and clears the hint. A retry re-sends under the SAME message id, so
+a receiver that already has the message keeps one copy. `failed` stays for what this device itself knows: its own
+hold queue let the message go.
+
 ### 2 · Reachability-on-this-circle is answered ABOVE the send path
 
 An NKN-only member of a relay circle dropped out silently: a relay reports it can reach anyone, so the

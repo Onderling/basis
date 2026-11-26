@@ -44,8 +44,9 @@ export function renderContactThread(container, {
   // retryable chip calls `onRetryDelivery(messageId)`. All optional: absent, the bubble says nothing, as before.
   deliveryStateFor = null,
   deliveryReasonFor = null,
+  deliveryRelayGaveUpFor = null,   // the relay's give-up (the map's `relayGaveUpOf`): a retry hint beside the rung
   onRetryDelivery = null,
-  attachMenu = [],          // the contact-scoped "+" entries (attachEntriesFor({scope: 'contact'}))
+  attachMenu = [],         // the contact-scoped "+" entries (attachEntriesFor({scope: 'contact'}))
   onAttachCommand = null,   // (entry) => dispatch it to this contact; absent → no "+"
   face = null,       // the contact's picture as the pair circle carries it (a sealed media ref) — null = the initial
   resolvePicture = null,   // opens it with the pair circle's media opener; absent → the initial
@@ -308,6 +309,7 @@ export function renderContactThread(container, {
       const chip = buildDeliveryChip(deliveryStateFor(m.messageId), {
         tr, rowId: m.messageId, onRetryDelivery,
         reason: typeof deliveryReasonFor === 'function' ? deliveryReasonFor(m.messageId) : null,
+        relayGaveUp: typeof deliveryRelayGaveUpFor === 'function' ? deliveryRelayGaveUpFor(m.messageId) : null,
       });
       if (chip) meta.appendChild(chip);
       bubble.appendChild(meta);

@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A companion is CLAIMED, not configured: started without an owner it prints one claim code, and the first person to
  * hand that code back — in a statement signed by one of their DEVICES, with the device's root-signed delegation

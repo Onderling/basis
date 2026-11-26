@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The first screen a new person sees says what Basis is in plain words: "Basis" capitalised, no "neighbourhood chat",
  * no "Solid pod" — the same three lines Vandaag's first card says (encrypted, no account, what a circle is), one source.

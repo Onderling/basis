@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The peer-wiring builder must take the boot bundle as a PARAMETER — never read the prop it captured.
  *

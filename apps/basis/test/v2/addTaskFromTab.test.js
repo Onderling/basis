@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * "＋ ADD TASK" ON THE TASKS TAB OPENS THE TASK FORM. A walk (2026-11-05) found it doing nothing on both phones: mobile
  * put "/addtask " into a composer the Tasks tab does not show; web asked through `prompt()`. The tab's button now runs

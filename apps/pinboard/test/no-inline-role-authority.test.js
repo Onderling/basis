@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * Guard (roles-authority reconciliation): pinboard skills must NOT gate
  * authority with inline role-string comparisons like

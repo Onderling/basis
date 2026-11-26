@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * MAKING SOMEONE AN ADMIN FOLLOWS THE CIRCLE'S SETTINGS RULE (Frits 2026-11-10: role changes are a governed action
  * under the settings class). Before: any one admin did it alone, whatever the circle's rules, which let one admin

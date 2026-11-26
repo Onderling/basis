@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The wire register: the shape check refuses what is not a row's shape, and the register agrees with the constants the
  * rails and doors send by. The check runs under test at the one wire call (test/support/wireShapeCheck.setup.js) and in

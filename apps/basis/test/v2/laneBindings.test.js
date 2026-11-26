@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The kinds table declares what a receiver ACCEPTS a kind with; the rails choose their verifier at wiring time.
  * Two layers holding one fact — this pins the agreement, so a rail that changes its default verifier, or a kind

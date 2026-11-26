@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 88
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 89
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -82,6 +82,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `sheet-cap` | — | A PHONE SHEET IS CAPPED IN WINDOW PIXELS, NEVER A PERCENTAGE. A card capped with `maxHeight: '85%'` did not… |
 | `shell-reaches-waist` | — | a shell may COMPOSE the substrate, never CALL it |
 | `shell-seams` | — | web ≡ mobile ≡ box: every shell composes every seam (`shell-seams.mjs` declares them) |
+| `source-reading-tests` | — | a test that reads source code as TEXT is one rung 1 can find |
 | `stale-params` | — | a REGISTERED param that NOTHING reads is dead (the #36 fork of lint-unreached-exports) |
 | `storage-register` | — | every name a shell or the box stores under comes from the one register, and the register |
 | `store-reads` | — | a store never takes what it could not read for "nothing" and saves over it |

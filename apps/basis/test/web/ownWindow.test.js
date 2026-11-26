@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The web app runs only in a window of its own, never inside another page's frame (ledger L1041).
  *

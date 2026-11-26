@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * After a join, a device pulls the circle's lanes from the members it now knows — ALL of them. Every shell pulled only
  * membership · governance · keys there, so the circle's CONTENT (lists, chores, appointments on the items lane; the

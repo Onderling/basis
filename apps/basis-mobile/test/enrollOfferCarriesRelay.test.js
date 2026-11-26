@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A phone's add-device offer names this device's relay — web parity (circleApp passes its live relay to
  * buildEnrollOffer). Mobile passed `{}`, so the offer carried no relay and the new device had no way to find this one

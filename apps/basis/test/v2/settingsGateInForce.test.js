@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * WHO DECIDES A SETTINGS SAVE IS THE RULE IN FORCE, NOT THE ONE BEING SAVED.
  *

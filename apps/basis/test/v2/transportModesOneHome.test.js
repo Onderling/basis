@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 // The device transport modes (nkn · relay · both) are listed ONCE, as TRANSPORT_MODES in circleSettingsControls.js.
 // Eight copies had grown (the manifest, both shells, the agent, the host handler, the settings wizard); a ninth with
 // a fourth mode would have been refused by some and accepted by others. Every other file reads the one list.

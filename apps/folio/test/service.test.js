@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * service.test.js — unit tests for `folio install-service` / `uninstall-service` /
  * `service-status` across launchd / systemd / Task Scheduler.

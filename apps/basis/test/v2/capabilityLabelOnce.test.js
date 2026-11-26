@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * ONE lookup for a capability's label (`src/v2/capabilityLabel.js`): no shell builds it from `circle.settings.verb.<atom>`
  * itself. Seven screens did (three copies of a `verbLabel` on the phone, four inline on web), each painting the noun's

@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A PERSON ON THE DECISIONS SCREEN IS NEVER A KEY (L897, second part, 2026-11-14): a proposal's subject (who is removed,
  * whose role changes), a disputed author, and whoever made a change without the vote are named from this device's own

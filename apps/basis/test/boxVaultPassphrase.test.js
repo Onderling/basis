@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The box's vault passphrase comes from its environment (the box's .env), never from a file in the data directory: that
  * directory is a volume the box backs up off the device, and a snapshot holding both the sealed stores and the key that

@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * One refusal shape. Every check that can say no — the tier, the door's map, the role, the op's own rule, the door's
  * settings — answers `null` (go on) or `{layer, code, message?}`, and the checks run in ONE written order, deny-wins

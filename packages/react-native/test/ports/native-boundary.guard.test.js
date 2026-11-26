@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * FITNESS GUARD — the shared RN library layer stays native-free outside the
  * sanctioned ports/adapters boundary.

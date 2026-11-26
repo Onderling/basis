@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * WHO MAY WRITE TO ME FIRST, on the persona's profile (decision 2026-11-12: the persona is the policy). Two controls per
  * persona card in Mij, both shells: who may write first (request / open) and whether people in this persona's circles

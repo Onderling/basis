@@ -25,6 +25,7 @@
 import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { join } from 'node:path';
+import { whereInSelf } from './guard-where.mjs';
 
 const ROOT = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
@@ -131,10 +132,15 @@ function hasOwnDoor(opId) {
 
 const problems = [];
 const table = chatBuiltins();
-if (table.length === 0) problems.push('could not read the chat builtins table — the parse needle moved');
+const BUILTINS = 'apps/basis/src/core/localBuiltins.js';
+const handlerAt = (cmd) => {
+  const i = read(BUILTINS).split('\n').findIndex((l) => new RegExp(`^\\s{2,6}'?${cmd}'?:\\s*(?:async\\s*)?\\(`).test(l));
+  return `${BUILTINS}:${i + 1 || 1}`;
+};
+if (table.length === 0) problems.push(`${BUILTINS}: could not read the chat builtins table — the parse needle moved.\n    Fix: point chatBuiltins() in this guard at the table's new shape (it reads \`return {\` inside createLocalBuiltins).`);
 
 for (const shell of GENERAL_ROUTE) {
-  problems.push(`${shell} no longer dispatches the general typed command (the composerCommands seam + the basis waist call). Without it only the five hand-written builtins can be typed there, and this guard's list goes back to 24.`);
+  problems.push(`${shell} no longer dispatches the general typed command (the composerCommands seam + the basis waist call). Without it only the five hand-written builtins can be typed there, and this guard's list goes back to 24.\n    Fix: route a typed command through composerCommands and the basis waist call again, as the other shell does.`);
 }
 
 const typeable = (cmd) => {
@@ -145,11 +151,11 @@ const typeable = (cmd) => {
 
 for (const cmd of table) {
   if (typeable(cmd) || UNREACHED.has(cmd) || hasOwnDoor(cmd)) continue;
-  problems.push(`"${cmd}" is a handler a person cannot type: it declares no slash command, and is not declared unreached. Give it one, or say why it should not have one.`);
+  problems.push(`${handlerAt(cmd)}: "${cmd}" is a handler a person cannot type: it declares no slash command, and is not declared unreached.\n    Fix: give its op a slash command in its manifest, or add it to UNREACHED in this guard with why it should not have one.`);
 }
 for (const cmd of UNREACHED) {
-  if (circleSet.has(cmd)) problems.push(`"${cmd}" is declared unreached AND present in CIRCLE_BUILTIN_COMMANDS — it has a door now, so remove it from UNREACHED.`);
-  else if (!table.includes(cmd)) problems.push(`"${cmd}" is declared unreached but no longer exists as a handler — remove the stale entry.`);
+  if (circleSet.has(cmd)) problems.push(`${whereInSelf(import.meta.url, `'${cmd}'`)}: "${cmd}" is declared unreached AND present in CIRCLE_BUILTIN_COMMANDS — it has a door now.\n    Fix: remove it from UNREACHED.`);
+  else if (!table.includes(cmd)) problems.push(`${whereInSelf(import.meta.url, `'${cmd}'`)}: "${cmd}" is declared unreached but no longer exists as a handler.\n    Fix: remove the stale entry from UNREACHED.`);
 }
 
 if (problems.length) {

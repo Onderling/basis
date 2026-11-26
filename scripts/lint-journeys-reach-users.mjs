@@ -68,7 +68,9 @@ for (const f of walk(path.join(ROOT, JOURNEYS))) {
   const app = /callSkill\(\s*['"]([\w-]+)['"]\s*,\s*op\b/.exec(text)?.[1] ?? 'pinboard';
   for (const op of opsIn(text, app)) {
     if (!journeyOps.has(op)) journeyOps.set(op, []);
-    journeyOps.get(op).push(path.relative(ROOT, f));
+    const name = op.split(':').pop();
+    const i = text.split('\n').findIndex((l) => new RegExp(`['"\`]${name}['"\`]`).test(l));
+    journeyOps.get(op).push(`${path.relative(ROOT, f)}${i >= 0 ? `:${i + 1}` : ''}`);
   }
 }
 
@@ -101,15 +103,16 @@ if (fresh.length) {
   console.error(`✖ lint:journeys-reach-users — ${fresh.length} op(s) a journey walks that NOTHING a person uses can reach:\n`);
   for (const op of fresh) console.error(`  • ${op}\n      walked by ${journeyOps.get(op).join(', ')}`);
   console.error('\nA green journey over an op no shell reaches proves the mechanism, not the feature —');
-  console.error('that is how a role system came to be fully built and completely unusable. Paint the');
-  console.error('control, or record the gap on purpose: node scripts/lint-journeys-reach-users.mjs --update');
+  console.error('that is how a role system came to be fully built and completely unusable.');
+  console.error('Fix: paint the control for the op in the shells (a button, a tab or a slash command),');
+  console.error('or record the gap on purpose: node scripts/lint-journeys-reach-users.mjs --update');
   process.exit(1);
 }
 
 if (fixed.length) {
   console.error(`✖ lint:journeys-reach-users — ${fixed.length} baselined gap(s) are now REACHED. Drop them:\n`);
   for (const op of fixed) console.error(`  • ${op}`);
-  console.error('\n  node scripts/lint-journeys-reach-users.mjs --update');
+  console.error('\n  Fix: node scripts/lint-journeys-reach-users.mjs --update');
   process.exit(1);
 }
 

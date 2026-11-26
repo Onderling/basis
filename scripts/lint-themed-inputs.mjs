@@ -31,10 +31,12 @@ if (existsSync(SRC)) walk(SRC);
 for (const f of files) {
   if (f === THEMED) continue;
   const s = readFileSync(f, 'utf8');
-  const code = s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  // comments out, newlines kept, so a match's index still gives its line
+  const code = s.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, '')).replace(/\/\/[^\n]*/g, '');
+  const lineOfMatch = (re) => { const m = re.exec(code); return m ? code.slice(0, m.index).split('\n').length : 1; };
   const rel = relative(ROOT, f);
-  if (/<TextInput\b/.test(code)) errors.push(`${rel}: a raw <TextInput>: use ThemedTextInput, so its text, placeholder and cursor follow the theme`);
-  if (/import\s*\{[^}]*\bTextInput\b[^}]*\}\s*from\s*['"]react-native['"]/.test(code)) errors.push(`${rel}: imports TextInput from react-native: use ThemedTextInput`);
+  if (/<TextInput\b/.test(code)) errors.push(`${rel}:${lineOfMatch(/<TextInput\b/)}: a raw <TextInput>: use ThemedTextInput instead, so its text, placeholder and cursor follow the theme`);
+  if (/import\s*\{[^}]*\bTextInput\b[^}]*\}\s*from\s*['"]react-native['"]/.test(code)) errors.push(`${rel}:${lineOfMatch(/import\s*\{[^}]*\bTextInput\b/)}: imports TextInput from react-native: import ThemedTextInput instead`);
 }
 
 if (existsSync(CSS)) {
@@ -46,7 +48,7 @@ if (existsSync(CSS)) {
     const background = /background(-color)?\s*:/.test(body);
     if (background && !colour) {
       const line = css.slice(0, m.index).split('\n').length;
-      errors.push(`apps/basis/web/v2/circle.css:${line}: "${sel.slice(0, 80)}" sets an input's background but not its text colour`);
+      errors.push(`apps/basis/web/v2/circle.css:${line}: "${sel.slice(0, 80)}" sets an input's background but not its text colour — add color: var(--ink) (or the matching token) to the rule`);
     }
   }
 }

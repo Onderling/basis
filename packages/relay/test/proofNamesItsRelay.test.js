@@ -10,7 +10,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import WebSocket, { WebSocketServer } from 'ws';
 import { randomBytes } from 'node:crypto';
-import { AgentIdentity, signAddressPossession, isPrivateRelayName, relayOwnNames } from '@onderling/core';
+import { AgentIdentity, signAddressPossession, isHomeNetworkHost, relayOwnNames } from '@onderling/core';
 import { RelayTransport } from '@onderling/transports';
 import { startRelay } from '../src/server.js';
 
@@ -93,12 +93,12 @@ describe('the proof of an address names the relay it was answered for', () => {
 describe('which names cannot be a relay on the public internet', () => {
   it('localhost, loopback, private, link-local and shared-range literals, with any port', () => {
     for (const n of ['localhost', 'localhost:8787', 'relay:8787', '127.0.0.1:1', '10.0.0.5', '172.16.0.1:443', '172.31.255.255', '192.168.1.1:8787',
-      '169.254.1.1', '100.73.134.19:8787', '[::1]:8787', '::1', '[fd12::1]:8787', '[fe80::1]', '[::ffff:192.168.1.2]:1']) {
-      expect(isPrivateRelayName(n), n).toBe(true);
+      '169.254.1.1', '100.64.0.1:8787', 'box.local', 'box.local:8443', '[::1]:8787', '::1', '[fd12::1]:8787', '[fe80::1]', '[::ffff:192.168.1.2]:1']) {
+      expect(isHomeNetworkHost(n), n).toBe(true);
     }
     for (const n of ['relay.example.org', 'relay.example.org:443', '8.8.8.8', '172.32.0.1', '100.128.0.1', '192.169.1.1',
       '[2001:db8::1]:443', '127.0.0.1.example.org', 'localhost.example.org', '', '999.1.1.1']) {
-      expect(isPrivateRelayName(n), n).toBe(false);
+      expect(isHomeNetworkHost(n), n).toBe(false);
     }
   });
 

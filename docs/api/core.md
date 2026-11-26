@@ -1246,18 +1246,47 @@ relayNameOf(url)
 
 A relay's name as a device dials it: the host (with its port) of the ws(s) address; `localhost` for a local socket.
 
-### `isPrivateRelayName`
+### `homeNetworkKind`
 
-**Kind:** function · **Import:** `isPrivateRelayName` from `'@onderling/core'`
+**Kind:** function · **Import:** `homeNetworkKind` from `'@onderling/core'`
 
 ```js
-isPrivateRelayName(name)
+homeNetworkKind(name)
 ```
 
-A name that cannot be a relay on the public internet: `localhost` or another single-label name (a compose service
-such as `relay`), or a loopback, private-range, link-local or
-shared-range (100.64/10: carrier NAT, Tailscale) address literal, with any port. Only such a name may be taken from
-the Host a connection came in on; a public name must be configured by the relay's operator.
+Which part of the home network a host is, or `null` when it may be on the public internet. The one rule for "the home
+network, never the internet"; its kinds let a caller narrow it in a line of its own (the toolbox page does):
+  - `loopback`: `localhost`, 127/8, `::1`;
+  - `private`: 10/8, 172.16/12, 192.168/16, unique-local IPv6 (fc00::/7);
+  - `link-local`: 169.254/16, fe80::/10;
+  - `shared`: 100.64/10, carrier NAT and Tailscale: the neighbours on a carrier's network share it;
+  - `local-name`: a `.local` name (mDNS), one label before it;
+  - `single-label`: a name with no dot, such as a compose service (`relay`): no public name has that shape.
+A port (`host:port`, `[v6]:port`) is allowed; an IPv4-mapped IPv6 literal is read as its IPv4 address.
+
+**Parameters**
+
+- `name` `unknown`
+
+**Returns:** `null | 'loopback' | 'private' | 'link-local' | 'shared' | 'local-name' | 'single-label'`
+
+### `isHomeNetworkHost`
+
+**Kind:** function · **Import:** `isHomeNetworkHost` from `'@onderling/core'`
+
+```js
+isHomeNetworkHost(name)
+```
+
+A host in the home network, never the internet (any kind of `homeNetworkKind`), with any port. The relay uses it
+whole: only such a name may be taken from the Host a connection came in on (a public name must be configured by the
+relay's operator), and only such a name may be dialled over plain `ws:`.
+
+**Parameters**
+
+- `name` `unknown`
+
+**Returns:** `boolean`
 
 ### `relayAddressRefusal`
 
@@ -1268,7 +1297,7 @@ relayAddressRefusal(url)
 ```
 
 Why a client may NOT dial this relay address, or `null` when it may. A relay is dialled over TLS (`wss:`); a plain
-`ws:` address is allowed only to a name that cannot be a public relay (`isPrivateRelayName`: the device itself, the
+`ws:` address is allowed only to a name that cannot be a public relay (`isHomeNetworkHost`: the device itself, the
 home network, a compose service). Plain ws to a public host lets anyone on the path, not only the relay, read and
 rewrite the relay protocol: which addresses a device registers, its proofs, the control frames.
 
@@ -1288,7 +1317,7 @@ relayOwnNames({ names = [] } = {})
 
 Which names a relay answers to. Its names are its OPERATOR's (`names`, RELAY_NAMES), never the caller's: the Host
 header is written by whoever dials, so a hostile relay dialling an honest one would choose it. When names are
-configured, only they count. Without them the Host is used only for a private name (`isPrivateRelayName`), which keeps
+configured, only they count. Without them the Host is used only for a private name (`isHomeNetworkHost`), which keeps
 the dev relay, the tests and a home-network box working with no setting; a public name that is not configured is
 refused.
 

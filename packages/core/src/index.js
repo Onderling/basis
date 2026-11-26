@@ -60,7 +60,7 @@ export {
 // NOT circleLink: the verifier supplies a fresh nonce — see the header of addressPossession.js.
 export {
   ADDRESS_NONCE_BYTES, ADDRESS_CHALLENGE_TTL_MS, newAddressChallenge,
-  addressPossessionMessage, relayNameOf, relayOwnNames, isPrivateRelayName, relayAddressRefusal, signAddressPossession, signAddressPossessionFromSeed,
+  addressPossessionMessage, relayNameOf, relayOwnNames, isHomeNetworkHost, homeNetworkKind, relayAddressRefusal, signAddressPossession, signAddressPossessionFromSeed,
   circleAddressSigner, verifyAddressPossession,
 } from './identity/addressPossession.js';
 export { hashHex, hmacBase64Url } from './hashHex.js';

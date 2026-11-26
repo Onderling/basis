@@ -20,6 +20,7 @@ import { readToolboxCard, callTool, readItemList, fetchThumbs, thumbIdsInOrder }
 import { firstPartyFirstWords } from '@onderling/app-manifest';
 import { GATE_WORDS } from './gateWords.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import { homeNetworkKind } from '@onderling/core';
 
 const ON_KEY = 'tools.on';
 const NAME = /^[a-z][a-z0-9-]{0,31}$/;
@@ -39,7 +40,7 @@ function pageAddressOk(s, { overHttp = null } = {}) {
   if (u.protocol !== 'http:' || u.username || u.password) return false;
   if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') return true;
   // PLAIN HTTP IN THE HOME NETWORK (L1183), only as the operator's explicit choice in the placed file and only on a
-  // private address: the card says the risk before the yes (an active attacker on the same network can alter the page's
+  // home-network host (`privateHomeHost`: core's one rule minus the kinds declared below): the card says the risk before the yes (an active attacker on the same network can alter the page's
   // code as it loads; the data between page and bot stays sealed end to end)
   return overHttp === PAGE_OVER_HTTP_HOME && privateHomeHost(u.hostname);
 }
@@ -47,15 +48,20 @@ function pageAddressOk(s, { overHttp = null } = {}) {
 /** The placed file's explicit choice for a page on plain http in the home network. */
 export const PAGE_OVER_HTTP_HOME = 'home-network';
 
-/** A private IPv4 address (10/8, 172.16/12, 192.168/16) or a `.local` name: the home network, never the internet. */
+/**
+ * The kinds of the home network (core's one rule, `homeNetworkKind`) a toolbox page may NOT be served from over plain
+ * http, and why. The relay takes the whole home network: what crosses a plain ws relay is sealed end to end, so a
+ * wider set costs little there. A page over plain http is unsigned code painted for the person:
+ *   - `shared` (100.64/10): on carrier NAT the neighbours share that network, so it is not the home; this also means
+ *     no page over a Tailscale address (accepted until asked for);
+ *   - `loopback`: `pageAddressOk` takes `localhost` and `127.0.0.1` in its own line, exactly; nothing else on loopback.
+ */
+const PAGE_NOT_OVER_HTTP = new Set(['shared', 'loopback']);
+
+/** May a toolbox page be served over plain http from this host: the home network minus `PAGE_NOT_OVER_HTTP`. */
 export function privateHomeHost(host) {
-  const h = String(host ?? '').toLowerCase();
-  if (/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.local$/.test(h)) return true;
-  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
-  if (!m) return false;
-  const [a, b, c, d] = m.slice(1).map(Number);
-  if ([a, b, c, d].some((n) => n > 255)) return false;
-  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  const kind = homeNetworkKind(host);
+  return kind !== null && !PAGE_NOT_OVER_HTTP.has(kind);
 }
 
 /** A placed file as the operator wrote it, or null when it is not one (a bad name, address or words). */

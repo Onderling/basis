@@ -40,7 +40,10 @@ was started 2026-11-18 with the first toolbox, a grocery search.
   **How the page is reached and what it may do (L1113).** The housemate types `/scherm <toolbox>`; the bot sends, in
   their own private chat only, a link to the page where the operator placed it (an https address, or a loopback
   address `http://localhost:<port>/…` or `http://127.0.0.1:<port>/…`, which works on the same device only; plain
-  http on any other host is not kept), carrying a one-use ticket (short-lived,
+  http on another host only as the operator's explicit choice, `"pageOverHttp": "home-network"` in the placed file, on a
+  host of the home network: core's one rule `homeNetworkKind`, the same the relay uses for a plain `ws:` address, minus
+  the shared range 100.64/10 (carrier NAT, Tailscale) and loopback, declared in `toolboxes.js` with the reason; the card
+  says the risk before the yes; any other http address is not kept), carrying a one-use ticket (short-lived,
   bound to that housemate and that toolbox). The page hands the ticket back in its offer; the bot reads the toolbox from
   the ticket, never from the page's own words, and then asks the housemate for the code as for any screen. A toolbox
   offer without a ticket, with a used, expired or someone else's ticket, or naming another toolbox, is refused in words

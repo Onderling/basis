@@ -4,110 +4,27 @@
  * RN counterpart of web's circleRulesEditor: the six governance questions
  * over a rules document; required questions (purpose + agreements) gate
  * Save. "Preview" shows the assembled doc as a joiner consents to it. Holds
- * a working copy seeded from the passed `doc`; the host persists onSave.
- *
- * γ.4 — conflict resolution.  When `incomingRules` is non-null (the
- * source plumbing — peer broadcast / pod-sync — is deferred to a later
- * slice; today every existing call site passes none of these opts and
- * the screen behaves exactly as before), the screen runs a 3-way diff
- * against the last captured version (γ.2) and — if conflicts surface —
- * overlays the SAME modal (CircleRecipeConflictScreen) used by the
- * recipe editor with a rules-namespaced heading via its `title` prop.
+ * a working copy seeded from the passed `doc`; the host saves through the circle's rule for changing the rules
+ * (`changeRulesDoor`), and an approved change reaches the other members on the rules-update lane.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import {
   RULES_QUESTIONS, normalizeRulesDoc, isRulesComplete,
-  detectRulesConflicts, applyRulesResolution, decisionsForMerges,
 } from '@onderling-app/basis';
 import { t } from '../../core/localisation.js';
-import CircleRecipeConflictScreen from './CircleRecipeConflictScreen.js';
 import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function CircleRulesScreen({
   doc, onSave, onBack, onPreview,
   notice = null,   // what the last save came to, in words (a proposal opened · refused)
-  // γ.4 — opt-in conflict resolver.  See file header for the deferred
-  // source plumbing.  Existing callers pass none of these and get the
-  // pre-γ.4 behaviour.
-  incomingRules = null,
-  rulesStore,
-  circleId,
-  onIncomingApplied,
-  onIncomingDiscarded,
 }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [working, setWorking] = useState(() => normalizeRulesDoc(doc));
   const setField = useCallback((k, v) => setWorking((w) => ({ ...w, [k]: v })), []);
   const complete = isRulesComplete(working);
-
-  // γ.4 — conflict resolver state.  `report === null` means "not detected
-  // yet" or "no overlay needed".
-  const [conflictReport, setConflictReport] = useState(null);
-  const [localForCompare, setLocalForCompare] = useState(null);
-
-  useEffect(() => {
-    if (incomingRules == null) { setConflictReport(null); return; }
-    let live = true;
-    (async () => {
-      let base = null;
-      try {
-        if (rulesStore && typeof rulesStore.listVersions === 'function' && circleId) {
-          const versions = await rulesStore.listVersions(circleId);
-          const head = Array.isArray(versions) && versions.length > 0 ? versions[0] : null;
-          base = head && typeof head === 'object' && head.value != null ? head.value : null;
-        }
-      } catch { /* best-effort */ }
-
-      const report = detectRulesConflicts(working, incomingRules, base);
-      if (!live) return;
-      setLocalForCompare(working);
-
-      // Web parity (story 6.2): resolve each auto-merge to the side that ACTUALLY changed. `apply` defaults
-      // unlisted paths to `theirs`, so `{}` here silently reverted a fresher LOCAL edit whenever the
-      // divergence was ours — a stale second device coming back overwrote the newer doc with no prompt.
-      if (report.identical
-          || (report.blockConflicts.length === 0 && report.metaConflicts.length === 0)) {
-        const merged = applyRulesResolution(working, incomingRules, decisionsForMerges(report.toMerge));
-        try {
-          if (rulesStore && typeof rulesStore.set === 'function' && circleId) {
-            await rulesStore.set(circleId, merged);
-          }
-        } catch { /* best-effort */ }
-        onIncomingApplied?.(merged);
-        return;
-      }
-      setConflictReport(report);
-    })();
-    return () => { live = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incomingRules, rulesStore, circleId]);
-
-  const handleResolve = async (decisions) => {
-    if (!localForCompare || !incomingRules) { setConflictReport(null); return; }
-    const merged = applyRulesResolution(localForCompare, incomingRules, decisions);
-    try {
-      if (rulesStore && typeof rulesStore.set === 'function' && circleId) {
-        await rulesStore.set(circleId, merged);
-      }
-    } catch { /* best-effort */ }
-    setConflictReport(null);
-    onIncomingApplied?.(merged);
-  };
-
-  const conflictOverlay = conflictReport ? (
-    <CircleRecipeConflictScreen
-      visible
-      conflicts={conflictReport}
-      local={localForCompare}
-      incoming={incomingRules}
-      title="circle.rules.conflict.title"
-      onResolve={handleResolve}
-      onCancel={() => { setConflictReport(null); onIncomingDiscarded?.(); }}
-    />
-  ) : null;
 
   return (
     <>
@@ -149,7 +66,6 @@ export default function CircleRulesScreen({
           <Text style={styles.saveText}>{t('circle.rules.save')}</Text>
         </Pressable>
       </View>
-      {conflictOverlay}
     </>
   );
 }

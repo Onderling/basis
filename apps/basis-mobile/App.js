@@ -85,7 +85,6 @@ import { initCirclePods, circleControlAgentRouter, setCirclePodSession, setCircl
 // Mirrors the recipe wire: ChatScreen writes via the receiver,
 // CircleLauncherScreen reads on rules-screen open + clears after the
 // γ.4 resolver applies / discards.
-import { makeCircleRulesPendingStoreRN } from './src/core/circleRulesPendingStorageRN.js';
 // γ-next.policy — per-circle pending-policy cache (AsyncStorage-backed).
 // Mirrors the rules wire: ChatScreen writes via the receiver,
 // CircleLauncherScreen's settings editor reads on open + clears after
@@ -289,19 +288,6 @@ export default function App() {
   const circleRecipeDedupRef = useRef(null);
   if (!circleRecipeDedupRef.current) {
     circleRecipeDedupRef.current = new Set();
-  }
-  // γ-next.rules — shared circle-rules-broadcast pending store.
-  // ChatScreen's peer-router writes via the receiver handler;
-  // CircleLauncherScreen's rules editor reads on mount + clears after
-  // the γ.4 resolver applies/discards.
-  const circleRulesPendingStoreRef = useRef(null);
-  if (!circleRulesPendingStoreRef.current) {
-    circleRulesPendingStoreRef.current = makeCircleRulesPendingStoreRN(AsyncStorage);
-  }
-  // γ-next.rules — shared LRU dedup for the rules-broadcast handler.
-  const circleRulesDedupRef = useRef(null);
-  if (!circleRulesDedupRef.current) {
-    circleRulesDedupRef.current = new Set();
   }
   // THE CIRCLE'S POLICY ON THE GOVERNANCE LANE (web parity: circleApp's `circlePolicyLane`) — built once and handed
   // to both screens: ChatScreen APPLIES it (it holds the governance rail), the launcher STATES it (an admin's save,
@@ -753,8 +739,6 @@ export default function App() {
             deliveryStateMap={deliveryStateMapRef.current}
             circleRecipePendingStore={circleRecipePendingStoreRef.current}
             circleRecipeDedup={circleRecipeDedupRef.current}
-            circleRulesPendingStore={circleRulesPendingStoreRef.current}
-            circleRulesDedup={circleRulesDedupRef.current}
             circlePolicyLane={circlePolicyLaneRef.current}
             sessionRef={sessionRef}
             onSessionChanged={refreshCirclePodWriter}

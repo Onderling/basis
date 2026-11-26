@@ -206,8 +206,6 @@ export {
 } from './v2/circleRecipeBlocks.js';
 // γ.3 — recipe conflict detection + resolution (Phase 9 sync absorption).
 export { detectRecipeConflicts, applyResolution } from './v2/recipeConflict.js';
-// γ.4 — rules-doc + circle-policy conflict detection + resolution (same flow).
-export { detectRulesConflicts,  applyRulesResolution, decisionsForMerges } from './v2/rulesConflict.js';
 // γ-next.recipe — receiver + pending-cache substrate for the recipe broadcast.
 export { makeCircleRecipePeerHandler }              from './v2/circleRecipeReceiver.js';
 export { createCircleRecipePendingStore }           from './v2/circleRecipePending.js';

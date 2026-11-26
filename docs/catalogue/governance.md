@@ -99,7 +99,7 @@ kernel's roster fold; every shell composes the same binding).
 
 <!-- catalogue-ops
 governance: governance.propose governance.vote governance.resolve governance.policyUpdate governance.rulesUpdate governance.reportFile governance.reportResolve
-pinboard: removeMember setMemberRole editGroupRules recordGroupRulesUpdate getGroupRulesUpdateStatement broadcastCircleGovernance broadcastCircleRules
+pinboard: removeMember setMemberRole editGroupRules recordGroupRulesUpdate getGroupRulesUpdateStatement broadcastCircleGovernance
 -->
 
 ## Proof
@@ -142,6 +142,10 @@ pinboard: removeMember setMemberRole editGroupRules recordGroupRulesUpdate getGr
   roster frozen at the proposal. The decision code is built and tested.
 - **A decision is judged by the policy in force on the receiving device**, not the policy at the time it was made.
 - **Polls with a real circle effect** (a typed poll item whose outcome is told or enacts a governed action): L737.
+- **No view of a circle's earlier rules.** A rules change is a versioned statement on the rules-update lane; each
+  device keeps the newest only. The Decisions screen lists settled decisions, a rules change among them, as history; no
+  screen shows the text a change replaced. The older broadcast of the whole rules document with a merge in the editor (and a
+  device-local copy with versions) was removed on 2026-11-26: nothing sent it and nothing read what it stored.
 
 ## Open rows
 

@@ -890,8 +890,10 @@ import { makeGiveUpConsumers } from '../../src/v2/deliveryGiveUp.js';
 import { securityStatus } from '../../src/core/localBuiltins.js';
 import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../../src/v2/circleMembrane.js';
 
-// the key door this tab built at its start (the browser lock): one object, so an opened door stays open in this tab
+// the key door this tab built at its start (the browser lock): one object, so an opened door stays open in this tab;
+// `appLockOn`: whether the person's lock is on (read at the start, changed by the settings switch)
 let keyDoor = null;
+let appLockOn = false;
 
 // actor label stamped on local chat-message events. Real WebID/
 // peer-display wiring lands with peer broadcast.
@@ -5554,6 +5556,24 @@ async function showMyData(opts) {
     // disconnect the pod (the `signout` op, through the waist), then read the state again; a bot's /koppel link, pasted
     onSignOut: () => Promise.resolve(rawCallSkill('basis', 'signout', {})).catch(() => null).then(() => again()),
     onLinkBot: typeof _openBotLink === 'function' ? _openBotLink : null,
+    // The person's lock on this browser: host acts onto the key door. The code goes ONLY into the door's own calls
+    // below; nothing here logs it, stores it or hands it to the waist (no op), and a failure is reported by code alone.
+    appLock: typeof keyDoor?.setLock === 'function' ? {
+      on: appLockOn,
+      set: async (code) => {
+        try { await keyDoor.setLock(code); } catch { return { ok: false, code: 'failed' }; }
+        appLockOn = true; again(); return { ok: true };
+      },
+      clear: async (code) => {
+        // asked once, and checked on a SECOND door object: a wrong code never touches this tab's open door
+        const probe = pickRootKeyStore({ fallbackVault: makeBrowserVault(storageName('vaultOwnerRoot')) });
+        if (!(await probe.unlock(code).catch(() => false))) return { ok: false, code: 'wrong' };
+        try { await keyDoor.clearLock(); } catch { return { ok: false, code: 'failed' }; }
+        appLockOn = false; again(); return { ok: true };
+      },
+      // the door key leaves this tab's memory, and the reload opens on the lock screen
+      lockNow: () => { keyDoor.lock(); window.location.reload(); },
+    } : null,
     onSignIn, podIssuerDefault: podAuth.resolveIssuer()?.url ?? null, podIssuers: podAuth.KNOWN_ISSUERS, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, thisDeviceId: circleHouseholdAgent?.myDeviceId?.() ?? null, deviceName: browserDeviceName(globalThis.navigator?.userAgent), onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
@@ -9797,6 +9817,7 @@ async function boot() {
       await openKeyDoorAtBoot(keyDoor, { askSecret: screen.ask });
       screen.close();
     }
+    appLockOn = (await keyDoor.status()) === 'unlocked' && typeof keyDoor.setLock === 'function';
   } catch (e) { console.warn(`[key door] could not be asked at the start: ${e?.message ?? e}`); }
   // THE SIGNATURE CHECK: WebCrypto's batch behind the one strict rule, after its self-test (the vectors, an honest and a
   // tampered signature); a browser without Ed25519 in WebCrypto keeps tweetnacl. Reads then check ahead in one batch.

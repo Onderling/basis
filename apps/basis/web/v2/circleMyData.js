@@ -34,6 +34,9 @@ export function renderCircleMyData(container, {
   // the pod provider field: its default and the known providers (podAuth's list)
   podIssuerDefault = null, podIssuers = [],
   onViewMnemonic,
+  // the person's lock on this browser, the host's acts onto the key door: `{on, set(code), clear(code), lockNow()}`;
+  // `set`/`clear` resolve `{ok}` or `{ok: false, code: 'wrong' | 'failed'}`. Absent ⇒ no lockable door here.
+  appLock = null,
   onRestore,
   onEnroll, onReceivePersonas,
   onExportRecovery,
@@ -1109,6 +1112,74 @@ export function renderCircleMyData(container, {
     },
     // ── Herstel: the way back, in a group of its own ────────────────────────────────────────────────────────────────
     'recovery-phrase': () => actionSection([['cc-mydata__mnemonic', 'circle.mydata.view_mnemonic', onViewMnemonic]]),
+    // The person's own lock on this browser: the switch (on asks the code twice, with the plain line of what it does
+    // not stop; off asks it once) and, while on, "lock now". Every act is the host's (`appLock`) onto the key door:
+    // no op, so the code never passes the waist. "One moment" is painted before the slow derivation starts.
+    'app-lock': () => {
+      if (!appLock) return;
+      const sec = section(tr('circle.lock.section_title'));
+      sec.classList.add('cc-mydata__app-lock');
+      const state = document.createElement('p');
+      state.className = 'cc-mydata__hint';
+      state.textContent = tr(appLock.on ? 'circle.lock.state_on' : 'circle.lock.state_off');
+      const sw = document.createElement('button');
+      sw.type = 'button';
+      sw.className = 'cc-mydata__switch';
+      sw.setAttribute('role', 'switch');
+      sw.setAttribute('aria-checked', appLock.on ? 'true' : 'false');
+      sw.setAttribute('data-testid', 'app-lock-switch');
+      sw.textContent = tr('circle.lock.switch_label');
+      const form = document.createElement('form');
+      form.className = 'cc-mydata__app-lock-form';
+      form.hidden = true;
+      const field = (labelKey, testid) => {
+        const input = document.createElement('input');
+        input.type = 'password';
+        input.autocomplete = appLock.on ? 'current-password' : 'new-password';
+        input.setAttribute('aria-label', tr(labelKey));
+        input.setAttribute('data-testid', testid);
+        return input;
+      };
+      const first = field('circle.lock.field', 'app-lock-field');
+      const again = appLock.on ? null : field('circle.lock.field_again', 'app-lock-again');
+      const said = document.createElement('p');
+      said.setAttribute('role', 'alert');
+      said.setAttribute('data-testid', 'app-lock-said');
+      const go = document.createElement('button');
+      go.type = 'submit';
+      go.className = 'cc-btn cc-btn--primary';
+      go.setAttribute('data-testid', 'app-lock-go');
+      go.textContent = tr(appLock.on ? 'circle.lock.confirm_off' : 'circle.lock.confirm_on');
+      if (!appLock.on) { const plain = document.createElement('p'); plain.className = 'cc-mydata__hint'; plain.textContent = tr('circle.lock.plain_line'); form.appendChild(plain); }
+      form.append(first, ...(again ? [again] : []), go, said);
+      sw.addEventListener('click', () => { form.hidden = !form.hidden; if (!form.hidden) first.focus(); });
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const code = first.value;
+        if (!code) { said.textContent = tr('circle.lock.empty'); return; }
+        if (again && again.value !== code) { said.textContent = tr('circle.lock.mismatch'); return; }
+        go.disabled = true; said.textContent = tr('circle.lock.working');
+        // a frame to show "one moment" before the derivation blocks the page
+        requestAnimationFrame(() => setTimeout(async () => {
+          const r = await (appLock.on ? appLock.clear(code) : appLock.set(code)).catch(() => ({ ok: false }));
+          go.disabled = false;
+          // on success the host repaints this page with the new state
+          if (r?.ok) return;
+          said.textContent = tr(r?.code === 'wrong' ? 'circle.lock.wrong' : 'circle.lock.failed');
+        }, 0));
+      });
+      sec.append(state, sw, form);
+      if (appLock.on) {
+        const now = document.createElement('button');
+        now.type = 'button';
+        now.className = 'cc-mydata__action cc-mydata__lock-now';
+        now.setAttribute('data-testid', 'app-lock-now');
+        now.textContent = tr('circle.lock.lock_now');
+        now.addEventListener('click', () => appLock.lockNow());
+        sec.appendChild(now);
+      }
+      container.appendChild(sec);
+    },
     'restore': () => actionSection([['cc-mydata__restore', 'circle.mydata.restore', onRestore]]),
     // The recovery file: the circle list sealed to the phrase — the pod-less way back.
     'recovery-file': () => actionSection([

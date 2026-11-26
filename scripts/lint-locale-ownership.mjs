@@ -65,16 +65,21 @@ const shellOf = (rel) =>
   : (rel.startsWith('apps/basis/src/rn/') || rel.startsWith('apps/basis-mobile/')) ? 'mob'
   : 'shared';
 
-const webKeys = leaves(json(`${WEB}/en.json`));
-const mobKeys = leaves(json(`${MOB}/en.json`));
-const sharedNames = readdirSync(join(ROOT, SHARED)).filter((f) => f.endsWith('.en.json'));
-const sharedKeys = {};
-const sharedFileOf = {};
-for (const f of sharedNames) {
-  const own = leaves(json(`${SHARED}/${f}`));
-  Object.assign(sharedKeys, own);
-  for (const k of Object.keys(own)) sharedFileOf[k] ??= `${SHARED}/${f}`;
+// EVERY language: a duplicate that exists only in the Dutch files is the same fault (the overlap checks below run per
+// language; which code renders a key is read from the English tables, the languages share their keys)
+const LANGS = ['en', 'nl'];
+const byLang = {};
+for (const lang of LANGS) {
+  const sharedKeys = {};
+  const sharedFileOf = {};
+  for (const f of readdirSync(join(ROOT, SHARED)).filter((x) => x.endsWith(`.${lang}.json`))) {
+    const own = leaves(json(`${SHARED}/${f}`));
+    Object.assign(sharedKeys, own);
+    for (const k of Object.keys(own)) sharedFileOf[k] ??= `${SHARED}/${f}`;
+  }
+  byLang[lang] = { webKeys: leaves(json(`${WEB}/${lang}.json`)), mobKeys: leaves(json(`${MOB}/${lang}.json`)), sharedKeys, sharedFileOf };
 }
+const { webKeys, mobKeys, sharedKeys } = byLang.en;
 
 const refs = new Map();
 const inlineFallbacks = [];
@@ -91,10 +96,13 @@ for (const rel of walk('apps/basis/src').concat(walk('apps/basis/web'), walk('ap
 
 const problems = [];
 
-for (const k of Object.keys(webKeys)) {
-  if (k in mobKeys) {
-    problems.push(`${at(`${WEB}/en.json`, k)} and ${at(`${MOB}/en.json`, k)}: both shells define "${k}"`
-      + `\n    Fix: if both need it, it is shared by definition: move it to a block in ${SHARED}/ (both languages) and delete it from both shell bundles.`);
+for (const lang of LANGS) {
+  const { webKeys: w, mobKeys: m } = byLang[lang];
+  for (const k of Object.keys(w)) {
+    if (k in m) {
+      problems.push(`${at(`${WEB}/${lang}.json`, k)} and ${at(`${MOB}/${lang}.json`, k)}: both shells define "${k}"`
+        + `\n    Fix: if both need it, it is shared by definition: move it to a block in ${SHARED}/ (both languages) and delete it from both shell bundles.`);
+    }
   }
 }
 
@@ -102,11 +110,14 @@ for (const k of Object.keys(webKeys)) {
 // the merge would resolve it silently (shared wins), so the shell's copy is dead weight that can drift
 // without anyone seeing a conflict. Found by red-checking this guard: the first version compared only
 // the two shells, and a shell-vs-shared duplicate walked straight past it.
-for (const [name, table, dir] of [['web', webKeys, WEB], ['mobile', mobKeys, MOB]]) {
-  for (const k of Object.keys(table)) {
-    if (k in sharedKeys) {
-      problems.push(`${at(`${dir}/en.json`, k)}: "${k}" is defined in the ${name} bundle AND in the shared blocks (${at(sharedFileOf[k], k)})`
-        + `\n    Fix: delete the shell's copy (in both languages); the merge already prefers the shared one.`);
+for (const lang of LANGS) {
+  const { webKeys: w, mobKeys: m, sharedKeys: s, sharedFileOf: sf } = byLang[lang];
+  for (const [name, table, dir] of [['web', w, WEB], ['mobile', m, MOB]]) {
+    for (const k of Object.keys(table)) {
+      if (k in s) {
+        problems.push(`${at(`${dir}/${lang}.json`, k)}: "${k}" is defined in the ${name} bundle AND in the shared blocks (${at(sf[k], k)})`
+          + `\n    Fix: delete the shell's copy (in both languages); the merge already prefers the shared one.`);
+      }
     }
   }
 }

@@ -21,7 +21,7 @@ const CASES = [
   // DIFFER: the relay's wider set (loopback, link-local, the shared range of carrier NAT and Tailscale, a single-label
   // name such as a compose service, private IPv6); the toolbox page takes `localhost`/127.0.0.1 in its own line before
   // this rule, not here
-  ['127.0.0.1', true, false], ['localhost', true, false], ['169.254.10.1', true, false], ['100.73.134.19', true, false],
+  ['127.0.0.1', true, false], ['localhost', true, false], ['169.254.10.1', true, false], ['100.64.0.1', true, false],
   ['relay', true, false], ['[fd00::1]', true, false], ['[fe80::1]', true, false], ['[::1]', true, false],
   // DIFFER: a `.local` name (mDNS) is the toolbox page's only; a relay address `ws://name.local` is refused today
   ['box.local', false, true],
@@ -36,6 +36,6 @@ describe('the two home-network rules', () => {
   }
   it('the differences are exactly the declared ones (a new difference is added above on purpose)', () => {
     const differ = CASES.filter(([, r, t]) => r !== t).map(([h]) => h);
-    expect(differ).toEqual(['127.0.0.1', 'localhost', '169.254.10.1', '100.73.134.19', 'relay', '[fd00::1]', '[fe80::1]', '[::1]', 'box.local']);
+    expect(differ).toEqual(['127.0.0.1', 'localhost', '169.254.10.1', '100.64.0.1', 'relay', '[fd00::1]', '[fe80::1]', '[::1]', 'box.local']);
   });
 });

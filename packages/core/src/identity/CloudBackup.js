@@ -57,8 +57,11 @@ const SALT_LEN         = 16;
 const NONCE_LEN        = 24;     // nacl.secretbox.nonceLength
 const KEY_LEN          = 32;     // nacl.secretbox.keyLength
 
-// Production Argon2id cost parameters (Q-C.2: m=64MB, t=3, p=1).
-const PROD_ARGON_OPTS = Object.freeze({ m: 64 * 1024, t: 3, p: 1 });
+/**
+ * The backup's Argon2id cost (m in KiB = 64 MiB, t 3, p 1), for `derivePassphraseKey`. The browser's key door uses
+ * a lower cost of its own (`@onderling/vault` PASSPHRASE_SLOT_PARAMS), since it runs at every open of the app.
+ */
+export const PROD_ARGON_OPTS = Object.freeze({ m: 64 * 1024, t: 3, p: 1 });
 
 const utf8encode = (s) => new TextEncoder().encode(s);
 const utf8decode = (b) => new TextDecoder().decode(b);
@@ -83,6 +86,16 @@ function _argon2id(passphrase, salt, opts) {
     p:     opts.p,
     dkLen: KEY_LEN,
   });
+}
+
+/**
+ * The repo's one passphrase derivation, public: a 32-byte key from a passphrase by Argon2id (the backup's own
+ * function). The browser's key door gets it as an option, since `@onderling/vault` sits below core and cannot import it.
+ * @param {string} passphrase @param {Uint8Array} salt @param {{ m: number, t: number, p: number }} opts
+ * @returns {Uint8Array}
+ */
+export function derivePassphraseKey(passphrase, salt, opts) {
+  return _argon2id(passphrase, salt, opts);
 }
 
 /**

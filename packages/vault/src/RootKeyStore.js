@@ -28,6 +28,29 @@ export class RootKeyStore {
   /** @param {Uint8Array} seed 32 bytes. */
   async setSeed(seed)  { throw new Error(`${this.constructor.name}.setSeed() not implemented`); }
   async deleteSeed()   { throw new Error(`${this.constructor.name}.deleteSeed() not implemented`); }
+  /**
+   * The door's state: `empty` (no seed) · `open` (a seed, no lock) · `locked` · `unlocked`. A door without a lock (the
+   * phone's keystore, a vault, memory) answers `unlocked` when it holds a seed: its platform guards it, and there is
+   * nothing to open.
+   * @returns {Promise<'empty'|'open'|'locked'|'unlocked'>}
+   */
+  async status()       { return (await this.getSeed()) ? 'unlocked' : 'empty'; }
+}
+
+/** The code a `KeyLocked` carries, for a caller that tells it apart by code (also through a wrapping error's `cause`). */
+export const KEY_LOCKED = 'key-locked';
+
+/**
+ * The door holds a seed, but it is locked: the person's secret has not opened it in this page. Never answered as
+ * null, which means "no identity here" and would let a start make a new person over the locked one. `code` is what a
+ * caller reads (`KEY_LOCKED`), as for a key that could not be read.
+ */
+export class KeyLocked extends Error {
+  constructor() {
+    super('The key door is locked: open it with the secret first');
+    this.name = 'KeyLocked';
+    this.code = KEY_LOCKED;
+  }
 }
 
 export const ROOT_SEED_LEN = 32;

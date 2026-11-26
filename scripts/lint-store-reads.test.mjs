@@ -30,6 +30,11 @@ describe('lint-store-reads', () => {
     expect(findingsIn('class FilePersist { async load() {} }').gatelessPersist).toEqual(['FilePersist']);
     expect(findingsIn("import { mapSnapshotGate } from 'x';\nclass FilePersist { async load() {} }").gatelessPersist).toEqual([]);
   });
+  it('says on which lines a value is parsed by hand, and where a gateless persist adapter is declared', () => {
+    const f = findingsIn("const a = 1;\nconst raw = await AsyncStorage.getItem(K);\nconst v = raw ? JSON.parse(raw) : {};\nclass FilePersist {}");
+    expect(f.handParsedLines).toEqual([3]);
+    expect(f.persistLines).toEqual({ FilePersist: 4 });
+  });
   it('the repo itself is clean against its baseline', () => {
     expect(check()).toEqual([]);
   });

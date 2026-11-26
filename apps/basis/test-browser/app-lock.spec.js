@@ -113,6 +113,25 @@ test('the lock: switch on, reload asks, a wrong code stays locked, the right one
   await expect(page.locator('[data-testid="app-lock-go"]')).toBeEnabled({ timeout: 30_000 });
   await expect(page.locator('[data-testid="app-lock-switch"]')).toHaveAttribute('aria-checked', 'true');
   expect(await whoAmI(page), 'this tab is still open after a wrong code').toEqual({ webid: who.webid });
+  // SWITCH OFF WITH THE RIGHT CODE: the other tab still holds the locked shape's door key, so it is told and reloads
+  // (a mark set in it is gone after a reload) into an open door
+  await other.evaluate(() => { window.__beforeOff = true; });
+  await page.locator('[data-testid="app-lock-field"]').fill(CODE);
+  await page.locator('[data-testid="app-lock-go"]').click();
+  await expect(page.locator('[data-testid="app-lock-switch"]'), 'the lock is off').toHaveAttribute('aria-checked', 'false', { timeout: 30_000 });
+  await other.waitForFunction(() => !window.__beforeOff, null, { timeout: 30_000 });
+  await expect(other.locator('.cc-persona-button__button'), 'the other tab opens with no code').toBeVisible({ timeout: 60_000 });
+  await expect(lockScreen(other)).toHaveCount(0);
+  // and on again, for lock now below (the other tab is locked again and opened with the code)
+  await page.locator('[data-testid="app-lock-switch"]').click();
+  await page.locator('[data-testid="app-lock-field"]').fill(CODE);
+  await page.locator('[data-testid="app-lock-again"]').fill(CODE);
+  await page.locator('[data-testid="app-lock-go"]').click();
+  await expect(page.locator('[data-testid="app-lock-switch"]')).toHaveAttribute('aria-checked', 'true', { timeout: 30_000 });
+  await expect(lockScreen(other)).toBeVisible({ timeout: 30_000 });
+  await other.locator('[data-testid="lock-field"]').fill(CODE);
+  await other.locator('[data-testid="lock-open"]').click();
+  await expect(other.locator('.cc-persona-button__button')).toBeVisible({ timeout: 60_000 });
   await page.locator('[data-testid="app-lock-now"]').click();
   await expect(lockScreen(page), 'lock now reloads onto the lock screen').toBeVisible({ timeout: 30_000 });
   await expect(lockScreen(other), 'lock now locks the other tab too').toBeVisible({ timeout: 30_000 });

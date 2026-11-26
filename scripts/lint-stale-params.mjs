@@ -84,8 +84,9 @@ if (disagreements.length) {
   for (const [key, dm] of disagreements) {
     console.error(`   ${key}:`);
     for (const [d, where] of dm) console.error(`      default ${d}  ← ${where.join(', ')}`);
+    console.error(`     Fix: a key is the tunable's identity. Reuse a key only for the SAME value (a mirror): give every declaration of '${key}' in the files above one default, or use a distinct key.`);
   }
-  console.error('\n   A key is the tunable\'s identity. Reuse a key only for the SAME value (a mirror), or use a distinct key.\n');
+  console.error('');
   process.exit(1);
 }
 
@@ -105,7 +106,9 @@ function isRead(p) {
   return false;
 }
 
-const unread = params.filter((p) => !isRead(p)).map((p) => `${p.file}:${p.name}`).sort();
+const unreadParams = params.filter((p) => !isRead(p));
+const unread = unreadParams.map((p) => `${p.file}:${p.name}`).sort();
+const keyOf = new Map(unreadParams.map((p) => [`${p.file}:${p.name}`, p.key]));
 
 if (process.argv.includes('--update')) {
   writeFileSync(BASELINE, `${JSON.stringify({
@@ -126,13 +129,14 @@ const fresh = unread.filter((k) => !known.has(k));
 
 if (fresh.length) {
   console.error(`\n✗ lint:stale-params — ${fresh.length} registered param(s) that NOTHING reads:\n`);
-  for (const k of fresh) console.error(`   - ${k}`);
+  for (const k of fresh) {
+    const [file, name] = [k.slice(0, k.lastIndexOf(':')), k.slice(k.lastIndexOf(':') + 1)];
+    console.error(`   - ${file}: ${name} (key '${keyOf.get(k)}') is declared with param({…}) and nothing reads it.`);
+    console.error(`     Fix: in order of preference, 1. READ it: consume its value (${name}, or register.valueOf('${keyOf.get(k)}')). 2. DELETE it: drop the declaration if nothing needs it. 3. Baseline it (node scripts/lint-stale-params.mjs --update, into scripts/stale-params-baseline.json) WITH A REASON in review, if it is a deliberate not-yet-wired declaration.`);
+  }
   console.error(`
 A param declared with param({…}) but whose value nothing reads is DEAD CONFIG — it reads as a tunable in every
-doc that cites the register, and it does nothing. Fix, in order of preference:
-  1. READ it — consume its value (its const, or register.valueOf('<key>')). That is what makes it a param.
-  2. DELETE it — if nothing needs it, drop the declaration.
-  3. Baseline it (--update) WITH A REASON in review, if it is a deliberate not-yet-wired declaration.
+doc that cites the register, and it does nothing. Reading it is what makes it a param.
 `);
   process.exit(1);
 }

@@ -34,6 +34,37 @@ export function whereIn(rel, needle, root = ROOT) {
   return `${rel}:${lineOf(text, needle)}`;
 }
 
+/** The list that names every manifest the app runs: where to look when a manifest's own file is not found. */
+export const MANIFEST_LIST = 'apps/basis/src/v2/manifestSources.js';
+
+/**
+ * The repo file that declares each manifest, `{ app: rel }`, for a guard that holds the manifests as loaded objects.
+ * Every `apps/<dir>/manifest.js` and `apps/basis/src/v2/*Manifest.js` is imported and its exports are matched to the
+ * given manifests BY IDENTITY (a re-export under another name is still the same object). An app whose manifest is in
+ * none of those files maps to the list that names it (`MANIFEST_LIST`).
+ * @param {object[]} manifests
+ * @returns {Promise<Record<string, string>>}
+ */
+export async function manifestFileByApp(manifests, root = ROOT) {
+  const { readdirSync, existsSync } = await import('node:fs');
+  const { pathToFileURL } = await import('node:url');
+  const candidates = [];
+  for (const d of readdirSync(path.join(root, 'apps'), { withFileTypes: true })) {
+    if (d.isDirectory() && existsSync(path.join(root, 'apps', d.name, 'manifest.js'))) candidates.push(`apps/${d.name}/manifest.js`);
+  }
+  const v2 = 'apps/basis/src/v2';
+  for (const f of readdirSync(path.join(root, v2))) if (/Manifest\.js$/.test(f)) candidates.push(`${v2}/${f}`);
+  const want = new Set(manifests ?? []);
+  const out = {};
+  for (const rel of candidates) {
+    let mod;
+    try { mod = await import(pathToFileURL(path.join(root, rel)).href); } catch { continue; }
+    for (const v of Object.values(mod)) if (want.has(v) && v?.app && !out[v.app]) out[v.app] = rel;
+  }
+  for (const m of manifests ?? []) if (m?.app && !out[m.app]) out[m.app] = MANIFEST_LIST;
+  return out;
+}
+
 /** `rel:line` in a guard's own file for the first line holding `needle` (`metaUrl` is the guard's import.meta.url). */
 export function whereInSelf(metaUrl, needle, root = ROOT) {
   return whereIn(path.relative(root, fileURLToPath(metaUrl)), needle, root);

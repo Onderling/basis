@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { allManifests } from '../apps/basis/src/v2/manifestSources.js';
 import { capabilitiesOf, opNouns, declaredNounsOf } from '../packages/app-manifest/src/index.js';
 import { canonicalAtom } from '../packages/app-manifest/src/atoms.js';
+import { manifestFileByApp } from './guard-where.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BASELINE = path.join(HERE, 'capability-rows-baseline.json');
@@ -48,18 +49,26 @@ export function opsWithNoRow(manifests) {
   return [...new Set(out)].sort();
 }
 
-/** Problems against the baseline: new ops with no row (red), and baseline entries that are fixed or gone (asks --update). */
-export function auditRows(found, baseline) {
+const BASELINE_REL = 'scripts/capability-rows-baseline.json';
+
+/**
+ * Problems against the baseline: new ops with no row (red), and baseline entries that are fixed or gone (asks --update).
+ * @param {string[]} found  @param {string[]} baseline
+ * @param {Record<string, string>} [files]  each app's manifest file (repo-relative); `apps/<app>/manifest.js` when absent
+ */
+export function auditRows(found, baseline, files = {}) {
   const held = new Set(baseline);
   const now = new Set(found);
+  const fileOf = (k) => { const app = k.slice(0, k.indexOf('.')); return files[app] ?? `apps/${app}/manifest.js`; };
   const problems = [];
-  for (const k of found) if (!held.has(k)) problems.push(`${k} has a verb whose atom and noun name no capability row: bind it to a row (declare the noun × atom, or the kind), never leave a switch that switches nothing`);
-  for (const k of held) if (!now.has(k)) problems.push(`the baseline holds ${k}, which now has its row (or is gone): run with --update`);
+  for (const k of found) if (!held.has(k)) problems.push(`${fileOf(k)}: ${k} has a verb whose atom and noun name no capability row.\n    Fix: bind it to a row (declare the noun × atom, or the kind), never leave a switch that switches nothing.`);
+  for (const k of held) if (!now.has(k)) problems.push(`${BASELINE_REL}: the baseline holds ${k}, which now has its row (or is gone).\n    Fix: run node scripts/lint-capability-rows.mjs --update (it only removes entries).`);
   return problems;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const found = opsWithNoRow(allManifests());
+  const manifests = allManifests();
+  const found = opsWithNoRow(manifests);
   const baseline = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')).noRow ?? [] : [];
   if (process.argv.includes('--update')) {
     const noRow = baseline.filter((k) => found.includes(k));
@@ -67,7 +76,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(`lint-capability-rows: baseline ${baseline.length} → ${noRow.length} (it only shrinks)`);
     process.exit(0);
   }
-  const problems = auditRows(found, baseline);
+  const problems = auditRows(found, baseline, await manifestFileByApp(manifests));
   if (problems.length) {
     console.error(`✖ lint-capability-rows: ${problems.length} problem(s)`);
     for (const p of problems.slice(0, 40)) console.error(`  ${p}`);

@@ -43,6 +43,7 @@ export async function getSmokeAgent({ relayUrl = RELAY_URL } = {}) {
     const agent = await createMeshAgent({
       label: AGENT_LABEL,
       relayUrl,
+    relayPeerDiscovery: true,   // auto-hello pulls peers from the relay's list (its relay runs with discovery on)
       vault: new KeychainVault({ service: VAULT_SERVICE }),
       peerGraphPrefix: PEER_GRAPH_PREFIX,
       // Defer start() until any scenario-specific skill registration we

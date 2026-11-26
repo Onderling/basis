@@ -40,6 +40,13 @@ describe('suite-summary', () => {
     expect(text).toBe('✓ 2 files, 4 tests green');
   });
 
+  it('a red exit with no failing file never reads green (an unhandled error, a worker crash)', () => {
+    const json = { numTotalTests: 4, numFailedTests: 0, numTotalTestSuites: 2, numFailedTestSuites: 0, testResults: [] };
+    const { text } = summarize(json, ROOT, 1);
+    expect(text).not.toMatch(/green/);
+    expect(text).toMatch(/✗ vitest exit 1, no failing file named: an unhandled error/);
+  });
+
   it('a file with many failing tests lists the first five and counts the rest', () => {
     const tests = Array.from({ length: 8 }, (_, i) => t(`e ${i}`, 'failed', 'Error: no'));
     const json = { numTotalTests: 8, numFailedTests: 8, numTotalTestSuites: 1, numFailedTestSuites: 1, testResults: [file('test/e.test.js', 'failed', tests)] };

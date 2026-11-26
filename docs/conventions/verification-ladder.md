@@ -33,8 +33,8 @@ one in ten skipped runs turns out red in CI after two weeks, the whole suite com
   this rung would have missed 24; 11 of them were tests that read source as text outside `test/fitness` (the Parity
   tests in `apps/basis-mobile`, the guards' self-tests). Those are in the row above since this date.
 
-**Reading a red suite:** run a package's suite as `npm run suite -- <package dir> [vitest args]`
-(`scripts/suite.mjs`). It prints every failing file, its failing tests and the first line of each failure, after the
+**Reading a red suite:** run a package's suite as `node scripts/suite.mjs <package dir> [vitest args]`
+from the repo root. It prints every failing file, its failing tests and the first line of each failure, after the
 count. Read those files and run them alone; never rerun the whole suite on a count alone (the retro counted 29 of 134
 red suites rerun that way). With `SUITE_LOG=<file>` each run appends one JSON line, for the next retro's miss count.
 

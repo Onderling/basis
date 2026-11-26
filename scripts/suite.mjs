@@ -37,7 +37,7 @@ if (!json) {
   process.exit(r.status || 1);
 }
 
-const { text, failedFiles } = summarize(json, dir);
+const { text, failedFiles } = summarize(json, dir, r.status ?? 1);
 console.log(`\n── suite: ${path.relative(process.cwd(), dir) || '.'} ──\n${text}`);
 if (process.env.SUITE_LOG) {
   try {

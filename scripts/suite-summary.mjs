@@ -8,12 +8,17 @@ import path from 'node:path';
 const MAX_TESTS_PER_FILE = 5;
 const firstLine = (s) => String(s || '').split('\n').map((l) => l.trim()).find(Boolean) || '';
 
-/** @returns {{ text: string, failedFiles: string[] }} */
-export function summarize(json, rootDir) {
+/**
+ * `exitCode` is vitest's own: a run can exit red with no failing file or test in its report (an unhandled rejection,
+ * a worker crash), and then the summary must not say green.
+ * @returns {{ text: string, failedFiles: string[] }}
+ */
+export function summarize(json, rootDir, exitCode = 0) {
   const files = json.numTotalTestSuites ?? (json.testResults || []).length;
   const failed = (json.testResults || []).filter((r) => r.status === 'failed');
   const failedFiles = failed.map((r) => path.relative(rootDir, r.name));
   if (!failed.length && !json.numFailedTests) {
+    if (exitCode) return { text: `✗ vitest exit ${exitCode}, no failing file named: an unhandled error, read the output above`, failedFiles };
     return { text: `✓ ${files} files, ${json.numTotalTests ?? 0} tests green`, failedFiles };
   }
   const lines = [`✗ ${failed.length} of ${files} files failed (${json.numFailedTests ?? 0} of ${json.numTotalTests ?? 0} tests):`];

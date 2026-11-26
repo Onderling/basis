@@ -55,6 +55,10 @@ was started 2026-11-18 with the first toolbox, a grocery search.
   device) and serves the page's files; without a live entry or cookie it answers a refusal page in words that says to
   ask the bot for a link. A housemate who is revoked, or a toolbox switched off, ends the cookies at once. The entry
   and the cookie only open the files; what the page may DO is still its paired grant.
+  **This cookie is Basis's only one, on purpose.** Basis keeps no state in cookies (Frits 2026-11-26): a device's state
+  lives in the storage register, sealed where it is content. The toolbox page's cookie holds no data: it is a server
+  deciding who may load a page's files. `lint-no-cookies` (in `npm run guards`) is red on any other cookie use in
+  shipped code, naming the line and what to use instead, and it is red when this exception stops using a cookie.
 - **The household's admin** types `/toolbox`: the toolboxes the box's operator placed, each with its words and whether
   it is on. `/toolbox <naam> aan` shows the toolbox's card (its name, address, words and what it receives) and switches
   it on after their yes, in their own private chat only. `/toolbox <naam> uit` switches it off.

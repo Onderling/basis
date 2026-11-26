@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 89
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 90
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -55,6 +55,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `manifest-scopes` | — | every writing op declares where it writes; every manifest, the hosts it reaches |
 | `mobile-buttons` | — | the phone's twin of lint-unstyled-buttons: a button on the phone wears the one button family |
 | `my-circle-ids` | — | the circles this device is in are read through ONE reader (`apps/basis/src/v2/myCircleIds.js`) |
+| `no-cookies` | — | Basis keeps no state in cookies (Frits 2026-11-26): one declared exception, red on any other |
 | `no-pinboard-pod-attach` | — | basis never attaches pinboard's own store to a person's pod while what it writes is |
 | `no-relay-literal` | — | the public relay's domain appears nowhere in the tree |
 | `no-relay-word` | — | THE WORD "RELAY" IS NOT SHOWN TO A PERSON |

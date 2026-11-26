@@ -26,8 +26,32 @@ const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
  * of this guard read a list of fragments and reported three stores missing that were sitting right there.
  * A guard that mis-parses in silence is worse than no guard.
  */
-const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
-const read = (p) => { try { return strip(readFileSync(path.join(ROOT, p), 'utf8')); } catch { return ''; } };
+// a block comment keeps its newlines, so a line number in the stripped text is the line in the file
+const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, '')).replace(/(^|[^:])\/\/.*$/gm, '$1');
+const read = (p) => { try { return readFileSync(path.join(ROOT, p), 'utf8'); } catch { return ''; } };
+
+/** The stores one source names through the given patterns, with their 1-based lines: `[{name, line}]`. */
+export function storeSites(src, patterns) {
+  const text = strip(String(src));
+  const out = [];
+  for (const re of patterns) {
+    for (const m of text.matchAll(re)) out.push({ name: m[1], line: text.slice(0, m.index).split('\n').length });
+  }
+  return out;
+}
+
+/** The red message: what is wrong, each store as file:line, and what to do instead. */
+export function redMessage(unsaid) {
+  return [
+    `\n✖ lint-content-classification: ${unsaid.length} durable store(s) a shell builds but the storage register does not classify:`,
+    ...unsaid.map((u) => `   ${u.file}:${u.line}: '${u.name}'`),
+    '\nA freshly enrolled device must know whether each of these is the THROWAWAY self\'s content or this device\'s own.',
+    'Fix: give it a row in apps/basis/src/v2/storageRegister.js with `forget: throwaway` (it goes) or `keep` (it stays),',
+    'and say why in a comment, because the next reader has to be able to check your answer.\n',
+  ].join('\n');
+}
+
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
 /** Where a shell names a durable store, and how. Template literals (`cc-circle-${id}`) are the per-circle family. */
 const SITES = [
@@ -41,29 +65,23 @@ const NOT_A_STORE = new Set(['all', 'self', 'circle', 'items', 'outbox']);
 
 // The classification is the storage register's `forget` column: a row ruled `throwaway` or `keep` is said; an
 // unruled name is not, so a shell that builds a store the register lacks is red here.
-const { STORAGE } = await import(path.join(ROOT, 'apps/basis/src/v2/storageRegister.js'));
-const classified = new Set(Object.values(STORAGE).filter((r) => r.forget !== 'undecided').map((r) => r.name));
+if (isMain) {
+  const { STORAGE } = await import(path.join(ROOT, 'apps/basis/src/v2/storageRegister.js'));
+  const classified = new Set(Object.values(STORAGE).filter((r) => r.forget !== 'undecided').map((r) => r.name));
 
-const unsaid = [];
-for (const site of SITES) {
-  const text = read(site.file);
-  for (const re of site.patterns) {
-    for (const m of text.matchAll(re)) {
-      const name = m[1];
+  const unsaid = [];
+  for (const site of SITES) {
+    for (const { name, line } of storeSites(read(site.file), site.patterns)) {
       if (NOT_A_STORE.has(name) || classified.has(name)) continue;
       // The per-circle family is resolved at run time from the registry, not named one by one.
       if (/^cc-circle(-cache)?-/.test(name)) continue;
-      unsaid.push({ name, file: site.file });
+      unsaid.push({ name, file: site.file, line });
     }
   }
-}
 
-if (unsaid.length) {
-  console.error(`\n✖ lint-content-classification: ${unsaid.length} durable store(s) a shell builds but the storage register does not classify:`);
-  for (const u of unsaid) console.error(`   • '${u.name}'  — built in ${u.file}`);
-  console.error('\nA freshly enrolled device must know whether each of these is the THROWAWAY self\'s content or this');
-  console.error('device\'s own. Give it a row in src/v2/storageRegister.js with `forget: throwaway` (it goes) or `keep` (it stays) —');
-  console.error('and say why in a comment, because the next reader has to be able to check your answer.\n');
-  process.exit(1);
+  if (unsaid.length) {
+    console.error(redMessage(unsaid));
+    process.exit(1);
+  }
+  console.log(`lint-content-classification: every durable store a shell builds is classified (${classified.size} names on the list).`);
 }
-console.log(`lint-content-classification: every durable store a shell builds is classified (${classified.size} names on the list).`);

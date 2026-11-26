@@ -17,4 +17,13 @@ describe('lint-op-owners', () => {
   it('is red until the baseline shrinks with the code', () => {
     expect(opOwnerProblems({}, { y: ['a', 'b'] }).join('\n')).toMatch(/shrink OP_OWNER_BASELINE/);
   });
+  it('every red message says what to do instead; the baseline one names its file:line', () => {
+    const all = [
+      ...opOwnerProblems({ q: ['a', 'b'] }, {}),
+      ...opOwnerProblems({ y: ['a', 'b', 'c'] }, { y: ['a', 'b'] }),
+      ...opOwnerProblems({}, { y: ['a', 'b'] }),
+    ];
+    for (const p of all) expect(p).toMatch(/\n\s*Fix: /);
+    expect(all[2]).toMatch(/scripts\/lint-op-owners\.mjs:\d+/);
+  });
 });

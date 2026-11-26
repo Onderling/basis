@@ -25,18 +25,34 @@ const BASELINE = path.join(ROOT, 'scripts/one-signing-baseline.json');
 // a signature made (not `.detached.verify`) or a key pair derived from a seed, by the library itself
 const DIRECT = /\bsign\.detached\s*\(|\bsign\.keyPair\.fromSeed\s*\(/;
 
-/** Direct signing / derivation sites per file: `{ file: count }`. */
-export function directSigning(files, read = (f) => readFileSync(path.join(ROOT, f), 'utf8')) {
+/** Direct signing / derivation sites per file, as 1-based line numbers: `{ file: [line, …] }`. */
+export function directSigningLines(files, read = (f) => readFileSync(path.join(ROOT, f), 'utf8')) {
   const out = {};
   for (const f of files) {
     if (f === THE_PORT || f === IMPLEMENTATIONS) continue;
     let text = '';
     try { text = read(f); } catch { continue; }
-    let n = 0;
-    for (const line of text.split('\n')) if (DIRECT.test(line) && !/^\s*(\*|\/\/)/.test(line)) n += 1;
-    if (n) out[f] = n;
+    const lines = [];
+    text.split('\n').forEach((line, i) => { if (DIRECT.test(line) && !/^\s*(\*|\/\/)/.test(line)) lines.push(i + 1); });
+    if (lines.length) out[f] = lines;
   }
   return out;
+}
+
+/** Direct signing / derivation sites per file: `{ file: count }`. */
+export function directSigning(files, read) {
+  return Object.fromEntries(Object.entries(directSigningLines(files, read)).map(([f, ls]) => [f, ls.length]));
+}
+
+/** The red message for files that grew: what is wrong, each site as file:line, and what to do instead. */
+export function redMessage(grew, lines) {
+  const out = ['✖ lint-one-signing: a signature is made, or a key pair derived, outside the port (ed25519Sign.js) — it signs in pure JS and the start gets slower:'];
+  for (const g of grew) {
+    out.push(`  ${g.file}: ${g.now} site(s), baseline ${g.was}`);
+    for (const l of lines[g.file] ?? []) out.push(`    ${g.file}:${l}`);
+  }
+  out.push(`Fix: call ed25519Sign(message, secretKey) or ed25519KeyPairFromSeed(seed) from ${THE_PORT} instead of nacl.sign.detached / nacl.sign.keyPair.fromSeed.`);
+  return out.join('\n');
 }
 
 /** What grew against the baseline: `[{file, now, was}]` (a new file has was = 0). */
@@ -45,13 +61,13 @@ export function grewAgainst(now, baseline) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const now = directSigning(shippedSources());
+  const lines = directSigningLines(shippedSources());
+  const now = Object.fromEntries(Object.entries(lines).map(([f, ls]) => [f, ls.length]));
   let baseline = {};
   try { baseline = JSON.parse(readFileSync(BASELINE, 'utf8')); } catch { baseline = {}; }
   const grew = grewAgainst(now, baseline);
   if (grew.length) {
-    console.error('lint-one-signing: a signature is made, or a key pair derived, outside the port (ed25519Sign.js):');
-    for (const g of grew) console.error(`  • ${g.file}: ${g.now} (baseline ${g.was})`);
+    console.error(redMessage(grew, lines));
     process.exit(1);
   }
   if (process.argv.includes('--update')) {

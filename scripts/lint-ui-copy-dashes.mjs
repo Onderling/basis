@@ -17,6 +17,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { lineOf, lineOfKey } from './guard-where.mjs';
 
 /** A spaced dash between two non-space characters: ` — `, ` – `, or ` - `. */
 const SPACED_DASH = /\S\s+[—–-]\s+\S/;
@@ -45,6 +46,36 @@ export function dashHits(json) {
 
 const BASELINE_FILE = 'scripts/ui-copy-dashes.baseline.json';
 
+/** `file:line` of a hit (`file#key`): the line of its key, or of its nearest parent key when the string sits in an array. */
+function whereHit(hit, read) {
+  const [f, key] = [hit.slice(0, hit.indexOf('#')), hit.slice(hit.indexOf('#') + 1)];
+  const text = read(f);
+  const segs = key.split('.');
+  for (let n = segs.length; n > 0; n -= 1) {
+    const l = lineOfKey(text, segs.slice(0, n).join('.'));
+    if (l > 1) return `${f}:${l}`;
+  }
+  return `${f}:1`;
+}
+
+/** The red message for new hits (`file#key`), or, when there are none, for baseline entries that no longer match: what
+ *  is wrong, where (`file:line`) and a `Fix:` line. `read(rel)` gives a repo file's text. */
+export function redMessage(added, gone, read = () => '') {
+  if (added.length) {
+    return [
+      `✖ lint-ui-copy-dashes: ${added.length} new dash construction(s) in UI copy (a spaced ' — ', ' – ' or ' - ' joining two clauses):`,
+      ...added.map((h) => `  • ${whereHit(h, read)}: ${h}`),
+      "  Fix: write it as plain sentences: a full stop or a comma instead of the dash (a range like 9–17 or a word like e-mail is fine).",
+    ].join('\n');
+  }
+  const base = read(BASELINE_FILE);
+  return [
+    `✖ lint-ui-copy-dashes: ${gone.length} baseline entr${gone.length === 1 ? 'y' : 'ies'} no longer match (the copy was fixed):`,
+    ...gone.map((h) => `  • ${BASELINE_FILE}:${lineOf(base, `"${h}"`)}: ${h}`),
+    `  Fix: delete those lines from ${BASELINE_FILE}, or run node scripts/lint-ui-copy-dashes.mjs --write to prune it.`,
+  ].join('\n');
+}
+
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -67,12 +98,8 @@ if (isMain) {
   const known = new Set(baseline);
   const added = now.filter((h) => !known.has(h));
   const gone = baseline.filter((h) => !now.includes(h));
-  if (added.length) {
-    console.error(`✖ lint-ui-copy-dashes: ${added.length} new dash construction(s) in UI copy (plain sentences, no ' — ', ' – ', ' - '):\n${added.map((h) => `  • ${h}`).join('\n')}`);
-    process.exit(1);
-  }
-  if (gone.length) {
-    console.error(`✖ lint-ui-copy-dashes: ${gone.length} baseline entr${gone.length === 1 ? 'y' : 'ies'} no longer match (fixed copy): run with --write to prune:\n${gone.map((h) => `  • ${h}`).join('\n')}`);
+  if (added.length || gone.length) {
+    console.error(redMessage(added, gone, (f) => readFileSync(path.join(ROOT, f), 'utf8')));
     process.exit(1);
   }
   console.log(`✓ lint-ui-copy-dashes: ${files.length} locale files, no new dash construction (${baseline.length} in the baseline, to shrink).`);

@@ -12,6 +12,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { lineOfKey } from './guard-where.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const LOCALES = 'apps/basis/src/locales';
@@ -46,11 +47,27 @@ export function currentHits(root = ROOT) {
   return hits;
 }
 
+/** The red message for hits (`'file key'`, file inside the locales folder): what is wrong, each hit as `file:line` of its
+ *  key, and a `Fix:` line. `read(rel)` gives a repo file's text. */
+export function redMessage(hits, read = (rel) => readFileSync(join(ROOT, rel), 'utf8')) {
+  const where = (h) => {
+    const [f, key] = [h.slice(0, h.indexOf(' ')), h.slice(h.indexOf(' ') + 1)];
+    const rel = `${LOCALES}/${f}`;
+    let text = '';
+    try { text = read(rel); } catch { /* missing file: point at its top */ }
+    return `${rel}:${lineOfKey(text, key)}: ${key}`;
+  };
+  return [
+    '✗ "relay" in a text a person reads (Frits 2026-11-17):',
+    ...hits.map((h) => `   ${where(h)}`),
+    '   Fix: say "verbindingspunt" (nl) / "connection point" (en) in that text; a placeholder named {{relay}} may stay.',
+  ].join('\n');
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const hits = currentHits();
   if (hits.length) {
-    console.error('✗ "relay" in a text a person reads: say "verbindingspunt" / "connection point" (Frits 2026-11-17):');
-    for (const h of hits) console.error(`   ${h}`);
+    console.error(redMessage(hits));
     process.exit(1);
   }
   console.log('✓ no "relay" in a text a person reads');

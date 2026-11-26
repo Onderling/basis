@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { keysIn, dynamicPrefixesIn, declaredKeys, covers, localeKeys } from './lint-locale-key-parity.mjs';
+import { keysIn, dynamicPrefixesIn, declaredKeys, covers, localeKeys, redMessage } from './lint-locale-key-parity.mjs';
 
 describe('lint-locale-key-parity', () => {
   const known = new Set(['circle.fileShare.download', 'circle.share.stop', 'circle.scope.self']);
@@ -18,5 +18,16 @@ describe('lint-locale-key-parity', () => {
   });
   it('reads a bundle\'s leaf keys', () => {
     expect([...localeKeys({ circle: { a: { text: 'A' }, b: { c: { text: 'C', doc: 'd' } } } })]).toEqual(['circle.a', 'circle.b.c']);
+  });
+});
+
+describe('lint-locale-key-parity — the red message says where and what to do instead', () => {
+  const locale = '{\n  "share": {\n    "stop": { "text": "Stop" }\n  },\n  "stop": { "text": "x" }\n}\n';
+  const baseline = '{\n  "web": [\n    "circle.old.key"\n  ],\n  "mobile": []\n}\n';
+  it('a new one-sided key at its line in the locale file, a stale entry at its baseline line, each with a Fix line', () => {
+    const msg = redMessage([{ kind: 'new', side: 'web', key: 'circle.share.stop' }, { kind: 'stale', side: 'web', key: 'circle.old.key' }], { locale, baseline });
+    expect(msg).toMatch(/apps\/basis\/src\/locales\/circle\.nl\.json:3\b.*circle\.share\.stop/);
+    expect(msg).toMatch(/scripts\/locale-key-parity\.baseline\.json:3\b.*circle\.old\.key/);
+    expect(msg.match(/^\s*Fix: /gm)).toHaveLength(2);
   });
 });

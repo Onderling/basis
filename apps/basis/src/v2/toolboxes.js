@@ -54,9 +54,11 @@ export const PAGE_OVER_HTTP_HOME = 'home-network';
  * wider set costs little there. A page over plain http is unsigned code painted for the person:
  *   - `shared` (100.64/10): on carrier NAT the neighbours share that network, so it is not the home; this also means
  *     no page over a Tailscale address (accepted until asked for);
- *   - `loopback`: `pageAddressOk` takes `localhost` and `127.0.0.1` in its own line, exactly; nothing else on loopback.
+ *   - `loopback`: `pageAddressOk` takes `localhost` and `127.0.0.1` in its own line, exactly; nothing else on loopback;
+ *   - `single-label`: a name without a dot is answered by whatever network the phone is on, and a page address is
+ *     opened by a person's own device, where a compose service name never resolves.
  */
-const PAGE_NOT_OVER_HTTP = new Set(['shared', 'loopback']);
+const PAGE_NOT_OVER_HTTP = new Set(['shared', 'loopback', 'single-label']);
 
 /** May a toolbox page be served over plain http from this host: the home network minus `PAGE_NOT_OVER_HTTP`. */
 export function privateHomeHost(host) {

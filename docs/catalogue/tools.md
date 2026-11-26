@@ -42,7 +42,7 @@ was started 2026-11-18 with the first toolbox, a grocery search.
   address `http://localhost:<port>/…` or `http://127.0.0.1:<port>/…`, which works on the same device only; plain
   http on another host only as the operator's explicit choice, `"pageOverHttp": "home-network"` in the placed file, on a
   host of the home network: core's one rule `homeNetworkKind`, the same the relay uses for a plain `ws:` address, minus
-  the shared range 100.64/10 (carrier NAT, Tailscale) and loopback, declared in `toolboxes.js` with the reason; the card
+  the shared range 100.64/10 (carrier NAT, Tailscale), loopback and a single-label name, declared in `toolboxes.js` with the reason; the card
   says the risk before the yes; any other http address is not kept), carrying a one-use ticket (short-lived,
   bound to that housemate and that toolbox). The page hands the ticket back in its offer; the bot reads the toolbox from
   the ticket, never from the page's own words, and then asks the housemate for the code as for any screen. A toolbox

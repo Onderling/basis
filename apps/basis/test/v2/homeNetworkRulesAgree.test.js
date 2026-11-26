@@ -12,7 +12,7 @@ import { isHomeNetworkHost, homeNetworkKind } from '@onderling/core';
 import { privateHomeHost } from '../../src/v2/toolboxes.js';
 
 // the kinds the toolbox page leaves out, with their reason in toolboxes.js (PAGE_NOT_OVER_HTTP)
-const PAGE_LEAVES_OUT = ['shared', 'loopback'];
+const PAGE_LEAVES_OUT = ['shared', 'loopback', 'single-label'];
 
 // [host, kind]: the relay takes every host of a kind; the page every host of a kind it does not leave out
 const CASES = [
@@ -35,6 +35,6 @@ describe('the one home-network rule and the toolbox page narrowing', () => {
   }
   it('the page differs from the relay only on the declared kinds (a new difference is a choice, made above)', () => {
     const differ = CASES.filter(([h]) => isHomeNetworkHost(h) !== privateHomeHost(h)).map(([h]) => h);
-    expect(differ).toEqual(['100.64.0.1', '127.0.0.1', 'localhost', '[::1]']);
+    expect(differ).toEqual(['relay', '100.64.0.1', '127.0.0.1', 'localhost', '[::1]']);
   });
 });

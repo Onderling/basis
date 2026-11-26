@@ -41,7 +41,7 @@
  * Uses `ws` in Node.js; falls back to globalThis.WebSocket in browsers.
  */
 import {
-  Transport, addressPossessionMessage, signAddressPossession, b64encode, relayNameOf,
+  Transport, addressPossessionMessage, signAddressPossession, b64encode, relayNameOf, relayAddressRefusal,
 } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { parseUntrustedJson } from '@onderling/core';
@@ -172,6 +172,14 @@ export class RelayTransport extends Transport {
   constructor(opts) {
     if (!opts?.relayUrl)  throw new Error('RelayTransport requires relayUrl');
     if (!opts?.identity)  throw new Error('RelayTransport requires identity');
+    // TLS outside local development: plain ws only to the own machine or network (`relayAddressRefusal`). Here, where
+    // the socket is made, so every client is held by it, whichever screen, setting or invite handed over the address.
+    if (relayAddressRefusal(opts.relayUrl) === 'plain-on-public-host') {
+      const err = new Error(`RelayTransport: ${opts.relayUrl} is a plain ws address to a public host; a relay outside the `
+        + 'own machine or network is dialled over TLS: use wss:// instead.');
+      err.code = 'RELAY_PLAIN_WS';
+      throw err;
+    }
     super({ address: opts.identity.pubKey, identity: opts.identity });
     this.#relayUrl = opts.relayUrl;
     // THE PRIMARY REGISTRATION (sync-policy §12): is THIS device the one the person chose for direct messages? Read

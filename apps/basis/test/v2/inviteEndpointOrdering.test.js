@@ -18,7 +18,7 @@ import { joinCircleFromInvite } from '../../src/v2/circleInvite.js';
 import { initialState, decodeInvite, finalSubmit } from '../../src/core/wizards/joinGroupState.js';
 import { sharedCircleLocale } from '../../src/locales/index.js';
 
-const RELAY = 'ws://relay.example:8787';
+const RELAY = 'wss://relay.example:8787';
 
 describe('endpointToDialForInvite — the decision', () => {
   it('returns the invite’s relay when this device is on none', () => {
@@ -39,7 +39,7 @@ describe('endpointToDialForInvite — the decision', () => {
   });
 
   it('junk is not an endpoint — a typo must not tear down a working socket', () => {
-    for (const relayUrl of ['', '   ', 'nope', 'https://a-pod.example', 'ws://']) {
+    for (const relayUrl of ['', '   ', 'nope', 'https://a-pod.example', 'ws://', 'ws://relay.example:8787']) {
       expect(endpointToDialForInvite({ invite: { relayUrl }, activeUrl: null })).toBeNull();
     }
   });

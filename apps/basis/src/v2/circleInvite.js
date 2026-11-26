@@ -17,7 +17,7 @@
  */
 
 import { encodeMembershipCodeUrl } from '../core/wizards/createGroupState.js';
-import { isPodUrl } from './connectionPoints.js';
+import { isPodUrl, isRelayUrl } from './connectionPoints.js';
 import { initialState, decodeInvite, finalSubmit, existingSelvesFrom, setLinkChoice, setPersona } from '../core/wizards/joinGroupState.js';
 import { rulesDocFromAnswer } from './circleRules.js';
 
@@ -141,7 +141,7 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
     // invite has no deep-link context, so without this the joiner reaches the circle only if their
     // device happens to ride the same default relay. Rule 1 (join populates the connection-point list)
     // needs the url ON the invite. Additive: older invites simply omit it.
-    ...(typeof relayUrl === 'string' && /^wss?:\/\/\S+$/.test(relayUrl.trim())
+    ...(isRelayUrl(relayUrl)
       ? { relayUrl: relayUrl.trim() } : {}),
   };
   return {

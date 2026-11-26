@@ -33,6 +33,7 @@ import { storageName } from './storageRegister.js';   // every storage name from
  * reconnect, not a re-join. But removing the ACTIVE one is a different event, and the report says that too.
  */
 import { reportNotReadable } from '@onderling/local-store';
+import { relayAddressRefusal } from '@onderling/core';
 import { jsonKv } from './localStoreSeal.js';
 
 /** How a point came to be here. Kept because "I added this" and "a circle brought this" read differently. */
@@ -192,7 +193,7 @@ export function createConnectionPoints({ initial = {}, save = null, now = () => 
      * (`adoptInheritedPoint`): scanning the card is the consent, as joining is for an invite's point.
      */
     addFromContact(url) {
-      if (!isUrl(url)) return { ok: false, reason: 'invalid-url' };
+      if (!isUrl(url)) return { ok: false, reason: relayRefusalReason(url) };
       upsert(url, { source: POINT_SOURCE.CONTACT, adopted: true });
       commit();
       return { ok: true };
@@ -200,7 +201,7 @@ export function createConnectionPoints({ initial = {}, save = null, now = () => 
 
     /** A point the user typed in themselves. */
     addManually(url) {
-      if (!isUrl(url)) return { ok: false, reason: 'invalid-url' };
+      if (!isUrl(url)) return { ok: false, reason: relayRefusalReason(url) };
       upsert(url, { source: POINT_SOURCE.MANUAL, adopted: true });
       commit();
       return { ok: true };
@@ -315,7 +316,26 @@ function isUrl(url, kind = POINT_KIND.RELAY) {
   if (typeof url !== 'string') return false;
   return kind === POINT_KIND.POD
     ? isPodUrl(url)
-    : /^wss?:\/\/\S+$/.test(url.trim());
+    : isRelayUrl(url);
+}
+
+/**
+ * A relay address the app may use: wss anywhere, plain ws only to the own machine or network (`relayAddressRefusal`,
+ * the rule the relay transport itself holds). The one test every place that takes a relay address uses.
+ * @param {unknown} url
+ */
+export function isRelayUrl(url) {
+  return relayAddressRefusal(url) === null;
+}
+
+/** Why a relay address was not taken, as `addManually` / `addFromContact` report it. */
+function relayRefusalReason(url) {
+  return relayAddressRefusal(url) === 'plain-on-public-host' ? 'plain-ws-public' : 'invalid-url';
+}
+
+/** The words for a point the person typed that was not taken (both shells show this key). */
+export function pointAddErrorKey(reason) {
+  return reason === 'plain-ws-public' ? 'circle.nearbyScreen.point_add_plain_ws' : 'circle.nearbyScreen.point_add_invalid';
 }
 
 /**
@@ -652,7 +672,7 @@ export function adoptExistingRelay({ relayUrl, points } = {}) {
  */
 export async function adoptInheritedPoint({ store, knowsRelay, points = [], dial, name = '', t } = {}) {
   if (knowsRelay !== false || !store) return { adopted: null, say: null };
-  const url = (Array.isArray(points) ? points : []).find((u) => typeof u === 'string' && /^wss?:\/\/\S+$/.test(u.trim())) ?? null;
+  const url = (Array.isArray(points) ? points : []).find((u) => isRelayUrl(u)) ?? null;
   if (!url || !store.addFromContact(url)?.ok) return { adopted: null, say: null };
   let dialled = null;
   try { dialled = await dial?.(url); } catch { dialled = { ok: false }; }

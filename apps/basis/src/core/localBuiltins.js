@@ -17,6 +17,7 @@
  * `apps/basis/manifest.js`.
  */
 
+import { relayAddressRefusal } from '@onderling/core';
 import { storageName } from '../v2/storageRegister.js';   // every storage name from the one register
 import { feedbackTarget, feedbackDraft, feedbackScreenId } from '../v2/feedbackContact.js';
 import { readTransportMode } from '../v2/circleSettingsControls.js';
@@ -1339,7 +1340,9 @@ async function setRelay(args, { agent, t }) {
   }
   const url = String(args?.url ?? '').trim();
   if (!url) return { ok: false, error: t('relay.url_required') };
-  if (!/^wss?:\/\//.test(url)) return { ok: false, error: t('relay.bad_url') };
+  const refusal = relayAddressRefusal(url);   // wss, or plain ws on the own machine or network only
+  if (refusal === 'plain-on-public-host') return { ok: false, error: t('relay.plain_ws_public') };
+  if (refusal) return { ok: false, error: t('relay.bad_url') };
   try {
     await agent.vault.set(RELAY_VAULT_KEY, url);
     if (agent.relay.status === 'connected') {

@@ -112,7 +112,7 @@ import { removeMemberDoor, changeRulesDoor, changeRoleDoor, changeSettingsDoor, 
 // routing fallback: a global address seen in two contexts collapses two personas into one person.
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../src/v2/addressSharing.js';
 import {
-  createConnectionPoints, adoptExistingRelay, adoptInheritedPoint, localStorageConnectionPointsIo, recordJoinedCirclePoints, POINT_KIND,
+  createConnectionPoints, pointAddErrorKey, adoptExistingRelay, adoptInheritedPoint, localStorageConnectionPointsIo, recordJoinedCirclePoints, POINT_KIND,
   // Used at module scope to pick the boot relay; it was never imported, so loading the web shell threw
   // `bootRelayUrl is not defined` before anything rendered — a BLANK PAGE, not a degraded one.
   bootRelayUrl, bootRelayUrls,
@@ -4267,7 +4267,8 @@ function showConnectionPoints() {
   /** Record it, then dial it. Both halves are reported: a point that is listed but not connected is a
    *  different (and recoverable) state from one that was never accepted at all. */
   async function addRelayByHand(url, pointsStore, redraw) {
-    if (!pointsStore.addManually(url)?.ok) { addError = 'circle.nearbyScreen.point_add_invalid'; redraw(); return; }
+    const added = pointsStore.addManually(url);
+    if (!added?.ok) { addError = pointAddErrorKey(added?.reason); redraw(); return; }
     addError = null; redraw();
     try {
       const r = await _peerAgent?.addRelay?.(url, { awaitReady: true });

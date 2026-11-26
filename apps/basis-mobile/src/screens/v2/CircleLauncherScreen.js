@@ -79,7 +79,7 @@ import {
   // Nearby model + label helpers (the action map + banner rule are SHARED with web — invariant 3).
   buildNearbyModel, NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS,
   nearbyVisibilityKey, createNearbyScreen, POINT_SOURCE_LABELS, POINT_STATUS_LABELS, pointStatus,
-  createConnectionPoints, adoptExistingRelay,
+  createConnectionPoints, pointAddErrorKey, adoptExistingRelay,
   // "My things" private notes-list.
   myThingsFromListFiles,
   // circle-scoped event stream + per-row action chips.
@@ -5849,7 +5849,8 @@ function ConnectionPointsHost({ bundle, onBack }) {
   // Record it, then dial it. Both halves are reported: a point that is listed but not connected is a
   // different (and recoverable) state from one that was never accepted at all.
   const addByHand = useCallback(async (url) => {
-    if (!storeRef.current?.addManually(url)?.ok) { setAddError('circle.nearbyScreen.point_add_invalid'); return; }
+    const added = storeRef.current?.addManually(url);
+    if (!added?.ok) { setAddError(pointAddErrorKey(added?.reason)); return; }
     setAddError(null);
     try {
       const r = await bundle?.agent?.addRelay?.(url, { awaitReady: true });

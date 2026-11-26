@@ -65,25 +65,27 @@ async function collect() {
   ({ CLAIM_FIELDS } = await load('packages/item-store/src/causalMerge.js'));
   const writeOpsMissing = [];   // `<app>:<opId>` write-ops with no resolves
   const violations = [];        // hard errors (bad policy / downgrade) — never baselined
+  const fileOf = {};            // `<app>:<opId>` -> the manifest file that declares it
   for (const { app, rel } of appManifests()) {
     let mod;
-    try { mod = await load(rel); } catch (e) { violations.push(`${rel}: manifest failed to import (${e.message})`); continue; }
+    try { mod = await load(rel); } catch (e) { violations.push(`${rel}: manifest failed to import (${e.message}).\n     Fix: make the manifest import cleanly (run node on it to see the error).`); continue; }
     const manifest = mod.default ?? Object.values(mod).find((v) => v && Array.isArray(v.operations));
     for (const op of manifest?.operations ?? []) {
       const key = `${app}:${op.id}`;
+      fileOf[key] = rel;
       const decls = Array.isArray(op.resolves) ? op.resolves : [];
       // Agreement: declared policies must be real; task claim-cluster fields must stay `claim`.
       const types = Array.isArray(op.appliesTo?.type) ? op.appliesTo.type : (op.appliesTo?.type ? [op.appliesTo.type] : []);
       for (const d of decls) {
-        if (!d || !RESOLUTIONS.has(d.policy)) { violations.push(`${key}: declares unknown policy "${d?.policy}" for field "${d?.field}"`); continue; }
+        if (!d || !RESOLUTIONS.has(d.policy)) { violations.push(`${rel}: ${key}: declares unknown policy "${d?.policy}" for field "${d?.field}".\n     Fix: set the policy to one of ${[...RESOLUTIONS].join(' | ')} in the op's \`resolves\`.`); continue; }
         if (types.includes('task') && CLAIM_FIELDS.includes(d.field) && d.policy !== 'claim') {
-          violations.push(`${key}: declares (task, ${d.field}) → ${d.policy}, but the claim cluster is FIXED at claim (no downgrade)`);
+          violations.push(`${rel}: ${key}: declares (task, ${d.field}) → ${d.policy}, but the claim cluster is FIXED at claim (no downgrade).\n     Fix: declare { field: '${d.field}', policy: 'claim' }, or drop that entry from the op's \`resolves\`.`);
         }
       }
       if (WRITE_VERBS.has(op.verb) && decls.length === 0) writeOpsMissing.push(key);
     }
   }
-  return { writeOpsMissing: writeOpsMissing.sort(), violations };
+  return { writeOpsMissing: writeOpsMissing.sort(), violations, fileOf };
 }
 
 function scanOrdering() {
@@ -104,7 +106,7 @@ function scanOrdering() {
   return hits;
 }
 
-const { writeOpsMissing, violations } = await collect();
+const { writeOpsMissing, violations, fileOf } = await collect();
 const orderingHits = scanOrdering();
 
 if (process.argv.includes('--update')) {
@@ -128,12 +130,12 @@ if (violations.length) {
 if (newMissing.length) {
   red = true;
   console.error('✗ lint:resolution-policy — new write-op(s) with no declared resolution policy:');
-  for (const k of newMissing) console.error(`   ${k}  (add \`resolves: [{ field, policy }]\` to the op, or --update with a reason)`);
+  for (const k of newMissing) console.error(`   ${fileOf[k]}: ${k} writes with no declared resolution policy.\n     Fix: add \`resolves: [{ field, policy }]\` to the op, or run node scripts/lint-resolution-policy.mjs --update with a reason (it rewrites scripts/resolution-policy-baseline.json).`);
 }
 if (newOrdering.length) {
   red = true;
   console.error('✗ lint:resolution-policy — new bespoke timestamp/wall-clock ordering (a SECOND ordering mechanism):');
-  for (const [f, n] of newOrdering) console.error(`   ${f}: ${n} site(s), baseline allows ${base.timestampSorts?.[f] ?? 0} — order by the Lamport clock, not a wall clock.`);
+  for (const [f, n] of newOrdering) console.error(`   ${f}: ${n} site(s), baseline allows ${base.timestampSorts?.[f] ?? 0} (scripts/resolution-policy-baseline.json).\n     Fix: order by the Lamport clock, not a wall clock.`);
 }
 if (red) process.exit(1);
 

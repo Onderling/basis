@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lineAt, linesMatching, lineOf, whereIn, whereInSelf } from './guard-where.mjs';
+import { lineAt, linesMatching, lineOf, whereIn, whereInSelf, manifestFileByApp, MANIFEST_LIST } from './guard-where.mjs';
 
 describe('guard-where', () => {
   it('turns an index, a pattern or a needle into 1-based lines', () => {
@@ -14,6 +14,16 @@ describe('guard-where', () => {
     expect(whereIn('scripts/guard-where.mjs', 'export function lineAt')).toMatch(/^scripts\/guard-where\.mjs:\d+$/);
     expect(whereIn('no/such/file.js', 'x')).toBe('no/such/file.js:1');
     expect(whereInSelf(import.meta.url, "describe('guard-where'")).toBe('scripts/guard-where.test.mjs:4');
+  });
+  it('names the file that declares each loaded manifest, a re-export included', async () => {
+    const { allManifests } = await import('../apps/basis/src/v2/manifestSources.js');
+    const files = await manifestFileByApp(allManifests());
+    expect(files.lists).toBe('apps/lists/manifest.js');
+    expect(files.tasks).toBe('apps/tasks-v0/manifest.js');          // re-exported by mockManifests.js as mockTasksManifest
+    expect(files.params).toBe('apps/basis/src/v2/paramsManifest.js');
+    expect(files['chat-lane']).toBe('apps/basis/src/v2/chatManifest.js');
+    expect(Object.values(files)).not.toContain(MANIFEST_LIST);       // every manifest the app runs is found in its own file
+    expect(await manifestFileByApp([{ app: 'ghost', operations: [] }])).toEqual({ ghost: MANIFEST_LIST });
   });
 });
 

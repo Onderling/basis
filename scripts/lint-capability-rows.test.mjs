@@ -24,7 +24,15 @@ describe('lint-capability-rows', () => {
   });
   it('a new op with no row is red; a fixed baseline entry asks for --update; the baseline never grows', () => {
     expect(auditRows(['pin.peek'], [])).toEqual([expect.stringMatching(/pin\.peek has a verb whose atom and noun name no capability row/)]);
-    expect(auditRows([], ['pin.peek'])).toEqual([expect.stringMatching(/run with --update/)]);
+    expect(auditRows([], ['pin.peek'])).toEqual([expect.stringMatching(/--update/)]);
     expect(auditRows(['pin.peek'], ['pin.peek'])).toEqual([]);
+  });
+  it('a red line names the file to open and says what to do on a Fix line', () => {
+    const [noRow] = auditRows(['pin.peek'], [], { pin: 'apps/pin/manifest.js' });
+    expect(noRow).toMatch(/^apps\/pin\/manifest\.js: pin\.peek has a verb/);
+    expect(noRow).toMatch(/\n {4}Fix: bind it to a row/);
+    const [stale] = auditRows([], ['pin.peek']);
+    expect(stale).toMatch(/^scripts\/capability-rows-baseline\.json: /);
+    expect(stale).toMatch(/\n {4}Fix: run node scripts\/lint-capability-rows\.mjs --update/);
   });
 });

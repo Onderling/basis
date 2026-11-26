@@ -22,6 +22,7 @@ import { allManifests } from '../apps/basis/src/v2/manifestSources.js';
 // the words the app READS (the reader's registry): an app counts as described only when its files are imported there
 import { OP_DESCRIPTIONS, genericVerbWords, opDescription } from '../apps/basis/src/v2/opDescriptions.js';
 import { capabilitiesOf } from '../packages/app-manifest/src/index.js';
+import { manifestFileByApp, MANIFEST_LIST } from './guard-where.mjs';
 
 /** The nouns with generic ops (a capability with no op of its own), `[{app, noun, atoms}]`, and their names. */
 export function genericNouns(manifests = allManifests()) {
@@ -62,45 +63,79 @@ export function declaredOps(manifests = allManifests()) {
 }
 
 
+const BASELINE_REL = 'scripts/op-descriptions-baseline.json';
+const READER = 'apps/basis/src/v2/opDescriptions.js';
+const SHARED_LOCALE = (lang) => `apps/basis/src/locales/circle.${lang}.json`;
+const FIX = '\n    Fix: ';
+const RUN_UPDATE = `${FIX}run node scripts/lint-op-descriptions.mjs --update (it only removes entries).`;
+const NO_DASH = `${FIX}rewrite it without the dash (an en or em dash, or a hyphen between spaces): a full stop, a comma or a colon instead.`;
+
 /**
- * @param {{ declared: Record<string, Record<string, string[]>>, files: Record<string, Record<string, object>>, baseline: string[] }} a
- *   files: `{ app: { en: {…}, nl: {…} } }` for the apps that have any file
+ * The descriptions file that sits beside a manifest file: `apps/<dir>/manifest.js` → `apps/<dir>/descriptions.<lang>.json`,
+ * `<dir>/<name>.js` → `<dir>/<name>.descriptions.<lang>.json` (the manifests declared inside basis).
+ */
+export function descriptionsFile(manifestRel, lang) {
+  if (/(^|\/)manifest\.js$/.test(manifestRel)) return manifestRel.replace(/manifest\.js$/, `descriptions.${lang}.json`);
+  return manifestRel.replace(/\.js$/, `.descriptions.${lang}.json`);
+}
+
+/** Where an app's manifest and words live, from `{ app: manifestRel }` (`apps/<app>/manifest.js` when absent). */
+function filesOf(manifestFiles, app) {
+  const manifest = manifestFiles?.[app] ?? `apps/${app}/manifest.js`;
+  const beside = manifest === MANIFEST_LIST ? `apps/${app}/manifest.js` : manifest;   // its own file not found: the usual place
+  return { manifest, words: (lang) => descriptionsFile(beside, lang) };
+}
+
+/**
+ * @param {{ declared: Record<string, Record<string, string[]>>, files: Record<string, Record<string, object>>, baseline: string[],
+ *   manifestFiles?: Record<string, string> }} a
+ *   files: `{ app: { en: {…}, nl: {…} } }` for the apps that have any file; manifestFiles: each app's manifest file
  * @returns {string[]} problems
  */
-export function auditDescriptions({ declared, files, baseline }) {
+export function auditDescriptions({ declared, files, baseline, manifestFiles = {} }) {
   const problems = [];
   const owed = new Set(baseline);
   for (const app of Object.keys(declared)) {
-    if (!files[app]) { if (!owed.has(app)) problems.push(`${app} has no descriptions and is not in the baseline (add apps/<app>/descriptions.{en,nl}.json)`); continue; }
+    const at = filesOf(manifestFiles, app);
+    if (!files[app]) {
+      if (!owed.has(app)) problems.push(`${app} has no descriptions and is not in the baseline (no ${at.words('en')}, ${at.words('nl')} the reader imports).${FIX}add ${at.words('en')} and ${at.words('nl')}, a \`what\` per op and a phrase per param that ${at.manifest} declares, and import both in ${READER}.`);
+      continue;
+    }
     const ops = declared[app];
     for (const lang of LANGS) {
+      const file = at.words(lang);
       const f = files[app][lang];
-      if (!f) { problems.push(`${app} has no descriptions.${lang}.json`); continue; }
+      if (!f) { problems.push(`${file}: ${app} has no descriptions.${lang}.json.${FIX}add it with the same ops as the other language's file, and import it in ${READER}.`); continue; }
       for (const [opId, params] of Object.entries(ops)) {
         const d = f[opId];
-        if (typeof d?.what !== 'string' || !d.what.trim()) problems.push(`${app}.${opId} has no \`what\` (${lang})`);
+        if (typeof d?.what !== 'string' || !d.what.trim()) problems.push(`${file}: ${app}.${opId} has no \`what\` (${lang}).${FIX}add "${opId}": { "what": "<a sentence a person reads>" }, for the op ${at.manifest} declares.`);
         else {
-          if (words(d.what) > MAX_WHAT) problems.push(`${app}.${opId} \`what\` (${lang}) is ${words(d.what)} words; at most ${MAX_WHAT}`);
-          if (DASH.test(d.what)) problems.push(`${app}.${opId} \`what\` (${lang}) has a dash`);
+          if (words(d.what) > MAX_WHAT) problems.push(`${file}: ${app}.${opId} \`what\` (${lang}) is ${words(d.what)} words; at most ${MAX_WHAT}.${FIX}shorten ${opId}.what to at most ${MAX_WHAT} words.`);
+          if (DASH.test(d.what)) problems.push(`${file}: ${app}.${opId} \`what\` (${lang}) has a dash.${NO_DASH}`);
         }
         for (const p of params) {
           const phrase = d?.params?.[p];
-          if (typeof phrase !== 'string' || !phrase.trim()) { problems.push(`${app}.${opId} param \`${p}\` has no phrase (${lang})`); continue; }
-          if (words(phrase) > MAX_PHRASE) problems.push(`${app}.${opId} param \`${p}\` (${lang}) is ${words(phrase)} words; at most ${MAX_PHRASE}`);
-          if (DASH.test(phrase)) problems.push(`${app}.${opId} param \`${p}\` (${lang}) has a dash`);
+          if (typeof phrase !== 'string' || !phrase.trim()) { problems.push(`${file}: ${app}.${opId} param \`${p}\` has no phrase (${lang}).${FIX}add "${p}": "<a short phrase>" under ${opId}.params, for the param ${at.manifest} declares on the op.`); continue; }
+          if (words(phrase) > MAX_PHRASE) problems.push(`${file}: ${app}.${opId} param \`${p}\` (${lang}) is ${words(phrase)} words; at most ${MAX_PHRASE}.${FIX}shorten ${opId}.params.${p} to at most ${MAX_PHRASE} words.`);
+          if (DASH.test(phrase)) problems.push(`${file}: ${app}.${opId} param \`${p}\` (${lang}) has a dash.${NO_DASH}`);
         }
       }
       for (const [opId, d] of Object.entries(f)) {
-        if (!(opId in ops)) { problems.push(`${app}.${opId} (${lang}) describes an op no manifest declares`); continue; }
-        for (const p of Object.keys(d?.params ?? {})) if (!ops[opId].includes(p)) problems.push(`${app}.${opId} param \`${p}\` (${lang}) describes a param the op does not declare`);
+        if (!(opId in ops)) { problems.push(`${file}: ${app}.${opId} (${lang}) describes an op no manifest declares.${FIX}remove the entry, or correct the op id to the one ${at.manifest} declares.`); continue; }
+        for (const p of Object.keys(d?.params ?? {})) if (!ops[opId].includes(p)) problems.push(`${file}: ${app}.${opId} param \`${p}\` (${lang}) describes a param the op does not declare.${FIX}remove the phrase, or correct the name to the param the op declares in ${at.manifest}.`);
       }
     }
   }
   for (const app of owed) {
-    if (!(app in declared)) problems.push(`baseline lists ${app}, which no manifest declares any more: run with --update`);
-    else if (files[app]) problems.push(`baseline lists ${app}, which now has its descriptions: run with --update`);
+    if (!(app in declared)) problems.push(`${BASELINE_REL}: baseline lists ${app}, which no manifest declares any more.${RUN_UPDATE}`);
+    else if (files[app]) problems.push(`${BASELINE_REL}: baseline lists ${app}, which now has its descriptions.${RUN_UPDATE}`);
   }
   return problems;
+}
+
+/** The red line for a words file on disk that the reader does not import. */
+export function unreadMessage(f) {
+  return `${f}: on disk, but the reader (${READER}) does not import it: words nobody reads.${FIX}import it in ${READER} and add it to OP_DESCRIPTIONS, or delete the file.`;
 }
 
 // an app folder whose name is not its app id
@@ -130,7 +165,7 @@ export function unreadFiles(paths, registry) {
  *   names: Record<string, Record<string, {one?: string, other?: string}>>, owed: string[] }} a
  * @returns {string[]}
  */
-export function auditGeneric({ generic, atomWords, names, owed }) {
+export function auditGeneric({ generic, atomWords, names, owed, manifestFiles = {} }) {
   const problems = [];
   const owedSet = new Set(owed);
   const named = (key, lang) => Boolean(names[key]?.[lang]?.one && names[key]?.[lang]?.other);
@@ -140,17 +175,17 @@ export function auditGeneric({ generic, atomWords, names, owed }) {
     keys.add(key);
     if (owedSet.has(key)) continue;
     for (const lang of LANGS) {
-      if (!named(key, lang)) problems.push(`${key} has no names (${lang}): its manifest's nouns.${g.noun}.names needs {one, other}`);
+      if (!named(key, lang)) problems.push(`${filesOf(manifestFiles, g.app).manifest}: ${key} has no names (${lang}).${FIX}its manifest's nouns.${g.noun}.names needs {one, other}: add nouns.${g.noun}.names.${lang} = { one, other }.`);
       for (const atom of g.atoms) {
         const what = atomWords[lang]?.[atom]?.what;
-        if (typeof what !== 'string' || !what.trim()) problems.push(`the generic verb \`${atom}\` has no sentence (${lang}), and ${key} uses it`);
-        else if (DASH.test(what)) problems.push(`the generic verb \`${atom}\` (${lang}) has a dash`);
+        if (typeof what !== 'string' || !what.trim()) problems.push(`${SHARED_LOCALE(lang)}: the generic verb \`${atom}\` has no sentence (${lang}), and ${key} uses it.${FIX}add settings.verb_what.${atom} in ${SHARED_LOCALE(lang)}.`);
+        else if (DASH.test(what)) problems.push(`${SHARED_LOCALE(lang)}: the generic verb \`${atom}\` (${lang}) has a dash.${NO_DASH}`);
       }
     }
   }
   for (const key of owedSet) {
-    if (!keys.has(key)) problems.push(`baseline owes ${key}, which is no generic noun any more: run with --update`);
-    else if (LANGS.every((l) => named(key, l))) problems.push(`baseline owes ${key}, which now has its words: run with --update`);
+    if (!keys.has(key)) problems.push(`${BASELINE_REL}: baseline owes ${key}, which is no generic noun any more.${RUN_UPDATE}`);
+    else if (LANGS.every((l) => named(key, l))) problems.push(`${BASELINE_REL}: baseline owes ${key}, which now has its words.${RUN_UPDATE}`);
   }
   return [...new Set(problems)];
 }
@@ -164,17 +199,19 @@ export function auditGeneric({ generic, atomWords, names, owed }) {
  *   keys: `<app>.<opId>` per help phrase, over every locale
  * @returns {string[]} problems
  */
-export function auditHelpPhrases({ keys, frozen, describe }) {
+export function auditHelpPhrases({ keys, frozen, describe, manifestFiles = {} }) {
   const problems = [];
   const held = new Set(frozen);
+  const LOCALES = SHARED_LOCALE(`{${LANGS.join(',')}}`);
   for (const k of new Set(keys)) {
     const dot = k.indexOf('.');
     const app = k.slice(0, dot), opId = k.slice(dot + 1);
-    if (!held.has(k)) problems.push(`circle.bot.help.ops.${k} is a NEW help phrase: what an op does goes in its descriptions file (L1033), not here`);
-    if (!describe(app, opId)) problems.push(`circle.bot.help.ops.${k} names an op with no description: describe ${app}.${opId} first`);
+    const wordsFile = filesOf(manifestFiles, app).words('en');
+    if (!held.has(k)) problems.push(`${LOCALES}: circle.bot.help.ops.${k} is a NEW help phrase.${FIX}what an op does goes in its descriptions file (L1033), not here: remove bot.help.ops.${k} and put the words in ${wordsFile} as ${opId}.what.`);
+    if (!describe(app, opId)) problems.push(`${LOCALES}: circle.bot.help.ops.${k} names an op with no description.${FIX}describe ${app}.${opId} first, in ${wordsFile} (and its nl twin).`);
   }
   const present = new Set(keys);
-  for (const k of held) if (!present.has(k)) problems.push(`the frozen help list holds ${k}, which no locale has any more: run with --update`);
+  for (const k of held) if (!present.has(k)) problems.push(`${BASELINE_REL}: the frozen help list holds ${k}, which no locale has any more.${RUN_UPDATE}`);
   return problems;
 }
 
@@ -229,13 +266,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const beside = readdirSync(path.join(ROOT, 'apps/basis/src/v2')).filter((f) => /\.descriptions\.[a-z]+\.json$/.test(f)).map((f) => `apps/basis/src/v2/${f}`);
   const base = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : {};
   const { generic, names } = genericNouns();
+  const manifestFiles = await manifestFileByApp(allManifests());
   const problems = [
-    ...auditDescriptions({ declared, files, baseline: before }),
-    ...auditGeneric({ generic, atomWords: Object.fromEntries(LANGS.map((l) => [l, genericVerbWords(l)])), names, owed: base.nounsOwed ?? [] }),
-    ...auditHelpPhrases({ keys: helpKeysNow(), frozen: base.helpPhrases ?? [], describe: (app, opId) => opDescription(app, opId, 'en') }),
-    ...unreadFiles(onDisk, files).map((f) => `${f} is on disk but the reader (apps/basis/src/v2/opDescriptions.js) does not import it: words nobody reads`),
-    ...unreadBesideFiles(beside, readFileSync(path.join(ROOT, 'apps/basis/src/v2/opDescriptions.js'), 'utf8'))
-      .map((f) => `${f} is on disk but the reader (apps/basis/src/v2/opDescriptions.js) does not import it: words nobody reads`),
+    ...auditDescriptions({ declared, files, baseline: before, manifestFiles }),
+    ...auditGeneric({ generic, atomWords: Object.fromEntries(LANGS.map((l) => [l, genericVerbWords(l)])), names, owed: base.nounsOwed ?? [], manifestFiles }),
+    ...auditHelpPhrases({ keys: helpKeysNow(), frozen: base.helpPhrases ?? [], describe: (app, opId) => opDescription(app, opId, 'en'), manifestFiles }),
+    ...unreadFiles(onDisk, files).map(unreadMessage),
+    ...unreadBesideFiles(beside, readFileSync(path.join(ROOT, READER), 'utf8')).map(unreadMessage),
   ];
   if (problems.length) {
     console.error(`✖ lint-op-descriptions: ${problems.length} problem(s)`);

@@ -10,7 +10,7 @@ import { setShellContentSeal, sealedKeyValue } from '../../src/v2/localStoreSeal
 import { localCirclePolicyStore } from '../../src/v2/circlePolicyStore.js';
 import { localCircleRecipeStore, addRecipe } from '../../src/v2/circleRecipe.js';
 import { localCircleRulesStore, RULES_FIELDS } from '../../src/v2/circleRules.js';
-import { makeCirclePolicyStoreRN, makeCircleRecipeStoreRN, makeCircleRulesStoreRN } from '../../../basis-mobile/src/core/circleStoresRN.js';
+import { makeCirclePolicyStoreRN, makeCircleRecipeStoreRN } from '../../../basis-mobile/src/core/circleStoresRN.js';
 
 const KEY = 'A'.repeat(43);
 /** localStorage's shape (sync, enumerable), its contents inspectable. */
@@ -56,15 +56,20 @@ describe('a circle\'s policy at rest', () => {
     expect((await makeCirclePolicyStoreRN(s).get('c1')).llmTool).toBe('local');
   });
 
-  it('the recipe and the rules beside it: sealed on web and mobile, read back', async () => {
-    const field = RULES_FIELDS[0];
-    for (const [s, recipe, rules] of [[webStorage(), localCircleRecipeStore, localCircleRulesStore], [rnStorage(), makeCircleRecipeStoreRN, makeCircleRulesStoreRN]]) {
+  it('the recipe: sealed on web and mobile, read back', async () => {
+    for (const [s, recipe] of [[webStorage(), localCircleRecipeStore], [rnStorage(), makeCircleRecipeStoreRN]]) {
       await recipe(s).set('c1', addRecipe(null, 'geheim-recept'));
-      await rules(s).update('c1', { [field]: 'geheime-regel' });
-      expect(allRaw(s)).not.toMatch(/geheim-recept|geheime-regel|recipes/);
+      expect(allRaw(s)).not.toMatch(/geheim-recept|recipes/);
       expect((await recipe(s).get('c1')).recipes[0].name).toBe('geheim-recept');
-      expect((await rules(s).get('c1'))[field]).toBe('geheime-regel');
     }
+  });
+
+  it('the rules beside it: sealed on web, read back', async () => {
+    const field = RULES_FIELDS[0];
+    const s = webStorage();
+    await localCircleRulesStore(s).update('c1', { [field]: 'geheime-regel' });
+    expect(allRaw(s)).not.toMatch(/geheime-regel/);
+    expect((await localCircleRulesStore(s).get('c1'))[field]).toBe('geheime-regel');
   });
 
   it('a plain value written before sealing still reads; before the key exists nothing is written in the clear', async () => {

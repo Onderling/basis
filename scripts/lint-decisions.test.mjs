@@ -21,4 +21,13 @@ describe('lint-decisions', () => {
     expect(decisionsProblems(DEC, '(decided 2026-08-26)').join('\n')).toMatch(/cites a decision of 2026-08-26/);
     expect(decisionsProblems(`${DEC}\n## No date here`, '').join('\n')).toMatch(/has no date in its heading/);
   });
+  it('every red message names a file:line and says what to do instead', () => {
+    const all = [
+      ...decisionsProblems(DEC, 'line one\n(decided 2026-08-26)'),
+      ...decisionsProblems(`${DEC}\n## No date here`, ''),
+    ];
+    expect(all.length).toBe(2);
+    for (const p of all) { expect(p).toMatch(/\.md:\d+/); expect(p).toMatch(/\n\s*Fix: /); }
+    expect(all[0]).toMatch(/docs\/architecture\.md:2/);
+  });
 });

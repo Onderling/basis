@@ -58,14 +58,39 @@ export function auditHints(manifests, nlBundle, allow = ALLOW) {
   return { missing, badShape, stale };
 }
 
+const NL = 'apps/basis/src/locales/chat-hints.nl.json';
+const SELF = 'scripts/lint-chat-hints-localised.mjs';
+
+/** The red lines for an audit: what is wrong, where (file:line where a file holds it), and what to do instead. */
+export function hintMessages({ missing, badShape, stale }, { nlText = '', selfText = '' } = {}) {
+  const lineOf = (text, needle) => { const i = String(text).split('\n').findIndex((l) => l.includes(needle)); return i < 0 ? 1 : i + 1; };
+  const out = [];
+  if (missing.length) {
+    out.push('✖ lint:chat-hints — no Dutch hint for these chat ops (declared in their manifest; the hints file has no entry yet):');
+    for (const k of missing) out.push(`  ${k}`);
+    out.push(`  Fix: add "<app>": { "<opId>": { "text": "…", "doc": "…" } } for each to ${NL}.`);
+  }
+  if (badShape.length) {
+    out.push('✖ lint:chat-hints — a hint that is not {text, doc}:');
+    for (const k of badShape) out.push(`  ${NL}:${lineOf(nlText, `"${k.split(':')[1]}"`)}: ${k}`);
+    out.push('  Fix: make each entry an object { "text": "<the hint>", "doc": "<what the op does>" }.');
+  }
+  if (stale.length) {
+    out.push('✖ lint:chat-hints — translated, but still on ALLOW:');
+    for (const k of stale) out.push(`  ${SELF}:${lineOf(selfText, `'${k}'`)}: ${k}`);
+    out.push('  Fix: take each off ALLOW (the list only shrinks).');
+  }
+  return out;
+}
+
 async function main() {
   const { catalogueManifests, DOOR_MANIFESTS } = await import(pathToFileURL(path.join(ROOT, 'apps/basis/src/v2/manifestSources.js')).href);
-  const nl = JSON.parse(readFileSync(path.join(ROOT, 'apps/basis/src/locales/chat-hints.nl.json'), 'utf8'));
+  const nlText = readFileSync(path.join(ROOT, NL), 'utf8');
+  const nl = JSON.parse(nlText);
   const { missing, badShape, stale } = auditHints([...catalogueManifests(), ...DOOR_MANIFESTS], nl);
   if (missing.length || badShape.length || stale.length) {
-    if (missing.length) console.error(`✖ lint:chat-hints — no Dutch hint (chat-hints.nl.json <app>.<opId>) for:\n  ${missing.join('\n  ')}`);
-    if (badShape.length) console.error(`✖ lint:chat-hints — not {text, doc}:\n  ${badShape.join('\n  ')}`);
-    if (stale.length) console.error(`✖ lint:chat-hints — translated, so take it off ALLOW:\n  ${stale.join('\n  ')}`);
+    const selfText = readFileSync(path.join(ROOT, SELF), 'utf8');
+    for (const l of hintMessages({ missing, badShape, stale }, { nlText, selfText })) console.error(l);
     process.exit(1);
   }
   console.log(`✓ lint:chat-hints: every household-scope chat op has its Dutch hint (${ALLOW.size} still allowed, shrinking).`);

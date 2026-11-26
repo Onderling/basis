@@ -7,7 +7,8 @@
  *   • a `not-understood` is NEVER answered (no loops): it is taken before the router, so it can never be "unknown";
  *   • it goes only to a sender that passed the receive gate: the router only ever sees envelopes the security layer
  *     verified and authorized (a refused envelope never reaches it), and HI never reaches it at all;
- *   • at most ONCE per peer and subtype per start (`createNotUnderstood`, in memory).
+ *   • at most ONCE per peer and subtype per start, and at most NOT_UNDERSTOOD_PER_PEER names per peer per start
+ *     (`createNotUnderstood`, in memory): a peer inventing names cannot grow the memory or draw answers without end.
  *
  * The answer carries the answerer's WIRE, and the words ("an older Basis") are said only when that wire is below ours.
  * The same wire means two CURRENT builds disagree: a gap in one of our own shells (a subtype one routes and another
@@ -21,6 +22,9 @@ export const NOT_UNDERSTOOD_SUBTYPE = 'not-understood';
 /** The longest subtype name an answer carries or a notice keeps (a name off the wire is bounded). */
 const MAX_SUBTYPE_CHARS = 64;
 
+/** How many subtype names one peer may draw answers for, or leave on its row, in one start. */
+export const NOT_UNDERSTOOD_PER_PEER = 16;
+
 const cleanSubtype = (s) => (typeof s === 'string' && s && s.length <= MAX_SUBTYPE_CHARS ? s : null);
 
 /**
@@ -30,6 +34,14 @@ const cleanSubtype = (s) => (typeof s === 'string' && s && s.length <= MAX_SUBTY
 export function createNotUnderstood() {
   const answered = new Set();          // `${from}\n${subtype}`
   const told = new Map();              // peer address → Set<subtype>
+  const counts = new Map();            // `${direction}\n${peer}` → how many names kept (the per-peer cap)
+  const room = (direction, peer) => {
+    const k = `${direction}\n${peer}`;
+    const n = counts.get(k) ?? 0;
+    if (n >= NOT_UNDERSTOOD_PER_PEER) return false;
+    counts.set(k, n + 1);
+    return true;
+  };
   return {
     /**
      * The answer to send for a frame the router named not understood, or null (already answered, no name, or itself an
@@ -43,7 +55,7 @@ export function createNotUnderstood() {
       const of = cleanSubtype(subtype);
       if (typeof from !== 'string' || !from || !of || of === NOT_UNDERSTOOD_SUBTYPE) return null;
       const k = `${from}\n${of}`;
-      if (answered.has(k)) return null;
+      if (answered.has(k) || !room('answered', from)) return null;
       answered.add(k);
       return { subtype: NOT_UNDERSTOOD_SUBTYPE, of, wire };
     },
@@ -62,13 +74,13 @@ export function createNotUnderstood() {
       const theirs = Number.isInteger(payload?.wire) ? payload.wire : null;
       if (theirs === null || !(theirs < ourWire)) {
         const k = `same\n${from}\n${of}`;
-        if (answered.has(k)) return false;
+        if (answered.has(k) || !room('same', from)) return false;
         answered.add(k);
         return 'same-wire';
       }
       let set = told.get(from);
       if (!set) { set = new Set(); told.set(from, set); }
-      if (set.has(of)) return false;
+      if (set.has(of) || !room('told', from)) return false;
       set.add(of);
       return 'older';
     },

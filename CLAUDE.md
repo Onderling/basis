@@ -240,7 +240,7 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   it needs its own interaction model** (Frits, 2026-07-28): pinboard and tasks do not, so they reduce to close
   to a manifest; **folio does** — basis is a poor file manager — so it keeps a surface of its own.
 - **Ship web first, then mobile** as separate steps/commits; don't bundle both platforms in one commit.
-- **The verification ladder — which check runs when.** Rungs 0–2 (the one red-first test · the package suite +
+- **The verification ladder — which check runs when.** Rungs 0–2 (the one red-first test · the affected tests +
   guards · the cheapest REAL thing: a relay walk, one browser spec, a throwaway profile on the real box) before
   the PR; the CI gate (~8 min) gates the merge; the browser tail runs AFTER the merge and gates the *release*;
   `npm run release:check` says whether it passed on the bytes about to ship. A shell/transport/box change never

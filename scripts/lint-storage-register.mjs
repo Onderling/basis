@@ -76,10 +76,11 @@ export const WRITES_FOR_ITS_CALLER = Object.freeze({
 });
 
 export const SEAL_HEADS = Object.freeze(['not content:', 'not sealable:', 'unwritten:', 'debt:']);
-const RAW_WRITE = /\.setItem\s*(\?\.)?\s*\(/;
+// setItem, and the two batch writes React Native's storage also has (none in the shell roots today; a later one is seen)
+const RAW_WRITE = /\.(?:setItem|multiSet|mergeItem)\s*(\?\.)?\s*\(/;
 // a write through `sealedIn(storage)` (nativeCalendar: wraps in sealedKeyValue) is sealed by construction
-const VIA_SEALED_IN = /\bsealedIn\([^)]*\)\.setItem/;
-const RECEIVER = /\b([A-Za-z_$][\w$]*)\s*\??\.setItem\s*(?:\?\.)?\s*\(/;
+const VIA_SEALED_IN = /\bsealedIn\([^)]*\)\.(?:setItem|multiSet|mergeItem)/;
+const RECEIVER = /\b([A-Za-z_$][\w$]*)\s*\??\.(?:setItem|multiSet|mergeItem)\s*(?:\?\.)?\s*\(/;
 // a store DEFINED in the file: `const kv = sealedKeyValue(…)` · `const kv = cond ? jsonKv(storage, …) : null`
 const STORE_DEF = /\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:[^;=]*\?\s*)?(sealedKeyValue|jsonKv)\s*\(\s*([A-Za-z_$][\w$]*)?/;
 

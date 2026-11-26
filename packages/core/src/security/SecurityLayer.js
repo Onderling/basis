@@ -601,14 +601,11 @@ export class SecurityLayer {
 
     // 4b. THE WIRE GATE — the wire the sender speaks, read from inside the signature it just passed (so nobody on the
     // path lowered or stripped it). Missing or below ours = refused, before anything is registered or opened. A HIGHER
-    // wire is not refused here: the newer side decides.
-    if (!wireAccepted(env[WIRE_FIELD], this.#minWire)) {
-      const peerWire = Number.isInteger(env[WIRE_FIELD]) ? env[WIRE_FIELD] : null;
-      throw Object.assign(new SecurityError(
-        SEC.WIRE_REFUSED,
-        `Envelope ${env._id} speaks wire ${peerWire ?? 'none'}; this build accepts ${this.#minWire} and up`,
-      ), { from: env._from, to: typeof env._to === 'string' ? env._to : null, envelopeId: env._id, peerWire });
-    }
+    // wire is not refused here: the newer side decides. Read HERE, refused AFTER 5a and 5b: until then this key is
+    // nobody in particular, and a refusal marks the address it names and answers it. An envelope that 5a or 5b refuses
+    // is refused for that, silently, whatever its wire (a throwaway key naming a contact must not cut both sides off,
+    // and a stranger must not get a signed answer from a circle address).
+    const wireOk = wireAccepted(env[WIRE_FIELD], this.#minWire);
 
     // ── Everything below runs ONLY on an envelope that is internally consistent. Nothing above
     //    touched `#peers`, so a rejection up to here leaves no trace at all — the rollback the
@@ -681,6 +678,18 @@ export class SecurityLayer {
           + 'Install one with setSenderAuthorizer(fn). This warning appears once per SecurityLayer.',
         );
       }
+    }
+
+    // 5b'. The wire refusal, for an envelope that 5a and 5b let through. It is ANSWERABLE (marked, one frame back) only
+    // when it would have been accepted had its wire been current: a key we already hold for that address, or a hello
+    // (first contact, which 5c would establish). Anything else is refused silently, and nothing is registered either way.
+    if (!wireOk) {
+      const peerWire = Number.isInteger(env[WIRE_FIELD]) ? env[WIRE_FIELD] : null;
+      const answerable = held !== undefined || env._p === P.HI;
+      throw Object.assign(new SecurityError(
+        SEC.WIRE_REFUSED,
+        `Envelope ${env._id} speaks wire ${peerWire ?? 'none'}; this build accepts ${this.#minWire} and up`,
+      ), { from: env._from, to: typeof env._to === 'string' ? env._to : null, envelopeId: env._id, peerWire, answerable });
     }
 
     // 5c. First contact. An address we hold no key for may have one ESTABLISHED by a hello — that

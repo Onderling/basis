@@ -25,6 +25,7 @@ import {
 import {
   Body, Field, Actions, ErrorBanner, WizardTheme, wizardPalette,
 } from './_kit.js';
+import { isRelayUrl } from '../../v2/connectionPoints.js';
 
 // Pod sign-in section (Bundle I, 2026-05-27).  Mirrors
 // apps/tasks-mobile/src/screens/PodSettingsScreen.jsx: status row,
@@ -162,8 +163,8 @@ export default function SettingsWizardModal({
   const onSaveRelay = useCallback(async () => {
     const url = relayInput.trim();
     if (!agent?.relay) { setRelayError('Relay subsystem not available.'); return; }
-    if (!/^wss?:\/\//.test(url)) {
-      setRelayError('URL must start with ws:// or wss://');
+    if (!isRelayUrl(url)) {
+      setRelayError('URL must start with wss:// (plain ws:// only on your own device or home network)');
       return;
     }
     setRelayBusy(true);

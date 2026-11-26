@@ -1259,6 +1259,25 @@ such as `relay`), or a loopback, private-range, link-local or
 shared-range (100.64/10: carrier NAT, Tailscale) address literal, with any port. Only such a name may be taken from
 the Host a connection came in on; a public name must be configured by the relay's operator.
 
+### `relayAddressRefusal`
+
+**Kind:** function · **Import:** `relayAddressRefusal` from `'@onderling/core'`
+
+```js
+relayAddressRefusal(url)
+```
+
+Why a client may NOT dial this relay address, or `null` when it may. A relay is dialled over TLS (`wss:`); a plain
+`ws:` address is allowed only to a name that cannot be a public relay (`isPrivateRelayName`: the device itself, the
+home network, a compose service). Plain ws to a public host lets anyone on the path, not only the relay, read and
+rewrite the relay protocol: which addresses a device registers, its proofs, the control frames.
+
+**Parameters**
+
+- `url` `unknown`
+
+**Returns:** `null | 'not-websocket' | 'plain-on-public-host'`
+
 ### `relayOwnNames`
 
 **Kind:** function · **Import:** `relayOwnNames` from `'@onderling/core'`

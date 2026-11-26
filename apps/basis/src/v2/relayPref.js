@@ -1,3 +1,4 @@
+import { relayAddressRefusal } from '@onderling/core';
 import { storageName } from './storageRegister.js';   // every storage name from the one register
 // The member's IN-APP relay URL — so the cross-peer relay (packages/relay) can be pointed at a reachable
 // server from the SETTINGS UI, not only the build-time env var (VITE_/EXPO_PUBLIC_CIRCLE_RELAY_URL). One
@@ -11,7 +12,7 @@ import { storageName } from './storageRegister.js';   // every storage name from
 // pre-boot cache of relay.url
 const STORAGE_KEY = storageName('relayUrl');
 
-/** Coerce raw input to a valid ws://|wss:// relay URL, or '' (blank ⇒ use the env fallback). */
+/** Coerce raw input to a usable relay URL (wss, or plain ws on the own network: `relayAddressRefusal`), or '' (blank ⇒ use the env fallback). */
 export function normalizeRelayUrl(raw) {
   const s = (typeof raw === 'string' ? raw : '').trim();
   if (!s) return '';
@@ -19,7 +20,7 @@ export function normalizeRelayUrl(raw) {
   if (!/^wss?:\/\/.+/i.test(s)) return '';
   try {
     const u = new URL(s);
-    if (u.protocol !== 'ws:' && u.protocol !== 'wss:') return '';
+    if (relayAddressRefusal(s) !== null) return '';
     return u.toString().replace(/\/$/, '');   // drop a trailing slash for stable comparison
   } catch { return ''; }
 }

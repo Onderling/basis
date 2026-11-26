@@ -3778,6 +3778,10 @@
       "text": "Dat is geen adres van een verbindingspunt. Het begint met ws:// of wss://.",
       "doc": "Shown when the typed address is not a websocket endpoint."
     },
+    "point_add_plain_ws": {
+      "text": "Dit adres is niet beveiligd. Een verbindingspunt buiten je eigen apparaat of thuisnetwerk begint met wss://.",
+      "doc": "Shown when the typed address is a plain ws:// address to a public host; such a point is only used over a secured (wss://) connection."
+    },
     "point_add_failed": {
       "text": "Toegevoegd aan de lijst, maar verbinden lukte niet. Het probeert het opnieuw.",
       "doc": "The point is recorded but the socket did not open — honest about both halves rather than reporting success."

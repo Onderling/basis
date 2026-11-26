@@ -332,6 +332,10 @@
       "text": "Bad connection point address. Must start with ws:// or wss://",
       "doc": "/set-relay called with a URL that doesn't have a websocket scheme."
     },
+    "plain_ws_public": {
+      "text": "This address is not secured. A connection point outside your own device or home network starts with wss://",
+      "doc": "/set-relay called with a plain ws:// address to a public host; such a point is only used over wss://."
+    },
     "cleared": {
       "text": "✓ Connection point cleared. NKN remains active.",
       "doc": "/set-relay --clear succeeded."

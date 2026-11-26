@@ -104,7 +104,7 @@ async function enrolFrom(browser, owner, label, circle) {
   expect(offer?.ok, `${label}: enrol offer ${JSON.stringify(offer)}`).toBe(true);
   const phrase = (await call(owner.page, 'household', 'revealOwnerPhrase', {}))?.mnemonic;
   const enrolled = await dev.page.evaluate(async ([uri, words, lbl]) => {
-    localStorage.setItem('onderling.enrollOffer', uri);
+    localStorage.setItem('basis.enrollOffer', uri);
     return window.onderlingCall('household', 'enrollDevice', { mnemonic: words, label: lbl });
   }, [offer.uri, phrase, label]);
   expect(enrolled?.ok, `${label}: enrolled ${JSON.stringify(enrolled)}`).toBe(true);

@@ -3,9 +3,9 @@ import { storageName } from '../../../basis/src/v2/storageRegister.js';   // eve
  * basis-mobile — first-run identity probe (5.9b).
  *
  * The chat-side vault persists `agent-privkey` under
- * `cc-chat-id:agent-privkey`; its absence is the canonical signal that
+ * `basis.chat-id:agent-privkey`; its absence is the canonical signal that
  * this device has no basis identity yet.  We also write a
- * `cc.welcomed` flag once the user dismisses the welcome screen, so the
+ * `basis.welcomed` flag once the user dismisses the welcome screen, so the
  * intro can't accidentally re-appear if the vault is cleared but the
  * marker survives (or the substrate path changes underneath us).
  *

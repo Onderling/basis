@@ -96,7 +96,7 @@ function rawTouches() {
 
 /**
  * The storage key a line touches. Most sites name it inline; the shared pref modules bind it to a
- * file-local constant first (`const STORAGE_KEY = 'cc.relayUrl'`), which is deliberate — one contract,
+ * file-local constant first (`const STORAGE_KEY = 'basis.relayUrl'`), which is deliberate — one contract,
  * one name — so the constant is resolved against the file rather than treated as unreadable. A guard
  * that only saw string literals would have called the relay mirror dead and told us to delete it, which
  * is how a guard teaches the wrong lesson very confidently.
@@ -190,7 +190,7 @@ for (const touch of rawTouches()) {
  * importer that calls a writer to name the register param too.
  */
 const declaringFile = (key) => {
-  // declared by its name (`const KEY = 'cc.relayUrl'`) or by its register id (`const KEY = storageName('relayUrl')`)
+  // declared by its name (`const KEY = 'basis.relayUrl'`) or by its register id (`const KEY = storageName('relayUrl')`)
   const spellings = [`'${key}'`, ...Object.entries(STORAGE).filter(([, r]) => r.name === key).map(([id]) => `storageName('${id}')`)];
   for (const sp of spellings) {
     const hit = execSync(

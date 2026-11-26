@@ -69,11 +69,11 @@ describe('a circle\'s policy at rest', () => {
 
   it('a plain value written before sealing still reads; before the key exists nothing is written in the clear', async () => {
     const s = webStorage();
-    s.setItem('cc.circlePolicy.old', JSON.stringify({ llmTool: 'off' }));
+    s.setItem('basis.circlePolicy.old', JSON.stringify({ llmTool: 'off' }));
     expect((await localCirclePolicyStore(s).get('old')).llmTool).toBe('off');
     setShellContentSeal(null);
     const kv = sealedKeyValue(s);
-    await expect(kv.setItem('cc.circlePolicy.x', '{"llmTool":"local"}')).rejects.toThrow(/unsealed|no content key/);
-    expect(s.raw.has('cc.circlePolicy.x')).toBe(false);
+    await expect(kv.setItem('basis.circlePolicy.x', '{"llmTool":"local"}')).rejects.toThrow(/unsealed|no content key/);
+    expect(s.raw.has('basis.circlePolicy.x')).toBe(false);
   });
 });

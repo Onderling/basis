@@ -1,7 +1,7 @@
 /**
  * basis v2 — γ-next.rules localStorage adapter tests.
  *
- * Verifies the wire-level keys (`cc.circleRulesPending.<id>`), JSON
+ * Verifies the wire-level keys (`basis.circleRulesPending.<id>`), JSON
  * round-trip, and the missing-key / clear semantics.  Uses a vi-mock
  * `storage` rather than jsdom so the test is fast + node-portable.
  */
@@ -27,11 +27,11 @@ function memStorage() {
 }
 
 describe('localStorageCircleRulesPendingIo · γ-next.rules', () => {
-  it('writes to cc.circleRulesPending.<id> as JSON', async () => {
+  it('writes to basis.circleRulesPending.<id> as JSON', async () => {
     const s = memStorage();
     const io = localStorageCircleRulesPendingIo(s);
     await io.save('g1', { purpose: 'Neighbourhood', agreements: 'be kind' });
-    expect(openStoredValue(SEAL, 'cc.circleRulesPending.g1', s._backing.get('cc.circleRulesPending.g1'))).toBe(JSON.stringify({ purpose: 'Neighbourhood', agreements: 'be kind' }),
+    expect(openStoredValue(SEAL, 'basis.circleRulesPending.g1', s._backing.get('basis.circleRulesPending.g1'))).toBe(JSON.stringify({ purpose: 'Neighbourhood', agreements: 'be kind' }),
     );
   });
 
@@ -51,7 +51,7 @@ describe('localStorageCircleRulesPendingIo · γ-next.rules', () => {
 
   it('returns null when stored JSON is corrupt', async () => {
     const s = memStorage();
-    s.setItem('cc.circleRulesPending.g3', 'not json');
+    s.setItem('basis.circleRulesPending.g3', 'not json');
     const io = localStorageCircleRulesPendingIo(s);
     expect(await io.load('g3')).toBeNull();
   });
@@ -61,7 +61,7 @@ describe('localStorageCircleRulesPendingIo · γ-next.rules', () => {
     const io = localStorageCircleRulesPendingIo(s);
     await io.save('g4', { purpose: 'r' });
     await io.remove('g4');
-    expect(s._backing.has('cc.circleRulesPending.g4')).toBe(false);
+    expect(s._backing.has('basis.circleRulesPending.g4')).toBe(false);
     expect(await io.load('g4')).toBeNull();
   });
 

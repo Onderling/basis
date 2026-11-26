@@ -3,7 +3,7 @@
  * screen-blocks cache.
  *
  * Mirrors `apps/basis/test/v2/screenBlocksCacheStorage.test.js` so
- * the wire-level key shape (`cc.screenBlocksCache.<screenId>`) is
+ * the wire-level key shape (`basis.screenBlocksCache.<screenId>`) is
  * identical on both surfaces.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -35,7 +35,7 @@ describe('δ.1 — screenBlocksCacheStorageRN', () => {
     const io = asyncStorageScreenBlocksCacheIo(storage);
     const blocks = [{ blockId: 'b1', type: 'noticeboard', status: 'ok' }];
     await io.save('s1', blocks);
-    expect(openStoredValue(seal, 'cc.screenBlocksCache.s1', storage.map.get('cc.screenBlocksCache.s1'))).toBe(JSON.stringify(blocks));
+    expect(openStoredValue(seal, 'basis.screenBlocksCache.s1', storage.map.get('basis.screenBlocksCache.s1'))).toBe(JSON.stringify(blocks));
     expect(await io.load('s1')).toEqual(blocks);
   });
 
@@ -45,7 +45,7 @@ describe('δ.1 — screenBlocksCacheStorageRN', () => {
   });
 
   it('returns null when stored JSON is corrupt', async () => {
-    await storage.setItem('cc.screenBlocksCache.s2', 'not json');
+    await storage.setItem('basis.screenBlocksCache.s2', 'not json');
     const io = asyncStorageScreenBlocksCacheIo(storage);
     expect(await io.load('s2')).toBeNull();
   });
@@ -54,7 +54,7 @@ describe('δ.1 — screenBlocksCacheStorageRN', () => {
     const io = asyncStorageScreenBlocksCacheIo(storage);
     await io.save('s3', [{ blockId: 'b' }]);
     await io.remove('s3');
-    expect(storage.map.has('cc.screenBlocksCache.s3')).toBe(false);
+    expect(storage.map.has('basis.screenBlocksCache.s3')).toBe(false);
     expect(await io.load('s3')).toBeNull();
   });
 

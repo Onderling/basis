@@ -11,7 +11,7 @@
  * (`pickWebBackend` on web, `createAsBackend` on mobile) must sit inside `sealedLocalBackend(...)`.
  *
  * The same rule covers the per-circle KEY vault, and that one is why this guard is not paranoia. The
- * vault at `cc-circle-pod` holds two private keys per circle. It is built in the SHELLS, so
+ * vault at `basis.circle-pod` holds two private keys per circle. It is built in the SHELLS, so
  * `realAgent`'s `sealedVault()` never reached it, and its rows sat readable on the disk right next to
  * the content they decrypt — found 2026-09-10, by a test that read the raw store instead of the store.
  * A vault constructor in a shell must sit inside `sealedLocalVault(...)`.
@@ -53,7 +53,7 @@ const FILES = [
 const SAME_SEAL = { sealedLocalBackend: ['sealedLocalBackend', 'sealedNamedBackend'] };
 
 /** Sealed by realAgent instead, so the shell hands it over bare. Matched on the store name. */
-const SEALED_ELSEWHERE = /cc-agent-registry|storageName\('agentRegistry'\)/;   // by its name, or its register id
+const SEALED_ELSEWHERE = /basis.agent-registry|storageName\('agentRegistry'\)/;   // by its name, or its register id
 
 const problems = [];
 let checked = 0;

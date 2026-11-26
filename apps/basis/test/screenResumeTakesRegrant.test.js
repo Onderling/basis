@@ -20,7 +20,7 @@ function fakeAgent() {
 
 describe('a resumed screen takes its bot\'s new grant', () => {
   it('the new tokens replace the kept ones, and are kept for the next visit', async () => {
-    const storage = new Map([[`onderling.screen.${BOT}`, JSON.stringify({ botAddress: BOT, relayUrl: null, tokens: [{ id: 'old', skill: 'lists.listLists', subject: ME }] })]]);
+    const storage = new Map([[`basis.screen.${BOT}`, JSON.stringify({ botAddress: BOT, relayUrl: null, tokens: [{ id: 'old', skill: 'lists.listLists', subject: ME }] })]]);
     const store = { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) };
     const sa = fakeAgent();
     const view = createScreenView({ link: `https://x/${screenAddressFor(BOT)}`, makeAgent: async () => sa, storage: store });
@@ -29,11 +29,11 @@ describe('a resumed screen takes its bot\'s new grant', () => {
     sa.onPeer({ from: BOT, payload: { subtype: CONNECTION_GRANT_SUBTYPE, nonce: 'n2', tokens: [{ id: 'new', skill: 'lists.listLists', subject: ME, issuer: BOT }] } });
     await view.call('lists.listLists');
     expect(sa.used.map((u) => u[1])).toEqual(['old', 'new']);
-    expect(JSON.parse(storage.get(`onderling.screen.${BOT}`)).tokens[0].id).toBe('new');
+    expect(JSON.parse(storage.get(`basis.screen.${BOT}`)).tokens[0].id).toBe('new');
   });
 
   it('not from its bot, or not for its own key: ignored', async () => {
-    const storage = new Map([[`onderling.screen.${BOT}`, JSON.stringify({ botAddress: BOT, tokens: [{ id: 'old', skill: 'lists.listLists', subject: ME }] })]]);
+    const storage = new Map([[`basis.screen.${BOT}`, JSON.stringify({ botAddress: BOT, tokens: [{ id: 'old', skill: 'lists.listLists', subject: ME }] })]]);
     const sa = fakeAgent();
     const view = createScreenView({ link: `https://x/${screenAddressFor(BOT)}`, makeAgent: async () => sa, storage: { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) } });
     await view.resume();

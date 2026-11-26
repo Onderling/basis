@@ -55,7 +55,7 @@ import { mkHandleField } from './_wizardKit.js';   // the one handle field the j
  * N1+E8 — persist the wizard's chosen policy axes (features incl. the
  * neighbourhood chat-off default, reveal/pod/llm/agents/consensus) onto the new
  * circle's policy, so the launcher's CONVERSATION gating honours
- * them.  Shares the launcher's localStorage key (`cc.circlePolicy.<id>`).
+ * them.  Shares the launcher's localStorage key (`basis.circlePolicy.<id>`).
  * Only writes axes a template actually filled.  Best-effort.
  */
 async function persistCreatedCirclePolicy(groupId, state) {

@@ -17,7 +17,7 @@
  */
 import { RootKeyStore, assertSeed } from './RootKeyStore.js';
 
-const DB_NAME    = 'onderling-root-key';
+const DB_NAME    = 'basis.root-key';
 const STORE      = 'keys';
 const K_WRAP     = 'wrap-key';
 const K_SEED     = 'sealed-seed';

@@ -2,7 +2,7 @@
  * basis-mobile — AsyncStorage IO for the screen-blocks cache (δ.1).
  *
  * Mirrors web's `screenBlocksCacheStorage.js` verbatim on the key shape
- * (`cc.screenBlocksCache.<screenId>`) so a future pod-sync sees one
+ * (`basis.screenBlocksCache.<screenId>`) so a future pod-sync sees one
  * canonical key prefix across surfaces.
  *
  * Portable: `storage` is injected (no top-level AsyncStorage import) so

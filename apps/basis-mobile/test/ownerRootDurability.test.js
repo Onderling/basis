@@ -2,8 +2,8 @@
  * The owner root has to SURVIVE A RESTART on mobile.
  *
  * Found on hardware 2026-07-30, running the first real message round-trip. `agentBundle` synthesised two
- * AsyncStorage vaults from `opts.asyncStorage` — `cc-chat-id:` and `cc-host-id:` — and not a third for the
- * owner root. `realAgent` therefore fell back to its own `makeBrowserVault('cc-owner-root:')`, which looks
+ * AsyncStorage vaults from `opts.asyncStorage` — `basis.chat-id:` and `basis.host-id:` — and not a third for the
+ * owner root. `realAgent` therefore fell back to its own `makeBrowserVault('basis.owner-root:')`, which looks
  * for `localStorage`, finds none on React Native, and quietly returns a VaultMemory. A fresh owner root was
  * minted on every launch.
  *
@@ -49,7 +49,7 @@ describe('the mobile bundle gives the owner root a durable home', () => {
     const text = await fs.readFile(
       url.fileURLToPath(new URL('../src/core/agentBundle.js', import.meta.url)), 'utf8',
     );
-    for (const prefix of ['cc-chat-id:', 'cc-host-id:', 'cc-owner-root:']) {
+    for (const prefix of ['basis.chat-id:', 'basis.host-id:', 'basis.owner-root:']) {
       expect(text, `no vault synthesised for ${prefix}`).toContain(prefix);
     }
     // …and it must be HANDED to the agent, not merely constructed. The distinction is the whole bug: an
@@ -59,18 +59,18 @@ describe('the mobile bundle gives the owner root a durable home', () => {
 
   it('the vault it builds actually persists across a fresh instance — the restart', async () => {
     const asyncStorage = fakeAsyncStorage();
-    const first = new VaultAsyncStorage({ prefix: 'cc-owner-root:', asyncStorage });
+    const first = new VaultAsyncStorage({ prefix: 'basis.owner-root:', asyncStorage });
     await first.set('owner-phrase', 'twenty four words go here');
 
     // A new process, the same storage.
-    const second = new VaultAsyncStorage({ prefix: 'cc-owner-root:', asyncStorage });
+    const second = new VaultAsyncStorage({ prefix: 'basis.owner-root:', asyncStorage });
     expect(await second.get('owner-phrase')).toBe('twenty four words go here');
   });
 
   it('and it does not collide with the chat identity’s keys', async () => {
     const asyncStorage = fakeAsyncStorage();
-    const owner = new VaultAsyncStorage({ prefix: 'cc-owner-root:', asyncStorage });
-    const chat  = new VaultAsyncStorage({ prefix: 'cc-chat-id:',    asyncStorage });
+    const owner = new VaultAsyncStorage({ prefix: 'basis.owner-root:', asyncStorage });
+    const chat  = new VaultAsyncStorage({ prefix: 'basis.chat-id:',    asyncStorage });
     await owner.set('owner-phrase', 'owner');
     await chat.set('owner-phrase', 'chat');
     expect(await owner.get('owner-phrase')).toBe('owner');
@@ -87,7 +87,7 @@ describe('a memory fallback for the owner root is at least AUDIBLE', () => {
     );
     // The owner root asks for the loud variant. Without this flag the fallback is silent, and silence is
     // what let a regenerated identity root pass for a network fault for a full day.
-    expect(text).toMatch(/pickVault\((?:'cc-owner-root:'|storageName\('vaultOwnerRoot'\)),\s*\{\s*durabilityMatters:\s*true\s*\}\)/);
+    expect(text).toMatch(/pickVault\((?:'basis.owner-root:'|storageName\('vaultOwnerRoot'\)),\s*\{\s*durabilityMatters:\s*true\s*\}\)/);
     expect(text).toMatch(/durabilityMatters/);
   });
 });
@@ -142,8 +142,8 @@ describe('the boot path itself keeps the owner root across a restart', () => {
       expect(second.addresses).toEqual(first.addresses);             // …and still reachable where the roster says
       // Custody cutover: what is on disk under the owner-root prefix is the SEED behind the key door
       // (here the vault-backed fallback — no secureStore passed) — the phrase itself is never at rest.
-      expect(await asyncStorage.getItem('cc-owner-root:owner-root-seed')).toBeTruthy();
-      expect(await asyncStorage.getItem('cc-owner-root:owner-phrase')).toBe(null);
+      expect(await asyncStorage.getItem('basis.owner-root:owner-root-seed')).toBeTruthy();
+      expect(await asyncStorage.getItem('basis.owner-root:owner-phrase')).toBe(null);
     });
 });
 
@@ -152,13 +152,13 @@ describe('a memory fallback for the owner root is reachable only when storage is
     { timeout: BOOT_TIMEOUT }, async () => {
       const { VaultMemory } = await import('@onderling/vault');
       // No asyncStorage and no ownerRootVault → agentBundle passes undefined → realAgent's
-      // makeBrowserVault('cc-owner-root:', { durabilityMatters: true }) finds no localStorage in node,
+      // makeBrowserVault('basis.owner-root:', { durabilityMatters: true }) finds no localStorage in node,
       // exactly as it finds none on Hermes.
       const memoryBoot = () => bootAndDescribe({ chatVault: new VaultMemory(), hostVault: new VaultMemory() });
       const { result: first, lines } = await withCapturedWarnings(memoryBoot);
       const { result: second } = await withCapturedWarnings(memoryBoot);
 
-      const spoke = lines.filter((l) => l.includes('cc-owner-root:'));
+      const spoke = lines.filter((l) => l.includes('basis.owner-root:'));
       expect(spoke.length, 'the memory fallback for the owner root was SILENT').toBeGreaterThan(0);
       expect(spoke[0]).toMatch(/MEMORY/);
       expect(spoke[0]).toMatch(/recovery phrase/);   // it names what is actually at stake, not just the prefix
@@ -174,7 +174,7 @@ describe('a memory fallback for the owner root is reachable only when storage is
       const { lines } = await withCapturedWarnings(
         () => bootAndDescribe({ asyncStorage: fakeAsyncStorage() }),
       );
-      expect(lines.filter((l) => l.includes('cc-owner-root:')), 'warned about a fallback it never took')
+      expect(lines.filter((l) => l.includes('basis.owner-root:')), 'warned about a fallback it never took')
         .toEqual([]);
     });
 });

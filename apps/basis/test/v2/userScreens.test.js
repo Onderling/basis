@@ -231,7 +231,7 @@ describe('userScreens · α.2.a — localStorageScreenIo', () => {
     const io = localStorageScreenIo(storage);
     const book = addScreen(EMPTY_SCREEN_BOOK, 'Stream');
     await io.save(book);
-    expect(mem.has('cc.userScreens')).toBe(true);
+    expect(mem.has('basis.userScreens')).toBe(true);
     const loaded = await io.load();
     expect(loaded.screens).toHaveLength(1);
     expect(loaded.screens[0].name).toBe('Stream');

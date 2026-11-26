@@ -42,7 +42,7 @@ test('a line read on one of the person\'s devices is no longer news on the other
     expect(offer?.ok, JSON.stringify(offer)).toBe(true);
     const phrase = (await call(A1.page, 'household', 'revealOwnerPhrase', {}))?.mnemonic;
     const enrolled = await A2.page.evaluate(async ([uri, words]) => {
-      localStorage.setItem('onderling.enrollOffer', uri);
+      localStorage.setItem('basis.enrollOffer', uri);
       return window.onderlingCall('household', 'enrollDevice', { mnemonic: words, label: 'walk-read-marks' });
     }, [offer.uri, phrase]);
     expect(enrolled?.ok, JSON.stringify(enrolled)).toBe(true);

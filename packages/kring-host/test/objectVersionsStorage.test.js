@@ -62,7 +62,7 @@ describe('createObjectVersionsAdapter', () => {
     // Per-version records under the v2 root.
     const keys = [...backend.map.keys()];
     expect(keys).toHaveLength(2);
-    for (const k of keys) expect(k.startsWith('cc.versions2.policy/c1/')).toBe(true);
+    for (const k of keys) expect(k.startsWith('basis.versions.policy/c1/')).toBe(true);
   });
 
   it('dedups an identical value against the newest entry — no time window', async () => {
@@ -89,8 +89,8 @@ describe('createObjectVersionsAdapter', () => {
     await policy.capture('c1', { kind: 'p' });
     await recipe.capture('c1', { kind: 'r' });
     const keys = [...backend.map.keys()].sort();
-    expect(keys.some((k) => k.startsWith('cc.versions2.policy/c1/'))).toBe(true);
-    expect(keys.some((k) => k.startsWith('cc.versions2.recipe/c1/'))).toBe(true);
+    expect(keys.some((k) => k.startsWith('basis.versions.policy/c1/'))).toBe(true);
+    expect(keys.some((k) => k.startsWith('basis.versions.recipe/c1/'))).toBe(true);
     expect((await policy.list('c1'))[0].value).toEqual({ kind: 'p' });
     expect((await recipe.list('c1'))[0].value).toEqual({ kind: 'r' });
   });
@@ -173,18 +173,18 @@ describe('localStorageBackend', () => {
   it('round-trips records through a Storage-like backend', async () => {
     const storage = mockLocalStorage();
     const backend = localStorageBackend(storage);
-    await backend.put('cc.versions2.policy/c1/1', { ts: 1, sha256: 'x', size: 1, content: '1' });
-    expect((await backend.get('cc.versions2.policy/c1/1')).bytes)
+    await backend.put('basis.versions.policy/c1/1', { ts: 1, sha256: 'x', size: 1, content: '1' });
+    expect((await backend.get('basis.versions.policy/c1/1')).bytes)
       .toEqual({ ts: 1, sha256: 'x', size: 1, content: '1' });
-    expect(await backend.list('cc.versions2.policy/c1/')).toEqual(['cc.versions2.policy/c1/1']);
-    await backend.delete('cc.versions2.policy/c1/1');
-    expect(await backend.get('cc.versions2.policy/c1/1')).toBeNull();
+    expect(await backend.list('basis.versions.policy/c1/')).toEqual(['basis.versions.policy/c1/1']);
+    await backend.delete('basis.versions.policy/c1/1');
+    expect(await backend.get('basis.versions.policy/c1/1')).toBeNull();
   });
 
   it('a corrupt record reads as absent (null)', async () => {
     const storage = mockLocalStorage();
-    storage.map.set('cc.versions2.policy/c1/1', 'not json{');
-    expect(await localStorageBackend(storage).get('cc.versions2.policy/c1/1')).toBeNull();
+    storage.map.set('basis.versions.policy/c1/1', 'not json{');
+    expect(await localStorageBackend(storage).get('basis.versions.policy/c1/1')).toBeNull();
   });
 
   it('put tolerates a throwing storage (quota / disabled)', async () => {

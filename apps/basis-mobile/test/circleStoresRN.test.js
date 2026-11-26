@@ -30,35 +30,35 @@ describe('M3 circleStoresRN', () => {
   beforeEach(() => { storage = mockAsyncStorage(); setShellContentSeal(groupKeyStrategy({ groupKey: 'A'.repeat(43) })); });
   afterEach(() => setShellContentSeal(null));
 
-  it('policy store round-trips an edit under cc.circlePolicy.<id>', async () => {
+  it('policy store round-trips an edit under basis.circlePolicy.<id>', async () => {
     const store = makeCirclePolicyStoreRN(storage);
     const fresh = await store.get('circle-1');
     expect(fresh).toEqual(DEFAULT_CIRCLE_POLICY);
 
     await store.update('circle-1', { llmTool: 'local', features: { tasks: true } });
-    expect([...storage.map.keys()]).toContain('cc.circlePolicy.circle-1');
+    expect([...storage.map.keys()]).toContain('basis.circlePolicy.circle-1');
 
     const reloaded = await makeCirclePolicyStoreRN(storage).get('circle-1');
     expect(reloaded.llmTool).toBe('local');
     expect(reloaded.features.tasks).toBe(true);
   });
 
-  it('override store round-trips a flow-through patch under cc.circleOverride.<id>', async () => {
+  it('override store round-trips a flow-through patch under basis.circleOverride.<id>', async () => {
     const store = makeMemberOverrideStoreRN(storage);
     await store.update('circle-9', { chatOff: true, flowThrough: { tasksToPersonal: true } });
-    expect([...storage.map.keys()]).toContain('cc.circleOverride.circle-9');
+    expect([...storage.map.keys()]).toContain('basis.circleOverride.circle-9');
 
     const reloaded = await makeMemberOverrideStoreRN(storage).get('circle-9');
     expect(reloaded.chatOff).toBe(true);
     expect(reloaded.flowThrough.tasksToPersonal).toBe(true);
   });
 
-  it('availability store is keyless and persists under cc.availability', async () => {
+  it('availability store is keyless and persists under basis.availability', async () => {
     const store = makeAvailabilityStoreRN(storage);
     expect(await store.get()).toEqual(DEFAULT_AVAILABILITY);
 
     await store.update({ holiday: { active: true, until: '2026-06-10' } });
-    expect([...storage.map.keys()]).toEqual(['cc.availability']);
+    expect([...storage.map.keys()]).toEqual(['basis.availability']);
 
     const reloaded = await makeAvailabilityStoreRN(storage).get();
     expect(reloaded.holiday.active).toBe(true);
@@ -66,7 +66,7 @@ describe('M3 circleStoresRN', () => {
   });
 
   it('asyncKeyedIo tolerates corrupt JSON (returns null)', async () => {
-    storage.map.set('cc.circlePolicy.bad', '{not json');
-    expect(await asyncKeyedIo('cc.circlePolicy.', storage).load('bad')).toBeNull();
+    storage.map.set('basis.circlePolicy.bad', '{not json');
+    expect(await asyncKeyedIo('basis.circlePolicy.', storage).load('bad')).toBeNull();
   });
 });

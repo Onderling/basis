@@ -40,42 +40,42 @@ describe('the classification is TOTAL — a store is content or it is kept, neve
   it('keeps the offer stash and the vault — the ceremony just wrote them', () => {
     // The box says it out loud: "the vaults the ceremony wrote and the offer stash stay." A device that forgets
     // the stash comes back enrolled and in no circle; one that forgets the vault is not enrolled at all.
-    expect(THROWAWAY_CONTENT.keep).toContain('onderling.enrollOffer');
+    expect(THROWAWAY_CONTENT.keep).toContain('basis.enrollOffer');
     expect(THROWAWAY_CONTENT.keep.some((k) => /vault/i.test(k)), 'the vault is named as a survivor').toBe(true);
   });
 
   it('clears the flags that gate the help circle TOGETHER — one without the other is an empty Uitleg', () => {
     // `helpCircleProvisioned` says the circle exists; `onboardingDone` says the bot already spoke in it. Clear
     // the first and keep the second and the enrolled person gets a fresh help circle that never says anything.
-    expect(THROWAWAY_CONTENT.keys).toContain('cc.helpCircleProvisioned');
-    expect(THROWAWAY_CONTENT.keys).toContain('cc.onboardingDone');
+    expect(THROWAWAY_CONTENT.keys).toContain('basis.helpCircleProvisioned');
+    expect(THROWAWAY_CONTENT.keys).toContain('basis.onboardingDone');
   });
 
   it('names the help circle\'s own stores, because the registry may not list them', () => {
     // `HELP_CIRCLE_ID` is the literal `cc-help`, so the throwaway self and the enrolled person share the store
     // NAME — the one database where two identities' sealed rows sit together. A throwaway self that never
     // provisioned it is not in the registry, so the registry-driven route would skip exactly that one.
-    expect(THROWAWAY_CONTENT.stores).toContain('cc-circle-cc-help');
-    expect(THROWAWAY_CONTENT.stores).toContain('cc-circle-cache-cc-help');
+    expect(THROWAWAY_CONTENT.stores).toContain('basis.circle-cc-help');
+    expect(THROWAWAY_CONTENT.stores).toContain('basis.circle-cache-cc-help');
   });
 });
 
 describe('forgetThrowawaySelf — the order is the safety', () => {
   it('reads the circle ids BEFORE dropping the registry, and clears their stores too', async () => {
-    const s = shellOf({ stores: ['cc-agent-registry', 'cc-circle-abc', 'cc-circle-cache-abc'], circleIds: ['abc'] });
+    const s = shellOf({ stores: ['basis.agent-registry', 'basis.circle-abc', 'basis.circle-cache-abc'], circleIds: ['abc'] });
     const r = await forgetThrowawaySelf(s);
     expect(r.ok).toBe(true);
     expect(s.listCircleIds).toHaveBeenCalled();
     expect(s.dropped.stores, 'the per-circle stores went with the registry').toEqual(
-      expect.arrayContaining(['cc-agent-registry', 'cc-circle-abc', 'cc-circle-cache-abc']),
+      expect.arrayContaining(['basis.agent-registry', 'basis.circle-abc', 'basis.circle-cache-abc']),
     );
-    const registryAt = s.dropped.stores.indexOf('cc-agent-registry');
-    const circleAt = s.dropped.stores.indexOf('cc-circle-abc');
+    const registryAt = s.dropped.stores.indexOf('basis.agent-registry');
+    const circleAt = s.dropped.stores.indexOf('basis.circle-abc');
     expect(circleAt, 'the circle store is named before the registry is gone').toBeLessThan(registryAt);
   });
 
   it('a registry that cannot be read clears NOTHING — half-cleared is a device in circles it cannot open', async () => {
-    const s = shellOf({ stores: ['cc-agent-registry', 'cc-circle-abc'], keys: ['cc.contactNames'], failListing: true });
+    const s = shellOf({ stores: ['basis.agent-registry', 'basis.circle-abc'], keys: ['basis.contactNames'], failListing: true });
     const r = await forgetThrowawaySelf(s);
     expect(r.ok).toBe(false);
     expect(r.reason).toMatch(/circle-ids|registry/i);
@@ -85,12 +85,12 @@ describe('forgetThrowawaySelf — the order is the safety', () => {
 
   it('clears the prefixed keys, and leaves the kept ones exactly alone', async () => {
     const s = shellOf({
-      keys: ['cc.sharedDisclosure.default::abc', 'cc.contactNames', 'onderling.enrollOffer', 'basis.theme', 'circle.app.lang'],
+      keys: ['basis.sharedDisclosure.default::abc', 'basis.contactNames', 'basis.enrollOffer', 'basis.theme', 'basis.app.lang'],
     });
     const r = await forgetThrowawaySelf(s);
     expect(r.ok).toBe(true);
-    expect([...s.live.keys].sort(), 'the survivors survived').toEqual(['basis.theme', 'circle.app.lang', 'onderling.enrollOffer']);
-    expect(s.dropped.keys).toEqual(expect.arrayContaining(['cc.sharedDisclosure.default::abc', 'cc.contactNames']));
+    expect([...s.live.keys].sort(), 'the survivors survived').toEqual(['basis.app.lang', 'basis.enrollOffer', 'basis.theme']);
+    expect(s.dropped.keys).toEqual(expect.arrayContaining(['basis.sharedDisclosure.default::abc', 'basis.contactNames']));
   });
 
   it('is a no-op it can report when there is nothing of a former self to forget', async () => {
@@ -124,16 +124,16 @@ describe('§8c — the device comes back WHOLE after the clear', () => {
     expect(KEPT('custody-mode'), 'the custody marker says this install is a delegation').toBe(true);
     expect(KEPT('device-delegation-seed'), 'the delegation blob carries the deviceId and the PRE-SIGNED record').toBe(true);
     // 3 · the offer stash — which circles to re-join
-    expect(THROWAWAY_CONTENT.keep).toContain('onderling.enrollOffer');
+    expect(THROWAWAY_CONTENT.keep).toContain('basis.enrollOffer');
   });
 
   it('and none of the three is also on the content side', () => {
     const content = [...THROWAWAY_CONTENT.stores, ...THROWAWAY_CONTENT.keys];
-    for (const n of ['custody-mode', 'device-delegation-seed', 'onderling.enrollOffer', 'content-at-rest-key']) {
+    for (const n of ['custody-mode', 'device-delegation-seed', 'basis.enrollOffer', 'content-at-rest-key']) {
       expect(content.some((c) => c.includes(n)), `${n} is not cleared`).toBe(false);
     }
     // the prefixes are the other way a key can be swept up without ever being named
-    for (const n of ['onderling.enrollOffer', 'custody-mode']) {
+    for (const n of ['basis.enrollOffer', 'custody-mode']) {
       expect(THROWAWAY_CONTENT.keyPrefixes.some((p) => n.startsWith(p)), `${n} is not caught by a prefix`).toBe(false);
     }
   });
@@ -157,10 +157,10 @@ describe('the NOTE, not a button — every path that enrols gets the clear', () 
     // Both shapes would have passed their own tests while the one path people and walks take went past.
     const v = fakeVault();
     await markForgetPending(v, 'enrol', ['abc']);
-    const s = shellOf({ stores: ['cc-agent-registry', 'cc-circle-abc'], keys: ['cc.contactNames'] });
+    const s = shellOf({ stores: ['basis.agent-registry', 'basis.circle-abc'], keys: ['basis.contactNames'] });
     const r = await runPendingForget({ markerVault: v, shell: s });
     expect(r.ran).toBe(true);
-    expect(s.dropped.stores, 'the noted circle went too').toEqual(expect.arrayContaining(['cc-circle-abc', 'cc-agent-registry']));
+    expect(s.dropped.stores, 'the noted circle went too').toEqual(expect.arrayContaining(['basis.circle-abc', 'basis.agent-registry']));
     expect(await v.get(FORGET_PENDING_KEY), 'the note is gone once the work is done').toBeNull();
   });
 
@@ -170,13 +170,13 @@ describe('the NOTE, not a button — every path that enrols gets the clear', () 
     // skipped in silence — the half-cleared state the whole file exists to avoid.
     const v = fakeVault();
     await markForgetPending(v, 'enrol', ['zzz']);
-    const s = shellOf({ stores: ['cc-circle-zzz'], circleIds: [] });   // the shell knows nothing
+    const s = shellOf({ stores: ['basis.circle-zzz'], circleIds: [] });   // the shell knows nothing
     await runPendingForget({ markerVault: v, shell: s });
-    expect(s.dropped.stores).toContain('cc-circle-zzz');
+    expect(s.dropped.stores).toContain('basis.circle-zzz');
   });
 
   it('a boot with no note does nothing at all', async () => {
-    const s = shellOf({ stores: ['cc-agent-registry'] });
+    const s = shellOf({ stores: ['basis.agent-registry'] });
     const r = await runPendingForget({ markerVault: fakeVault(), shell: s });
     expect(r).toMatchObject({ ran: false, reason: 'nothing-pending' });
     expect(s.dropped.stores, 'an ordinary boot never clears anything').toEqual([]);
@@ -200,7 +200,7 @@ describe('the NOTE, not a button — every path that enrols gets the clear', () 
     const v = fakeVault();
     // no ids on the note, and the shell's fallback throws — nothing is dropped, so nothing is forgotten
     await markForgetPending(v, 'enrol', []);
-    const s = shellOf({ stores: ['cc-agent-registry'], failListing: true });
+    const s = shellOf({ stores: ['basis.agent-registry'], failListing: true });
     const r = await runPendingForget({ markerVault: v, shell: s });
     expect(r.ok).toBe(false);
     expect(s.dropped.stores).toEqual([]);

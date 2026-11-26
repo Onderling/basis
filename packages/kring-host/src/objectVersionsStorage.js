@@ -15,7 +15,7 @@
  *
  * Storage layout (v2 — one record per version, versionStore's native shape):
  *
- *   `cc.versions2.<storeName>/<encodeURIComponent(circleId)>/<ts>`
+ *   `basis.versions.<storeName>/<encodeURIComponent(circleId)>/<ts>`
  *     → { ts, sha256, size, content } where `content` is the JSON string
  *       of the captured value.
  *
@@ -63,7 +63,7 @@ export function fingerprintHex(s) {
 }
 
 /** Key prefix for one store's version series (exported for tests/tooling). */
-export const versionsRootFor = (storeName) => `cc.versions2.${storeName}/`;
+export const versionsRootFor = (storeName) => `basis.versions.${storeName}/`;
 
 /**
  * Build a `{capture, list, restore}` versions adapter over a real

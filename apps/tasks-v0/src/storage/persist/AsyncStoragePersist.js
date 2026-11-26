@@ -11,7 +11,7 @@
  * Default prefix is `'tasks-cache:'` so a single AsyncStorage instance
  * hosting both pinboard ('pinboard-cache:') and tasks-v0 caches keeps them
  * isolated.  basis-mobile's agentBundle passes
- * `{dbName:'cc-tasks-cache', asyncStorage}` (no explicit prefix).
+ * `{dbName:'basis.tasks', asyncStorage}` (no explicit prefix).
  */
 import { mapSnapshotGate } from '@onderling/local-store';
 

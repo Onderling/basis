@@ -177,7 +177,7 @@ describe('localStorageRulesIo', () => {
     const io = localStorageRulesIo(storage);
     await io.save('c1', { purpose: 'Garden' });
     expect(await io.load('c1')).toEqual({ purpose: 'Garden' });
-    expect(map.has('cc.circleRules.c1')).toBe(true);
+    expect(map.has('basis.circleRules.c1')).toBe(true);
   });
 
   it('load returns null for missing / corrupt entries', async () => {

@@ -131,10 +131,10 @@ describe('5.4c makeCirclePolicyStoreRN with getPodWriter thunk', () => {
 
     await store.update('circle-1', { pod: 'shared', llmTool: 'local' });
 
-    // Local (canonical) write landed under the cc.circlePolicy.<id> key.
-    expect([...storage.map.keys()]).toContain('cc.circlePolicy.circle-1');
+    // Local (canonical) write landed under the basis.circlePolicy.<id> key.
+    expect([...storage.map.keys()]).toContain('basis.circlePolicy.circle-1');
     // sealed at rest: opened with the device's content key
-    const localValue = JSON.parse(openStoredValue(SEAL, 'cc.circlePolicy.circle-1', storage.map.get('cc.circlePolicy.circle-1')));
+    const localValue = JSON.parse(openStoredValue(SEAL, 'basis.circlePolicy.circle-1', storage.map.get('basis.circlePolicy.circle-1')));
     expect(localValue.pod).toBe('shared');
     expect(localValue.llmTool).toBe('local');
 
@@ -158,7 +158,7 @@ describe('5.4c makeCirclePolicyStoreRN with getPodWriter thunk', () => {
     // Pre-restore save: pod axis says 'shared' but no writer → local-only.
     await store.update('circle-2', { pod: 'shared' });
     expect(writer.writes).toHaveLength(0);
-    expect([...storage.map.keys()]).toContain('cc.circlePolicy.circle-2');
+    expect([...storage.map.keys()]).toContain('basis.circlePolicy.circle-2');
 
     // Session restores → next save picks the writer up via the SAME store
     // (no re-render, no rebuild).
@@ -178,7 +178,7 @@ describe('5.4c makeCirclePolicyStoreRN with getPodWriter thunk', () => {
     // Default policy has pod:'none' — tieredPolicyIo intentionally
     // refuses to publish (a private circle stays local).
     await store.update('circle-3', { llmTool: 'local' });
-    expect([...storage.map.keys()]).toContain('cc.circlePolicy.circle-3');
+    expect([...storage.map.keys()]).toContain('basis.circlePolicy.circle-3');
     expect(writer.writes).toHaveLength(0);
   });
 });

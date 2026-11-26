@@ -14,10 +14,10 @@ test.setTimeout(90_000);
 
 const NEWER = JSON.stringify({ v: 99, data: { 'mem://x/items/a': '{"title":"from a newer build"}' } });
 
-/** Put the snapshot where the web household store reads it (`cc-household-state` / `items` / `state`). */
+/** Put the snapshot where the web household store reads it (`basis.household` / `items` / `state`). */
 async function seed(page, raw) {
   await page.evaluate((value) => new Promise((resolve, reject) => {
-    const req = indexedDB.open('cc-household-state', 1);
+    const req = indexedDB.open('basis.household', 1);
     req.onupgradeneeded = (e) => e.target.result.createObjectStore('items');
     req.onerror = (e) => reject(e.target.error);
     req.onsuccess = (e) => {
@@ -30,7 +30,7 @@ async function seed(page, raw) {
   }), raw);
 }
 const stored = (page) => page.evaluate(() => new Promise((resolve, reject) => {
-  const req = indexedDB.open('cc-household-state', 1);
+  const req = indexedDB.open('basis.household', 1);
   req.onerror = (e) => reject(e.target.error);
   req.onsuccess = (e) => {
     const db = e.target.result;

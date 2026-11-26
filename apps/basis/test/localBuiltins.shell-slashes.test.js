@@ -253,7 +253,7 @@ describe('/set-relay', () => {
     const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     const r = await builtins['set-relay']({ url: 'wss://relay.example:9090' });
     expect(r.ok).toBe(true);
-    expect(agent.vault.set).toHaveBeenCalledWith('cc-relay-url', 'wss://relay.example:9090');
+    expect(agent.vault.set).toHaveBeenCalledWith('basis.relay-url', 'wss://relay.example:9090');
     expect(agent.relay.connect).toHaveBeenCalledWith({ relayUrl: 'wss://relay.example:9090' });
     expect(r.message).toMatch(/Connection point connected/);
     expect(r.message).toMatch(/wss:\/\/relay\.example:9090/);
@@ -273,7 +273,7 @@ describe('/set-relay', () => {
     const r = await builtins['set-relay']({ clear: true });
     expect(r.ok).toBe(true);
     expect(agent.relay.disconnect).toHaveBeenCalledTimes(1);
-    expect(agent.vault.delete).toHaveBeenCalledWith('cc-relay-url');
+    expect(agent.vault.delete).toHaveBeenCalledWith('basis.relay-url');
     expect(r.message).toMatch(/Connection point cleared/);
   });
 

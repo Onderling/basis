@@ -24,7 +24,7 @@ const ROOT = 'https://ann.pod/circles/c1';
 describe('a producer that does not own the circle root', () => {
   it('writes no key resource at boot — neither a restored copy nor a fresh key', async () => {
     const vault = new MemVault();
-    await vault.set('cc.circle-groupkey:c1', JSON.stringify({ version: 1, stale: true }));
+    await vault.set('basis.circle-groupkey:c1', JSON.stringify({ version: 1, stale: true }));
     const pod = spyPod();
     await produceWithPair({ circleId: 'c1', storagePosture: 'p2', vault, generateKeypair, makePodClient: () => pod.client, circleRootUri: ROOT, ownsRoot: false });
     expect(pod.writes.filter((u) => u.includes('/.keys/'))).toEqual([]);

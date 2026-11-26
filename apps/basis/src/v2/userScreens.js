@@ -21,7 +21,7 @@
  *                    (the new task block lands in α.4)
  *
  * Per-user storage (per):
- *   One ScreenBook per user; key `cc.userScreens` (NOT per-circle).
+ *   One ScreenBook per user; key `basis.userScreens` (NOT per-circle).
  *   Mirrors createCircleRecipeStore's injectable {load, save} shape so
  *   the host can swap localStorage → pod io later without changing
  *   any callers.
@@ -307,7 +307,7 @@ export function localUserScreenStore(storage = globalThis.localStorage) {
 
 /**
  * localStorage-backed io.  Single key (no per-circle splitting).
- *   key: `cc.userScreens`
+ *   key: `basis.userScreens`
  */
 export function localStorageScreenIo(storage = globalThis.localStorage) {
   const KEY = storageName('userScreens');

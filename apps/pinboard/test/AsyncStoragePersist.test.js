@@ -36,7 +36,7 @@ describe('AsyncStoragePersist — construction', () => {
 
   it('accepts injected mock AsyncStorage', () => {
     const ms = makeMockAsyncStorage();
-    expect(() => new AsyncStoragePersist({ dbName: 'cc-pinboard-cache', asyncStorage: ms }))
+    expect(() => new AsyncStoragePersist({ dbName: 'basis.pinboard', asyncStorage: ms }))
       .not.toThrow();
   });
 });

@@ -4,7 +4,7 @@
  * Pure orchestrator that takes a user-typed 24-word BIP39 mnemonic,
  * validates it (BIP39 wordlist + checksum), and seeds the chat-side
  * vault with the derived Ed25519 keypair under the same key that
- * `bootAgentBundle` consults on the NEXT boot (`cc-chat-id:agent-privkey`).
+ * `bootAgentBundle` consults on the NEXT boot (`basis.chat-id:agent-privkey`).
  *
  * Once this resolves with { ok: true } the caller flips the first-run
  * gate to 'dismissed' and lets bootAgentBundle proceed — it will find

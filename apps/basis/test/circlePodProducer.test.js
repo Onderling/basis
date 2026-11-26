@@ -67,9 +67,9 @@ describe('createCirclePodProducer', () => {
       circleId: 'beta', storagePosture: 'p2', vault, generateKeypair, makePodClient, bootstrap: n === 0,
     });
     await mk(0);
-    const k1 = await vault.get('cc.circle-controller-key:beta');
+    const k1 = await vault.get('basis.circle-controller-key:beta');
     await mk(1);
-    const k2 = await vault.get('cc.circle-controller-key:beta');
+    const k2 = await vault.get('basis.circle-controller-key:beta');
     expect(k1).toBe(k2);                       // same controller key reused, not regenerated
     expect(JSON.parse(k1)).toHaveProperty('privateKey');
   });
@@ -81,7 +81,7 @@ describe('createCirclePodProducer', () => {
     const p1 = await produceWithPair({ circleId: 'dur', storagePosture: 'p2', vault, generateKeypair, makePodClient });
     const id1 = await p1.sealingIdentity.ensure();
     const sealed = (await p1.controlAgent.sealingStrategy(id1.privateKey)).seal(text);
-    expect(await vault.get('cc.circle-groupkey:dur')).toBeTruthy();   // group key persisted to the vault
+    expect(await vault.get('basis.circle-groupkey:dur')).toBeTruthy();   // group key persisted to the vault
     // session 2 — SAME vault, FRESH pseudo-pod (makePodClient mints a new in-memory backend)
     const p2 = await produceWithPair({ circleId: 'dur', storagePosture: 'p2', vault, generateKeypair, makePodClient });
     const id2 = await p2.sealingIdentity.ensure();

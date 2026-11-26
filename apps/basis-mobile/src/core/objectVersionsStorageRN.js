@@ -12,7 +12,7 @@
  * (`getAllKeys`-based list) the version store needs.
  *
  * Key shape — logical (backend-level) keys are VERBATIM with web:
- *   `cc.versions2.<storeName>/<encodeURIComponent(circleId)>/<ts>`
+ *   `basis.versions.<storeName>/<encodeURIComponent(circleId)>/<ts>`
  * AsyncStorage physically prefixes them with the backend scope (`ccv:`),
  * which keeps version records out of the circle pods' `pp:` namespace.
  * Legacy `cc.versions.<storeName>.<circleId>` slot keys are ignored (no

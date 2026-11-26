@@ -82,7 +82,7 @@ describe('lint-register-bypass', () => {
       'export const save = (url) => relayStore.set(url);',
     ].join('\n'));
     try {
-      expect(runFails()).toMatch(/writes the 'cc\.relayUrl' cache .* never writes the register param 'relay\.url'/);
+      expect(runFails()).toMatch(/writes the 'basis\.relayUrl' cache .* never writes the register param 'relay\.url'/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

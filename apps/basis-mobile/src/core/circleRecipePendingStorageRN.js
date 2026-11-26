@@ -1,7 +1,7 @@
 /**
  * basis-mobile — AsyncStorage IO for the pending-recipe cache
  * (γ-next.recipe).  Mirrors web's `circleRecipePendingStorage.js`
- * verbatim on the key shape (`cc.circleRecipePending.<circleId>`) so a
+ * verbatim on the key shape (`basis.circleRecipePending.<circleId>`) so a
  * future pod-sync sees one canonical key prefix across surfaces.
  *
  * Portable: `storage` is injected (no top-level AsyncStorage import)

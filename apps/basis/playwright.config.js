@@ -31,7 +31,7 @@ import { defineConfig, devices } from '@playwright/test';
  *   --project=relay     the multi-client specs, against a server WITH the relay. Bring up a local
  *                       @onderling/relay by ARMING the
  *                       fixture with PEER_TEST_RELAY (a ws:// URL); globalSetup starts it, the harness
- *                       seeds it per-client (localStorage cc.relayUrl + ?relay=), globalTeardown kills it:
+ *                       seeds it per-client (localStorage basis.relayUrl + ?relay=), globalTeardown kills it:
  *                         PEER_TEST_RELAY=ws://127.0.0.1:8787 npx playwright test --project=relay
  * The per-client seed is the robust knob; VITE_CIRCLE_RELAY_URL below is the belt (only applied when
  * Playwright itself STARTS the dev server — a reused pre-existing :5173 keeps its own env). */
@@ -58,7 +58,7 @@ const NO_RELAY_BASE_URL = `http://localhost:${NO_RELAY_PORT}`;
 const FIRST_OPEN_SEEN = {
   cookies: [],
   origins: [BASE_URL, NO_RELAY_BASE_URL, `http://127.0.0.1:${PORT}`, `http://127.0.0.1:${NO_RELAY_PORT}`]
-    .map((origin) => ({ origin, localStorage: [{ name: 'cc.firstOpenSeen', value: '1' }] })),
+    .map((origin) => ({ origin, localStorage: [{ name: 'basis.firstOpenSeen', value: '1' }] })),
 };
 
 /* Which specs boot SEVERAL clients over the relay fixture (`peerHarness.js`, or their own contexts): they
@@ -164,7 +164,7 @@ export default defineConfig({
     env: {
       VITE_CIRCLE_LLM_BASEURL: 'http://127.0.0.1:9999',
       /* Belt to the per-client seed: when the relay setup is armed, boot the dev server with the relay
-       * as its build-time default too (ignored by a reused server — the per-client cc.relayUrl wins). */
+       * as its build-time default too (ignored by a reused server — the per-client basis.relayUrl wins). */
       ...(RELAY_URL ? { VITE_CIRCLE_RELAY_URL: RELAY_URL } : {}),
     },
   }, {

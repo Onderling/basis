@@ -25,8 +25,8 @@ function asyncStorage(init = {}) {
     multiRemove: async (ks) => { for (const k of ks) m.delete(k); },
   };
 }
-const MARK = `cc-owner-root:${START_OVER_PENDING_KEY}`;
-const CUSTODY = `cc-owner-root:${CUSTODY_MODE_KEY}`;
+const MARK = `basis.owner-root:${START_OVER_PENDING_KEY}`;
+const CUSTODY = `basis.owner-root:${CUSTODY_MODE_KEY}`;
 const delegationMarker = (extra = {}) => JSON.stringify({ mode: 'delegation', deviceId: 'd1', profileId: 'p1', ...extra });
 
 describe('the phrase first, and checked (L1115)', () => {
@@ -73,29 +73,29 @@ describe('the phrase first, and checked (L1115)', () => {
 
 describe('mark, clear, restore, unmark (L1115)', () => {
   it('the clear takes everything but the mark; the restore runs after it; the mark goes on success', async () => {
-    const s = asyncStorage({ 'cc-chat-id:content-at-rest-key': 'broken', 'cc.circlePinned': 'x', [CUSTODY]: 'y' });
+    const s = asyncStorage({ 'basis.chat-id:content-at-rest-key': 'broken', 'basis.circlePinned': 'x', [CUSTODY]: 'y' });
     const markerVault = markerVaultOver(s);
     const seen = [];
     const r = await startDeviceOver({
       phrase: 'p', fingerprint: 'fp', markerVault,
       wipe: async () => { seen.push(['wipe', [...s.m.keys()]]); await wipeKeyValueStorage(s, MARK); },
-      restore: async () => { seen.push(['restore', [...s.m.keys()], s.m.get(MARK)]); s.m.set('cc-chat-id:agent-privkey', 'new'); return { ok: true }; },
+      restore: async () => { seen.push(['restore', [...s.m.keys()], s.m.get(MARK)]); s.m.set('basis.chat-id:agent-privkey', 'new'); return { ok: true }; },
     });
     expect(r).toEqual({ ok: true });
     expect(seen[0][1]).toContain(MARK);                 // marked before the clear
     expect(seen[1][1]).toEqual([MARK]);                 // only the mark left when the restore runs
     expect(JSON.parse(seen[1][2])).toMatchObject({ stage: 'cleared', fingerprint: 'fp' });
     expect(JSON.stringify([...s.m.values()])).not.toContain('p ');   // the phrase is never written
-    expect([...s.m.keys()]).toEqual(['cc-chat-id:agent-privkey']);
+    expect([...s.m.keys()]).toEqual(['basis.chat-id:agent-privkey']);
   });
 
   it('a mark found at boot clears NOTHING by itself; cancel removes the mark and clears nothing more', async () => {
-    const s = asyncStorage({ 'cc-chat-id:content-at-rest-key': 'broken', [MARK]: JSON.stringify({ stage: 'marked', fingerprint: 'fp' }) });
+    const s = asyncStorage({ 'basis.chat-id:content-at-rest-key': 'broken', [MARK]: JSON.stringify({ stage: 'marked', fingerprint: 'fp' }) });
     const markerVault = markerVaultOver(s);
     expect(await readStartOverMark(markerVault)).toEqual({ stage: 'marked', fingerprint: 'fp' });
-    expect(s.m.has('cc-chat-id:content-at-rest-key')).toBe(true);
+    expect(s.m.has('basis.chat-id:content-at-rest-key')).toBe(true);
     await cancelStartOver(markerVault);
-    expect([...s.m.keys()]).toEqual(['cc-chat-id:content-at-rest-key']);
+    expect([...s.m.keys()]).toEqual(['basis.chat-id:content-at-rest-key']);
     expect(await readStartOverMark(markerVault)).toBe(null);
   });
 
@@ -107,7 +107,7 @@ describe('mark, clear, restore, unmark (L1115)', () => {
   it('killed after each step: the mark says how far it got, and the next run finishes with the phrase', async () => {
     const steps = ['mark', 'wipe', 'restore'];
     for (const killAt of steps) {
-      const s = asyncStorage({ 'cc-chat-id:content-at-rest-key': 'broken' });
+      const s = asyncStorage({ 'basis.chat-id:content-at-rest-key': 'broken' });
       const markerVault = markerVaultOver(s);
       const kill = (at) => { if (at === killAt) throw new Error(`killed at ${at}`); };
       const run = startDeviceOver({
@@ -129,7 +129,7 @@ describe('mark, clear, restore, unmark (L1115)', () => {
   it('a delegation device killed after the key-value clear: the mark still says "marked", and cancel ASKS first', async () => {
     // the custody marker went with the key-value clear, the key door still holds the delegation seed: a cancel with no
     // word would let the next boot read that seed as a root. So any mark makes cancel ask.
-    const s = asyncStorage({ [CUSTODY]: delegationMarker({ fingerprint: 'fp' }), 'cc-chat-id:content-at-rest-key': 'broken' });
+    const s = asyncStorage({ [CUSTODY]: delegationMarker({ fingerprint: 'fp' }), 'basis.chat-id:content-at-rest-key': 'broken' });
     const markerVault = markerVaultOver(s);
     const run = startDeviceOver({ phrase: 'p', fingerprint: 'fp', markerVault, wipe: async () => { await wipeKeyValueStorage(s, MARK); throw new Error('killed inside the wipe'); }, restore: async () => ({ ok: true }) });
     expect(await run).toEqual({ ok: false, code: 'storage' });
@@ -142,7 +142,7 @@ describe('mark, clear, restore, unmark (L1115)', () => {
   });
 
   it('the first mark write fails: nothing cleared, a code, no throw', async () => {
-    const s = asyncStorage({ 'cc-chat-id:x': 'y' });
+    const s = asyncStorage({ 'basis.chat-id:x': 'y' });
     const markerVault = { ...markerVaultOver(s), set: async () => { throw new Error('quota'); } };
     let wiped = false;
     const r = await startDeviceOver({ phrase: 'p', markerVault, wipe: async () => { wiped = true; }, restore: async () => ({ ok: true }) });
@@ -151,7 +151,7 @@ describe('mark, clear, restore, unmark (L1115)', () => {
   });
 
   it('a shell that cannot clear all of it says so BEFORE the mark: nothing is touched', async () => {
-    const s = asyncStorage({ 'cc-chat-id:x': 'y' });
+    const s = asyncStorage({ 'basis.chat-id:x': 'y' });
     const markerVault = markerVaultOver(s);
     let wiped = false;
     const r = await startDeviceOver({ phrase: 'p', markerVault, canClear: async () => ({ ok: false, code: 'cannot-list' }), wipe: async () => { wiped = true; }, restore: async () => ({ ok: true }) });
@@ -172,7 +172,7 @@ describe('mark, clear, restore, unmark (L1115)', () => {
 describe('the web clear: only what is Basis\'s, and a blocked delete is a failure (L1115)', () => {
   it('a key of the public site and a screen page\'s pairing stay; Basis\'s keys go', async () => {
     const s = asyncStorage({
-      'cc-chat-id:content-at-rest-key': 'x', 'cc.lastTab': 'x', 'basis.theme': 'x', 'circle.app.lang': 'x',
+      'basis.chat-id:content-at-rest-key': 'x', 'basis.lastTab': 'x', 'basis.theme': 'x', 'basis.app.lang': 'x',
       'site-cookie-consent': 'yes', 'onderling-screen:grant': 'g', [MARK]: 'm',
     });
     await wipeKeyValueStorage(s, MARK, { isOurs: isBasisStorageKey });
@@ -180,7 +180,9 @@ describe('the web clear: only what is Basis\'s, and a blocked delete is a failur
   });
 
   it('databases by name: Basis\'s, not the site\'s', () => {
-    expect(['cc-pinboard-state', 'cc-circle-pod-abc', 'onderling-root-key', 'basis', 'dwag-vault'].every(isBasisDatabase)).toBe(true);
+    expect(['basis.pinboard', 'basis.circle-pod-abc', 'basis.root-key', 'basis.chat-id:'].every(isBasisDatabase)).toBe(true);
+    // a name of the builds before the one prefix is not Basis's any more: the fresh start leaves it as dead bytes
+    expect(['cc-pinboard-state', 'onderling-root-key', 'basis'].some(isBasisDatabase)).toBe(false);
     expect(isBasisDatabase('site-analytics')).toBe(false);
   });
 

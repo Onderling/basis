@@ -1,5 +1,5 @@
 /**
- * The circles' seen-marks on this device (`cc.circleSeenAt`: circle id → when the person last looked), held for both
+ * The circles' seen-marks on this device (`basis.circleSeenAt`: circle id → when the person last looked), held for both
  * shells (ledger L1085). The rule a shell may not hold itself:
  *
  *   A MARK IS NEVER WRITTEN FROM A MAP THAT WAS NOT LOADED. Before, the phone started from `{}` and an `openCircle`

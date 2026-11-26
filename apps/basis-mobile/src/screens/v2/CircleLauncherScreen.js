@@ -3905,7 +3905,7 @@ function CircleDetail({
     tabMembers, mandateViewer]);
 
   // Chat ↔ Screen pill state (v2 §4 "De mode switch").
-  // Per-circle preference persists in AsyncStorage at cc.circleViewMode.
+  // Per-circle preference persists in AsyncStorage at basis.circleViewMode.
   // §4 — until the member has flipped the pill for this circle, the
   // landing surface is the admin's policy.view front door
   // (defaultViewModeFromPolicy): 'screen' → screen, else → chat.
@@ -4548,7 +4548,7 @@ function CircleDetail({
     return () => { alive = false; off(); };
   }, []);
 
-  // B (per-circle policy) — THIS circle's llmTool is authoritative (same cc.circlePolicy.<id> store the
+  // B (per-circle policy) — THIS circle's llmTool is authoritative (same basis.circlePolicy.<id> store the
   // settings screen writes). Unset → the deployment default CIRCLE_LLM_POLICY. Reloads per circle.
   const [circleLlmPolicy, setCircleLlmPolicy] = useState(CIRCLE_LLM_POLICY);
   // This circle's app scope for the LLM tool list (the S6.C per-circle apps). Empty → fall back to the

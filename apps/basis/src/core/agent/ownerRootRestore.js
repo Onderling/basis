@@ -87,7 +87,7 @@ export function newDeviceId({ crypto: c = globalThis.crypto } = {}) {
  * @param {object} a.rootKeyStore     the platform key door the root SEED lives behind (the phrase
  *                                    itself is never persisted — it stays in the user's hands)
  * @param {object} a.chatVault        the BACKING vault for the default profile's chat identity
- *                                    (`cc-chat-id:`, unsealed) — this function seals it to the
+ *                                    (`basis.chat-id:`, unsealed) — this function seals it to the
  *                                    restored root and writes through the sealed layer, so the
  *                                    seed never sits in it as plaintext
  * @param {{label?: string}} [a.enrollDevice]

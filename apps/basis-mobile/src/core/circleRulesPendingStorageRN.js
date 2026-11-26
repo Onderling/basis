@@ -1,7 +1,7 @@
 /**
  * basis-mobile — AsyncStorage IO for the pending-rules cache
  * (γ-next.rules).  Mirrors web's `circleRulesPendingStorage.js`
- * verbatim on the key shape (`cc.circleRulesPending.<circleId>`) so a
+ * verbatim on the key shape (`basis.circleRulesPending.<circleId>`) so a
  * future pod-sync sees one canonical key prefix across surfaces.
  *
  * Portable: `storage` is injected (no top-level AsyncStorage import)

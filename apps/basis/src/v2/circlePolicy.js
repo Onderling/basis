@@ -350,7 +350,7 @@ export function enabledFeatures(policy) {
 // value to 'chat', the mode this table always mapped it to. The mapping row is kept so an
 // un-normalized read of an old policy blob still lands on chat, not undefined.)
 //
-// The per-user pill (cc.circleViewMode) overrides this once the member has
+// The per-user pill (basis.circleViewMode) overrides this once the member has
 // flipped it — see readViewMode() (web) / the viewMode useEffect (mobile).
 const VIEW_AXIS_TO_MODE = { screen: 'screen', chat: 'chat', 'cross-stream': 'chat' };
 

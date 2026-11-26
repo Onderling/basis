@@ -3,8 +3,8 @@
  *
  * Wires `createScreenBlocksCache` to `window.localStorage` (or an
  * injected `storage` matching that interface for tests).  Key prefix
- * `cc.screenBlocksCache.<screenId>` matches the convention of every
- * other v2 per-id cache (`cc.circleRecipePending.<id>`, etc.).
+ * `basis.screenBlocksCache.<screenId>` matches the convention of every
+ * other v2 per-id cache (`basis.circleRecipePending.<id>`, etc.).
  */
 
 import { storageName } from './storageRegister.js';   // every storage name from the one register

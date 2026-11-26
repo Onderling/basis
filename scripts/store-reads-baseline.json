@@ -1,11 +1,11 @@
 {
   "apps/basis/web/v2/circleApp.js": {
     "count": 3,
-    "note": "harmless loss: the per-circle view mode (cc.circleViewMode, the alpha paints chat whatever it holds: alphaViewMode) read and written at :3918/:3928, and the nearby allows (basis.nearbyAllows, card/chat, :4493; a lost one is simply asked again)"
+    "note": "harmless loss: the per-circle view mode (basis.circleViewMode, the alpha paints chat whatever it holds: alphaViewMode) read and written at :3918/:3928, and the nearby allows (basis.nearbyAllows, card/chat, :4493; a lost one is simply asked again)"
   },
   "apps/basis/src/v2/addressFallback.js": {
     "count": 1,
-    "note": "harmless loss: the fallback offer state (cc.fallbackOffer), a remembered offer that may simply be offered again"
+    "note": "harmless loss: the fallback offer state (basis.fallbackOffer), a remembered offer that may simply be offered again"
   },
   "apps/basis/src/v2/connectionPoints.js": {
     "count": 1,
@@ -33,7 +33,7 @@
   },
   "apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js": {
     "count": 2,
-    "note": "harmless loss: the per-circle view mode on the phone (cc.circleViewMode), read and written at :3902/:3916; the alpha paints chat whatever it holds"
+    "note": "harmless loss: the per-circle view mode on the phone (basis.circleViewMode), read and written at :3902/:3916; the alpha paints chat whatever it holds"
   },
   "apps/basis/src/v2/boxStorage.js": {
     "count": 3,

@@ -14,9 +14,9 @@ describe('a screen whose own key will not read (L1115)', () => {
     expect(screenClientCode(new Error('boom'))).toBe('failed');
   });
   it('forgetting removes only this screen\'s key and grants', () => {
-    const m = new Map([['onderling-screen:agent-privkey', 'x'], ['onderling.screen.BOT', 'g'], ['cc.circlePinned', 'p']]);
+    const m = new Map([['onderling-screen:agent-privkey', 'x'], ['basis.screen.BOT', 'g'], ['basis.circlePinned', 'p']]);
     const storage = { get length() { return m.size; }, key: (i) => [...m.keys()][i] ?? null, removeItem: (k) => { m.delete(k); } };
     expect(forgetScreenKey(storage)).toBe(2);
-    expect([...m.keys()]).toEqual(['cc.circlePinned']);
+    expect([...m.keys()]).toEqual(['basis.circlePinned']);
   });
 });

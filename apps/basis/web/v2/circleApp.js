@@ -495,7 +495,7 @@ function openCircleConfirmDialog(request) {
 // The lists service over THE CIRCLE'S OWN STORE — `agent.circleStoreFor(circleId)`, the same
 // `CircleItemStore` a task, a message and a noticeboard post live in.
 //
-// It used to build its own IndexedDB DataSource (`cc-circle-lists-state`) and its own store registry, so
+// It used to build its own IndexedDB DataSource (`basis.circle-lists-state`) and its own store registry, so
 // a circle had TWO stores: the one the rail mirrors and the one lists wrote to. The architecture names
 // that exactly — "two stores for one circle is a defect, not a design", and "a type that reaches a peer
 // some other way is a second implementation of sync". Nothing carried a list to anybody; the feature
@@ -1254,7 +1254,7 @@ const overrideStore = createMemberOverrideStore(localStorageOverrideIo());
 // The mute membrane's circle↔person index — fed by every roster read (householdRosterPairing), consumed
 // by the receive path (circleEnforcement). One per agent; attached to the agent post-boot below.
 const circleGroupsIndex = makeCircleGroupsIndex();
-// β.5 — pin store (single keyless map at `cc.circlePinned`).
+// β.5 — pin store (single keyless map at `basis.circlePinned`).
 const pinStore = createCirclePinStore(localStoragePinIo());
 // Per-user pod writer — built lazily from the restored Solid session
 // (`window.onderlingPodSession`, set once sign-in completes below) and
@@ -1271,7 +1271,7 @@ const perUserPodWriter = () => {
   return _perUserPodWriter;
 };
 // SILENT out-of-circle delivery — per-user "shared with me" store. TIERED
-// (Frits' call): localStorage (`cc.sharedWithMe`) is canonical; when a
+// (Frits' call): localStorage (`basis.sharedWithMe`) is canonical; when a
 // signed-in pod writer is present the sealed copies are mirrored to
 // `onderling/cc-shared-with-me/received.json` so they SURVIVE + SYNC across the
 // user's devices. Received copies land here via the peer router
@@ -3866,7 +3866,7 @@ function paintContactTurn({ contactId, fromAddr, origin, text, buttons, messageI
   return bubble;
 }
 
-// The circles' seen-marks (`cc.circleSeenAt`), held by the shared `createCircleSeenMarks`: sealed at rest, loaded when
+// The circles' seen-marks (`basis.circleSeenAt`), held by the shared `createCircleSeenMarks`: sealed at rest, loaded when
 // the content key arrives, `null` ("not known yet": no unread counts) until then; an open before the load is applied to
 // the loaded map, never written over it (ledger L1085). The synchronous readers below read the in-memory copy.
 const circleSeenMarks = createCircleSeenMarks(circleSeenMarksIo(globalThis.localStorage));
@@ -4319,7 +4319,7 @@ function showNearby() {
   let wizard = null;      // the first-time wizard while it is open: `{step, notice}` (`nearbyWizardPress` moves it)
   // which self the level is for: null while the room still asks who enters
   const roomSelfId = () => { const s = nearbyRoomSelfNow().self; return s?.asking ? null : (s?.id ?? null); };
-  const markAsked = (id) => { try { localStorage.setItem(`${storageName('nearbyAskedWeb')}${id}`, '1'); } catch { /* best-effort */ } };
+  const markAsked = (id) => { try { localStorage.setItem(`${storageName('nearbyAsked')}${id}`, '1'); } catch { /* best-effort */ } };
   const changeLevel = async (v) => {
     const id = roomSelfId();
     const w = await _nearbyIdentity?.setLevel?.(v);
@@ -4357,7 +4357,7 @@ function showNearby() {
     nearbyScreen?.levelChanged();
     const id = roomSelfId();
     let asked = true;
-    try { asked = id ? !!localStorage.getItem(`${storageName('nearbyAskedWeb')}${id}`) : true; } catch { asked = true; }
+    try { asked = id ? !!localStorage.getItem(`${storageName('nearbyAsked')}${id}`) : true; } catch { asked = true; }
     const fu = nearbyFirstUse({ self: id ? { id } : { asking: true }, asked, levelSet: st.set });
     if (fu.mark) markAsked(id);
     if (fu.ask && !wizard) wizard = { step: 1 };   // an open wizard stays open (a self picked in step 1 re-reads the level)
@@ -4481,8 +4481,8 @@ function openNearbyContact(address, label, transports = null) {
 // The room face: 'name' (default) · 'handle' · 'none' — per device, like the allows.
 // WHO THIS DEVICE ENTERS THE NEARBY ROOM AS: the switcher's set decides (nearbyIdentity.js); with several ticked, the last
 // answer here is the default — kept per device, nothing more durable
-function readNearbySelf() { try { return localStorage.getItem(storageName('nearbySelfWeb')); } catch { return null; } }
-function writeNearbySelf(id) { try { if (typeof id === 'string' && id) localStorage.setItem(storageName('nearbySelfWeb'), id); } catch { /* best-effort */ } }
+function readNearbySelf() { try { return localStorage.getItem(storageName('nearbySelf')); } catch { return null; } }
+function writeNearbySelf(id) { try { if (typeof id === 'string' && id) localStorage.setItem(storageName('nearbySelf'), id); } catch { /* best-effort */ } }
 // the general persona's handle, as the room sees it — read when Nearby opens (showNearby)
 let _nearbyHandle = null;
 function nearbyRoomSelfNow() {
@@ -4491,10 +4491,10 @@ function nearbyRoomSelfNow() {
   return { r, view, self: roomSelfFor(r, _selfSet.held) };
 }
 // The room's per-device allows (card / chat) — kept across opens, this browser only.
-function readNearbyAllows() { try { const raw = localStorage.getItem(storageName('nearbyAllowsWeb')); return raw ? JSON.parse(raw) : null; } catch { return null; } }
+function readNearbyAllows() { try { const raw = localStorage.getItem(storageName('nearbyAllows')); return raw ? JSON.parse(raw) : null; } catch { return null; } }
 function writeNearbyAllows(next) {
   if (!next || typeof next !== 'object') return;
-  try { localStorage.setItem(storageName('nearbyAllowsWeb'), JSON.stringify({ card: next.card === true, chat: next.chat === true })); } catch { /* best-effort */ }
+  try { localStorage.setItem(storageName('nearbyAllows'), JSON.stringify({ card: next.card === true, chat: next.chat === true })); } catch { /* best-effort */ }
 }
 let _unsubscribeNearbyHeard = null;
 function closeNearby() {
@@ -9028,7 +9028,7 @@ function showFolio(id) {
 }
 
 // Circle rules document (boards 3B/3C) — editor persists per circle
-// (cc.circleRules.<id>); "preview" shows the Agree/Decline consent screen.
+// (basis.circleRules.<id>); "preview" shows the Agree/Decline consent screen.
 // Threading the consent into the real join flow is the follow-on.
 // THE CIRCLE'S RULES: the screen reads the circle's rules head (what the invite carries and a joiner agrees to) and
 // saves through the circle's rule for changing them (governanceDoors.js): where any admin may, written at once and
@@ -9657,7 +9657,7 @@ async function showSettings(id) {
 // tab already holds cannot be deleted (no store here closes on `versionchange`), so the door only asks for the page
 // (`START_OVER_PAGE_KEY`, a per-tab view choice that clears nothing) and reloads.
 const START_OVER_PAGE_KEY = storageName('startOverPage');
-const START_OVER_MARK_KEY = `cc-owner-root:${START_OVER_PENDING_KEY}`;
+const START_OVER_MARK_KEY = `${storageName('vaultOwnerRoot')}${START_OVER_PENDING_KEY}`;
 function openStartOverPage() {
   try { window.sessionStorage.setItem(START_OVER_PAGE_KEY, '1'); } catch { /* the page opens on this load only */ }
   window.location.reload();
@@ -9896,18 +9896,18 @@ async function boot() {
       // PERSISTENT chat identity (the secure-agent peer address). Without a persistent vault the
       // identity is in-memory and ROTATES on every page reload — so this device's address changes,
       // the circle roster's recorded address goes stale, and peers can no longer reach it (no-pod
-      // sync silently dies after a refresh). localStorage-backed, same 'cc-chat-id:' prefix the
+      // sync silently dies after a refresh). localStorage-backed, same 'basis.chat-id:' prefix the
       // mobile bundle uses (VaultAsyncStorage) → stable address across reloads, web≡mobile.
       chatVault: new VaultLocalStorage({ prefix: storageName('vaultChatId') }),
-      pinboardPersistDb: { dbName: storageName('pinboardWeb'), storeName: 'items' },
+      pinboardPersistDb: { dbName: storageName('pinboard'), storeName: 'items' },
       // OBJ-2 S1e (web) — persist the household store in IndexedDB so items survive
       // a reload (mobile already threads its AsyncStorage descriptor). Parity with pinboard.
-      householdPersistDb: { dbName: storageName('householdWeb'), storeName: 'items' },
+      householdPersistDb: { dbName: storageName('household'), storeName: 'items' },
       // #36 — persist the PARAMETER REGISTER's settings (retention etc.) in IndexedDB so a set-param survives
       // a reload (cross-app-settings shared.json / devices/<id>.json layout, on this store).
-      settingsPersistDb: { dbName: storageName('settingsWeb'), storeName: 'settings' },
+      settingsPersistDb: { dbName: storageName('settings'), storeName: 'settings' },
       // The outbox — held messages + the dead-address verdict — survives a reload (device-local, never the pod).
-      outboxPersistDb: { dbName: storageName('outboxWeb'), storeName: 'outbox' },
+      outboxPersistDb: { dbName: storageName('outbox'), storeName: 'outbox' },
       // Push subscriptions: their own device-local store (never the pod, never a sibling).
       pinboardPushPersistDb: { dbName: storageName('pushDevice'), storeName: 'subscriptions' },
       // #36 pod-sync — when signed in, hand realAgent the SELF-SEALED settings pod inner so agent/circle

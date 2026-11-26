@@ -38,7 +38,7 @@ describe('a producer start with an older vault copy', () => {
     });
     const a = await start(vaultA);
     // B's vault: the founder's controller key and the key file AS IT WAS before anyone joined
-    const vaultB = await copyVault(vaultA, [`cc.circle-controller-key:${CIRCLE}`, `cc.circle-groupkey:${CIRCLE}`]);
+    const vaultB = await copyVault(vaultA, [`basis.circle-controller-key:${CIRCLE}`, `basis.circle-groupkey:${CIRCLE}`]);
 
     const member = generateKeypair(); const device = generateKeypair();
     await a.controlAgent.addMember({ webId: 'ref:member', publicKey: member.publicKey });
@@ -50,7 +50,7 @@ describe('a producer start with an older vault copy', () => {
     expect(opens(stored, member.privateKey), 'the member added by the other instance still opens the key').toBe(true);
     expect(opens(stored, device.privateKey), 'the device enrolled by the other instance still opens the key').toBe(true);
     // …and B's vault copy now follows the pod
-    const refreshed = JSON.parse(await vaultB.get(`cc.circle-groupkey:${CIRCLE}`));
+    const refreshed = JSON.parse(await vaultB.get(`basis.circle-groupkey:${CIRCLE}`));
     expect(opens(refreshed, member.privateKey), 'the vault copy is refreshed from the pod').toBe(true);
     expect(KEY_FILE).toContain('.keys/group.json');
   });

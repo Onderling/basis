@@ -2,7 +2,7 @@
  * basis-mobile · γ-next.rules — AsyncStorage adapter round-trip.
  *
  * Mirrors `apps/basis/test/v2/circleRulesPendingStorage.test.js`
- * so the wire-level key shape (`cc.circleRulesPending.<circleId>`) is
+ * so the wire-level key shape (`basis.circleRulesPending.<circleId>`) is
  * identical on both surfaces.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -33,7 +33,7 @@ describe('γ-next.rules — circleRulesPendingStorageRN', () => {
   it('round-trips a rules doc through save / load', async () => {
     const io = asyncStorageCircleRulesPendingIo(storage);
     await io.save('g1', { purpose: 'Neighbourhood', agreements: 'be kind' });
-    expect(openStoredValue(SEAL, 'cc.circleRulesPending.g1', storage.map.get('cc.circleRulesPending.g1'))).toBe(JSON.stringify({ purpose: 'Neighbourhood', agreements: 'be kind' }),
+    expect(openStoredValue(SEAL, 'basis.circleRulesPending.g1', storage.map.get('basis.circleRulesPending.g1'))).toBe(JSON.stringify({ purpose: 'Neighbourhood', agreements: 'be kind' }),
     );
     expect(await io.load('g1')).toEqual({ purpose: 'Neighbourhood', agreements: 'be kind' });
   });
@@ -44,7 +44,7 @@ describe('γ-next.rules — circleRulesPendingStorageRN', () => {
   });
 
   it('returns null when stored JSON is corrupt', async () => {
-    await storage.setItem('cc.circleRulesPending.g2', 'not json');
+    await storage.setItem('basis.circleRulesPending.g2', 'not json');
     const io = asyncStorageCircleRulesPendingIo(storage);
     expect(await io.load('g2')).toBeNull();
   });
@@ -53,7 +53,7 @@ describe('γ-next.rules — circleRulesPendingStorageRN', () => {
     const io = asyncStorageCircleRulesPendingIo(storage);
     await io.save('g3', { purpose: 'r' });
     await io.remove('g3');
-    expect(storage.map.has('cc.circleRulesPending.g3')).toBe(false);
+    expect(storage.map.has('basis.circleRulesPending.g3')).toBe(false);
     expect(await io.load('g3')).toBeNull();
   });
 

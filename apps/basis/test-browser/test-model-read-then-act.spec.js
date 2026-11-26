@@ -20,7 +20,7 @@ test('the read-then-act look on web, through the real model route', async ({ pag
     const ids = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k?.startsWith('cc.circlePolicy.')) ids.push(k.slice('cc.circlePolicy.'.length));
+      if (k?.startsWith('basis.circlePolicy.')) ids.push(k.slice('basis.circlePolicy.'.length));
     }
     for (const id of ids) await window.onderlingCirclePolicy.update(id, { llmTool: 'user' });
   });

@@ -56,7 +56,7 @@ describe('restoreFromMnemonic', () => {
     const r = await restoreFromMnemonic({ mnemonic: phrase, asyncStorage });
     expect(r.ok).toBe(true);
 
-    // The keypair landed under cc-chat-id:agent-privkey — the same key
+    // The keypair landed under basis.chat-id:agent-privkey — the same key
     // bootAgentBundle's VaultAsyncStorage will read on next boot — SEALED at rest
     // (the vault-at-rest layer): the raw value is ciphertext, never the seed envelope.
     const stored = await asyncStorage.getItem(`${CHAT_VAULT_KEY_PREFIX}agent-privkey`);
@@ -66,7 +66,7 @@ describe('restoreFromMnemonic', () => {
     // DELEGATION-derived key: the restore ceremony enrolled this install as a device, the custody
     // marker names its deviceId, and the whole chain (phrase → profile seed → device seed →
     // at-rest key) reproduces it.
-    const mode = await readCustodyMode(new VaultAsyncStorage({ prefix: 'cc-owner-root:', asyncStorage }));
+    const mode = await readCustodyMode(new VaultAsyncStorage({ prefix: 'basis.owner-root:', asyncStorage }));
     expect(mode.mode).toBe('delegation');
     const delegationSeed = deriveDeviceSeed(
       Bootstrap.fromMnemonic(phrase).deriveAgentSeed('default'), mode.deviceId,

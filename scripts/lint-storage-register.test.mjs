@@ -11,14 +11,14 @@ const names = (t) => handNamesIn(t).map((h) => h.name);
 
 describe('lint-storage-register', () => {
   it('sees a literal at getItem / setItem / removeItem', () => {
-    expect(names("localStorage.getItem('cc.lastTab');\nAsyncStorage.setItem('cc.x', v);\ns.removeItem(\"cc.y\");")).toEqual(['cc.lastTab', 'cc.x', 'cc.y']);
+    expect(names("localStorage.getItem('basis.lastTab');\nAsyncStorage.setItem('cc.x', v);\ns.removeItem(\"cc.y\");")).toEqual(['basis.lastTab', 'cc.x', 'cc.y']);
   });
   it('sees a template that starts with literal text, and an UPPER_CASE const', () => {
-    expect(names("const KEY = 'cc.availability';\nkv.getItem(KEY);\nAsyncStorage.getItem(`cc.circlePolicy.${id}`);")).toEqual(['cc.availability', 'cc.circlePolicy.${id}']);
+    expect(names("const KEY = 'basis.availability';\nkv.getItem(KEY);\nAsyncStorage.getItem(`basis.circlePolicy.${id}`);")).toEqual(['basis.availability', 'basis.circlePolicy.${id}']);
   });
   it('sees the backend and vault builders, and dbName', () => {
-    expect(names("pickWebBackend('cc-agent-registry');\nmakeBrowserVault('cc-chat-id:');\nsealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-device-log' }));\nbuild({ dbName: 'cc-outbox-cache' });"))
-      .toEqual(['cc-agent-registry', 'cc-chat-id:', 'cc-device-log', 'cc-outbox-cache']);
+    expect(names("pickWebBackend('basis.agent-registry');\nmakeBrowserVault('basis.chat-id:');\nsealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'basis.device-log' }));\nbuild({ dbName: 'basis.outbox' });"))
+      .toEqual(['basis.agent-registry', 'basis.chat-id:', 'basis.device-log', 'basis.outbox']);
   });
   it('does not see a register call, a name passed through, or a scope that is not storage', () => {
     expect(names("kv.getItem(storageName('lastTab'));\ns.getItem(`${prefix}${id}`);\nconst control = { scope: 'circle' };\nstore.getItem(key);")).toEqual([]);
@@ -27,9 +27,9 @@ describe('lint-storage-register', () => {
     const { mkdirSync, writeFileSync, rmSync } = await import('node:fs');
     const dir = new URL('../apps/basis/src/guard-fixture-storage-tmp/', import.meta.url);
     mkdirSync(dir, { recursive: true });
-    writeFileSync(new URL('keyHelper.js', dir), 'export const key = (id) => `cc.circlePolicy.${id}`;\n');
+    writeFileSync(new URL('keyHelper.js', dir), 'export const key = (id) => `basis.circlePolicy.${id}`;\n');
     try {
-      expect((await check()).some((p) => p.includes("builds a 'cc.circlePolicy.' key by hand"))).toBe(true);
+      expect((await check()).some((p) => p.includes("builds a 'basis.circlePolicy.' key by hand"))).toBe(true);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
   describe('rule 3: the seal ruled on the row', () => {

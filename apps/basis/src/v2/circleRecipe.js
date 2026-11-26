@@ -319,7 +319,7 @@ export function localCircleRecipeStore(storage = globalThis.localStorage) {
   return createCircleRecipeStore({ io: localStorageRecipeIo(sealed), versions: localStorageObjectVersions('recipe', sealed) });
 }
 
-/** localStorage-backed io.  Key: `cc.circleRecipe.<circleId>`. */
+/** localStorage-backed io.  Key: `basis.circleRecipe.<circleId>`. */
 export function localStorageRecipeIo(storage) {   // no default: a raw localStorage would write the recipe plain
   const key = (id) => `${storageName('circleRecipe')}${id}`;
   const kv = storage ? jsonKv(storage, { name: 'the circle recipe', kind: 'settings' }) : null;

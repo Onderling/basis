@@ -28,21 +28,28 @@ export function lastUpdated(text) {
   return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== m[1] ? null : m[1];
 }
 
+/** The 1-based line of the "Last updated" line, or 1 when there is none (where it belongs: the top). */
+export function lastUpdatedLine(text) {
+  const i = String(text).split('\n').findIndex((l) => /\*\*Last updated:/.test(l));
+  return i < 0 ? 1 : i + 1;
+}
+
 /**
- * Problems, as messages.
+ * Problems, as messages: each names the file:line and ends with what to do instead.
  * @param {string} text        the file now
  * @param {string|null} base   the file on the base branch, or null when the base is not available
  * @param {string} today       YYYY-MM-DD
  */
 export function architectureDateProblems(text, base, today) {
   const now = lastUpdated(text);
-  if (!now) return [`${FILE} has no valid "**Last updated: YYYY-MM-DD**" line near its top`];
+  const at = `${FILE}:${lastUpdatedLine(text)}`;
+  if (!now) return [`${at}: no valid "**Last updated: YYYY-MM-DD**" line near the top.\n    Fix: add the line "> **Last updated: ${today}**" under the title.`];
   const out = [];
-  if (now > today) out.push(`${FILE} says it was last updated ${now}, which is in the future`);
+  if (now > today) out.push(`${at}: says it was last updated ${now}, which is in the future.\n    Fix: set the date to the day of your change (today is ${today}).`);
   if (base != null && base !== text) {
     const was = lastUpdated(base);
     // moved, or already today (a second change on the day the base was dated)
-    if (was && now <= was && now !== today) out.push(`${FILE} changed but its "Last updated" date did not move (still ${now}) — set it to today`);
+    if (was && now <= was && now !== today) out.push(`${at}: the file changed but its "Last updated" date did not move (still ${now}).\n    Fix: set it to today, ${today}.`);
   }
   return out;
 }
@@ -61,7 +68,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   const base = baseText();
   const problems = architectureDateProblems(text, base, new Date().toISOString().slice(0, 10));
   if (problems.length) {
-    console.error('lint-architecture-date:');
+    console.error('✖ lint-architecture-date:');
     for (const p of problems) console.error(`  • ${p}`);
     process.exit(1);
   }

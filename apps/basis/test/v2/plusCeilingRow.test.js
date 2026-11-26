@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * HOW FAR THE "+" GOES, on the persona's card in Mij (ledger L977, D.3b): one row per persona with four choices, the
  * one in force marked (its own, else the general persona's, else 3). A tap writes it through the ceiling's own op for

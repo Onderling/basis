@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The mobile receipt sender must send through a seam that EXISTS, and carry the circle scope.
  *

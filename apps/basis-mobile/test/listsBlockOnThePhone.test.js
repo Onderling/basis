@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The phone shows the circle's lists block as the web does (the shared materializer fills it), where a person's own
  * screen recipe carries it; the circle's lists themselves are its Lists tab (circleListsTab.test.js).

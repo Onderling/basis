@@ -46,15 +46,28 @@ export function scanSource(src) {
   return out;
 }
 
+/** The red message: what is wrong, each hand-styled button in a grown file as file:line, what to use instead. */
+export function redMessage(over) {
+  const out = ['✖ lint-mobile-buttons: hand-styled buttons beyond the baseline — a Pressable styled anew instead of the one button family:'];
+  for (const { file, now, was, lines } of over) {
+    out.push(`  ${file}: ${now} (baseline ${was}); the new one is among these:`);
+    for (const l of lines) out.push(`    ${file}:${l}`);
+  }
+  out.push("  Fix: use <Btn variant=… label=… onPress=… /> from screens/v2/Btn.js instead of a <Pressable style={styles.btn…}>.");
+  out.push('  (A Pressable that is not a button, a row or a card, gets a style name without btn/button/chip/pill.)');
+  return out.join('\n');
+}
+
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isMain) {
   const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
   const files = execSync('git ls-files', { cwd: ROOT, encoding: 'utf8' }).split('\n').filter((f) => SCOPE.test(f) && !EXEMPT.has(f));
   const counts = {};
+  const linesOf = {};
   for (const f of files) {
     let src; try { src = readFileSync(path.join(ROOT, f), 'utf8'); } catch { continue; }
-    const n = scanSource(src).length;
-    if (n) counts[f] = n;
+    const hits = scanSource(src);
+    if (hits.length) { counts[f] = hits.length; linesOf[f] = hits.map((h) => h.line); }
   }
   const basePath = path.join(ROOT, BASELINE);
   const base = existsSync(basePath) ? JSON.parse(readFileSync(basePath, 'utf8')) : {};
@@ -70,8 +83,7 @@ if (isMain) {
   }
   const over = Object.entries(counts).filter(([f, n]) => n > (base[f] ?? 0));
   if (over.length) {
-    console.error('lint-mobile-buttons: hand-styled buttons beyond the baseline — use Btn (screens/v2/Btn.js):');
-    for (const [f, n] of over) console.error(`  ${f}: ${n} (baseline ${base[f] ?? 0})`);
+    console.error(redMessage(over.map(([file, now]) => ({ file, now, was: base[file] ?? 0, lines: linesOf[file] }))));
     process.exit(1);
   }
   const shrunk = Object.entries(base).filter(([f, n]) => (counts[f] ?? 0) < n);

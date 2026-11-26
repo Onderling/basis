@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * THE CLOSED SET COVERS THE CONTACT DOOR. A message-request hold the door's first call refused is written to the
  * refusal log with its reason, then held anyway. A reason added to the hold without its code would be logged as

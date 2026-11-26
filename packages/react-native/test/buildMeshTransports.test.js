@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * buildMeshTransports — the shared RN mesh transport builder (T5.2d/T5.3c).
  *

@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * THE E2E MAKER'S CARD NEVER SHIPS. An e2e build carries a fixed test person as its feedback contact
  * (e2e/support/makerCard.fixture.json) so a walk can prove the feedback door; a build a person installs must never

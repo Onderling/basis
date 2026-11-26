@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * THE CONTACTS HEADER'S BUTTONS STAY CLEAR OF THE AVATAR.
  *

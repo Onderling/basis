@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The APP layer rule — a shell imports its COMPOSER, and nothing else from `apps/`.
  *

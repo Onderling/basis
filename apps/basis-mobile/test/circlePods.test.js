@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * Mobile per-circle pod producers + content-seal strategy (RN parity with web). Drives the
  * REAL sealing substrate (pure-JS tweetnacl/@noble — RN-safe) over an in-memory pseudo-pod

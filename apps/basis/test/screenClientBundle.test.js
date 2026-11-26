@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The screen client as ONE file (ledger L1035, the circle-tools brief's rules for a toolbox's page): built from
  * the same source by `scripts/build-screen-client.mjs`; one ESM file with no real `import()` (comments aside), no

@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * Guard (reconciliation): the role→rank table has ONE source of truth,
  * `@onderling/core` `STANDARD_RANKS`. The relay's GroupAuthVerifier used to

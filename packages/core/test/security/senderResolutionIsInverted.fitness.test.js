@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * FITNESS — the line that has to stay deleted (Decision 1, design §12).
  *

@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A FILE TO A CONTACT, FROM THE THREAD (Frits, sitting row 76: must work for alpha). A walk found no attach in a contact
  * thread: only the `/send-file` slash. The thread now has the circle composer's "+", fed by the same projector for a

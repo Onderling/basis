@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * THE CLOSED SET COVERS THE RAIL. The refusal log writes only codes from its closed set; anything else becomes 'other'
  * with no detail. So a reason added to the statement check without its code would be logged as 'other', and the log

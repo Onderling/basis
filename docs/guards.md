@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 88
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 89
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -83,6 +83,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `sheet-cap` | — | A PHONE SHEET IS CAPPED IN WINDOW PIXELS, NEVER A PERCENTAGE. A card capped with `maxHeight: '85%'` did not… |
 | `shell-reaches-waist` | — | a shell may COMPOSE the substrate, never CALL it |
 | `shell-seams` | — | web ≡ mobile ≡ box: every shell composes every seam (`shell-seams.mjs` declares them) |
+| `source-reading-tests` | — | a test that reads source code as TEXT is one rung 1 can find |
 | `stale-params` | — | a REGISTERED param that NOTHING reads is dead (the #36 fork of lint-unreached-exports) |
 | `storage-register` | — | every name a shell or the box stores under comes from the one register, and the register |
 | `store-reads` | — | a store never takes what it could not read for "nothing" and saves over it |
@@ -107,6 +108,10 @@ designed to be — a claim without a guard is exactly where the code silently dr
 
 | Id | Claim | Where |
 |---|---|---|
+| G-C1 | a circle owns ONE store: the local write and its publisher are the same object | `apps/basis/test/appTaskFanTwoDevice.test.js` |
+| G-C3 | a task fanned from one device arrives on another device's per-type tasks store | `apps/basis/test/appTaskFanTwoDevice.test.js` |
+| G-DICT | every field the runtime writes on a type is declared on its canonical schema | `packages/item-types/test/taskSchemaSuperset.test.js` |
+| G-L23 | resolution policy is DECLARED per (item-type,field), receiver-enforced, behaviour-preserving | `packages/item-store/test/resolutionPolicy.test.js` |
 | — | a circle owns ONE store: a list entry is an item in the circle's `CircleItemStore`, so it rides | `apps/basis/test/appListFanTwoDevice.test.js` |
 | — | an entry added on A arrives on B | `apps/basis/test/appListFanTwoDevice.test.js` |
 | — | sa.audit and the agent trail read their AUDIT retention window from ONE shared table | `apps/basis/test/auditRetentionAgreement.test.js` |
@@ -125,16 +130,12 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | — | a toolbox's list of things gets one /kies button per thing, and the tap adds THAT thing (its reference, quantity 1) t… | `apps/basis/test/v2/toolboxChoices.test.js` |
 | — | a tool call speaks the recorded wire (card, SendMessage, A2A-Version 1.0, bearer) and every failure ends in ONE code,… | `apps/basis/test/v2/toolboxClient.test.js` |
 | — | a toolbox is switched on only after the admin's yes in their own private chat, never from a group chat, and no line o… | `apps/basis/test/v2/toolboxDoor.test.js` |
-| — | a placed toolbox is off until the admin's yes; one that is off is refused before any call leaves, and its words reach… | `apps/basis/test/v2/toolboxes.test.js` |
-| — | a toolbox's key never appears in a reply, a refusal, a log line or the list of tools, and a toolbox with no key on th… | `apps/basis/test/v2/toolboxes.test.js` |
 | — | Telegram door and a screen's kernel skill both reach tools.useTool through the gated call, so both write the tool-cal… | `apps/basis/test/v2/toolboxEveryRoute.test.js` |
 | — | toolbox wire is crossed for real: a socket, an HTTP server, the client's own fetch | `apps/basis/test/v2/toolboxOverHttp.test.js` |
 | — | a toolbox word's slot phrase is taken off the line only as whole words at its start or end (longest first, any case),… | `apps/basis/test/v2/toolboxSlots.test.js` |
+| — | a placed toolbox is off until the admin's yes; one that is off is refused before any call leaves, and its words reach… | `apps/basis/test/v2/toolboxes.test.js` |
+| — | a toolbox's key never appears in a reply, a refusal, a log line or the list of tools, and a toolbox with no key on th… | `apps/basis/test/v2/toolboxes.test.js` |
 | — | framed by another page, the web app's main shell refuses to start and a screen address starts (its entry asks before … | `apps/basis/test/web/ownWindow.test.js` |
 | — | web app's page loads no script, stylesheet or frame from another origin, and the NKN library it runs is the installed… | `apps/basis/test/webOwnOrigin.test.js` |
 | — | subtask-spawn gate bites — only an authorized actor can spawn under a parent | `packages/item-store/test/spawnSubtask.test.js` |
 | — | a param declares scope (sync) + kind (security); kind:internal is immutable by construction, and set-param gates on kind | `packages/params/test/params.test.js` |
-| G-C1 | a circle owns ONE store: the local write and its publisher are the same object | `apps/basis/test/appTaskFanTwoDevice.test.js` |
-| G-C3 | a task fanned from one device arrives on another device's per-type tasks store | `apps/basis/test/appTaskFanTwoDevice.test.js` |
-| G-DICT | every field the runtime writes on a type is declared on its canonical schema | `packages/item-types/test/taskSchemaSuperset.test.js` |
-| G-L23 | resolution policy is DECLARED per (item-type,field), receiver-enforced, behaviour-preserving | `packages/item-store/test/resolutionPolicy.test.js` |

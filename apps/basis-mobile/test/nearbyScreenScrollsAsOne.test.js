@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The Nearby screen scrolls as ONE column. On the walk of 2026-10-26 (Frits's FP4) the peer list had its own scroller,
  * which took the whole height, and the sections under it (asked here · ask the room · circles open here · you here) sat

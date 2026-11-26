@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * GUARD — `dlog` is a channel OBJECT; calling it is a TypeError, and one of them was in the boot path.
  *

@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * Every authority gate in this app reads the caller's role from ONE source: the host's membership head
  * when a host injects it, else the composition's declared map. Before this, the gates read the bundle's own

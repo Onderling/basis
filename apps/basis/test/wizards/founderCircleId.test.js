@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A CIRCLE'S ID COMES FROM ITS FOUNDER — on every create path, from one helper (L126, 2026-09-24).
  *

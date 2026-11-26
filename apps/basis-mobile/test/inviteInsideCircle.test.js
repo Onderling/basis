@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * Invite from INSIDE a circle (⋯ → Invite) set `inviteFor` and painted nothing: the invite modal lived only in the
  * launcher list's return, and the open circle returns early (walked 2026-10-09 on an emulator: 22 s of nothing, then the

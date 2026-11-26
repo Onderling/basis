@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * Mij = identity, ONE declared screen — web ≡ mobile. Both Me screens paint the declared actions (`meActions`) and
  * the declared blocks (`meBlocks`, filled by the shared `mijScreenBlocks`, painted by each shell's block painter),

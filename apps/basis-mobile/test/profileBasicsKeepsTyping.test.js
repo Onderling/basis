@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The phone's profile form keeps a name typed while the profile loads, as the web form does: its load sets each field
  * through the shared `fieldAfterLoad`, never straight to the loaded value.

@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A VALUE THE PHONE COULD NOT OPEN STAYS REFUSED WHEN THE CIRCLE'S STORE IS REBUILT. The sealing layer remembers "could
  * not open: do not write over" per storage NAME when one is given, else per backend object. The phone rebuilds a

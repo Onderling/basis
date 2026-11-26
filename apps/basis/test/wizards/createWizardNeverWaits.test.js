@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * "Creating circle…" sat ~3 min with every button off (walk 2026-10-09). The circle existed after 0.2 s; the wizard
  * waited on bookkeeping behind it — the founder's release (finalSubmit, pinned in createPersonaFounder.test.js) and,

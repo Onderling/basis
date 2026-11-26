@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * Fitness guard — every mobile screen must PARSE AS AN ES MODULE.
  *

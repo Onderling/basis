@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A CHANGE MADE WITHOUT THE VOTE IS SHOWN, NOT ONLY REFUSED (Frits 2026-11-10: kept and shown, never applied).
  *

@@ -17,6 +17,7 @@
  * fix is a `@guard` docstring convention, a later step).
  */
 import { readdirSync, statSync, readFileSync, writeFileSync } from 'node:fs';
+import { byteCompare } from './guard-run.mjs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -115,7 +116,7 @@ function namedGuards() {
   }
   // Every guard without an id shares the id '—': break that tie on file, then claim, never on walk order.
   return [...byKey.values()].sort((a, b) =>
-    String(a.id).localeCompare(String(b.id)) || a.file.localeCompare(b.file) || a.claim.localeCompare(b.claim));
+    byteCompare(String(a.id), String(b.id)) || byteCompare(a.file, b.file) || byteCompare(a.claim, b.claim));
 }
 
 /** Trim a describe string to the CLAIM: drop the id + a leading separator, cap length. */

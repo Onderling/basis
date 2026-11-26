@@ -178,6 +178,23 @@ open of the app, so it is lower than the backup's 64 MiB / t 3. Measured 2026-11
 builder's laptop, one derivation: 64 MiB t 3 = 2.08 s, 64 MiB t 2 = 1.39 s, 46 MiB t 2 = 0.99 s, 32 MiB t 3 = 1.02 s.
 Chosen: 46 MiB, t 2 (about a second, with room for a slower laptop). Never the vault's PBKDF2.
 
+### `SECRET_EMPTY`
+
+**Kind:** constant · **Import:** `SECRET_EMPTY` from `'@onderling/vault'`
+
+The code a `SecretEmpty` carries.
+
+### `SecretEmpty`
+
+**Kind:** class · **Import:** `SecretEmpty` from `'@onderling/vault'`
+
+```js
+class SecretEmpty extends Error
+new SecretEmpty()
+```
+
+A lock was asked for with no secret at all: a short code is allowed, nothing is not a code.
+
 ### `RootKeyStoreWebCrypto`
 
 **Kind:** class · **Import:** `RootKeyStoreWebCrypto` from `'@onderling/vault'`

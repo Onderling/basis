@@ -138,8 +138,8 @@ if (paid.length) {
   console.error(`\n✗ lint:stale-params — the baseline lists ${paid.length} param(s) that are read now or gone:\n`);
   for (const k of paid) console.error(`   - scripts/stale-params-baseline.json: ${k}`);
   console.error('     Fix: run node scripts/lint-stale-params.mjs --update (it only removes).\n');
-  process.exit(1);
 }
+// both lists in ONE run: a person with a paid entry and a new unread param sees both at once
 const fresh = unread.filter((k) => !known.has(k));
 
 if (fresh.length) {
@@ -153,8 +153,8 @@ if (fresh.length) {
 A param declared with param({…}) but whose value nothing reads is DEAD CONFIG — it reads as a tunable in every
 doc that cites the register, and it does nothing. Reading it is what makes it a param.
 `);
-  process.exit(1);
 }
+if (paid.length || fresh.length) process.exit(1);
 
 if (unread.length) {
   console.warn(`⚠ lint:stale-params — ${unread.length} known unread param(s) carried (declared but unread — wire or delete).`);

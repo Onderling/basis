@@ -21,7 +21,8 @@ const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 export const TAG = '@reads-source';
 
 const READS_FILES = /\breadFileSync\s*\(|\breadFile\s*\(/;
-const SOURCE_PATH = /['"`][^'"`\n]*(?:\.(?:m?jsx?|tsx?)['"`]|\/src\/|^['"`]src\/)/;
+// A path literal naming a source file (.js/.mjs/.jsx/.ts/.tsx), or a src folder: 'src', '../src', 'src/x', `../src/${f}`.
+const SOURCE_PATH = /['"`][^'"`\n]*\.(?:m?jsx?|tsx?)['"`]|(['"`])(?:[^'"`\n]*\/)?src(?:\/[^'"`\n]*)?\1/;
 const COMMENT_LINE = /^\s*(?:\/\/|\/\*|\*)/;
 const IMPORT_LINE = /^\s*(?:import\b|export\b[^\n]*\bfrom\b|\}\s*from\b)|\bimport\s*\(|\brequire\s*\(/;
 

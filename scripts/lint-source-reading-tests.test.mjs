@@ -14,6 +14,14 @@ describe('lint-source-reading-tests', () => {
     expect(untaggedSourceReads('apps/basis-mobile/test/y.test.js', text)).toEqual([{ line: 1 }]);
   });
 
+  it('a folder path that ENDS in src (listed, then read file by file) counts, and a bare src segment too', () => {
+    const listed = "const dir = fileURLToPath(new URL('../src', import.meta.url));\nfor (const f of readdirSync(dir)) readFileSync(join(dir, f), 'utf8');";
+    expect(untaggedSourceReads('apps/basis/test/s.test.js', listed)).toEqual([{ line: 1 }]);
+    const joined = "const SRC = join(HERE, '..', 'src');\nreadFileSync(join(SRC, 'a.txt'), 'utf8');";
+    expect(untaggedSourceReads('apps/basis/test/t.test.js', joined)).toEqual([{ line: 1 }]);
+    expect(untaggedSourceReads('apps/basis/test/u.test.js', "const p = 'source-notes';\nreadFileSync(p, 'utf8');")).toEqual([]);
+  });
+
   it('the tag clears it', () => {
     const text = `// @reads-source\n${read('../src/a.js')}`;
     expect(untaggedSourceReads('apps/basis/test/z.test.js', text)).toEqual([]);

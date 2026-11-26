@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * Every colour a mobile screen names is one the theme has. `theme.color.terracotta` (the retired linen theme's) had no
  * value, so My data's "Opslaan & verbinden" and "Verbindingspunten" buttons painted with no background — dark text on

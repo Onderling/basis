@@ -7,6 +7,8 @@ import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 
 import { frozenExports, normKey, sameSet, checkVocabularies, VOCABULARIES } from './lint-duplicate-vocab.mjs';
 
@@ -53,5 +55,18 @@ describe('lint-duplicate-vocab', () => {
   it('the current tree has exactly one definer of the retention vocab (no drift)', () => {
     // A red here means a second retention table crept back in.
     expect(checkVocabularies()).toEqual([]);
+  });
+});
+
+describe('lint-duplicate-vocab — the red message says where and what to do instead', () => {
+  it('names the off-home copy as file:line and says to import it from the home', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'dupvocab-'));
+    try {
+      const f = path.join(dir, 'copy.js');
+      writeFileSync(f, "const a = 1;\nexport const RULES = Object.freeze({ at: 1, before: 2, 'evening-before': 3, morning: 4 });\n");
+      const p = checkVocabularies([f]).join('\n');
+      expect(p).toMatch(/copy\.js:2: RULES/);
+      expect(p).toMatch(/Fix: /);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

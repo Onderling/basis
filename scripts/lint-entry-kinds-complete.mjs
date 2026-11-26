@@ -79,38 +79,54 @@ export function parseManifestLanes(files, read) {
   return out;
 }
 
-export function audit({ rows, unknown, vocab, manifestLanes, mirrored = null }) {
+/**
+ * @param {object} a  kindsText: the entry-kinds file's text, readFile: a manifest's text by path — both only to say
+ *   WHERE (file:line); every problem ends with a Fix line
+ */
+export function audit({ rows, unknown, vocab, manifestLanes, mirrored = null, kindsText = '', readFile = () => '' }) {
   const problems = [];
+  const lines = String(kindsText).split('\n');
+  const kindAt = (kind) => {
+    const i = lines.findIndex((l) => new RegExp(`^\\s*(?:'${kind.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'|${kind.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})\\s*:`).test(l));
+    return `${KINDS_FILE}:${i + 1 || 1}`;
+  };
+  const unknownAt = () => `${KINDS_FILE}:${lines.findIndex((l) => l.includes('export const UNKNOWN_KIND')) + 1 || 1}`;
+  const laneAt = (l) => {
+    let t = ''; try { t = readFile(l.file); } catch { /* unreadable: its top */ }
+    const i = String(t).split('\n').findIndex((x) => new RegExp(`appends:\\s*\\[\\s*\\{\\s*lane:\\s*${l.laneConst}\\b`).test(x));
+    return `${l.file}:${i + 1 || 1}`;
+  };
+  const CELLS_FIX = `Fix: give the row a binding: LOCAL_BINDING (never leaves the device), CIRCLE_BINDING(…), or an object naming ${CELLS.join(', ')}.`;
   // what the person's own history mirror keeps is declared on every kind (docs/decisions.md 2026-11-13)
   if (mirrored) for (const [kind, v] of Object.entries(mirrored)) {
-    if (v !== 'true' && v !== 'false') problems.push(`'${kind}': declares no \`mirrored\` (true | false): whether the person's own history mirror keeps it`);
+    if (v !== 'true' && v !== 'false') problems.push(`${kindAt(kind)}: '${kind}': declares no \`mirrored\` (true | false): whether the person's own history mirror keeps it.\n    Fix: add the \`mirrored\` argument, true or false, to its K(…) row.`);
   }
   const check = (kind, binding) => {
-    if (binding == null) { problems.push(`'${kind}': no binding — the four cells (${CELLS.join(' · ')}) are missing`); return; }
+    if (binding == null) { problems.push(`${kindAt(kind)}: '${kind}': no binding — the four cells (${CELLS.join(' · ')}) are missing.\n    ${CELLS_FIX}`); return; }
     if (/^LOCAL_BINDING$/.test(binding)) return;
     if (/^CIRCLE_BINDING\(/.test(binding)) { checkTokens(kind, binding); return; }
     if (/^\{[\s\S]*\}$/.test(binding)) {
-      for (const c of CELLS) if (!new RegExp(`\\b${c}\\s*:`).test(binding)) problems.push(`'${kind}': binding lacks the '${c}' cell`);
+      for (const c of CELLS) if (!new RegExp(`\\b${c}\\s*:`).test(binding)) problems.push(`${kindAt(kind)}: '${kind}': binding lacks the '${c}' cell.\n    Fix: add '${c}: …' to the binding object.`);
       checkTokens(kind, binding);
       return;
     }
-    problems.push(`'${kind}': binding '${binding}' is not LOCAL_BINDING, CIRCLE_BINDING(…) or an object naming the four cells`);
+    problems.push(`${kindAt(kind)}: '${kind}': binding '${binding}' is not LOCAL_BINDING, CIRCLE_BINDING(…) or an object naming the four cells.\n    ${CELLS_FIX}`);
   };
   const checkTokens = (kind, text) => {
     for (const [cell, name] of Object.entries(VOCAB_OF)) {
       for (const m of text.matchAll(new RegExp(`\\b${name}\\.([A-Z_]+)`, 'g'))) {
-        if (!(m[1] in vocab[name])) problems.push(`'${kind}': ${cell} names ${name}.${m[1]}, which the ${name} vocabulary does not have`);
+        if (!(m[1] in vocab[name])) problems.push(`${kindAt(kind)}: '${kind}': ${cell} names ${name}.${m[1]}, which the ${name} vocabulary does not have.\n    Fix: use one of ${Object.keys(vocab[name] ?? {}).map((k) => `${name}.${k}`).join(', ')}, or add the value to ${name} in ${KINDS_FILE}.`);
       }
     }
   };
   for (const [kind, binding] of Object.entries(rows)) check(kind, binding);
-  if (unknown == null) problems.push('UNKNOWN_KIND: not found');
-  else if (!/LOCAL_BINDING(\s*,\s*(true|false))?\s*$/.test(unknown)) problems.push(`UNKNOWN_KIND: must be the local binding (accepts none — an undeclared kind is refused by construction), got: ${unknown}`);
+  if (unknown == null) problems.push(`${unknownAt()}: UNKNOWN_KIND: not found.\n    Fix: declare \`export const UNKNOWN_KIND = K(…, LOCAL_BINDING)\` in ${KINDS_FILE}.`);
+  else if (!/LOCAL_BINDING(\s*,\s*(true|false))?\s*$/.test(unknown)) problems.push(`${unknownAt()}: UNKNOWN_KIND: must be the local binding (accepts none — an undeclared kind is refused by construction), got: ${unknown}.\n    Fix: make its binding LOCAL_BINDING.`);
   for (const l of manifestLanes) {
-    if (!l.lane) { problems.push(`${l.file}: appends to ${l.laneConst}, which that manifest does not define`); continue; }
-    if (!(l.lane in rows)) { problems.push(`${l.file}: appends to lane '${l.lane}', which is not a declared ENTRY_KINDS row`); continue; }
+    if (!l.lane) { problems.push(`${laneAt(l)}: appends to ${l.laneConst}, which that manifest does not define.\n    Fix: define \`export const ${l.laneConst} = '<lane>';\` in the manifest, or append to a lane it does define.`); continue; }
+    if (!(l.lane in rows)) { problems.push(`${laneAt(l)}: appends to lane '${l.lane}', which is not a declared ENTRY_KINDS row.\n    Fix: declare '${l.lane}' in ENTRY_KINDS (${KINDS_FILE}) with its binding, or append to a declared lane.`); continue; }
     const b = rows[l.lane] ?? '';
-    if (/^LOCAL_BINDING$/.test(b) || /accepts:\s*ACCEPTS\.NONE/.test(b)) problems.push(`${l.file}: appends to lane '${l.lane}', whose kind accepts nothing from a peer`);
+    if (/^LOCAL_BINDING$/.test(b) || /accepts:\s*ACCEPTS\.NONE/.test(b)) problems.push(`${laneAt(l)}: appends to lane '${l.lane}', whose kind accepts nothing from a peer.\n    Fix: give that kind a binding that accepts the peers who append, or append to a lane that does.`);
   }
   return problems;
 }
@@ -120,7 +136,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url
   const src = read(KINDS_FILE);
   const vocab = Object.fromEntries(Object.values(VOCAB_OF).map((n) => [n, parseVocab(src, n)]));
   const manifests = execSync(`git ls-files '${MANIFEST_GLOB}'`, { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
-  const problems = audit({ rows: parseRows(src), unknown: parseUnknown(src), vocab, manifestLanes: parseManifestLanes(manifests, read), mirrored: parseMirrored(src) });
+  const problems = audit({ rows: parseRows(src), unknown: parseUnknown(src), vocab, manifestLanes: parseManifestLanes(manifests, read), mirrored: parseMirrored(src), kindsText: src, readFile: read });
   if (problems.length) {
     console.error(`\n✗ lint:entry-kinds-complete — ${problems.length} problem(s):\n`);
     for (const p of problems) console.error(`   - ${p}`);

@@ -15,6 +15,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FUNCTIONS, SHELLS } from './function-matrix.mjs';
+import { whereIn } from './guard-where.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
@@ -49,11 +50,13 @@ if (isMain) {
   console.log(`function matrix — ${rows.length} functions × ${SHELLS.join(' · ')}   (● named · ◐ proposed, to confirm · ✗ red · — not applicable)`);
   console.log(`${''.padEnd(w)}  ${SHELLS.map((s) => s.padEnd(6)).join(' ')}`);
   for (const r of rows) console.log(`${r.id.padEnd(w)}  ${SHELLS.map((s) => mark(r.cells[s]).padEnd(6)).join(' ')}`);
-  const reds = rows.flatMap((r) => SHELLS.filter((s) => r.cells[s].state === 'red').map((s) => `${r.id} × ${s}: ${r.cells[s].why}`));
+  const reds = rows.flatMap((r) => SHELLS.filter((s) => r.cells[s].state === 'red')
+    .map((s) => `${whereIn('scripts/function-matrix.mjs', `id: '${r.id}'`)}: ${r.id} × ${s}: ${r.cells[s].why}`));
   const proposed = rows.reduce((n, r) => n + SHELLS.filter((s) => r.cells[s].proposed).length, 0);
   const named = rows.reduce((n, r) => n + SHELLS.filter((s) => r.cells[s].state === 'green' && !r.cells[s].proposed).length, 0);
   console.log(`\n${named} named · ${proposed} proposed · ${reds.length} red`);
   for (const line of reds) console.log(`  ✗ ${line}`);
+  if (reds.length) console.log('  Fix: name the cell\'s story in scripts/function-matrix.mjs ({ file, test } of a spec that asserts), or { na: \'<why it does not apply>\' }.');
   if (gate && reds.length) process.exit(1);
   console.log(gate ? '✓ lint:function-matrix — every cell has a story' : '✓ lint:function-matrix (reporting) — not a gate until the cells are named');
 }

@@ -55,7 +55,7 @@ reinstall exposes version conflicts and does not come back.
    consolidate, then add a guard so it can't recur.
 4. **The manifest is the source of truth for surfaces.** Add an op/surface to `manifest.js`, never a per-shell switch
    statement. After any manifest change, regenerate + commit the coverage snapshot (`npm run coverage` in
-   `apps/basis`). A GUI button, a tab and a slash command for the same act target the same op; a nav target is only
+   `apps/basis` → `docs/surface-coverage.md`). A GUI button, a tab and a slash command for the same act target the same op; a nav target is only
    for a view that no op backs.
 5. **Three-layer dependency invariant:** `apps/` → `packages/{substrates}` → `packages/core` (the **kernel**: ports +
    kernel logic). Concrete adapters live outside the kernel (`@onderling/transports`, `@onderling/pod-client`,
@@ -141,7 +141,8 @@ The long form of each, with its case: [`working-lessons.md`](docs/conventions/wo
 
 **Git, shells and Frits**
 - **Branch per feature; the trunk moves by merge.** `development` is the trunk, `live` the release branch: never
-  commit straight onto either (`.githooks/pre-commit`, `lint-branch-hygiene`).
+  commit straight onto either (`.githooks/pre-commit`, set once per clone with `git config core.hooksPath .githooks`;
+  `lint-branch-hygiene`). Push to `live` only with guards + both suites green.
 - **Ship web first, then mobile**, as separate commits.
 - **Shared checkout, two agents:** a tracked file is edited only in a worktree (`plans/tools/mk-worktree.sh`), never
   in the shared `canopy-mono` checkout, whose branch is never switched. At session start and before stopping,

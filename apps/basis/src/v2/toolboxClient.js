@@ -163,6 +163,20 @@ function imageMime(bytes) {
 }
 
 /**
+ * The order a reply's pictures come in, as row indices: each shop's card rows first (the first TOOL_CARDS_PER_GROUP of
+ * each `seller`), then the rest as they came. The count of pictures is spent in this order, and a screen's pictures
+ * are left out from its end when an answer must shrink to fit.
+ * @param {Array<{seller?: string|null}>} rows
+ * @returns {number[]}
+ */
+export function thumbOrder(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const seen = new Map();
+  const isCard = list.map((x) => { const s = String(x?.seller ?? ''); const n = seen.get(s) ?? 0; seen.set(s, n + 1); return n < TOOL_CARDS_PER_GROUP; });
+  return [...list.keys()].filter((i) => isCard[i]).concat([...list.keys()].filter((i) => !isCard[i]));
+}
+
+/**
  * A toolbox's pictures, fetched BY THE BOX and put on the rows as bytes (`thumb: {mime, data}` base64), so no door ever
  * fetches a shop's picture itself (that would tell the shop the person's address). Only an image on the toolbox's own
  * placed host (the same origin as its endpoint, with its key: the egress stays one host per toolbox), only jpeg, png or
@@ -177,11 +191,8 @@ export async function fetchThumbs(items, { endpoint, key = null, fetch = globalT
   let origin = null;
   try { origin = new URL(endpoint).origin; } catch { origin = null; }
   const rows = Array.isArray(items) ? items : [];
-  // the order the count is spent in: each shop's card rows, then the others as they came
-  const seen = new Map();
-  const isCard = rows.map((x) => { const s = String(x?.seller ?? ''); const n = seen.get(s) ?? 0; seen.set(s, n + 1); return n < TOOL_CARDS_PER_GROUP; });
   const sameHost = (x) => { const url = typeof x?.image === 'string' ? x.image : null; try { return Boolean(url && origin && new URL(url).origin === origin); } catch { return false; } };
-  const chosen = new Set([...rows.keys()].filter((i) => isCard[i]).concat([...rows.keys()].filter((i) => !isCard[i])).filter((i) => sameHost(rows[i])).slice(0, THUMB_MAX_COUNT));
+  const chosen = new Set(thumbOrder(rows).filter((i) => sameHost(rows[i])).slice(0, THUMB_MAX_COUNT));
   const one = async (url) => {
     // `within` answers {value} · {error} · {timedOut}: only a value goes on
     const got = await within(timeoutMs, Promise.resolve().then(() => fetch(url, { method: 'GET', redirect: 'error', headers: { Accept: 'image/jpeg, image/png, image/webp', ...(key ? { authorization: `Bearer ${key}` } : {}) } })));

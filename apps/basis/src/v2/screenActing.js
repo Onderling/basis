@@ -57,15 +57,27 @@ export const SCREEN_NO_BUTTON = Object.freeze([
 /**
  * A screen's answer as it may travel: one relay envelope holds `MAX_ENVELOPE_BYTES` AFTER sealing (the JSON grows ~4/3 in
  * base64, plus the envelope around it), so an answer above ~70% of it is refused with a clear code, never cut: the page
- * asks for less (fewer things, details in smaller groups). Everything else passes unchanged.
+ * asks for less (fewer things, details in smaller groups). Pictures beside an answer (`thumbs`, a tool's answer to a
+ * screen) are the one thing left out instead: the last first (the map's order puts the cards' first), until it fits;
+ * only an answer too large without any picture is refused. Everything else passes unchanged.
  * @param {object} result
  * @returns {object}
  */
 export function screenAnswerFits(result) {
+  const size = (x) => new TextEncoder().encode(JSON.stringify(x ?? null)).length;
   let bytes = 0;
-  try { bytes = new TextEncoder().encode(JSON.stringify(result ?? null)).length; } catch { return result; }
+  try { bytes = size(result); } catch { return result; }
   const limit = Math.floor(MAX_ENVELOPE_BYTES * 0.7);
-  return bytes > limit ? { ok: false, code: 'answer-too-large', error: 'answer-too-large', bytes, limit } : result;
+  if (bytes <= limit) return result;
+  const thumbs = result?.thumbs && typeof result.thumbs === 'object' ? Object.entries(result.thumbs) : [];
+  while (thumbs.length) {
+    thumbs.pop();
+    const { thumbs: _all, ...rest } = result;
+    const fewer = thumbs.length ? { ...rest, thumbs: Object.fromEntries(thumbs) } : rest;
+    bytes = size(fewer);
+    if (bytes <= limit) return fewer;
+  }
+  return { ok: false, code: 'answer-too-large', error: 'answer-too-large', bytes, limit };
 }
 
 /**

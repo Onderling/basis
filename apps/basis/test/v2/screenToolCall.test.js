@@ -80,6 +80,15 @@ describe('an answer too large for one envelope', () => {
     // three pictures of 30% each do not fit under 70%, two do: the LAST is left out, the first (the cards') stay
     expect(Object.keys(r.thumbs)).toEqual(['ah:1', 'ah:2']);
     expect(new TextEncoder().encode(JSON.stringify(r)).length).toBeLessThanOrEqual(Math.floor(MAX_ENVELOPE_BYTES * 0.7));
+    // identifiers that look like whole numbers: an object lists them ascending ('12' before '900') whatever order they
+    // were put in, so the drop order comes from the answer's own list, never from the map's keys
+    const row = (id, seller) => ({ '@type': 'ListItem', item: { '@type': 'Product', identifier: id, name: id, offers: { seller: { name: seller } } } });
+    const list = { '@type': 'ItemList', itemListElement: [row('900', 'AH'), row('901', 'AH'), row('902', 'AH'), row('12', 'AH')] };
+    const big2 = Math.floor(MAX_ENVELOPE_BYTES * 0.4);
+    const numbered = { ok: true, output: list, thumbs: { 900: { mime: 'image/jpeg', data: 'a'.repeat(big2) }, 12: { mime: 'image/jpeg', data: 'b'.repeat(big2) } } };
+    expect(Object.keys(numbered.thumbs)).toEqual(['12', '900']);
+    // '900' is a card (the first three of its shop), '12' is behind "meer": '12' goes, '900' stays
+    expect(Object.keys(screenAnswerFits(numbered).thumbs)).toEqual(['900']);
     // an output too large on its own is still refused, pictures or not
     const big = { ok: true, output: { blob: 'x'.repeat(MAX_ENVELOPE_BYTES) }, thumbs: { 'ah:1': pic('a') } };
     expect(screenAnswerFits(big)).toMatchObject({ ok: false, code: 'answer-too-large' });

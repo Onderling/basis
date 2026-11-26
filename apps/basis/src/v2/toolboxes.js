@@ -16,7 +16,7 @@
 import { isReservedName } from './storageRegister.js';
 import { jsonKv } from './localStoreSeal.js';
 import { reportNotReadable } from '@onderling/local-store';
-import { readToolboxCard, callTool, readItemList, fetchThumbs, thumbOrder } from './toolboxClient.js';
+import { readToolboxCard, callTool, readItemList, fetchThumbs, thumbIdsInOrder } from './toolboxClient.js';
 import { firstPartyFirstWords } from '@onderling/app-manifest';
 import { GATE_WORDS } from './gateWords.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
@@ -236,10 +236,11 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
       // `output`: the toolbox's own answer, unchanged, ONLY for a screen (a toolbox's page builds on it); a chat door gets
       // `items` alone (half the bytes, and none of the shops' image addresses the rows dropped)
       if (!forScreen) return { ok: true, name: n, title: live.title, tool, items };
-      // a screen's pictures ride ONCE, as a map by the thing's identifier (what its page finds in `output`), in the order
-      // the count was spent: the cards' first, so an answer that must shrink to fit one envelope drops the last first
+      // a screen's pictures ride ONCE, as a map by the thing's identifier (what its page finds in `output`); its order is
+      // `thumbIdsInOrder` over the same list, which `screenAnswerFits` reads again from `output` when it must shrink it
       const thumbs = {};
-      for (const i of thumbOrder(items)) { const x = items[i]; if (x?.thumb && x.ref?.ref && !(x.ref.ref in thumbs)) thumbs[x.ref.ref] = x.thumb; }
+      const byId = new Map(items.filter((x) => x?.thumb && x.ref?.ref).map((x) => [x.ref.ref, x.thumb]).reverse());
+      for (const id of thumbIdsInOrder(items)) if (byId.has(id)) thumbs[id] = byId.get(id);
       const rows = items.map(({ thumb, ...x }) => x);
       return { ok: true, name: n, title: live.title, tool, items: rows, output: r.output, ...(Object.keys(thumbs).length ? { thumbs } : {}) };
     },

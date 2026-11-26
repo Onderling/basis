@@ -177,6 +177,18 @@ export function thumbOrder(rows) {
 }
 
 /**
+ * The things' identifiers in picture order (`thumbOrder`), each once: the order a screen's `thumbs` map is meant in. The
+ * map's own key order cannot carry it (an object lists whole-number keys first, ascending), so whoever builds the map
+ * and whoever shrinks it both take the order from here.
+ * @param {Array<{seller?: string|null, ref?: {ref?: string}}>} rows  rows as `readItemList` reads them
+ * @returns {string[]}
+ */
+export function thumbIdsInOrder(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  return [...new Set(thumbOrder(list).map((i) => list[i]?.ref?.ref).filter((id) => typeof id === 'string' && id))];
+}
+
+/**
  * A toolbox's pictures, fetched BY THE BOX and put on the rows as bytes (`thumb: {mime, data}` base64), so no door ever
  * fetches a shop's picture itself (that would tell the shop the person's address). Only an image on the toolbox's own
  * placed host (the same origin as its endpoint, with its key: the egress stays one host per toolbox), only jpeg, png or

@@ -895,7 +895,8 @@ import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../../src/v2/circ
 let keyDoor = null;
 let appLockOn = false;
 // THE OTHER TABS of this browser: a door key opened in one tab lives in that tab only, so "lock now", or the lock
-// switched on, in one tab tells the others; each drops its door key and reloads onto the lock screen. The lock is for
+// switched on or off, in one tab tells the others; each drops its door key and reloads (onto the lock screen, or, after
+// an off, into an open door). The lock is for
 // someone else at the same computer, and a second tab left open would be their way in. No channel: this tab only.
 // ONE channel object per tab: a message reaches every OTHER object of the same name, this tab's own included.
 let keyDoorTabs = null;
@@ -5590,6 +5591,9 @@ async function showMyData(opts) {
         const probe = pickRootKeyStore({ fallbackVault: makeBrowserVault(storageName('vaultOwnerRoot')) });
         if (!(await probe.unlock(code).catch(() => false))) return { ok: false, code: 'wrong' };
         try { await keyDoor.clearLock(); } catch { return { ok: false, code: 'failed' }; }
+        // another open tab still holds the locked shape's door key: a seed it wrote now would be sealed under a key the
+        // store no longer uses and lost at the next read. It reloads and finds the open door.
+        tellOtherTabsLocked();
         appLockOn = false; again(); return { ok: true };
       },
       // the door key leaves this tab's memory, and every other tab's; the reload opens on the lock screen

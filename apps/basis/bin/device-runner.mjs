@@ -136,7 +136,7 @@ import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
 import { EventLog } from '../src/eventLog.js';
 import { fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
 import { besidePersistDb } from '../src/household/persist.js';
-import { boxStores, vaultFilesMissing, BOX_REGISTRY_DIR, startFailures, markBoxStarted, startBackoffMs, failureIsPermanent, BOX_START_FAILURES_BEFORE_HOLD } from '../src/v2/boxStorage.js';
+import { boxStores, boxAgentVaultFile, vaultFilesMissing, BOX_REGISTRY_DIR, startFailures, markBoxStarted, startBackoffMs, failureIsPermanent, BOX_START_FAILURES_BEFORE_HOLD } from '../src/v2/boxStorage.js';
 import { resolveVaultPassphrase } from '../src/v2/boxVaultPassphrase.js';
 import { retentionFromDays } from '../src/v2/retentionPref.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, openOfferPersonas, pickByNames, enrolPickArgs, pickPrimary } from '../src/v2/enrollOffer.js';
@@ -300,7 +300,7 @@ contentPaths.contactDm = stores.paths.contactDm;
 contentPaths.agentVaults = path.join(dataDir, 'agent-vaults');
 const agentVaultFor = (prefix) => {
   mkdirSync(contentPaths.agentVaults, { recursive: true });
-  return new VaultNodeFs(path.join(contentPaths.agentVaults, `${prefix.replace(/[^a-z0-9-]/gi, '')}.json`), vaultPassphrase());
+  return new VaultNodeFs(path.join(contentPaths.agentVaults, boxAgentVaultFile(prefix)), vaultPassphrase());
 };
 // The device log is the record every lane rides: a device that forgets it on restart would re-admit a connection
 // its owner revoked, and would come back to its circles as if it had never been in them. It is SEALED, so the agent

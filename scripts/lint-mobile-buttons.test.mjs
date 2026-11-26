@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scanSource } from './lint-mobile-buttons.mjs';
+import { scanSource, redMessage } from './lint-mobile-buttons.mjs';
 
 describe('lint-mobile-buttons', () => {
   it('counts a Pressable styled as a button, not a row or the family', () => {
@@ -14,5 +14,11 @@ describe('lint-mobile-buttons', () => {
   });
   it('reads props past an arrow function to the tag end', () => {
     expect(scanSource('<Pressable onPress={() => { a > b; }} style={styles.chip}>')).toHaveLength(1);
+  });
+  it('the red message names each hand-styled button in a grown file as file:line and says what to use instead', () => {
+    const msg = redMessage([{ file: 'apps/basis-mobile/src/a.js', now: 2, was: 1, lines: [4, 9] }]);
+    expect(msg).toMatch(/^\s*apps\/basis-mobile\/src\/a\.js:4$/m);
+    expect(msg).toMatch(/^\s*apps\/basis-mobile\/src\/a\.js:9$/m);
+    expect(msg).toMatch(/Fix: .*<Btn/);
   });
 });

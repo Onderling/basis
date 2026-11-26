@@ -22,6 +22,25 @@ const BASELINE = join(ROOT, 'scripts', 'default-literal-baseline.json');
  *  device is 'default' is the same misreading, one step earlier). */
 export function countDefaultLiterals(src) { return (String(src).match(/(['"])default\1/g) ?? []).length; }
 
+/** The 1-based line of each `'default'` literal in one source text (a line with two appears twice). */
+export function defaultLiteralLines(src) {
+  const out = [];
+  String(src).split('\n').forEach((line, i) => { for (let k = countDefaultLiterals(line); k > 0; k -= 1) out.push(i + 1); });
+  return out;
+}
+
+/** The red message: what is wrong, every literal in a grown file as file:line (the new one is among them), what instead. */
+export function redMessage(up, linesByFile) {
+  const out = ["✗ lint-default-literal: a new 'default' literal in the agent core — 'default' means the GENERAL PERSONA only, never \"this device\":"];
+  for (const { file, was, now } of up) {
+    out.push(`   ${file}: ${was} → ${now} (the new one is among these lines)`);
+    for (const l of [...new Set(linesByFile[file] ?? [])]) out.push(`     ${file}:${l}`);
+  }
+  out.push("   Fix: where \"this device\" is meant, use the agent's primary self (primaryId) instead of 'default'.");
+  out.push('   Only if it does mean the general persona, raise the baseline in the same PR (node scripts/lint-default-literal.mjs --write) and say so.');
+  return out.join('\n');
+}
+
 export function currentCounts(root = ROOT) {
   const out = {};
   for (const f of readdirSync(join(root, SCOPE)).filter((n) => n.endsWith('.js')).sort()) {
@@ -46,9 +65,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const baseline = JSON.parse(readFileSync(BASELINE, 'utf8'));
   const up = grown(counts, baseline);
   if (up.length) {
-    console.error("✗ a new 'default' literal in the agent core — 'default' means the GENERAL PERSONA only; this device is the primary (primaryId):");
-    for (const { file, was, now } of up) console.error(`   ${file}: ${was} → ${now}`);
-    console.error('   If it does mean the general persona, raise the baseline in the same PR (node scripts/lint-default-literal.mjs --write) and say so.');
+    const linesByFile = Object.fromEntries(up.map(({ file }) => [file, defaultLiteralLines(readFileSync(join(ROOT, file), 'utf8'))]));
+    console.error(redMessage(up, linesByFile));
     process.exit(1);
   }
   console.log(`✓ 'default' literals in the agent core: none added (${Object.values(counts).reduce((a, b) => a + b, 0)} counted)`);

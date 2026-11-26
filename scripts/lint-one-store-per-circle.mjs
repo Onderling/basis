@@ -22,7 +22,9 @@
 import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const SELF = fileURLToPath(import.meta.url);
 const ROOT = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
 const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
 
@@ -62,27 +64,35 @@ for (const file of callSites()) {
   if (file === 'packages/item-store/src/circleStores.js' || file === 'packages/item-store/src/index.js') continue;
   // Count CALLS, not mentions: the constructor is named in prose all over the substrate (it is the thing
   // those files document), and a guard that cannot tell a sentence from a call reports the docs as the bug.
-  const calls = read(file)
-    .split('\n')
-    .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
-    .filter((line) => /createCircleStores\s*\(/.test(line))
-    .length;
-  if (calls === 0) continue;
+  const calls = [];
+  read(file).split('\n').forEach((line, i) => {
+    if (!/^\s*(\/\/|\*|\/\*)/.test(line) && /createCircleStores\s*\(/.test(line)) calls.push(i + 1);
+  });
+  if (calls.length === 0) continue;
   if (ALLOWED[file]) continue;
-  problems.push(
-    `${file} builds a per-circle store registry (${calls}×). A circle owns ONE store: take it from `
-    + '`agent.circleStoreFor(circleId)`. If this genuinely is not a circle store, add it to ALLOWED with '
-    + 'the reason — that is the sentence review should read.',
-  );
+  for (const line of calls) {
+    problems.push(
+      `${file}:${line}: builds a per-circle store registry — a circle owns ONE store.\n`
+      + '    Fix: take the circle\'s store from `agent.circleStoreFor(circleId)` instead. Only if this genuinely is not a '
+      + `circle store, add it to ALLOWED in ${path.relative(ROOT, SELF)} with the reason — that is the sentence review should read.`,
+    );
+  }
+}
+
+/** Where ALLOWED names a file, as `guard:line`, so a stale entry points at the line to delete. */
+function allowedAt(file) {
+  const lines = readFileSync(SELF, 'utf8').split('\n');
+  const i = lines.findIndex((l) => l.includes(`'${file}'`));
+  return `${path.relative(ROOT, SELF)}:${i + 1}`;
 }
 
 // The allowances must stay honest: an entry naming a file that no longer builds one is stale.
 for (const [file, why] of Object.entries(ALLOWED)) {
   let src = '';
-  try { src = read(file); } catch { problems.push(`ALLOWED names "${file}", which does not exist — remove it.`); continue; }
+  try { src = read(file); } catch { problems.push(`${allowedAt(file)}: ALLOWED names "${file}", which does not exist.\n    Fix: remove that entry.`); continue; }
   const builds = src.split('\n').some((line) => !/^\s*(\/\/|\*|\/\*)/.test(line) && /createCircleStores\s*\(/.test(line));
   if (!builds) {
-    problems.push(`ALLOWED names "${file}" (${why.slice(0, 40)}…) but it no longer builds one — remove the allowance.`);
+    problems.push(`${allowedAt(file)}: ALLOWED names "${file}" (${why.slice(0, 40)}…) but it no longer builds one.\n    Fix: remove the allowance.`);
   }
 }
 

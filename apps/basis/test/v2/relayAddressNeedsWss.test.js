@@ -6,8 +6,8 @@ import { normalizeRelayUrl, resolveRelayUrl } from '../../src/v2/relayPref.js';
 import { createConnectionPoints, isRelayUrl, pointAddErrorKey } from '../../src/v2/connectionPoints.js';
 import { parseInviteDeepLink } from '../../src/v2/inviteDeepLink.js';
 
-const PUBLIC_PLAIN = 'ws://relay.onderling.org:8787';
-const PUBLIC_TLS = 'wss://relay.onderling.org';
+const PUBLIC_PLAIN = 'ws://relay.test:8787';
+const PUBLIC_TLS = 'wss://relay.test';
 const HOME_PLAIN = 'ws://192.168.2.20:8787';
 
 describe('the app takes a relay address only over wss outside the own network', () => {
@@ -15,7 +15,7 @@ describe('the app takes a relay address only over wss outside the own network', 
     expect(isRelayUrl(PUBLIC_TLS)).toBe(true);
     expect(isRelayUrl(HOME_PLAIN)).toBe(true);
     expect(isRelayUrl(PUBLIC_PLAIN)).toBe(false);
-    expect(isRelayUrl('https://relay.onderling.org')).toBe(false);
+    expect(isRelayUrl('https://relay.test')).toBe(false);
   });
 
   it('the device setting drops a plain public address and falls through to the next candidate', () => {

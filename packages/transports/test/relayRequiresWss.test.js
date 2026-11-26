@@ -12,16 +12,16 @@ describe('RelayTransport: wss required outside local development', () => {
   it('refuses a plain ws address to a public host, and says why in words', async () => {
     const identity = await newIdentity();
     let err = null;
-    try { new RelayTransport({ relayUrl: 'ws://relay.onderling.org:8787', identity }); } catch (e) { err = e; }
+    try { new RelayTransport({ relayUrl: 'ws://relay.test:8787', identity }); } catch (e) { err = e; }
     expect(err).toBeTruthy();
     expect(err.code).toBe('RELAY_PLAIN_WS');
     expect(err.message).toMatch(/wss:\/\//);
-    expect(err.message).toMatch(/relay\.onderling\.org/);
+    expect(err.message).toMatch(/relay\.test/);
   });
 
   it('takes wss anywhere and plain ws on the own machine or network', async () => {
     const identity = await newIdentity();
-    for (const relayUrl of ['wss://relay.onderling.org', 'ws://127.0.0.1:8787', 'ws://192.168.2.20:8787', 'ws://relay:8787']) {
+    for (const relayUrl of ['wss://relay.test', 'ws://127.0.0.1:8787', 'ws://192.168.2.20:8787', 'ws://relay:8787']) {
       expect(new RelayTransport({ relayUrl, identity }).url, relayUrl).toBe(relayUrl);
     }
   });

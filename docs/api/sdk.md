@@ -247,6 +247,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `registerTunnelOpen` | function | [`core.md`](core.md#registertunnelopen) |
 | `registerTunnelOw` | function | [`core.md`](core.md#registertunnelow) |
 | `registerTunnelReceiveSealed` | function | [`core.md`](core.md#registertunnelreceivesealed) |
+| `relayAddressRefusal` | function | [`core.md`](core.md#relayaddressrefusal) |
 | `relayNameOf` | function | [`core.md`](core.md#relaynameof) |
 | `relayOwnNames` | function | [`core.md`](core.md#relayownnames) |
 | `REPLY_CODES` | constant | [`core.md`](core.md#reply_codes) |

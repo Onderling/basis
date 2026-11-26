@@ -24,6 +24,7 @@
 import { execSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
+import { lineOf, whereInSelf } from './guard-where.mjs';
 
 const ROOT = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
 const KINDS_FILE = 'packages/item-store/src/entryKinds.js';
@@ -111,24 +112,29 @@ if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url
     read: (f) => readFileSync(path.join(ROOT, f), 'utf8'),
   });
 
+  const kindsText = readFileSync(path.join(ROOT, KINDS_FILE), 'utf8');
+  const kindAt = (k) => `${KINDS_FILE}:${Math.max(lineOf(kindsText, `'${k}':`), lineOf(kindsText, `  ${k}:`))}`;
+  const rowAt = (k) => whereInSelf(import.meta.url, `'${k}':`);
   let failed = false;
   if (missing.length) {
     failed = true;
     console.error(`\n✗ lint:kind-appenders — ${missing.length} declared kind(s) with NO appender row:\n`);
-    for (const k of missing) console.error(`   - '${k}'`);
-    console.error('\n   A kind in ENTRY_KINDS must name its production write path in APPENDERS (this guard),');
-    console.error('   or be carried as an explicit `pending` row with a plan pointer. Declared-but-unwritten');
-    console.error('   is how the key-event drift hid for a month.\n');
+    for (const k of missing) console.error(`   - ${kindAt(k)}: '${k}'`);
+    console.error('\n   Declared-but-unwritten is how the key-event drift hid for a month.');
+    console.error('   Fix: add an APPENDERS row (this guard) naming the production write path { file, needle },');
+    console.error('   or carry it as an explicit `pending` row saying where its writer will come from.\n');
   }
   if (stale.length) {
     failed = true;
-    console.error(`\n✗ lint:kind-appenders — ${stale.length} APPENDERS row(s) for kind(s) no longer declared: ${stale.map((k) => `'${k}'`).join(', ')}\n`);
+    console.error(`\n✗ lint:kind-appenders — ${stale.length} APPENDERS row(s) for kind(s) no longer declared:\n${stale.map((k) => `   - ${rowAt(k)}: '${k}'`).join('\n')}`);
+    console.error('   Fix: remove each row from APPENDERS.\n');
   }
   if (broken.length) {
     failed = true;
     console.error(`\n✗ lint:kind-appenders — ${broken.length} appender evidence row(s) no longer hold:\n`);
-    for (const [k, why] of broken) console.error(`   - '${k}': ${why}`);
-    console.error('\n   The write path moved — repoint the evidence at where the kind is appended now.\n');
+    for (const [k, why] of broken) console.error(`   - ${rowAt(k)}: '${k}': ${why}`);
+    console.error('\n   The write path moved.');
+    console.error('   Fix: repoint the row\'s file and needle at where the kind is appended now.\n');
   }
   if (failed) process.exit(1);
 

@@ -67,6 +67,7 @@ if (isMain) {
   }
   if (problems.length) {
     console.error(`✖ lint-locale-duplicate-keys — a key repeated in one object (JSON keeps only the last):\n${problems.map((p) => `  • ${p}`).join('\n')}`);
+    console.error('  Fix: keep one entry per key — merge the two into the one that should win and delete the other.');
     process.exit(1);
   }
   console.log(`✓ lint-locale-duplicate-keys: ${files.length} locale files, no key twice in one object.`);

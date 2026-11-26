@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { directSecretbox, grewAgainst } from './lint-one-secretbox.mjs';
+import { directSecretbox, directSecretboxLines, grewAgainst, redMessage } from './lint-one-secretbox.mjs';
 
 const files = {
   'packages/core/src/identity/x.js': "const c = nacl.secretbox(m, n, k);\nconst p = nacl.secretbox.open(c, n, k);",
@@ -18,5 +18,12 @@ describe('lint-one-secretbox', () => {
   it('is red when a file grows past its baseline or a new file appears; a shrink is fine', () => {
     expect(grewAgainst({ a: 2, b: 1 }, { a: 2 })).toEqual([{ file: 'b', now: 1, was: 0 }]);
     expect(grewAgainst({ a: 1 }, { a: 2 })).toEqual([]);
+  });
+  it('the red message names each site as file:line and says what to call instead', () => {
+    const lines = directSecretboxLines(Object.keys(files), read);
+    const msg = redMessage(grewAgainst(directSecretbox(Object.keys(files), read), {}), lines);
+    expect(msg).toMatch(/packages\/core\/src\/identity\/x\.js:2\b/);
+    expect(msg).toMatch(/packages\/x\/src\/named\.js:1\b/);
+    expect(msg).toMatch(/^Fix: .*secretbox\.js/m);
   });
 });

@@ -19,6 +19,8 @@
 //   4. An id reused after retirement (monotonic against the high-water mark in the baseline).
 //   5. A question marker in a private doc with no `[ledger L<n>]` / `[ledger n/a]` annotation and no
 //      baseline entry — drift 1: a question raised in a design doc that never reached the ledger.
+//   6. From L1206 on: a `? Needs Frits` row without `Recommend:` and `Meanwhile:`, or a row without `asked <date>`.
+//      Once the baseline carries `rowLengthLimit` (set by the trim): any open row longer than it. Older rows warn.
 //
 // SKIPS CLEANLY when REMAINING-WORK.md is absent: it and plans/ are gitignored by design, so a fresh
 // public clone (and CI) has nothing to check. Absence is not a failure.
@@ -234,6 +236,35 @@ for (const rel of scanned) {
 const prior = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : { markerSites: [], highWaterMark: 0 };
 const highWater = Math.max(prior.highWaterMark || 0, ...allIds, 0);
 
+// ── 6. the row rules (agreed after the retro of 2026-11-25) ──────────────────
+// A question to Frits names the asker's recommendation and what happens meanwhile, so it never stops a build; a new
+// row says when it was asked, so its age can be read; and once the long rows were trimmed (their history moved to an
+// archive file), an open row stays short enough to read. Rows from ROW_RULES_FROM on are held; older rows only warn,
+// naming each id, so the history is fixed as it is touched rather than rewritten by a lint.
+const ROW_RULES_FROM = 1206; // the first id minted after the rules were agreed (2026-11-26)
+const isClosed = (line) => /✅\s*CLOSED/.test(line);
+const oldQuestions = [];
+for (const line of openItems) {
+  const [n] = idsIn(line);
+  if (n == null || isClosed(line)) continue;
+  const isNew = n >= ROW_RULES_FROM;
+  if (/\?\s*Needs Frits/.test(line) && !(/Recommend:/.test(line) && /Meanwhile:/.test(line))) {
+    if (isNew) errors.push(`L${n} asks Frits but lacks "Recommend:" and/or "Meanwhile:". Where: the row in REMAINING-WORK.md. Instead: add "Recommend: <your answer and why>" and "Meanwhile: <the reversible default the build takes>".`);
+    else oldQuestions.push(`L${n}`);
+  }
+  if (isNew && !/\basked \d{4}-\d{2}-\d{2}\b/.test(line)) {
+    errors.push(`L${n} is a new row without "asked <date>". Where: the row in REMAINING-WORK.md. Instead: put "asked YYYY-MM-DD" (from \`date\`) right after its id.`);
+  }
+  if (prior.rowLengthLimit && line.length > prior.rowLengthLimit) {
+    errors.push(`L${n} is ${line.length} characters, over the ${prior.rowLengthLimit} limit for an open row. Where: the row in REMAINING-WORK.md. Instead: keep the head and the newest STATUS; move the rest to REMAINING-WORK-archive/history/L${n}.md with a pointer (plans/tools/archive-ledger-rows.mjs --trim).`);
+  }
+}
+if (oldQuestions.length) warnings.push(`${oldQuestions.length} older "? Needs Frits" row(s) lack "Recommend:"/"Meanwhile:" (fill them when you touch them): ${oldQuestions.join(' ')}`);
+if (!prior.rowLengthLimit) {
+  const long = openItems.filter((l) => !isClosed(l) && l.length > 1500).length;
+  if (long) warnings.push(`${long} open row(s) are over 1500 characters; the length rule goes red once the trim has run and set rowLengthLimit in the baseline.`);
+}
+
 // `--next odd|even`: the next free id of that parity (Fable mints odd, Opus even), above every id the ledger, its
 // answered list, its archive and the baseline have ever held. This replaces grepping the ledger by hand, which cannot
 // see the archive.
@@ -254,6 +285,8 @@ if (UPDATE) {
     // ids that existed when the baseline was taken — so the reuse check can tell an OLD low id
     // (fine) from a NEW one that has claimed a retired number (not fine).
     knownIds: [...allIds].sort((a, b) => a - b),
+    // set once by the trim (archive-ledger-rows.mjs --trim); from then on an open row over it is red
+    ...(prior.rowLengthLimit ? { rowLengthLimit: prior.rowLengthLimit } : {}),
   }, null, 2)}\n`);
   console.log(`lint:ledger — baseline rewritten: ${sites.length} un-annotated marker site(s), high-water mark L${highWater}.`);
   console.log('  Triage these DOWN over time. Every one you annotate [ledger L<n>] or [ledger n/a] is one');

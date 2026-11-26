@@ -16,7 +16,7 @@
  *   3. neither — a fresh account: mint a root, seed the door, and the phrase exists only
  *      on the reveal screen from here on.
  */
-import { Bootstrap } from '@onderling/core';
+import { Bootstrap, derivePassphraseKey } from '@onderling/core';
 import { RootKeyStoreVault, RootKeyStoreWebCrypto } from '@onderling/vault';
 import { KeyUnreadable } from './keyUnreadable.js';
 
@@ -39,9 +39,30 @@ export function pickRootKeyStore({ fallbackVault } = {}) {
   // installed globally (every agent would read the first one's seed and become the same person).
   if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined'
     && typeof crypto !== 'undefined' && crypto.subtle) {
-    try { return new RootKeyStoreWebCrypto(); } catch { /* fall through */ }
+    // the slow derivation for the person's lock (the backup's Argon2id; the door's slot carries its own cost)
+    try { return new RootKeyStoreWebCrypto({ kdf: { name: 'argon2id', derive: derivePassphraseKey } }); } catch { /* fall through */ }
   }
   return new RootKeyStoreVault({ vault: fallbackVault });
+}
+
+/**
+ * The key door at a start, before the agent is built: a door without a lock (or with no seed yet) is ready at once; a
+ * LOCKED door is opened with the person's secret first. `askSecret({wrong})` is the shell's question, painted, answered
+ * with what was typed (`wrong`: the last one did not open it). The door decides; nothing else is tried. While this
+ * waits nothing else starts. The SAME door comes back, open: hand it on as the agent's `rootKeyStore`, since an opened
+ * door's key lives in that one object only. The phone and the box have no lock: their doors answer at once.
+ * @param {import('@onderling/vault').RootKeyStore} door
+ * @param {{askSecret: (o: {wrong: boolean}) => Promise<string>}} o
+ * @returns {Promise<import('@onderling/vault').RootKeyStore>}
+ */
+export async function openKeyDoorAtBoot(door, { askSecret }) {
+  if ((await door.status()) !== 'locked') return door;
+  let wrong = false;
+  for (;;) {
+    const secret = await askSecret({ wrong });
+    if (await door.unlock(String(secret ?? ''))) return door;
+    wrong = true;
+  }
 }
 
 /**

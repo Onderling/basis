@@ -40,6 +40,7 @@ const allSettingsProps = () => ({
   podStatus: { signedIn: false }, onExportRecovery: vi.fn(), onImportRecovery: vi.fn(),
   onEnroll: vi.fn(), onReplaceDevice: vi.fn(), onMakePrimary: vi.fn(), onClaimCompanion: vi.fn(), onLinkBot: vi.fn(),
   onViewMnemonic: vi.fn(), onRestore: vi.fn(), onReceivePersonas: vi.fn(),
+  appLock: { on: false, set: vi.fn(async () => ({ ok: true })), clear: vi.fn(async () => ({ ok: true })), lockNow: vi.fn() },
   devices: [{ deviceId: 'dev-1', label: 'telefoon', revoked: false }], onRevokeDevice: vi.fn(),
   companions: [{ node: 'N'.repeat(43), short: 'NNNNNNNN…' }], onOpenCompanionGrant: vi.fn(), onGrantCompanion: vi.fn(),
   connections: [{ viewPubKey: 'v1', short: 'v1…', label: 'scherm', sees: null, opCount: 1 }], onUnpairConnection: vi.fn(),

@@ -32,3 +32,4 @@ Rule for anyone ruling on absence: before "not built" or "needs design", read th
 | [contacts-and-personas.md](contacts-and-personas.md) | contacts, trust, personas, disclosure, Mij, message requests, blocking | started 2026-11-12 |
 | feedback | the feedback app (its own repo; one row here) | owed |
 | relay-and-box | relay, the always-on box, companion, delivery ladder | owed |
+| [keys-devices-and-recovery.md](keys-devices-and-recovery.md) | the person's key on each device, the browser lock, the recovery phrase, start over, enrolling a device | started 2026-11-26 (the browser lock) |

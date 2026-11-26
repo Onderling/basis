@@ -1206,6 +1206,14 @@ export default function CircleMyDataScreen({ screenOffer = null, onScreenOfferTa
       </ActSection>
     ) : null),
     // ── Herstel: the way back, in a group of its own ──
+    // The person's lock: on the web a code wraps the key; on the phone the key sits in the OS keystore behind the
+    // phone's own screen lock, so the phone says that, true as written (only when a screen lock is set), and offers no
+    // switch (a declared difference, docs/conventions/web-mobile-exceptions.md).
+    'app-lock': () => (
+      <Section title={t('circle.lock.section_title')}>
+        <Text style={styles.privacyBody} testID="mydata-app-lock-fact">{t('circle.lock.phone_fact')}</Text>
+      </Section>
+    ),
     'recovery-phrase': () => (
       <ActSection>
         <Pressable style={styles.action} onPress={revealMnemonic} testID="mydata-mnemonic">

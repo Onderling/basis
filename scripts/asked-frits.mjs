@@ -160,8 +160,8 @@ function main() {
   const b = text.indexOf(BEGIN);
   const e = text.indexOf(END);
   if (b < 0 || e < 0 || e < b) {
-    console.error(`\n✖ asked-frits: the ${BEGIN} / ${END} block is missing from the roadmap.`);
-    console.error('  Add the two comment lines where the table belongs, then run this script.\n');
+    console.error(`\n✖ asked-frits: ${path.basename(FILE)}: the ${BEGIN} / ${END} block is missing from the roadmap.`);
+    console.error('  Fix: add the two comment lines where the table belongs, then run `node scripts/asked-frits.mjs`.\n');
     process.exit(1);
   }
   const wanted = render(rows(text));
@@ -171,8 +171,8 @@ function main() {
     process.exit(0);
   }
   if (check) {
-    console.error('\n✖ asked-frits: the open-questions table does not match the `? Needs Frits` markers.');
-    console.error('  Run `node scripts/asked-frits.mjs` and commit. The table is generated, never hand-edited —');
+    console.error(`\n✖ asked-frits: ${path.basename(FILE)}:${text.slice(0, b).split('\n').length}: the open-questions table does not match the \`? Needs Frits\` markers.`);
+    console.error('  Fix: run `node scripts/asked-frits.mjs` and commit. The table is generated, never hand-edited —');
     console.error('  a list maintained beside the markers drifts, which is why it is a projection.\n');
     process.exit(1);
   }

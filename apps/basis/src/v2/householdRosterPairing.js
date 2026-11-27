@@ -209,7 +209,9 @@ export async function makeCircleReachable({ agent, circleId, invite = null, reco
   }
   let registered = false;
   if (typeof registerCirclePresence === 'function') {
-    try { await registerCirclePresence(); registered = true; }
+    // the JOINED circle is handed over: the substrate's list may not hold it yet, and a shell that registered only
+    // that list left the new circle's address off the relay until a restart (every shell unions what it is given)
+    try { await registerCirclePresence(circleId ? [circleId] : []); registered = true; }
     catch (err) {
       // Best-effort, but NOT silent (review, 2026-07-30). A join that succeeds while registration fails
       // leaves the member on the roster at an address their own device never announced — reachable by

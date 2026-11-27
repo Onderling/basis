@@ -46,6 +46,13 @@ export const DEFAULT_PROFILE = 'default';
  */
 /** The unsealed-vault note a phrase ceremony leaves for the next boot (see the restore-finish flow). */
 export const RESTORE_PENDING_KEY = 'restore-pending';
+/**
+ * The restore's KEY CHECK: one small entry sealed into the chat vault under the restore's at-rest key, by name. The first
+ * start after a restore opens it before any vault drops what no longer opens (realAgent): it opens only under the key
+ * this restore sealed with, and it is there whichever selves the device runs (a device without the general persona
+ * has none of its slots to prove the key on).
+ */
+export const RESTORE_KEY_CHECK = 'restore-key-check';
 // The delegation blob's slot is one of a persona's vault slots (personaVault.js); re-exported for the callers that
 // import it from here.
 export { DEVICE_DELEGATION_VAULT_KEY } from './personaVault.js';
@@ -151,6 +158,7 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
     //    vaults drop theirs at the next boot, which finds this restore pending and first proves its key (realAgent). No
     //    proof is needed here: `atRestKey` was derived just above from the phrase in hand, so it is the restore's key.
     await dropUnopenable({ backing: chatVault, key: atRestKey });
+    await new VaultEncrypted({ backing: chatVault, key: atRestKey }).set(RESTORE_KEY_CHECK, JSON.stringify({ at: new Date().toISOString() }));
     // 2–3. THE GENERAL PERSONA'S SLOTS (its chat seed, person key and delegation blob — the bare names, as personaVault
     //      names them), only when this device holds it: a device without it has nothing of it, not even an empty slot.
     let identity = null;

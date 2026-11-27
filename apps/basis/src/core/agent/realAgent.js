@@ -282,7 +282,7 @@ async function giveFreshSeedIfShared(vault, forbiddenPubKeys, healed) {
   } catch { /* an unreadable vault is restoreOrGenerate's case, not this one */ }
 }
 
-import { restoreOwnerRoot, handPersonasInto, personaWireAt, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
+import { restoreOwnerRoot, handPersonasInto, personaWireAt, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY, RESTORE_KEY_CHECK } from './ownerRootRestore.js';
 import { createPersonaRuntime } from './personaRuntime.js';
 import { personaVault, PERSONA_SLOT_KEYS, HELD_PERSONAS_VAULT_KEY, PAUSED_PERSONAS_VAULT_KEY, RECOVERY_SEAL_VAULT_KEY, RECOVERY_SEAL_LABEL } from './personaVault.js';
 import { circleIdsFrom } from '../../v2/enrolForgets.js';
@@ -552,20 +552,14 @@ export async function createRealHouseholdAgent(opts = {}) {
   // proves the key in force on it before any vault drops a thing.
   const chatVaultBacking = opts.chatVault ?? pickVault(storageName('vaultChatId'));
   // THE PROOF BEFORE A DROP. The sentinel binds to the root's fingerprint, never to the at-rest key, so a passing
-  // migration says nothing about the key. The restore sealed the chat vault's slots under ITS key (derived from the
-  // phrase); everything older was sealed under the previous one. So an entry there that opens under the key in force
-  // was written by the restore, and the key is the restore's. Nothing opens: no proof, nothing is dropped, and the
-  // start says the key could not be read, as it would without this.
+  // migration says nothing about the key. The restore sealed its KEY CHECK (`RESTORE_KEY_CHECK`) into the chat vault
+  // under its own key: it opens under the key in force only when that key is the restore's. Absent or unopenable: no
+  // proof, nothing is dropped, and the start says the key could not be read, as it would without this.
   let restoreKeyProof = null;
   const restoreKeyProven = () => {
     restoreKeyProof ??= (async () => {
-      const enc = new VaultEncrypted({ backing: chatVaultBacking, key: atRestHolder.current() });
-      for (const k of await chatVaultBacking.list()) {
-        const raw = await chatVaultBacking.get(k);
-        if (raw == null || !VaultEncrypted.isEncryptedValue(raw)) continue;
-        try { await enc.get(k); return true; } catch { /* sealed under another key */ }
-      }
-      return false;
+      try { return (await new VaultEncrypted({ backing: chatVaultBacking, key: atRestHolder.current() }).get(RESTORE_KEY_CHECK)) != null; }
+      catch { return false; }   // sealed under another key
     })();
     return restoreKeyProof;
   };

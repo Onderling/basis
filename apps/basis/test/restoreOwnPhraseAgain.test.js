@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { VaultMemory, RootKeyStoreVault } from '@onderling/vault';
 import { Bootstrap, AgentIdentity } from '@onderling/core';
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
-import { restoreOwnerRoot } from '../src/core/agent/ownerRootRestore.js';
+import { restoreOwnerRoot, RESTORE_KEY_CHECK } from '../src/core/agent/ownerRootRestore.js';
 
 describe('restoring a device from its own phrase', () => {
   it('a second restore with the same phrase on the same device succeeds', async () => {
@@ -71,5 +71,19 @@ describe('after a restore and a start, the device is clean whoever\'s phrase it 
     const other = await afterRestore(false);
     expect(own.host, 'the host vault after an own-phrase restore').toEqual(other.host);
     expect(own.chat, 'the chat vault after an own-phrase restore').toEqual(other.chat);
+  });
+});
+
+describe('the key check is there whichever selves the device runs', () => {
+  it('a restore on a device WITHOUT the general persona leaves the key check, and the start after it boots', async () => {
+    const PHRASE = Bootstrap.create().mnemonic;
+    const ownerRootVault = new VaultMemory(); const chatVault = new VaultMemory(); const hostVault = new VaultMemory();
+    const rootKeyStore = new RootKeyStoreVault({ vault: ownerRootVault });
+    const r = await restoreOwnerRoot({ mnemonic: PHRASE, rootKeyStore, chatVault, markerVault: ownerRootVault, withDefault: false, personas: ['p-0123456789ab'] });
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    expect(await chatVault.has(RESTORE_KEY_CHECK), 'the restore sealed its key check').toBe(true);
+    let err = null;
+    try { await createRealHouseholdAgent({ ownerRootVault, chatVault, hostVault }); } catch (e) { err = e; }
+    expect(err?.message ?? null, 'a healthy restore without the general persona could not start').toBe(null);
   });
 });

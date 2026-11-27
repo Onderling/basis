@@ -21,7 +21,6 @@
     "circleRag": {"v":"none","value":"rows"},
     "circleRecipe": {"v":"none","value":"json"},
     "circleRecipePending": {"v":"none","value":"json"},
-    "circleRulesPending": {"v":"none","value":"json"},
     "circleSeenAt": {"v":"none","value":"json"},
     "circleSkill": {"v":"none","value":"json"},
     "circleViewMode": {"v":"none","value":"json"},

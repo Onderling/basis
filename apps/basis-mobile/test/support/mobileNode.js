@@ -104,7 +104,6 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
   const { asyncStorageMappingsStore, MAPPINGS_DEVICE } = await import('../../src/core/mappingsStoreRN.js');
   const { makeMemberOverrideStoreRN, makeCirclePolicyStoreRN } = await import('../../src/core/circleStoresRN.js');
   const { makeCircleRecipePendingStoreRN } = await import('../../src/core/circleRecipePendingStorageRN.js');
-  const { makeCircleRulesPendingStoreRN } = await import('../../src/core/circleRulesPendingStorageRN.js');
   const { t } = await import('../../src/core/localisation.js');
   const { createAsBackend } = await import('@onderling/react-native/pseudo-pod-adapter');
   const { createDeliveryStateMap } = await import('@onderling/kring-host/deliveryState');
@@ -144,7 +143,6 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
       : Promise.reject(new Error('no peer send yet'))),
   });
   const recipePendingStore = makeCircleRecipePendingStoreRN(AsyncStorage);
-  const rulesPendingStore = makeCircleRulesPendingStoreRN(AsyncStorage);
   pods.initCirclePods(AsyncStorage);
   pods.setCirclePodSession(podSessionRef);   // as App.js: the session ref, empty until a sign-in
   const policyStore = makeCirclePolicyStoreRN(AsyncStorage);
@@ -231,7 +229,6 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     eventLog, deliveryStateMap: deliveryMap, chatStoredReceipt,
     onCirclesChanged: () => {},
     recipe: { pendingStore: recipePendingStore, dedup: new Set() },
-    rules: { pendingStore: rulesPendingStore, dedup: new Set() },
     circlePolicyLane,
     paint: {
       addMainBubble: (bubble) => { landed.mainBubbles.push(bubble); },

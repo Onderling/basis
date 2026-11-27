@@ -12,8 +12,7 @@
  *     the {subtype, payloadKey, logTag} descriptor);
  *   - all three pending stores + storage caches are the one factory shape,
  *     each with its own on-disk key prefix (which must NOT change);
- *   - policy + rules conflict share the flat-doc factory (recipe does not —
- *     it stays its own per-block module, and we assert that difference).
+ *   - the recipe conflict stays its own per-block module (we assert that difference).
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -22,39 +21,29 @@ import { setShellContentSeal } from '../../src/v2/localStoreSeal.js';
 // the pending caches seal at rest (ledger L1083): a content key is published, as after a boot
 setShellContentSeal(groupKeyStrategy({ groupKey: Buffer.from(new Uint8Array(32).fill(7)).toString('base64url') }));
 
-import { makeCircleRulesPeerHandler }  from '../../src/v2/circleRulesReceiver.js';
 import { makeCircleRecipePeerHandler } from '../../src/v2/circleRecipeReceiver.js';
 
-import { createCircleRulesPendingStore }  from '../../src/v2/circleRulesPending.js';
 import { createCircleRecipePendingStore } from '../../src/v2/circleRecipePending.js';
 
-import {
-  localStorageCircleRulesPendingIo,
-  createCircleRulesPendingStoreLocal,
-} from '../../src/v2/circleRulesPendingStorage.js';
 import {
   localStorageCircleRecipePendingIo,
   createCircleRecipePendingStoreLocal,
 } from '../../src/v2/circleRecipePendingStorage.js';
 
-import { detectRulesConflicts,  applyRulesResolution }  from '../../src/v2/rulesConflict.js';
 import { detectRecipeConflicts } from '../../src/v2/recipeConflict.js';
 
 const silentLogger = { warn: () => {}, info: () => {}, debug: () => {} };
 
 /** One row per kind: the factory + the wire subtype + the envelope payload field. */
 const RECEIVER_KINDS = [
-  { name: 'rules',  make: makeCircleRulesPeerHandler,  subtype: 'circle-rules-broadcast',  key: 'rulesDoc' },
   { name: 'recipe', make: makeCircleRecipePeerHandler, subtype: 'circle-recipe-broadcast', key: 'recipe' },
 ];
 
 const PENDING_KINDS = [
-  { name: 'rules',  make: createCircleRulesPendingStore },
   { name: 'recipe', make: createCircleRecipePendingStore },
 ];
 
 const STORAGE_KINDS = [
-  { name: 'rules',  io: localStorageCircleRulesPendingIo,  local: createCircleRulesPendingStoreLocal,  prefix: 'basis.circleRulesPending.' },
   { name: 'recipe', io: localStorageCircleRecipePendingIo, local: createCircleRecipePendingStoreLocal, prefix: 'basis.circleRecipePending.' },
 ];
 
@@ -130,19 +119,6 @@ describe('circle triplet · anti-drift guard (one factory, three kinds)', () => 
   it('every storage prefix is unique (kinds cannot collide on disk)', () => {
     const prefixes = STORAGE_KINDS.map((k) => k.prefix);
     expect(new Set(prefixes).size).toBe(prefixes.length);
-  });
-
-  it('rules conflict is the flat-doc factory shape (empty blockConflicts)', () => {
-    // (The circle policy used the same shape until 2026-09-26: it now arrives on the governance lane and is
-    // applied, so it has no incoming copy to reconcile and its resolver is gone.)
-    const local    = { purpose: 'a', extra: 'keep' };
-    const incoming = { purpose: 'b', extra: 'keep' };
-    const base     = { purpose: 'a', extra: 'keep' };
-    const r = detectRulesConflicts(local, incoming, base);
-    expect(r.blockConflicts).toEqual([]);
-    // Missing decision defaults to 'theirs' (incoming wins); a local-only key is preserved (lossless).
-    expect(applyRulesResolution(local, incoming, {}).purpose).toBe('b');
-    expect(applyRulesResolution(local, incoming, {}).extra).toBe('keep');
   });
 
   it('recipe conflict is NOT the flat-doc shape — it stays its own per-block module', () => {

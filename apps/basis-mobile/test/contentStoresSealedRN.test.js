@@ -13,7 +13,6 @@ import { actionFrequencyIo } from '../../basis/src/v2/actionFrequency.js';
 import { circleOfferingDraftIo } from '../../basis/src/v2/circleOfferingDraft.js';
 import { makeMemberOverrideStoreRN, makeAvailabilityStoreRN, makeSharedWithMeStoreRN, makeUserScreenStoreRN } from '../src/core/circleStoresRN.js';
 import { makeCircleRecipePendingStoreRN } from '../src/core/circleRecipePendingStorageRN.js';
-import { makeCircleRulesPendingStoreRN } from '../src/core/circleRulesPendingStorageRN.js';
 
 const MARK = 'Oma-Truus-verjaardag';
 afterEach(() => setShellContentSeal(null));
@@ -33,7 +32,6 @@ function asyncStorage() {
 const STORES = [
   ['basis.circlePolicyHead.*', (s) => { const h = sealedPolicyHeadStore(s); return { write: () => h.write('c1', { version: 2, statement: { text: MARK } }), read: async () => (await h.read('c1'))?.statement?.text }; }],
   ['basis.circleRecipePending.*', (s) => { const p = makeCircleRecipePendingStoreRN(s); return { write: () => p.set('c1', { name: MARK }), read: async () => (await p.get('c1'))?.name }; }],
-  ['basis.circleRulesPending.*', (s) => { const p = makeCircleRulesPendingStoreRN(s); return { write: () => p.set('c1', { text: MARK }), read: async () => (await p.get('c1'))?.text }; }],
   ['basis.circleOverride.*', (s) => { const o = makeMemberOverrideStoreRN(s); return { write: () => o.update('c1', { chatOff: true }), read: async () => ((await o.get('c1'))?.chatOff ? MARK : ''), mark: 'chatOff' }; }],
   ['basis.availability', (s) => { const a = makeAvailabilityStoreRN(s); return { write: () => a.update({ holiday: { active: true, until: '2099-01-01' } }), read: async () => ((await a.get()).holiday.until === '2099-01-01' ? MARK : ''), mark: '2099-01-01' }; }],
   ['basis.sharedWithMe', (s) => { const w = makeSharedWithMeStoreRN(s); return { write: () => w.add({ sealed: { id: 'r1', text: MARK }, from: 'x', receivedAt: 1 }), read: async () => JSON.stringify(await w.list()) }; }],

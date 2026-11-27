@@ -11,11 +11,8 @@
  * and incoming recipes; this screen calls `onResolve(decisions)` /
  * `onCancel()` and lets the host run `applyResolution` + persist.
  *
- * γ.4 — the modal is reused for the rules doc and the circle policy:
- * those shapes have no `blocks` array, so detection produces only
- * `metaConflicts`.  The `title` prop lets the host override the
- * heading translation key (`circle.rules.conflict.title`) while every other locale key stays
- * under `circle.recipe.conflict.*` — the picker copy is identical.
+ * The `title` prop lets a host override the heading key for a doc without a `blocks` array (only `metaConflicts`);
+ * every other locale key stays under `circle.recipe.conflict.*`. Today only the recipe editor uses the modal.
  */
 import React, { useState, useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, Modal, StyleSheet } from 'react-native';

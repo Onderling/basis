@@ -10,17 +10,13 @@
  * statements at the same version fold the same way everywhere (deny-wins); and a third member converges on that
  * one answer. (Until then the policy arrived as a broadcast parked for a person to resolve — the retired path.)
  *
- * THE RULES document keeps its conflict resolver, and its two cases stay here: the 3-way diff and the auto-merge
- * that must not revert a fresher local edit.
+ * THE RULES document rides the same kind of lane (the rules-update rider); its half of 6.2 is pinned where its version
+ * guard lives, apps/pinboard/test/rulesUpdateStaleVersion.test.js.
  *
  * Cast: Anna's phone (fresh) · Anna's laptop (stale) · Bram (a third member who must converge, not diverge).
  */
 import { describe, it, expect } from 'vitest';
-import { detectRulesConflicts, applyRulesResolution, decisionsForMerges } from '../../src/v2/rulesConflict.js';
 import { applyPolicyUpdates, makePolicyHeadStore, POLICY_UPDATE_KIND } from '../../src/v2/policyUpdateLane.js';
-
-const OLD = { houseRules: ['wees aardig'], quietHours: '22:00' };
-const NEW = { houseRules: ['wees aardig', 'geen fietsen in de gang'], quietHours: '22:00' };
 
 const admins = new Set(['anna']);
 const stmt = (version, policy, hash) => ({ body: { kind: POLICY_UPDATE_KIND, author: 'anna', hash, payload: { policy, version } }, sig: 's' });
@@ -59,35 +55,5 @@ describe('6.2 — the policy: a stale device cannot overwrite a fresher change',
     const b = device(); await b.receive([twin]); await b.receive([twin, fresh]);
     expect(a.policy()).toEqual(b.policy());
     expect(a.policy()).toMatchObject({ storagePosture: 'p2', llmTool: 'off' });
-  });
-});
-
-describe('6.2 — the rules document keeps its resolver', () => {
-  it('the 3-way diff records WHICH side diverged, so an auto-merge can resolve correctly', () => {
-    const base = OLD;                                           // what both devices last agreed on
-    const localChanged = detectRulesConflicts(NEW, OLD, base);  // the phone edited; the laptop is at base
-    expect(localChanged.metaConflicts).toEqual([]);             // not a conflict — only one side moved
-    expect(localChanged.toMerge).toEqual([
-      { path: ['houseRules'], yours: NEW.houseRules, theirs: OLD.houseRules, side: 'local' },
-    ]);
-    // …and the mirror case resolves the other way.
-    const incomingChanged = detectRulesConflicts(OLD, NEW, base);
-    expect(incomingChanged.toMerge[0].side).toBe('incoming');
-  });
-
-  it('AUTO-MERGE keeps each side\'s real change — a stale replica cannot revert a fresher local edit', () => {
-    const base = OLD;
-    // The no-conflict fast path both shells take. Passing `{}` here is what silently reverted the edit:
-    // `apply` defaults every unlisted path to `theirs`.
-    const naive = applyRulesResolution(NEW, OLD, {});
-    expect(naive.houseRules).toEqual(OLD.houseRules);           // ← the bug, pinned as the counter-example
-
-    const report = detectRulesConflicts(NEW, OLD, base);
-    const merged = applyRulesResolution(NEW, OLD, decisionsForMerges(report.toMerge));
-    expect(merged.houseRules).toEqual(NEW.houseRules);          // the fresh edit survives the stale fan
-
-    // Symmetry: a genuinely NEWER incoming change is still taken.
-    const r2 = detectRulesConflicts(OLD, NEW, base);
-    expect(applyRulesResolution(OLD, NEW, decisionsForMerges(r2.toMerge)).houseRules).toEqual(NEW.houseRules);
   });
 });

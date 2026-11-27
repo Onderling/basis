@@ -12,7 +12,6 @@ import { localStorageMappingsStore } from '@onderling/kring-host/mappingsStore';
 import { setShellContentSeal, sealedKeyValue, sealedJsonIo } from '../../src/v2/localStoreSeal.js';
 import { sealedPolicyHeadStore } from '../../src/v2/policyUpdateLane.js';
 import { createCircleRecipePendingStoreLocal } from '../../src/v2/circleRecipePendingStorage.js';
-import { createCircleRulesPendingStoreLocal } from '../../src/v2/circleRulesPendingStorage.js';
 import { createMemberOverrideStore, localStorageOverrideIo } from '../../src/v2/circlePolicyStore.js';
 import { createAvailabilityStore, localStorageAvailabilityIo } from '../../src/v2/memberAvailability.js';
 import { createSharedWithMeStore, localStorageSharedWithMeIo } from '../../src/v2/sharedWithMeStore.js';
@@ -49,7 +48,6 @@ afterEach(() => setShellContentSeal(null));
 const STORES = [
   ['basis.circlePolicyHead.*', (s) => { const h = sealedPolicyHeadStore(s); return { write: () => h.write('c1', { version: 2, statement: { text: MARK } }), read: async () => (await h.read('c1'))?.statement?.text }; }],
   ['basis.circleRecipePending.*', (s) => { const p = createCircleRecipePendingStoreLocal(s); return { write: () => p.set('c1', { name: MARK }), read: async () => (await p.get('c1'))?.name }; }],
-  ['basis.circleRulesPending.*', (s) => { const p = createCircleRulesPendingStoreLocal(s); return { write: () => p.set('c1', { text: MARK }), read: async () => (await p.get('c1'))?.text }; }],
   ['basis.circleOverride.*', (s) => { const o = createMemberOverrideStore(localStorageOverrideIo(s)); return { write: () => o.update('c1', { chatOff: true }), read: async () => ((await o.get('c1'))?.chatOff === true ? MARK : 'not kept'), mark: 'chatOff' }; }],
   ['basis.availability', (s) => { const a = createAvailabilityStore(localStorageAvailabilityIo(s)); return { write: () => a.update({ holiday: { active: true, until: '2099-01-01' } }), read: async () => ((await a.get()).holiday.until === '2099-01-01' ? MARK : 'not kept'), mark: '2099-01-01' }; }],
   ['basis.sharedWithMe', (s) => { const w = createSharedWithMeStore(localStorageSharedWithMeIo(s)); return { write: () => w.add({ sealed: { id: 'r1', text: MARK }, itemMeta: { title: MARK }, from: 'x', receivedAt: 1 }), read: async () => JSON.stringify(await w.list()) }; }],

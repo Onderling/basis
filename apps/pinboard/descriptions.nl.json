@@ -359,10 +359,6 @@
     "what": "Stuur een wijziging van een item naar de kring.",
     "params": {"groupId": "welke kring", "event": "wat er gebeurde", "msgId": "het kenmerk van het bericht", "ts": "wanneer"}
   },
-  "broadcastCircleRules": {
-    "what": "Stuur de regels naar de kring.",
-    "params": {"groupId": "welke kring", "rulesDoc": "de regels", "fromActor": "van wie", "msgId": "het kenmerk van het bericht", "ts": "wanneer"}
-  },
   "broadcastCircleRecipe": {
     "what": "Stuur een gedeeld sjabloon naar de leden.",
     "params": {"groupId": "welke kring", "recipe": "het sjabloon", "fromActor": "van wie", "msgId": "het kenmerk van het bericht", "ts": "wanneer"}

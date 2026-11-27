@@ -67,7 +67,7 @@ export const STORAGE = Object.freeze({
   tasks:                  row('basis.tasks', 'store', [M], 'throwaway', 'sealed', SNAP),
   circleLists:            row('basis.circle-lists-state', 'store', [M], 'throwaway', 'sealed', SNAP),
   circleRag:              row('basis.circle-rag', 'store', [W, M], 'throwaway', 'sealed', ROWS),
-  // the phone's object-version snapshots (a circle's policy, rules and recipe as they were): the throwaway self's too
+  // the phone's object-version snapshots (a circle's policy and recipe as they were): the throwaway self's too
   objectVersionsPhone:    row('basis.object-versions', 'store', [M], 'throwaway', 'sealed', ROWS),
   // the object-version snapshots' key family (kring-host's versionsRootFor, handed this prefix): in the sealed
   // localStorage on the web, inside the phone's object-versions scope
@@ -89,7 +89,6 @@ export const STORAGE = Object.freeze({
   circlePolicy:           row('basis.circlePolicy.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
   circlePolicyHead:       row('basis.circlePolicyHead.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
   circlePolicyPending:    row('basis.circlePolicyPending.', 'prefix', [W, M], 'throwaway', 'not content: a pending flag ({pending: bool}) per circle', k('json')),
-  circleRulesPending:     row('basis.circleRulesPending.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
   circleRecipe:           row('basis.circleRecipe.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
   circleRecipePending:    row('basis.circleRecipePending.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
   circleOverride:         row('basis.circleOverride.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),

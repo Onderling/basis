@@ -156,7 +156,7 @@ import { SURFACE_NUDGE_SUBTYPE } from '../../v2/surfaceNudge.js'; // the reading
 import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';
 import { COMPANION_GRANT_OUTCOMES } from '../../v2/companionGrant.js';   // the words a grant to a node's agent ends on   // pairing: how the grant reaches the view that asked for it
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
-import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, seedFromString, seedToString, createKeyHolder } from '@onderling/vault';
+import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, dropUnopenable, seedFromString, seedToString, createKeyHolder } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
 import { createSecureMeshAgent, samePoint } from '@onderling/secure-agent';
 import { createBrowserMultiCircleTasksAgent } from '@onderling-app/tasks/browser';
@@ -553,6 +553,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     // as a key's, said with the same words (L1115), never the generic failure
     try { await migrateVaultToEncrypted({ backing, key: atRestHolder.current(), fingerprint: rootFingerprint }); }
     catch (err) { throw new KeyUnreadable('vault-sentinel', err); }
+    // the first start after a phrase restore: the same person's phrase keeps the sentinel (same root), but the restore
+    // enrolled a new device id and so a new at-rest key; what the previous key sealed opens no more and goes now, before
+    // anything reads it (another person's phrase resets the whole vault above, for the same reason)
+    if (restorePendingAtBoot) {
+      try { await dropUnopenable({ backing, key: atRestHolder.current() }); }
+      catch (err) { throw new KeyUnreadable('vault-sentinel', err); }
+    }
     sealedBackings.push(backing);
     return new VaultEncrypted({ backing, key: atRestHolder });
   };

@@ -30,7 +30,7 @@
  */
 
 import { AgentIdentity, Bootstrap, deriveCircleRoot, deriveDeviceSeed, wireDeviceId, deriveVaultAtRestKeyFrom, signDeviceDelegation, deviceDelegationPubKey, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, storePersonKey } from '@onderling/core';
-import { VaultEncrypted, migrateVaultToEncrypted, seedToString } from '@onderling/vault';
+import { VaultEncrypted, migrateVaultToEncrypted, dropUnopenable, seedToString } from '@onderling/vault';
 import { loadProfile } from '@onderling/agent-registry';
 import { cutoverToDelegation } from './ownerRootCustody.js';
 import { markForgetPending } from '../../v2/enrolForgets.js';
@@ -145,6 +145,11 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
     //    chat key is a CHILD of the root (`deriveAgentSeed`), never the mnemonic's raw entropy.
     const atRestKey = delegationCustody ? deriveVaultAtRestKeyFrom(delegationSeed) : root.deriveVaultAtRestKey();
     await migrateVaultToEncrypted({ backing: chatVault, key: atRestKey, fingerprint: root.fingerprint() });
+    //    The SAME phrase on a device that already is this person keeps the sentinel (same root), but this restore enrols a
+    //    new device id, so a new at-rest key: what the previous one sealed opens no more. It goes here, before anything
+    //    reads a slot (`VaultEncrypted: decryption failed for agent-stable-id` on a phone, 2026-11-27); the other sealed
+    //    vaults drop theirs at the next boot, which finds this restore pending (realAgent).
+    await dropUnopenable({ backing: chatVault, key: atRestKey });
     // 2–3. THE GENERAL PERSONA'S SLOTS (its chat seed, person key and delegation blob — the bare names, as personaVault
     //      names them), only when this device holds it: a device without it has nothing of it, not even an empty slot.
     let identity = null;

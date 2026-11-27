@@ -322,7 +322,8 @@ export function localStorageScreenIo(storage = globalThis.localStorage) {
       } catch { return null; }
     },
     save: async (book) => {
-      try { await kv.setItem(KEY, JSON.stringify(book)); } catch { /* quota / disabled / no content key yet */ }
+      // quota / disabled / no content key yet: said, never silent (a seed that did not land is not painted: ensureVandaagBook)
+      try { await kv.setItem(KEY, JSON.stringify(book)); } catch (err) { console.warn(`[at-rest] the page book: a save did not land: ${err?.message ?? err}`); }
     },
   };
 }

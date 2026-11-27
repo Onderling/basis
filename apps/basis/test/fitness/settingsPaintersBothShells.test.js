@@ -71,7 +71,7 @@ describe('settings sections: declared once, painted on both shells', () => {
   // it does is a host callback that opens the ceremony (the ceremony's own ops are the waist's to gate).
   const custody = settingsHomeFor(basisManifest).groups.flatMap((g) => g.sections.filter((x) => x.custody).map((x) => x.id));
   it('the custody sections are the device acts, the way back (Herstel) and the storage (sign-in)', () => {
-    expect([...custody].sort()).toEqual(['bot-link', 'companion-claim', 'device-add', 'device-primary', 'device-replace', 'devices',
+    expect([...custody].sort()).toEqual(['app-lock', 'bot-link', 'companion-claim', 'device-add', 'device-primary', 'device-replace', 'devices',
       'personas-receive', 'recovery-file', 'recovery-phrase', 'restore', 'storage']);
   });
   const MANIFESTS = { basis: basisManifest };

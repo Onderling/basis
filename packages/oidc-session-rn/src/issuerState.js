@@ -11,9 +11,16 @@ export function forIssuer(slot, issuer) {
 }
 
 /**
- * May a sign-in start for `issuer`? Its own discovery, its own client (or one the app fixed), and the request built.
+ * May a sign-in start for `issuer`? Its own discovery, its own client (or one the app fixed), and a request built FOR
+ * them: expo-auth-session never clears its request, so until the new one's URL is made the previous provider's request
+ * (or the placeholder made before the client was in) still stands. A request counts only when its client id is the
+ * current one and its URL starts at this discovery's authorize endpoint.
  * @param {{ issuer: string, discovered: object|null, client: object|null, request: object|null, fixedClientId?: string|null }} s
  */
 export function issuerReady({ issuer, discovered, client, request, fixedClientId = null }) {
-  return Boolean(forIssuer(discovered, issuer) && (fixedClientId || forIssuer(client, issuer)) && request);
+  const discovery = forIssuer(discovered, issuer);
+  const clientId = fixedClientId || forIssuer(client, issuer);
+  if (!discovery || !clientId || !request) return false;
+  const endpoint = typeof discovery.authorizationEndpoint === 'string' ? discovery.authorizationEndpoint : null;
+  return request.clientId === clientId && Boolean(endpoint) && typeof request.url === 'string' && request.url.startsWith(endpoint);
 }

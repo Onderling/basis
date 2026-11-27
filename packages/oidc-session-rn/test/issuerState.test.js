@@ -17,16 +17,28 @@ describe('the sign-in state belongs to one issuer', () => {
     expect(forIssuer(null, LOCAL)).toBe(null);
   });
 
-  it('ready only when the discovery AND the client are the current issuer\'s, and the request is built', () => {
-    const disc = (issuer) => ({ issuer, value: { tokenEndpoint: 'x' } });
-    const client = (issuer) => ({ issuer, value: 'client-' + issuer });
-    expect(issuerReady({ issuer: INRUPT, discovered: disc(INRUPT), client: client(INRUPT), request: {} })).toBe(true);
+  const disc = (issuer) => ({ issuer, value: { tokenEndpoint: 'x', authorizationEndpoint: `${issuer}/authorize` } });
+  const client = (issuer) => ({ issuer, value: 'client-' + issuer });
+  // an AuthRequest as expo-auth-session builds it: its client id, and the URL made from a discovery's authorize endpoint
+  const req = (issuer, clientId = 'client-' + issuer) => ({ clientId, url: `${issuer}/authorize?client_id=${clientId}` });
+
+  it('ready only when the discovery AND the client are the current issuer\'s, and the request is built for them', () => {
+    expect(issuerReady({ issuer: INRUPT, discovered: disc(INRUPT), client: client(INRUPT), request: req(INRUPT) })).toBe(true);
     // the person picked another provider: Inrupt's discovery and client stand until the new ones are in
-    expect(issuerReady({ issuer: LOCAL, discovered: disc(INRUPT), client: client(INRUPT), request: {} })).toBe(false);
-    expect(issuerReady({ issuer: LOCAL, discovered: disc(LOCAL), client: client(INRUPT), request: {} }), 'never the old provider\'s client').toBe(false);
+    expect(issuerReady({ issuer: LOCAL, discovered: disc(INRUPT), client: client(INRUPT), request: req(INRUPT) })).toBe(false);
+    expect(issuerReady({ issuer: LOCAL, discovered: disc(LOCAL), client: client(INRUPT), request: req(INRUPT) }), 'never the old provider\'s client').toBe(false);
     expect(issuerReady({ issuer: LOCAL, discovered: disc(LOCAL), client: client(LOCAL), request: null })).toBe(false);
-    expect(issuerReady({ issuer: LOCAL, discovered: disc(LOCAL), client: client(LOCAL), request: {} })).toBe(true);
+    expect(issuerReady({ issuer: LOCAL, discovered: disc(LOCAL), client: client(LOCAL), request: req(LOCAL) })).toBe(true);
     // a client id the app fixed itself holds for any issuer
-    expect(issuerReady({ issuer: LOCAL, discovered: disc(LOCAL), client: null, fixedClientId: 'mine', request: {} })).toBe(true);
+    expect(issuerReady({ issuer: LOCAL, discovered: disc(LOCAL), client: null, fixedClientId: 'mine', request: req(LOCAL, 'mine') })).toBe(true);
+  });
+
+  // expo-auth-session never clears its request: until the new one's URL is made, the OLD request stands — one render
+  // where the discovery and the client are the new provider's and the request still the previous provider's
+  it('the request counts only when it was built for THIS client and THIS discovery', () => {
+    expect(issuerReady({ issuer: LOCAL, discovered: disc(LOCAL), client: client(LOCAL), request: req(INRUPT) }), 'the old provider\'s request').toBe(false);
+    // the placeholder request made before the client was in (its client id is the redirect URI)
+    expect(issuerReady({ issuer: LOCAL, discovered: disc(LOCAL), client: client(LOCAL), request: req(LOCAL, 'basis://auth/callback') }), 'the placeholder-client request').toBe(false);
+    expect(issuerReady({ issuer: LOCAL, discovered: disc(LOCAL), client: client(LOCAL), request: { clientId: 'client-' + LOCAL } }), 'a request with no URL yet').toBe(false);
   });
 });

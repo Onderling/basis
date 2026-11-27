@@ -1128,7 +1128,7 @@ a change it must refuse. Statements on the same lane whose subject is a named pr
 keptDecisionKeys(entries = [])
 ```
 
-`${circleId}|${proposalId}` for every proposal a record settings change in `entries` names (the prune's lookup).
+`${circleId}|${proposalId}` for every proposal a kept statement in `entries` names (the prune's lookup).
 
 ### `isKeptDecision`
 

@@ -158,13 +158,13 @@ describe('B1 — the recovery phrase brings back the same person, on a fresh ins
  * There are two doors into restore on mobile and only one of them works:
  *
  *   ✔ in-app  — CircleMyDataScreen → restoreFromMnemonicWizardModal → restoreFromMnemonicState.js
- *               → callSkill('household', 'restoreOwnerPhrase') → writes cc-owner-root:owner-phrase
+ *               → callSkill('household', 'restoreOwnerPhrase') → writes basis.owner-root:owner-phrase
  *               and re-derives the default profile. Covered by the passing tests above.
  *
  *   ✘ first-run — FirstRunWelcomeScreen "I have a recovery phrase" → MnemonicEntryScreen
  *               → App.js `submitMnemonic` (App.js:355) → src/core/restoreFromMnemonic.js.
  *               That helper predates the owner root (it is the "legacy direct-seed" path realAgent.js:952
- *               names). It writes ONLY `cc-chat-id:agent-privkey`, seeded from the mnemonic's raw entropy
+ *               names). It writes ONLY `basis.chat-id:agent-privkey`, seeded from the mnemonic's raw entropy
  *               — not from `Bootstrap.deriveAgentSeed('default')` — and never writes the owner root at all.
  *
  * That is the door a reinstalling tester walks through: it is the only one reachable BEFORE an identity
@@ -210,16 +210,16 @@ describe('B1 — first-run "I have a recovery phrase" restores properly (FIXED 2
       //     `ensureOwnerRoot` found an empty vault and minted a brand-new RANDOM root, taking every
       //     per-circle address with it.
       const keys = await newPhone.getAllKeys();
-      expect(keys.some((k) => k.startsWith('cc-owner-root:'))).toBe(true);
+      expect(keys.some((k) => k.startsWith('basis.owner-root:'))).toBe(true);
 
       // (b) the chat key is the owner-root DEFAULT PROFILE, not the mnemonic's raw entropy. Those
       //     are different keys, and writing the second one produced an install whose identity did
       //     not match its own root. Since the custody cutover the vault seals under the
       //     DELEGATION-derived key (the marker names the enrollment).
-      const mode = await readCustodyMode(new VaultAsyncStorage({ prefix: 'cc-owner-root:', asyncStorage: newPhone }));
+      const mode = await readCustodyMode(new VaultAsyncStorage({ prefix: 'basis.owner-root:', asyncStorage: newPhone }));
       expect(mode.mode).toBe('delegation');
       const restored = await AgentIdentity.restore(new VaultEncrypted({
-        backing: new VaultAsyncStorage({ prefix: 'cc-chat-id:', asyncStorage: newPhone }),
+        backing: new VaultAsyncStorage({ prefix: 'basis.chat-id:', asyncStorage: newPhone }),
         key: deriveVaultAtRestKeyFrom(deriveDeviceSeed(
           Bootstrap.fromMnemonic(phrase).deriveAgentSeed('default'), mode.deviceId,
         )),

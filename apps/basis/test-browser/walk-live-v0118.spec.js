@@ -86,7 +86,7 @@ test('v0.1.18 on the live build: a leave travels, a leave follows, and a disclos
     expect(phrase, 'the phrase is readable on A').toBeTruthy();
     A2 = await boot(browser, 'A(dev2)');
     const enrolled = await A2.page.evaluate(async ([uri, words]) => {
-      localStorage.setItem('onderling.enrollOffer', uri);
+      localStorage.setItem('basis.enrollOffer', uri);
       return window.onderlingCall('household', 'enrollDevice', { mnemonic: words, label: 'walk-dev2' });
     }, [offer.uri, phrase]);
     expect(enrolled?.ok, JSON.stringify(enrolled)).toBe(true);

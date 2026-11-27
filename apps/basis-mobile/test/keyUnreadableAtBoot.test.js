@@ -45,9 +45,9 @@ async function bootOnce(as) {
 // [what, which read fails, whether the first boot stores it] — a root-custody device holds no custody marker (absent
 // means root mode), but every boot READS it, and a read that fails must not be taken for "absent"
 const CASES = [
-  ['the content key', (k) => k.startsWith('cc-chat-id:') && k.includes('content-at-rest-key'), true],
-  ['the host key', (k) => k.startsWith('cc-host-id:') && k.includes('agent-privkey'), true],
-  ['the custody marker', (k) => k.startsWith('cc-owner-root:') && k.includes('custody-mode'), false],
+  ['the content key', (k) => k.startsWith('basis.chat-id:') && k.includes('content-at-rest-key'), true],
+  ['the host key', (k) => k.startsWith('basis.host-id:') && k.includes('agent-privkey'), true],
+  ['the custody marker', (k) => k.startsWith('basis.owner-root:') && k.includes('custody-mode'), false],
 ];
 
 describe('a key that cannot be read at a start (L1115)', () => {
@@ -89,12 +89,12 @@ describe('the way out: start this device over from its phrase (L1115)', () => {
     const as = storage();
     const first = await bootOnce(as);
     // this device's own phrase, from its key door (a root-custody first boot)
-    const ownerRootVault = new VaultAsyncStorage({ prefix: 'cc-owner-root:', asyncStorage: as });
+    const ownerRootVault = new VaultAsyncStorage({ prefix: 'basis.owner-root:', asyncStorage: as });
     const rootKeyStore = new RootKeyStoreVault({ vault: ownerRootVault });
     expect(await ownerRootVault.get(ROOT_SEED_VAULT_KEY)).toBeTruthy();
     const phrase = Bootstrap.fromSeed(await rootKeyStore.getSeed()).toMnemonic();
     // the content key's entry is damaged for good: every start stops
-    const ck = [...as.store.keys()].find((k) => k.startsWith('cc-chat-id:') && k.includes('content-at-rest-key'));
+    const ck = [...as.store.keys()].find((k) => k.startsWith('basis.chat-id:') && k.includes('content-at-rest-key'));
     as.store.set(ck, `${as.store.get(ck).slice(0, -8)}AAAAAAAA`);
     const err = await bootAgentBundle({ asyncStorage: as }).then((b) => { b.dispose?.(); return null; }, (e) => e);
     expect(bootFailureNotice(err)).toMatchObject({ retry: true, startOver: true });
@@ -107,11 +107,11 @@ describe('the way out: start this device over from its phrase (L1115)', () => {
     expect(checked.ok).toBe(true);
     const r = await startDeviceOver({
       phrase: checked.phrase, markerVault: markerVaultOver(as),
-      wipe: () => wipeKeyValueStorage(as, `cc-owner-root:${START_OVER_PENDING_KEY}`),
+      wipe: () => wipeKeyValueStorage(as, `basis.owner-root:${START_OVER_PENDING_KEY}`),
       restore: (p) => restoreFromMnemonic({ mnemonic: p, asyncStorage: as }),
     });
     expect(r).toEqual({ ok: true });
-    expect(as.store.has(`cc-owner-root:${START_OVER_PENDING_KEY}`)).toBe(false);
+    expect(as.store.has(`basis.owner-root:${START_OVER_PENDING_KEY}`)).toBe(false);
     const after = await bootOnce(as);
     expect(first.chat, 'the bundle names its chat identity').toBeTruthy();
     expect(after.chat, 'the same person: the chat identity derives from the same root').toBe(first.chat);

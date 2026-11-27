@@ -78,9 +78,9 @@ describe('the restore door and the boot door are the SAME keystore', () => {
       // device restoring from its phrase booted unenrolled first, like every device) — never a seed or a
       // phrase. This list is pinned deliberately: a secret arriving in this vault must fail a test, and
       // adding a note must be a decision someone took on purpose rather than a diff nobody read.
-      const rootKeys = [...newPhone.store.keys()].filter((k) => k.startsWith('cc-owner-root:')).sort();
+      const rootKeys = [...newPhone.store.keys()].filter((k) => k.startsWith('basis.owner-root:')).sort();
       expect(rootKeys).toEqual([
-        'cc-owner-root:custody-mode', 'cc-owner-root:forget-pending', 'cc-owner-root:restore-pending',
+        'basis.owner-root:custody-mode', 'basis.owner-root:forget-pending', 'basis.owner-root:restore-pending',
       ]);
 
       const b2 = await bootAgentBundle({ asyncStorage: newPhone, secureStore: keystore });

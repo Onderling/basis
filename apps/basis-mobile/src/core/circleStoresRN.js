@@ -3,8 +3,8 @@
  *
  * The shared circle stores (`@onderling-app/basis`) take an injectable
  * `{ load, save }` IO; web wires localStorage, mobile wires AsyncStorage
- * here.  Keys match the web convention verbatim (`cc.circlePolicy.<id>`,
- * `cc.circleOverride.<id>`, `cc.availability`) so a future pod-sync sees
+ * here.  Keys match the web convention verbatim (`basis.circlePolicy.<id>`,
+ * `basis.circleOverride.<id>`, `basis.availability`) so a future pod-sync sees
  * the same shape on both surfaces.
  *
  * Portable: `storage` is injected (no top-level AsyncStorage import), so
@@ -85,7 +85,7 @@ export function makeMemberOverrideStoreRN(storage) {
 
 /**
  * Objective D (Surface 3a) — the availability pref stays device-local
- * (AsyncStorage, key `cc.availability`) BUT its value must be readable by
+ * (AsyncStorage, key `basis.availability`) BUT its value must be readable by
  * other agents, so it mirrors to a per-user pod resource via the shared
  * `tieredAvailabilityIo` (same pattern as the circle-policy store). Pass a
  * `getPodWriter` thunk (returning a `createPodWriter`-shaped writer, or
@@ -101,7 +101,7 @@ export function makeAvailabilityStoreRN(storage, { getPodWriter } = {}) {
 
 /**
  * SILENT out-of-circle delivery — the per-user "shared with me" store on RN. Received sealed copies stay
- * device-canonical (AsyncStorage, key `cc.sharedWithMe` — SAME key web uses) AND mirror to a per-user pod
+ * device-canonical (AsyncStorage, key `basis.sharedWithMe` — SAME key web uses) AND mirror to a per-user pod
  * resource via the shared `tieredSharedWithMeIo` (leak-safe: only sealed ciphertext + structural metadata),
  * so copies SURVIVE + SYNC across the user's devices. Pass a `getPodWriter` thunk (a `createPodWriter`-shaped
  * writer, or null) to publish; omit it and behaviour is local-only. Mirrors `makeAvailabilityStoreRN` exactly
@@ -134,7 +134,7 @@ export function sessionToPodWriterRN(session) {
 }
 
 /** α.1a — per-circle recipe book store (one book per circle; key:
- *  `cc.circleRecipe.<circleId>`).  γ.2 — version capture above storage. */
+ *  `basis.circleRecipe.<circleId>`).  γ.2 — version capture above storage. */
 export function makeCircleRecipeStoreRN(storage) {
   const versions = asyncStorageObjectVersions('recipe', storage);
   return createCircleRecipeStore({
@@ -144,7 +144,7 @@ export function makeCircleRecipeStoreRN(storage) {
   });
 }
 
-/** The person's pages on this device (single book; key: `cc.userScreens`), each change kept as a version (undoable). */
+/** The person's pages on this device (single book; key: `basis.userScreens`), each change kept as a version (undoable). */
 export function makeUserScreenStoreRN(storage) {
   // sealed at rest; a read before the key waits for it, so the first-run seeding never writes over the person's book
   return createUserScreenStore({ io: localStorageScreenIo(storage), versions: asyncStorageObjectVersions('screens', storage) });
@@ -152,7 +152,7 @@ export function makeUserScreenStoreRN(storage) {
 
 
 
-/** β.5 — per-user "pin to top" store (single key: `cc.circlePinned`), sealed at rest through the shared io (web ≡ mobile). */
+/** β.5 — per-user "pin to top" store (single key: `basis.circlePinned`), sealed at rest through the shared io (web ≡ mobile). */
 export function makeCirclePinStoreRN(storage) {
   return createCirclePinStore(localStoragePinIo(storage));
 }

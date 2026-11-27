@@ -37,7 +37,7 @@ export default function CircleListsScreen({ circleId, storeFor, callSkill, onBac
     let alive = true;
     (async () => {
       // THE CIRCLE'S OWN STORE — the same one the waist ops write to and the rail carries. This screen
-      // used to build a service over a DataSource of its own (`cc-circle-lists-cache`), so a list made in
+      // used to build a service over a DataSource of its own (`basis.circle-lists-cache`), so a list made in
       // the conversation was invisible here and one made here reached nobody: two stores for one circle,
       // which the architecture names as a defect outright.
       if (!alive) return;

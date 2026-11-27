@@ -31,7 +31,7 @@ describe('an admission before the producer is built', () => {
       notePodAgent: (gid, webId, podAgent) => notePodAgentFor({ vault, circleId: gid, webId, podAgent }),
     });
     await router.addMember({ groupId: 'c1', webId: 'pk-bram', publicKey: 'seal-bram', podAgent: 'https://pod/bram/profile/card#me' });
-    expect(JSON.parse(vault.m.get('cc.circle-groupkey:pod-agents:c1'))).toEqual({ 'pk-bram': 'https://pod/bram/profile/card#me' });
+    expect(JSON.parse(vault.m.get('basis.circle-groupkey:pod-agents:c1'))).toEqual({ 'pk-bram': 'https://pod/bram/profile/card#me' });
   });
 
   it('a circle without a pod builds nothing', async () => {

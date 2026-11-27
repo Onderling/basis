@@ -97,7 +97,7 @@ test('A shares a link from the persona panel; B opens it, has A as a contact, wr
       badge: document.querySelector('[data-tab="contacten"] .circle-tabbar__badge')?.textContent ?? null,
       tabs: [...document.querySelectorAll('[data-tab]')].map((b) => b.dataset.tab),
       turns: ((await window.onderlingContactChannel?.rehydrateAll?.()) ?? []).map((t) => `${String(t.contactId).slice(0, 8)}:${t.origin}:${t.ts}`),
-      seen: (() => { try { return localStorage.getItem('cc.contactSeenAt'); } catch { return 'n/a'; } })(),
+      seen: (() => { try { return localStorage.getItem('basis.contactSeenAt'); } catch { return 'n/a'; } })(),
     })).catch((e) => String(e));
     try {
       await expect.poll(async () => (await badgeState())?.badge, { timeout: 30_000 }).toBe('1');

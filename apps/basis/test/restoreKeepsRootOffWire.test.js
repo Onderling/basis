@@ -84,7 +84,7 @@ describe('a device restored before the fix heals at the next boot', () => {
       const rootPub = b64encode(root.derivedPubKey());
       // What the old wizard left on a device: the phrase's own bytes as the pinboard agent's seed, in its vault
       // sealed at rest the way every key vault is.
-      const pinboardVault = new VaultEncrypted({ backing: device.vaultFor('cc-pinboard-id:'), key: root.deriveVaultAtRestKey() });
+      const pinboardVault = new VaultEncrypted({ backing: device.vaultFor('basis.pinboard-id:'), key: root.deriveVaultAtRestKey() });
       await AgentIdentity.fromSeed(mnemonicToSeed(phrase), pinboardVault);
       await pinboardVault.delete('in-process-key-checked');   // the old build never marked a vault as checked
       expect((await AgentIdentity.restore(pinboardVault)).pubKey).toBe(rootPub);

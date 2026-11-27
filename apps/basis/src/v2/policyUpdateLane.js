@@ -3,7 +3,7 @@
  * a joiner and a following device included — catches it up like the roster.
  *
  * The policy (storage posture, pod, features, sharing, the LLM posture, governance classes…) is CIRCLE state, but it
- * lived per device (`cc.circlePolicy.<id>`) and reached other members only through `broadcastCirclePolicy`: fired
+ * lived per device (`basis.circlePolicy.<id>`) and reached other members only through `broadcastCirclePolicy`: fired
  * when an admin SAVED settings, fire-and-forget, never caught up. So a member who joined after the founder created
  * the circle held no policy at all and read every axis at its default — a circle created sealed (p2) was sealed on
  * the founder's device and p0 on everyone else's (found 2026-09-25; Fable's ruling 2026-09-26: a lane, not a

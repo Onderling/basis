@@ -309,7 +309,7 @@ describe('circleRecipe · α.1a — localStorageRecipeIo', () => {
     const io = localStorageRecipeIo(storage);
     const book = addRecipe(EMPTY_RECIPE_BOOK, 'A');
     await io.save('g42', book);
-    expect(mem.has('cc.circleRecipe.g42')).toBe(true);
+    expect(mem.has('basis.circleRecipe.g42')).toBe(true);
     const loaded = await io.load('g42');
     expect(loaded.recipes).toHaveLength(1);
     expect(loaded.recipes[0].name).toBe('A');

@@ -53,7 +53,7 @@ export function redMessage(unsaid) {
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
-/** Where a shell names a durable store, and how. Template literals (`cc-circle-${id}`) are the per-circle family. */
+/** Where a shell names a durable store, and how. Template literals (`basis.circle-${id}`) are the per-circle family. */
 const SITES = [
   { file: 'apps/basis/web/v2/circleApp.js', patterns: [/pickWebBackend\(\s*'([^']+)'/g, /dbName:\s*'([^']+)'/g] },
   { file: 'apps/basis-mobile/App.js', patterns: [/scope:\s*'([^']+)'/g] },
@@ -74,7 +74,7 @@ if (isMain) {
     for (const { name, line } of storeSites(read(site.file), site.patterns)) {
       if (NOT_A_STORE.has(name) || classified.has(name)) continue;
       // The per-circle family is resolved at run time from the registry, not named one by one.
-      if (/^cc-circle(-cache)?-/.test(name)) continue;
+      if (/^basis\.circle(-cache)?-/.test(name)) continue;
       unsaid.push({ name, file: site.file, line });
     }
   }

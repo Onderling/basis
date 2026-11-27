@@ -4,6 +4,7 @@
  */
 import { Alert } from 'react-native';
 import { wipeKeyValueStorage, START_OVER_PENDING_KEY } from '../../../basis/src/v2/startOver.js';
+import { storageName } from '../../../basis/src/v2/storageRegister.js';   // every storage name from the one register
 import { makeSecureStoreRootKeyStore } from './secureStoreRootKeyStore.js';
 
 /**
@@ -12,7 +13,7 @@ import { makeSecureStoreRootKeyStore } from './secureStoreRootKeyStore.js';
  * not the app's to remove.
  */
 export async function wipePhone({ AsyncStorage, SecureStore, FileSystem = null }) {
-  await wipeKeyValueStorage(AsyncStorage, `cc-owner-root:${START_OVER_PENDING_KEY}`);
+  await wipeKeyValueStorage(AsyncStorage, `${storageName('vaultOwnerRoot')}${START_OVER_PENDING_KEY}`);
   try { await makeSecureStoreRootKeyStore(SecureStore).deleteSeed(); } catch { /* nothing held there */ }
   if (FileSystem?.documentDirectory) {
     // a failed delete of the folder is a failure of the clear: the shared order keeps the mark and says so

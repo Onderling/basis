@@ -30,14 +30,14 @@ function asyncStorage() {
 }
 
 const STORES = [
-  ['cc.circlePolicyHead.*', (s) => { const h = sealedPolicyHeadStore(s); return { write: () => h.write('c1', { version: 2, statement: { text: MARK } }), read: async () => (await h.read('c1'))?.statement?.text }; }],
-  ['cc.circleRecipePending.*', (s) => { const p = makeCircleRecipePendingStoreRN(s); return { write: () => p.set('c1', { name: MARK }), read: async () => (await p.get('c1'))?.name }; }],
-  ['cc.circleOverride.*', (s) => { const o = makeMemberOverrideStoreRN(s); return { write: () => o.update('c1', { chatOff: true }), read: async () => ((await o.get('c1'))?.chatOff ? MARK : ''), mark: 'chatOff' }; }],
-  ['cc.availability', (s) => { const a = makeAvailabilityStoreRN(s); return { write: () => a.update({ holiday: { active: true, until: '2099-01-01' } }), read: async () => ((await a.get()).holiday.until === '2099-01-01' ? MARK : ''), mark: '2099-01-01' }; }],
-  ['cc.sharedWithMe', (s) => { const w = makeSharedWithMeStoreRN(s); return { write: () => w.add({ sealed: { id: 'r1', text: MARK }, from: 'x', receivedAt: 1 }), read: async () => JSON.stringify(await w.list()) }; }],
-  ['cc.userScreens', (s) => { const u = makeUserScreenStoreRN(s); return { write: () => u.set({ screens: [{ id: 'p1', name: MARK, blocks: [] }], activeId: 'p1' }), read: async () => (await u.get()).screens[0]?.name }; }],
-  ['cc.contactNames', (s) => { const n = sealedContactNameStore(s); return { write: () => n.remember([{ contactId: 'k1', name: MARK }]), read: async () => (await n.read()).k1?.name }; }],
-  ['cc.actionFrequency', (s) => { const io = actionFrequencyIo(s); return { write: () => io.save({ [MARK]: { add: 3 } }), read: async () => Object.keys((await io.load()) ?? {})[0] }; }],
+  ['basis.circlePolicyHead.*', (s) => { const h = sealedPolicyHeadStore(s); return { write: () => h.write('c1', { version: 2, statement: { text: MARK } }), read: async () => (await h.read('c1'))?.statement?.text }; }],
+  ['basis.circleRecipePending.*', (s) => { const p = makeCircleRecipePendingStoreRN(s); return { write: () => p.set('c1', { name: MARK }), read: async () => (await p.get('c1'))?.name }; }],
+  ['basis.circleOverride.*', (s) => { const o = makeMemberOverrideStoreRN(s); return { write: () => o.update('c1', { chatOff: true }), read: async () => ((await o.get('c1'))?.chatOff ? MARK : ''), mark: 'chatOff' }; }],
+  ['basis.availability', (s) => { const a = makeAvailabilityStoreRN(s); return { write: () => a.update({ holiday: { active: true, until: '2099-01-01' } }), read: async () => ((await a.get()).holiday.until === '2099-01-01' ? MARK : ''), mark: '2099-01-01' }; }],
+  ['basis.sharedWithMe', (s) => { const w = makeSharedWithMeStoreRN(s); return { write: () => w.add({ sealed: { id: 'r1', text: MARK }, from: 'x', receivedAt: 1 }), read: async () => JSON.stringify(await w.list()) }; }],
+  ['basis.userScreens', (s) => { const u = makeUserScreenStoreRN(s); return { write: () => u.set({ screens: [{ id: 'p1', name: MARK, blocks: [] }], activeId: 'p1' }), read: async () => (await u.get()).screens[0]?.name }; }],
+  ['basis.contactNames', (s) => { const n = sealedContactNameStore(s); return { write: () => n.remember([{ contactId: 'k1', name: MARK }]), read: async () => (await n.read()).k1?.name }; }],
+  ['basis.actionFrequency', (s) => { const io = actionFrequencyIo(s); return { write: () => io.save({ [MARK]: { add: 3 } }), read: async () => Object.keys((await io.load()) ?? {})[0] }; }],
   ['cc.circleSkill.*', (s) => { const io = circleOfferingDraftIo(s); return { write: () => io.save('c1', { offers: [MARK] }), read: async () => (await io.load('c1'))?.offers?.[0] }; }],
 ];
 

@@ -48,7 +48,7 @@ describe('direct messages and the phone lists, sealed at rest', () => {
   it('phone: the same through AsyncStorage', async () => {
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY }));
     const asyncStorage = memoryAsyncStorage();
-    const dataSource = await buildShellSealedDataSource({ dbName: 'cc-contact-dm-state', asyncStorage, saveDelayMs: 5, kind: 'messages' });
+    const dataSource = await buildShellSealedDataSource({ dbName: 'basis.contact-dm-state', asyncStorage, saveDelayMs: 5, kind: 'messages' });
     const store = createContactDmStore({ dataSource, localActor: 'me' });
     await store.addItems([{ type: 'message', text: 'geheim bericht voor Bas' }], { conversationId: 'dm:bas' });
     await flushPendingSaves();
@@ -60,7 +60,7 @@ describe('direct messages and the phone lists, sealed at rest', () => {
 
   it('built before the key, it waits for it (never plain for the session)', async () => {
     const asyncStorage = memoryAsyncStorage();
-    const pending = buildShellSealedDataSource({ dbName: 'cc-circle-lists-state', asyncStorage, saveDelayMs: 5, kind: 'lists' });
+    const pending = buildShellSealedDataSource({ dbName: 'basis.circle-lists-state', asyncStorage, saveDelayMs: 5, kind: 'lists' });
     let built = false;
     pending.then(() => { built = true; });
     await new Promise((r) => setTimeout(r, 20));

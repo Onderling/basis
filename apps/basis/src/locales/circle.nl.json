@@ -4722,12 +4722,6 @@
         "doc": "Rules summary label (/group-rules): the circle's tags."
       }
     },
-    "conflict": {
-      "title": {
-        "text": "Twee van jullie hebben de regels bewerkt",
-        "doc": "γ.4 — modal heading when an incoming rules doc diverges from local; every other resolver locale string is reused from circle.recipe.conflict.*."
-      }
-    },
     "none": {
       "text": "Deze kring heeft nog geen regels.",
       "doc": "/group-rules for a circle without rules."

@@ -26,7 +26,6 @@
     "circle-membership-catchup-request": {"home":"circle","v":1,"fields":"circleId:string frontier:list? limit:number? subtype:string"},
     "circle-recipe-broadcast": {"home":"circle","v":1,"fields":"circleId:string msgId:string recipe:object subtype:string ts:number"},
     "circle-report-broadcast": {"home":"circle","v":1,"fields":"circleId:string event:object msgId:string? noWake:boolean? subtype:string ts:number?"},
-    "circle-rules-broadcast": {"home":"circle","v":1,"fields":"circleId:string msgId:string rulesDoc:object subtype:string ts:number"},
     "companion-grant": {"home":"direct","blockList":true,"v":1,"fields":"subtype:string tokens:list"},
     "contact-msg": {"home":"direct","blockList":true,"v":1,"fields":"auth:object? card:string? displayName:string? messageId:string pairInvite:string? pairRequest:boolean? replyTo:string? sealed:object? subtype:string text:string threadId:string? ts:number webid:string?"},
     "contact-reply": {"home":"direct","blockList":true,"v":1,"fields":"auth:object? card:string? displayName:string? messageId:string pairInvite:string? pairRequest:boolean? replyTo:string? sealed:object? subtype:string text:string threadId:string? ts:number webid:string?"},

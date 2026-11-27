@@ -61,7 +61,7 @@ describe('pinboard manifest — Slice D.1 structural invariants', () => {
   // declaring a slash surface.
   // Withheld from a model on purpose (Fable's prune rulings, ledger L1025; record: plans/notes/NOTE-unreached-ops-2026-11-18):
   // plumbing a person never asks for, or a picker's feed. Every OTHER op still declares its hint.
-  const NO_MODEL = new Set(['broadcastCircleRules', 'getLatestPostAddedAt', 'listCirclePostsSince', 'listConsentingPeers', 'listOfferingCategories']);
+  const NO_MODEL = new Set(['getLatestPostAddedAt', 'listCirclePostsSince', 'listConsentingPeers', 'listOfferingCategories']);
   it('every op declares { id, verb, surfaces.chat.hint } (+ valid slash.command when present), but the ones withheld from a model', () => {
     for (const op of pinboardManifest.operations) {
       expect(op.id, `op missing id: ${JSON.stringify(op)}`).toBeTruthy();
@@ -167,8 +167,10 @@ describe('pinboard manifest — Slice D.1 structural invariants', () => {
   // 2026-10-30: +1, `dismissRemovedCircle` — closing a circle an admin removed you from (this device's copy only) → 84.
   // 2026-11-14: +1, `memberStatus` — is a member still in after the admission a key change follows (the key router's
   // question on every compute; internal, no door) → 94.
-  it('ships the full chat+slash surface (one pinboard manifest, 94 ops)', () => {
-    expect(pinboardManifest.operations.length).toBe(94);
+  // 2026-11-26: -1, `broadcastCircleRules` retired — nothing called it and its receivers' pending store was never
+  // read; a rules change travels the rules-update lane → 93.
+  it('ships the full chat+slash surface (one pinboard manifest, 93 ops)', () => {
+    expect(pinboardManifest.operations.length).toBe(93);
   });
 
   // No two ops may declare the same slash command (Part G hard guardrail

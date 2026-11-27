@@ -32,7 +32,8 @@ export default function RecoveryFileWizardModal({ visible, theme = null, mode = 
   }, [state, callSkill, onDispatched]);
 
   const doSave = useCallback(async () => {
-    try { await onSaveFile?.(state.file, state.filename); }
+    // the screen saves (where the person chooses) and answers the line to show: where it went, or why not
+    try { const line = await onSaveFile?.(state.file, state.filename); setState((s) => ({ ...s, saveLine: typeof line === 'string' && line ? line : null })); }
     catch (err) { setState((s) => ({ ...s, submitError: err?.message ?? String(err) })); }
   }, [state, onSaveFile]);
 
@@ -87,6 +88,7 @@ export default function RecoveryFileWizardModal({ visible, theme = null, mode = 
                   </>
                 )}
                 {state.file && <Text style={styles.note}>{t('circle.wizard.recovery.export_ready')} {state.circles} · {state.filename}</Text>}
+                {state.file && state.saveLine ? <Text style={styles.note} testID="recovery-save-line">{state.saveLine}</Text> : null}
                 {state.file && (state.choices ?? []).filter((c) => c.roster && state.rosters && !state.rosters[c.id]).map((c) => (
                   <Text key={c.id} style={styles.note}>{c.name ?? c.id}: {t('circle.wizard.recovery.roster_none')}</Text>
                 ))}

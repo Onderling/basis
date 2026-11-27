@@ -235,12 +235,23 @@ export const RECORD_STATEMENTS = Object.freeze({ governance: Object.freeze(['pol
  */
 export const RECORD_DECISION_KINDS = Object.freeze({ governance: Object.freeze(['propose', 'vote', 'resolve']) });
 
-/** `${circleId}|${proposalId}` for every proposal a record settings change in `entries` names (the prune's lookup). */
+/**
+ * The kept statements that NAME a decision (`payload.proposalId`), by lane: a settings change (a record inside the
+ * governance lane), and a removal or role change (the membership lane, record-class as a whole), which the roster fold
+ * re-tallies from the proposal it names (`membershipGateFor`). Compacted, that proposal leaves a joiner after the
+ * window refusing a voted removal: the removed member stands on its roster.
+ */
+export const DECISION_NAMING_STATEMENTS = Object.freeze({
+  governance: RECORD_STATEMENTS.governance,
+  membership: Object.freeze(['evict', 'role']),
+});
+
+/** `${circleId}|${proposalId}` for every proposal a kept statement in `entries` names (the prune's lookup). */
 export function keptDecisionKeys(entries = []) {
   const out = new Set();
   for (const e of Array.isArray(entries) ? entries : []) {
     const body = e?.payload?.body;
-    if (!RECORD_STATEMENTS[e?.type]?.includes(body?.kind)) continue;
+    if (!DECISION_NAMING_STATEMENTS[e?.type]?.includes(body?.kind)) continue;
     const id = body?.payload?.proposalId;
     const circleId = e?.circleId ?? body?.circleId ?? null;
     if (typeof id === 'string' && id && circleId) out.add(`${circleId}|${id}`);

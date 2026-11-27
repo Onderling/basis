@@ -555,4 +555,28 @@ describe('a settings change is a record inside the audit lane (the content line 
     for (const kept of ['prop', 'vote', 'close', 'pol']) expect(ids, `${kept} compacted`).toContain(`governance:${kept}`);
     for (const gone of ['other', 'elsewhere']) expect(ids, `${gone} kept`).not.toContain(`governance:${gone}`);
   });
+
+  it('the decision a VOTED removal or role change names is kept with it (the membership statement never expires)', () => {
+    // the roster fold re-tallies the proposal an evict or role statement names (membershipGateFor); compacted, a joiner
+    // after the window finds no proposal and refuses the removal, so the removed member stands on its roster
+    let clock = 0;
+    const log = new EventLog({ now: () => clock, retention: { short: 500, chat: 1000, audit: 2000 } });
+    const gov = (id, ts, body) => log.append(ev({ id: `governance:${id}`, ts, app: 'system', type: 'governance', circleId: 'c1', actor: 'anna', payload: { body: { hash: id, circleId: 'c1', ...body } } }));
+    const mem = (id, ts, body) => log.append(ev({ id: `membership:${id}`, ts, app: 'system', type: 'membership', circleId: 'c1', actor: 'anna', payload: { body: { hash: id, circleId: 'c1', ...body } } }));
+    gov('rprop', 0, { kind: 'propose', subject: 'gov-r' });
+    gov('rvote', 1, { kind: 'vote', subject: 'gov-r' });
+    gov('rclose', 2, { kind: 'resolve', subject: 'gov-r' });
+    mem('evict', 3, { kind: 'evict', subject: 'bob', payload: { proposalId: 'gov-r', policyVersion: 2 } });
+    gov('qprop', 4, { kind: 'propose', subject: 'gov-q' });
+    gov('qvote', 5, { kind: 'vote', subject: 'gov-q' });
+    mem('role', 6, { kind: 'role', subject: 'cor', payload: { role: 'admin', proposalId: 'gov-q', policyVersion: 2 } });
+    gov('unnamed', 7, { kind: 'vote', subject: 'gov-x' });
+    clock = 3000;
+    log.prune();
+    const ids = log.query().map((e) => e.id);
+    for (const kept of ['governance:rprop', 'governance:rvote', 'governance:rclose', 'membership:evict', 'governance:qprop', 'governance:qvote', 'membership:role']) {
+      expect(ids, `${kept} compacted`).toContain(kept);
+    }
+    expect(ids, 'a decision nothing kept names still compacts').not.toContain('governance:unnamed');
+  });
 });

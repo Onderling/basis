@@ -197,6 +197,32 @@ export async function migrateVaultToEncrypted({ backing, key, drop = [], fingerp
 }
 
 /**
+ * DROP what no longer opens: every sealed entry that does not open under `key` is deleted; what opens stays.
+ *
+ * For a phrase restore on a device that already is this person: the sentinel is bound to the ROOT's fingerprint, so
+ * the same phrase keeps it, but the restore enrols a new device id and seals under a new at-rest key. Entries sealed
+ * under the previous key are unreadable to every later read (another person's phrase resets the whole vault for the
+ * same reason, `migrateVaultToEncrypted`); here only those go.
+ *
+ * @param {object} o
+ * @param {Vault}      o.backing  the encrypted vault (sentinel present).
+ * @param {Uint8Array|{current: () => Uint8Array}} o.key  the key every later read uses.
+ * @returns {Promise<{dropped: number, kept: number}>}
+ */
+export async function dropUnopenable({ backing, key } = {}) {
+  const enc = new VaultEncrypted({ backing, key });
+  let dropped = 0; let kept = 0;
+  for (const k of await backing.list()) {
+    if (k === VAULT_ENC_SENTINEL_KEY) continue;
+    const raw = await backing.get(k);
+    if (raw == null || !VaultEncrypted.isEncryptedValue(raw)) continue;   // plaintext strays: the migrate pass's job
+    try { await enc.get(k); kept += 1; }
+    catch { await backing.delete(k); dropped += 1; }
+  }
+  return { dropped, kept };
+}
+
+/**
  * RESEAL a fully-encrypted vault from one at-rest key to another, in place (the custody
  * migration: the sealing root moves from the owner root to the device's delegation seed; the
  * sentinel — bound to the ROOT's fingerprint, the same person — stays as it is).

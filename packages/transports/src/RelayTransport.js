@@ -245,14 +245,7 @@ export class RelayTransport extends Transport {
   /** Resolve once the relay has acked `address` on this socket: join the bind in flight, or start one. */
   #ensureBound(address) {
     if (this.#bound.has(address)) return Promise.resolve();
-    const pending = this.#pendingBinds.get(address);
-    if (pending) {
-      return new Promise((resolve, reject) => {
-        const { resolve: res0, reject: rej0 } = pending;
-        pending.resolve = () => { res0(); resolve(); };
-        pending.reject = (err) => { rej0(err); reject(err); };
-      });
-    }
+    if (this.#pendingBinds.has(address)) return this.#awaitBound(address);
     this.#sendRegister(address, this.#primaryFlags.get(address) === true);
     return this.#awaitBound(address);
   }
@@ -302,8 +295,20 @@ export class RelayTransport extends Transport {
    *
    * A rejection leaves the alias in the base class's replay set on purpose: the address is still
    * ours and the next reconnect re-proves it. What it must not do is report success.
+   *
+   * A second wait on an address already in flight (a reconnect's replay and a caller's own bind, or a moved flag)
+   * JOINS the first one: one entry, one timer, settled by the next ack. Replacing the entry left the first wait's
+   * timer running, so it reported a missing acknowledgement for an address the relay had acked.
    */
   #awaitBound(address) {
+    const pending = this.#pendingBinds.get(address);
+    if (pending) {
+      return new Promise((resolve, reject) => {
+        const { resolve: res0, reject: rej0 } = pending;
+        pending.resolve = () => { res0(); resolve(); };
+        pending.reject = (err) => { rej0(err); reject(err); };
+      });
+    }
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.#pendingBinds.delete(address);

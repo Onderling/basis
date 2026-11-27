@@ -11,6 +11,7 @@ import Btn from './Btn.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Modal, Alert, Share, Switch } from 'react-native';
 import { t, lang, setLang } from '../../core/localisation.js';
+import { saveFileToChosenPlace, fileSaveWords } from '../../core/fileSave.js';   // the recovery file, kept where the person chooses
 import { useTheme, useThemePref } from './themeContext.js';
 import { FAB_CLEARANCE } from './fab.js';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1296,7 +1297,12 @@ export default function CircleMyDataScreen({ screenOffer = null, onScreenOfferTa
           <RecoveryFileWizardModal
             visible mode={wizard === 'recovery-export' ? 'export' : 'import'} callSkill={callSkill} t={t} theme={theme}
             onClose={() => setWizard(null)} onDispatched={() => {}}
-            onSaveFile={async (text, name) => { await Share.share({ message: text, title: name }); }}
+            // kept WHERE THE PERSON CHOOSES (Android's folder picker), never the share sheet: the share sheet offered chat
+            // apps and "Copy text", and nothing stayed on the phone to load after a wipe (a walk, 2026-11-27)
+            onSaveFile={async (text, name) => {
+              const w = fileSaveWords(await saveFileToChosenPlace({ text, name, mime: 'application/json' }));
+              return w ? t(w.key, w.params) : null;
+            }}
             onPickFile={async () => {
               const r = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'text/plain', '*/*'], copyToCacheDirectory: true });
               const asset = r?.assets?.[0];

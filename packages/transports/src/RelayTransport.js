@@ -140,7 +140,8 @@ export class RelayTransport extends Transport {
   /** Set once this relay has failed the audit — we do not reconnect to it, and say why. */
   #unprovenRelay     = false;
   /**
-   * alias address → the `_bindAddress` call still waiting for that address's `registered` ack.
+   * address → its register frames still waiting for the relay's answer, oldest first, each with the calls
+   * waiting on it (`#openRegister`, `#awaitBound`, `#settleBind`).
    *
    * `addAddress()` used to resolve as soon as the `register` frame was WRITTEN, which read as
    * success while the relay had not yet challenged us, let alone accepted. Harmless while a device
@@ -148,7 +149,7 @@ export class RelayTransport extends Transport {
    * relay refuses a frame whose `_from` it has not registered — so an awaited `addAddress` followed
    * immediately by a send silently lost the first messages of every circle. Awaiting the ack makes
    * `addAddress` mean what its callers already assumed: the relay agrees this address is ours.
-   * @type {Map<string, {resolve: Function, reject: Function, timer: any}>}
+   * @type {Map<string, Array<{waiters: Array<{resolve: Function, reject: Function}>, timer: any}>>}
    */
   #pendingBinds      = new Map();
   /** envelope id → `{to, envelope, at, attempts}`: frames sent lately, kept in case the relay refuses one as over-rate. */
@@ -245,14 +246,7 @@ export class RelayTransport extends Transport {
   /** Resolve once the relay has acked `address` on this socket: join the bind in flight, or start one. */
   #ensureBound(address) {
     if (this.#bound.has(address)) return Promise.resolve();
-    const pending = this.#pendingBinds.get(address);
-    if (pending) {
-      return new Promise((resolve, reject) => {
-        const { resolve: res0, reject: rej0 } = pending;
-        pending.resolve = () => { res0(); resolve(); };
-        pending.reject = (err) => { rej0(err); reject(err); };
-      });
-    }
+    if (this.#pendingBinds.has(address)) return this.#awaitBound(address, { any: true });
     this.#sendRegister(address, this.#primaryFlags.get(address) === true);
     return this.#awaitBound(address);
   }
@@ -302,29 +296,53 @@ export class RelayTransport extends Transport {
    *
    * A rejection leaves the alias in the base class's replay set on purpose: the address is still
    * ours and the next reconnect re-proves it. What it must not do is report success.
+   *
+   * Every register frame opens its OWN entry with its own timer (`#sendRegister`), in the order sent; the relay
+   * answers one socket's frames in order and synchronously (its register-proof branch awaits nothing), so the next
+   * ack or refusal for an address answers that address's OLDEST open register. A wait that sent a register waits
+   * for THAT register's answer, so a moved flag is never settled by the ack of the frame that carried the old flag.
+   * One entry per address used to be replaced by a second register in flight (a reconnect's replay and a caller's
+   * own bind), leaving the first wait's timer to report a missing acknowledgement for an address the relay acked.
+   *
+   * `{ any: true }` (a caller that sent nothing and only needs the address bound) joins the oldest open register.
    */
-  #awaitBound(address) {
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.#pendingBinds.delete(address);
-        reject(new Error(`Relay: no acknowledgement for ${String(address).slice(0, 12)}… within 5s`));
-      }, 5_000);
-      this.#pendingBinds.set(address, { resolve, reject, timer });
-    });
+  #awaitBound(address, { any = false } = {}) {
+    const open = this.#pendingBinds.get(address);
+    const entry = open?.length ? (any ? open[0] : open[open.length - 1]) : null;
+    if (!entry) return Promise.reject(new Error(`Relay: no register in flight for ${String(address).slice(0, 12)}…`));
+    return new Promise((resolve, reject) => { entry.waiters.push({ resolve, reject }); });
   }
 
-  /** Settle a pending `_bindAddress` (ack, or a socket that died under it). */
+  /** Open the entry a register frame is answered on: its waiters, and its own 5 s timer. */
+  #openRegister(address) {
+    const entry = { waiters: [], timer: null };
+    entry.timer = setTimeout(() => {
+      const open = this.#pendingBinds.get(address);
+      const at = open ? open.indexOf(entry) : -1;
+      if (at >= 0) open.splice(at, 1);
+      if (open && open.length === 0) this.#pendingBinds.delete(address);
+      const err = new Error(`Relay: no acknowledgement for ${String(address).slice(0, 12)}… within 5s`);
+      for (const w of entry.waiters) w.reject(err);
+    }, 5_000);
+    const open = this.#pendingBinds.get(address);
+    if (open) open.push(entry); else this.#pendingBinds.set(address, [entry]);
+  }
+
+  /** Settle the OLDEST open register for `address` (its ack, its refusal, or a socket that died under it). */
   #settleBind(address, err = null) {
-    const pending = this.#pendingBinds.get(address);
-    if (!pending) return;
-    clearTimeout(pending.timer);
-    this.#pendingBinds.delete(address);
-    if (err) pending.reject(err); else pending.resolve();
+    const open = this.#pendingBinds.get(address);
+    if (!open?.length) return;
+    const entry = open.shift();
+    if (open.length === 0) this.#pendingBinds.delete(address);
+    clearTimeout(entry.timer);
+    for (const w of entry.waiters) { if (err) w.reject(err); else w.resolve(); }
   }
 
   /** Fail every outstanding bind — the socket went away before the relay answered. */
   #settleAllBinds(err) {
-    for (const address of [...this.#pendingBinds.keys()]) this.#settleBind(address, err);
+    for (const address of [...this.#pendingBinds.keys()]) {
+      while (this.#pendingBinds.has(address)) this.#settleBind(address, err);
+    }
   }
 
   // A socket cannot un-register a single address today, so removal takes effect on the next reconnect —
@@ -635,6 +653,7 @@ export class RelayTransport extends Transport {
     const serves = address === this.address && this.#serves.length ? { serves: this.#serves } : {};
     const standby = !primary && this.#standbyFlags.get(address) === true ? { standby: true } : {};
     this.#ws.send(JSON.stringify({ type: 'register', address, ...(primary ? { primary: true } : {}), ...standby, ...serves }));
+    this.#openRegister(address);   // every frame is answered once, in order: its entry keeps the count true
   }
 
   /** Sign the relay's nonce for `address` and send the proof. Silent about addresses we never asked for. */

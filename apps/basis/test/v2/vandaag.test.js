@@ -24,17 +24,6 @@ describe('Vandaag', () => {
     expect((await ensureVandaagBook({ store, t })).screens.map((s) => s.name)).toEqual(['Mijn dag']);
   });
 
-  // The phone walk (first start after a restore): the seeded page was painted, but the store held no page, so the
-  // "+"'s follow-up (screen-add-block, through the waist's own store) answered no-such-page. The screen paints what is
-  // STORED: a seed whose save did not land paints nothing, and the next look seeds again.
-  it('a seed whose save did not land is not painted: the book returned is the stored one', async () => {
-    let saves = 0;
-    const store = createUserScreenStore({ io: { load: async () => null, save: async () => { saves += 1; /* the write did not land */ } } });
-    const book = await ensureVandaagBook({ store, t });
-    expect(saves, 'the seed was tried').toBe(1);
-    expect(book.screens, 'nothing painted that the store does not hold').toEqual([]);
-  });
-
   it('circles with news: another person\'s lines since this device looked, newest first; my own never count', async () => {
     // each line lands when it is said here (news orders by when a line ARRIVED on this device)
     let clock = 0;

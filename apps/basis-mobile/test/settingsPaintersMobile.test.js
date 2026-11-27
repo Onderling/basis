@@ -54,6 +54,7 @@ const OWN_TITLE = {
   'restore': ACT,
   'recovery-file': ACT,
   'personas-receive': ACT,
+  'app-lock': 'circle.lock.section_title',
   'storage': 'circle.mydata.storage',
   'own-actions': 'circle.params.key.ownActions_record',
 };

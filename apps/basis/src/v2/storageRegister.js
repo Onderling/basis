@@ -71,7 +71,7 @@ export const STORAGE = Object.freeze({
   tasksWeb:               row('cc-tasks-state', 'store', [W], 'throwaway', 'unwritten: left by an earlier build; the web keeps its tasks in the per-circle stores', OPAQUE),
   circleLists:            row('cc-circle-lists-state', 'store', [M], 'throwaway', 'sealed', SNAP),
   circleRag:              row('cc-circle-rag', 'store', [W, M], 'throwaway', 'sealed', ROWS),
-  // the phone's object-version snapshots (a circle's policy, rules and recipe as they were): the throwaway self's too
+  // the phone's object-version snapshots (a circle's policy and recipe as they were): the throwaway self's too
   objectVersionsPhone:    row('ccv', 'store', [M], 'throwaway', 'sealed', ROWS),
   // The help circle's own stores, named explicitly. Its id is the literal `cc-help`, so the throwaway self and the
   // enrolled person share its store NAME: the one database where two identities' sealed rows sit together. A
@@ -94,8 +94,6 @@ export const STORAGE = Object.freeze({
   circlePolicy:           row('cc.circlePolicy.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
   circlePolicyHead:       row('cc.circlePolicyHead.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
   circlePolicyPending:    row('cc.circlePolicyPending.', 'prefix', [W, M], 'throwaway', 'not content: a pending flag ({pending: bool}) per circle', k('json')),
-  circleRules:            row('cc.circleRules.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
-  circleRulesPending:     row('cc.circleRulesPending.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
   circleRecipe:           row('cc.circleRecipe.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
   circleRecipePending:    row('cc.circleRecipePending.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
   circleOverride:         row('cc.circleOverride.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),

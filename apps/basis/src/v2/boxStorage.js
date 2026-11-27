@@ -131,6 +131,14 @@ export function boxStores(dataDir) {
   };
 }
 
+/**
+ * The file an agent's own vault is kept in on the box (`agent-vaults/<file>`, one per vault name the agent asks for):
+ * the register name with every character outside [a-z0-9-] dropped, so its separator goes (`cc-host-id:` →
+ * `cc-host-id.json`). Two names that differ only in a dropped character would share a file:
+ * `boxAgentVaultFile.test.js` holds every vault name of the storage register apart.
+ */
+export const boxAgentVaultFile = (prefix) => `${String(prefix).replace(/[^a-z0-9-]/gi, '')}.json`;
+
 /** The box's two vault files: the owner root's side and the chat side (the content key, the delegation record). */
 export const BOX_VAULT_FILES = Object.freeze(['vault.json', 'chat-vault.json']);
 /** Written LAST in a start that came up (`device-runner: up`): the one proof that this data folder ran a box before. */

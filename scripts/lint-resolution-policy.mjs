@@ -46,12 +46,28 @@ const ORDERING_RE = [
   /\b[ab]\.(updatedAt|createdAt|timestamp|ts)\b.*-.*\b[ab]\.(updatedAt|createdAt|timestamp|ts)\b/, // `(a,b)=> a.ts - b.ts` (comparator subtraction)
 ];
 
-function appManifests() {
-  const appsDir = path.join(ROOT, 'apps');
+// EVERY manifest: the set the app runs (`allManifests`: the app folders' manifests AND the ones declared inside basis,
+// the parameter register, the lanes, keys, grants, the assistant, the tools), then any `apps/*/manifest.js` that set
+// does not carry (an example app). An op is keyed by its manifest's own `app`, not by the folder it sits in.
+async function appManifests() {
   const out = [];
-  for (const app of readdirSync(appsDir)) {
-    const rel = `apps/${app}/manifest.js`;
-    try { readFileSync(path.join(ROOT, rel)); out.push({ app, rel }); } catch { /* no manifest */ }
+  const seen = new Set();
+  const { allManifests } = await load('apps/basis/src/v2/manifestSources.js');
+  for (const manifest of allManifests()) {
+    if (!manifest?.app || seen.has(manifest)) continue;
+    seen.add(manifest);
+    out.push({ app: manifest.app, rel: `the ${manifest.app} manifest (apps/basis/src/v2/manifestSources.js lists it)`, manifest });
+  }
+  const appsDir = path.join(ROOT, 'apps');
+  for (const dir of readdirSync(appsDir)) {
+    const rel = `apps/${dir}/manifest.js`;
+    try { readFileSync(path.join(ROOT, rel)); } catch { continue; }
+    let mod;
+    try { mod = await load(rel); } catch (e) { out.push({ app: dir, rel, error: e }); continue; }
+    const manifest = mod.default ?? Object.values(mod).find((v) => v && Array.isArray(v.operations));
+    if (!manifest || seen.has(manifest)) continue;
+    seen.add(manifest);
+    out.push({ app: manifest.app ?? dir, rel, manifest });
   }
   return out;
 }
@@ -66,10 +82,8 @@ async function collect() {
   const writeOpsMissing = [];   // `<app>:<opId>` write-ops with no resolves
   const violations = [];        // hard errors (bad policy / downgrade) — never baselined
   const fileOf = {};            // `<app>:<opId>` -> the manifest file that declares it
-  for (const { app, rel } of appManifests()) {
-    let mod;
-    try { mod = await load(rel); } catch (e) { violations.push(`${rel}: manifest failed to import (${e.message}).\n     Fix: make the manifest import cleanly (run node on it to see the error).`); continue; }
-    const manifest = mod.default ?? Object.values(mod).find((v) => v && Array.isArray(v.operations));
+  for (const { app, rel, manifest, error } of await appManifests()) {
+    if (error) { violations.push(`${rel}: manifest failed to import (${error.message}).\n     Fix: make the manifest import cleanly (run node on it to see the error).`); continue; }
     for (const op of manifest?.operations ?? []) {
       const key = `${app}:${op.id}`;
       fileOf[key] = rel;
@@ -109,14 +123,20 @@ function scanOrdering() {
 const { writeOpsMissing, violations, fileOf } = await collect();
 const orderingHits = scanOrdering();
 
-if (process.argv.includes('--update')) {
-  writeFileSync(BASELINE, JSON.stringify({ writeOpsMissing, timestampSorts: orderingHits }, null, 2) + '\n');
-  console.log(`✓ baseline updated: ${writeOpsMissing.length} grandfathered write-op(s), ${Object.keys(orderingHits).length} ordering site(s)`);
-  process.exit(0);
-}
-
 let base = { writeOpsMissing: [], timestampSorts: {} };
 try { base = JSON.parse(readFileSync(BASELINE, 'utf8')); } catch { /* none → everything new */ }
+
+// `--update` only SHRINKS the baseline (the debt is fixed, never re-granted): an entry stays while it is still
+// missing, an ordering count drops to what is there now; nothing is ever added. A new write-op declares its policy.
+if (process.argv.includes('--update')) {
+  const now = new Set(writeOpsMissing);
+  const kept = (base.writeOpsMissing ?? []).filter((k) => now.has(k)).sort();
+  const sorts = Object.fromEntries(Object.entries(base.timestampSorts ?? {})
+    .map(([f, n]) => [f, Math.min(n, orderingHits[f] ?? 0)]).filter(([, n]) => n > 0));
+  writeFileSync(BASELINE, JSON.stringify({ writeOpsMissing: kept, timestampSorts: sorts }, null, 2) + '\n');
+  console.log(`✓ baseline shrunk: ${base.writeOpsMissing?.length ?? 0} → ${kept.length} grandfathered write-op(s), ${Object.keys(sorts).length} ordering site(s) (it never grows)`);
+  process.exit(0);
+}
 const baseOps = new Set(base.writeOpsMissing ?? []);
 const newMissing = writeOpsMissing.filter((k) => !baseOps.has(k));
 const newOrdering = Object.entries(orderingHits).filter(([f, n]) => n > (base.timestampSorts?.[f] ?? 0));
@@ -130,12 +150,24 @@ if (violations.length) {
 if (newMissing.length) {
   red = true;
   console.error('✗ lint:resolution-policy — new write-op(s) with no declared resolution policy:');
-  for (const k of newMissing) console.error(`   ${fileOf[k]}: ${k} writes with no declared resolution policy.\n     Fix: add \`resolves: [{ field, policy }]\` to the op, or run node scripts/lint-resolution-policy.mjs --update with a reason (it rewrites scripts/resolution-policy-baseline.json).`);
+  for (const k of newMissing) console.error(`   ${fileOf[k]}: ${k} writes with no declared resolution policy.\n     Fix: add \`resolves: [{ field, policy }]\` to the op (the baseline only shrinks: --update never adds to it).`);
 }
 if (newOrdering.length) {
   red = true;
   console.error('✗ lint:resolution-policy — new bespoke timestamp/wall-clock ordering (a SECOND ordering mechanism):');
   for (const [f, n] of newOrdering) console.error(`   ${f}: ${n} site(s), baseline allows ${base.timestampSorts?.[f] ?? 0} (scripts/resolution-policy-baseline.json).\n     Fix: order by the Lamport clock, not a wall clock.`);
+}
+// A baseline entry whose debt is paid (the op declares its policy now, or is gone; fewer ordering sites) is red too:
+// left in, it would let the same op lose its declaration again unseen
+const nowMissing = new Set(writeOpsMissing);
+const paid = [...baseOps].filter((k) => !nowMissing.has(k));
+const fewer = Object.entries(base.timestampSorts ?? {}).filter(([f, n]) => (orderingHits[f] ?? 0) < n);
+if (paid.length || fewer.length) {
+  red = true;
+  console.error('✗ lint:resolution-policy — the baseline carries debt that is paid:');
+  for (const k of paid) console.error(`   scripts/resolution-policy-baseline.json: ${k} is listed, but it declares its policy now or no manifest has it.`);
+  for (const [f, n] of fewer) console.error(`   scripts/resolution-policy-baseline.json: ${f} allows ${n} ordering site(s), ${orderingHits[f] ?? 0} left.`);
+  console.error('     Fix: run node scripts/lint-resolution-policy.mjs --update (it only removes).');
 }
 if (red) process.exit(1);
 

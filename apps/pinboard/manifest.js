@@ -1641,21 +1641,6 @@ export const pinboardManifest = {
       },
     },
     {
-      id:   'broadcastCircleRules', visibility: 'authenticated', verb: 'share',
-      writes: { scope: 'circle', what: 'control' },
-      params: [
-        { name: 'groupId',    kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'rulesDoc',   kind: 'object', required: true },
-        { name: 'fromActor',  kind: 'string' },
-        { name: 'msgId',      kind: 'string' },
-        { name: 'ts',         kind: 'number' },
-      ],
-      surfaces: {
-        actState: 'none',   // background: the rules fan a circle's change sets off; never a person's act (L1025 prune)
-        ui:   { control: 'page' },
-      },
-    },
-    {
       id:   'broadcastCircleRecipe', visibility: 'authenticated', verb: 'share',
       writes: { scope: 'circle', what: 'content' },
       params: [

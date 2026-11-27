@@ -162,10 +162,6 @@ export default function ChatScreen({
   // so the launcher's editor sees the same store the receiver writes to.
   circleRecipePendingStore = null,
   circleRecipeDedup = null,
-  // γ-next.rules — pending-rules cache + dedup, mirrors the recipe wire.
-  // Launcher's rules editor reads from this store; receiver writes here.
-  circleRulesPendingStore = null,
-  circleRulesDedup = null,
   // The circle's policy on the governance lane (App.js builds it): applied here, where the governance rail is.
   circlePolicyLane = null,
   // 5.4c (2026-05-30) — App.js owns the OidcSessionRN so the v2 circle
@@ -459,7 +455,6 @@ export default function ChatScreen({
       sharedWithMeStore: sharedWithMeStore ?? null,
       eventLog: eventLogRef.current, deliveryStateMap, chatStoredReceipt, onCirclesChanged,
       recipe: circleRecipePendingStore ? { pendingStore: circleRecipePendingStore, dedup: circleRecipeDedup } : null,
-      rules: circleRulesPendingStore ? { pendingStore: circleRulesPendingStore, dedup: circleRulesDedup } : null,
       circlePolicyLane,
       paint: {
         addMainBubble,

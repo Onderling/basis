@@ -359,10 +359,6 @@
     "what": "Send a change to an item to the circle.",
     "params": {"groupId": "which circle", "event": "what happened", "msgId": "the message's mark", "ts": "when"}
   },
-  "broadcastCircleRules": {
-    "what": "Send the rules to the circle.",
-    "params": {"groupId": "which circle", "rulesDoc": "the rules", "fromActor": "from whom", "msgId": "the message's mark", "ts": "when"}
-  },
   "broadcastCircleRecipe": {
     "what": "Send a shared template to the members.",
     "params": {"groupId": "which circle", "recipe": "the template", "fromActor": "from whom", "msgId": "the message's mark", "ts": "when"}

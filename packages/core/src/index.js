@@ -75,7 +75,7 @@ export {
 // (SDK pod layer), not kernel identity. Import them from '@onderling/pod-client'.
 // `core` no longer re-exports them (guarded by test/layering.enforcement.test.js).
 // AgentIdentity / Bootstrap (kernel identity) stay here.
-export { CloudBackup }                 from './identity/CloudBackup.js';
+export { CloudBackup, derivePassphraseKey, PROD_ARGON_OPTS } from './identity/CloudBackup.js';
 export { CloudAdapter, MemoryAdapter } from './identity/CloudAdapter.js';
 export {
   generateMnemonic,

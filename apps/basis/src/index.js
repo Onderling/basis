@@ -206,8 +206,6 @@ export {
 } from './v2/circleRecipeBlocks.js';
 // γ.3 — recipe conflict detection + resolution (Phase 9 sync absorption).
 export { detectRecipeConflicts, applyResolution } from './v2/recipeConflict.js';
-// γ.4 — rules-doc + circle-policy conflict detection + resolution (same flow).
-export { detectRulesConflicts,  applyRulesResolution, decisionsForMerges } from './v2/rulesConflict.js';
 // γ-next.recipe — receiver + pending-cache substrate for the recipe broadcast.
 export { makeCircleRecipePeerHandler }              from './v2/circleRecipeReceiver.js';
 export { createCircleRecipePendingStore }           from './v2/circleRecipePending.js';
@@ -385,9 +383,6 @@ export {
 export {
   RULES_FIELDS, RULES_QUESTIONS, DEFAULT_RULES_DOC,
   normalizeRulesDoc, buildRulesDoc, isRulesComplete, isRulesEmpty,
-  // γ.2 — per-circle rules document store (was inline localStorage in
-  // launcher up to β).  Adds a single hook point for version capture.
-  createCircleRulesStore, localStorageRulesIo,
 } from './v2/circleRules.js';
 export {
   DEFAULT_AVAILABILITY, normalizeAvailability, mergeAvailability, isPushSuppressed,

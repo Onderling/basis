@@ -26,7 +26,7 @@ describe('the settings regroup', () => {
     // availability left: it is on Vandaag (its screen opens from that block)
     expect(sectionsOf('connection')).toEqual(['connection-points', 'relay', 'address-sharing', 'delivery']);
     expect(sectionsOf('devices')).toEqual(['devices', 'device-add', 'device-replace', 'device-primary', 'connections', 'connection-add', 'agents', 'companion-claim', 'bot-link']);
-    expect(sectionsOf('recovery')).toEqual(['recovery-phrase', 'restore', 'recovery-file', 'personas-receive']);
+    expect(sectionsOf('recovery')).toEqual(['recovery-phrase', 'restore', 'recovery-file', 'personas-receive', 'app-lock']);
     expect(sectionsOf('my-data')).toEqual(['history-mirror', 'message-cleanup', 'privacy', 'usage', 'frequent', 'own-actions', 'device-keeps', 'storage']);
   });
 

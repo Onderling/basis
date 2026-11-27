@@ -18,15 +18,11 @@
  * change; the per-kind suites are the gate.
  *
  * ── What is NOT here ────────────────────────────────────────────────────
- * The *conflict* layer only partly collapses.  policy + rules share the
- * flat-doc shape (`makeCircleFlatDocConflict`), but the RECIPE conflict
- * layer (`recipeConflict.js`) is genuinely different — it carries the
- * per-block merge regime (blocks-as-keyed-array, the 'both' keep-both
- * path with freshly-minted ids, a 'yours' default) and stays its own
- * module.  Correctness > maximal dedup.
+ * A conflict layer: the rules and the policy each had a flat-doc resolver here until their incoming copies
+ * moved onto the governance lane (the policy 2026-09-26, the rules 2026-11-26), where a versioned statement is
+ * applied and nothing is left to reconcile. The RECIPE conflict layer (`recipeConflict.js`) is its own module.
  */
 
-import { objectDiff } from '@onderling/sync-engine/objectDiff';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { sealedKeyValue } from './localStoreSeal.js';
 
@@ -45,7 +41,7 @@ const DEFAULT_DEDUP_CAP = param({ key: 'circleKind.dedupCap', scope: PARAM_SCOPE
  * All that differs between kinds is the descriptor:
  *
  * @param {object} descriptor
- * @param {string} descriptor.subtype     wire subtype, e.g. 'circle-rules-broadcast'
+ * @param {string} descriptor.subtype     wire subtype, e.g. 'circle-recipe-broadcast'
  * @param {string} descriptor.payloadKey  envelope field holding the doc, e.g. 'policy'
  * @param {string} descriptor.logTag      log prefix, e.g. '[circle-policy]'
  * @returns {(args?: object) => (fromPeerAddr: string, payload: object) => Promise<void>}
@@ -178,137 +174,4 @@ export function makeCircleKindPendingLocalIo(keyPrefix, storage = globalThis.loc
       } catch { /* ignore */ }
     },
   };
-}
-
-/* ─────────────────────────────────────────────────────────────────────── */
-/* Flat-doc conflict layer — one shape for policy + rules (NOT recipe)    */
-/* ─────────────────────────────────────────────────────────────────────── */
-
-/**
- * Build the detect/apply pair for a FLAT keyed conflict doc — the shared
- * shape behind `rulesConflict.js` (the circle policy used it too, until it moved onto the governance lane).  A
- * pure portable layer over `objectDiff` with NO `blocks` array, so every
- * divergence surfaces as a meta-conflict (`blockConflicts` always empty),
- * and both default missing decisions to 'theirs' (incoming wins).
- *
- * The ONE behavioural difference between the two kinds:
- *   - policy nests objects (`push:{...}`, `features:{...}`), so its apply
- *     deep-clones the incoming before overlaying picks → `deepIncoming:true`.
- *   - rules is flat, so a shallow spread suffices → `deepIncoming:false`.
- * Everything else is identical, so it lives here once.
- *
- * @param {object} [opts]
- * @param {boolean} [opts.deepIncoming=false]  deep-clone incoming before merge
- * @returns {{ detect: Function, apply: Function }}
- */
-/**
- * Decisions that resolve every AUTO-MERGEABLE difference to the side that actually changed.
- *
- * `toMerge` carries both directions — "I edited, they didn't" and "they edited, I didn't" — and they resolve
- * to OPPOSITE values. `apply()` defaults every unlisted path to `theirs`, so applying a toMerge set blindly
- * REVERTS the caller's own fresher edit whenever the divergence was local: exactly the stale-device overwrite
- * of story 6.2. Feed these decisions into `apply()` for the no-conflict fast path so each side keeps whatever
- * genuinely changed. Entries without a `side` (older diffs) fall through to the `theirs` default, unchanged.
- *
- * @param {Array<{path: string[], side?: 'local'|'incoming'}>} toMerge
- * @returns {Record<string, 'yours'|'theirs'>} decisions keyed by `path.join('.')`
- */
-export function decisionsForMerges(toMerge = []) {
-  const out = {};
-  for (const m of Array.isArray(toMerge) ? toMerge : []) {
-    if (!m || !Array.isArray(m.path) || m.path.length === 0) continue;
-    if (m.side === 'local') out[m.path.join('.')] = 'yours';
-    else if (m.side === 'incoming') out[m.path.join('.')] = 'theirs';
-  }
-  return out;
-}
-
-export function makeCircleFlatDocConflict({ deepIncoming = false } = {}) {
-  /**
-   * Detect conflicts against `base` (3-way merge ancestor; may be null).
-   * Output mirrors γ.3's `detectRecipeConflicts` with an always-empty
-   * `blockConflicts`, so the shared resolver UI is reusable as-is.
-   */
-  function detect(local, incoming, base) {
-    const { toMerge, conflicts, identical } =
-      objectDiff(local || {}, incoming || {}, base ?? null);
-    return {
-      blockConflicts: [],
-      metaConflicts:  conflicts,
-      identical,
-      toMerge,
-    };
-  }
-
-  /**
-   * Apply user-picked resolutions.  Decisions are keyed by `path.join('.')`
-   * and take 'yours' | 'theirs'; missing keys default to 'theirs'.  Local
-   * top-level keys absent from incoming are preserved (lossless).
-   */
-  function apply(local, incoming, decisions = {}) {
-    const safeLocal    = local    && typeof local    === 'object' ? local    : {};
-    const safeIncoming = incoming && typeof incoming === 'object' ? incoming : {};
-
-    // Default = take incoming wholesale, then overlay locally-picked
-    // 'yours' fields.  policy deep-clones so setAtPath never mutates the
-    // caller's nested incoming objects; rules is flat so a shallow spread
-    // is equivalent and cheaper.
-    const merged = deepIncoming ? deepClone(safeIncoming) : { ...safeIncoming };
-
-    for (const [pathKey, pick] of Object.entries(decisions || {})) {
-      if (typeof pathKey !== 'string' || pathKey === '') continue;
-      if (pick !== 'yours' && pick !== 'theirs') continue;
-      const path = pathKey.split('.');
-      if (pick === 'yours') {
-        setAtPath(merged, path, getAtPath(safeLocal, path));
-      } else if (pick === 'theirs') {
-        setAtPath(merged, path, getAtPath(safeIncoming, path));
-      }
-    }
-
-    // Preserve top-level local keys the incoming doesn't carry at all.
-    for (const k of Object.keys(safeLocal)) {
-      if (!(k in safeIncoming) && !(k in merged)) {
-        merged[k] = safeLocal[k];
-      }
-    }
-
-    return merged;
-  }
-
-  return { detect, apply };
-}
-
-/* ─────────────────────────────────────────────────────────────────────── */
-/* internals (shared by the flat-doc conflict layer)                      */
-/* ─────────────────────────────────────────────────────────────────────── */
-
-function getAtPath(obj, path) {
-  let cur = obj;
-  for (const seg of path) {
-    if (cur == null || typeof cur !== 'object') return undefined;
-    cur = cur[seg];
-  }
-  return cur;
-}
-
-function setAtPath(obj, path, value) {
-  if (!Array.isArray(path) || path.length === 0) return;
-  let cur = obj;
-  for (let i = 0; i < path.length - 1; i++) {
-    const seg = path[i];
-    if (cur[seg] == null || typeof cur[seg] !== 'object' || Array.isArray(cur[seg])) {
-      cur[seg] = {};
-    }
-    cur = cur[seg];
-  }
-  cur[path[path.length - 1]] = value;
-}
-
-function deepClone(v) {
-  if (v == null || typeof v !== 'object') return v;
-  if (Array.isArray(v)) return v.map(deepClone);
-  const out = {};
-  for (const k of Object.keys(v)) out[k] = deepClone(v[k]);
-  return out;
 }

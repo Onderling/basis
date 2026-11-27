@@ -80,16 +80,14 @@ describe('remove a persona from this device', () => {
   }, 120_000);
 
   it('refuses a wrong phrase, a paused persona, and a root-custody device', async () => {
-    const { phone, laptop, lap, phrase, w } = await laptopWithWerk();
+    const { phone, laptop, phrase, w } = await laptopWithWerk();
     // (the primary — the key-holder — is removable since part 2b: personaRemoveKeyHolder.test.js)
     expect((await laptop.callSkill('household', 'removePersonaHere', { mnemonic: 'x y z', personaId: w })).ok).toBe(false);
-    expect(await laptop.callSkill('household', 'pausePersona', { personaId: w })).toMatchObject({ ok: true, reloadRequired: true });
-    // a pause takes the next start, and this one stops (restartRequired.js); after it, marked paused: removal asks for a resume first
-    await laptop.shutdown?.();
-    const next = await boot(lap);
-    expect(await next.callSkill('household', 'removePersonaHere', { mnemonic: phrase, personaId: w })).toMatchObject({ ok: false, error: 'paused' });
+    expect(await laptop.callSkill('household', 'pausePersona', { personaId: w })).toMatchObject({ ok: true });
+    // still running this boot (a pause takes the next) — but marked paused: removal asks for a resume first
+    expect(await laptop.callSkill('household', 'removePersonaHere', { mnemonic: phrase, personaId: w })).toMatchObject({ ok: false, error: 'paused' });
     const pw = (await phone.callSkill('agents', 'createProfile', { name: 'Buurt' })).id;
     expect(await phone.callSkill('household', 'removePersonaHere', { mnemonic: phrase, personaId: pw })).toMatchObject({ ok: false, error: 'root-custody' });
-    await phone.shutdown?.(); await next.shutdown?.();
+    await phone.shutdown?.(); await laptop.shutdown?.();
   }, 120_000);
 });

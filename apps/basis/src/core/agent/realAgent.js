@@ -5750,7 +5750,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // the name rides back, so a typed `/pauze Werk` is answered in the screen's own words
     let name = null;
     try { name = (await agentsRegistryRef?.lookup?.(pid))?.name ?? null; } catch { /* nameless */ }
-    return { ok: true, paused: on, reloadRequired: true, personaId: pid, name };
+    // NOT reloadRequired: a pause or a resume changes what the NEXT start runs; this process is still the same selves
+    // until then and loses nothing written in it, so the restart stop does not stand (restartRequired.js)
+    return { ok: true, paused: on, takesEffectNextStart: true, personaId: pid, name };
   };
   hostAgent.register('pausePersona', async ({ parts }) => {
     return [DataPart(await setPaused(parts?.[0]?.data?.personaId, true))];

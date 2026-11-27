@@ -39,13 +39,11 @@ async function typed(agent, line) {
 
 describe('the persona slash commands', () => {
   it('/pauze Werk runs the device op for Werk — by name — and answers in the screen\'s words; /hervat undoes it', async () => {
-    const vaults = { seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend() };
-    const first = await createRealHouseholdAgent(vaults);
-    let a = first;
+    const a = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend() });
     const w = (await a.callSkill('agents', 'createProfile', { name: 'Werk' })).id;
     const p = await typed(a, '/pauze Werk');
     expect(p.route, 'the name resolved to the id').toMatchObject({ kind: 'ready', opId: 'pausePersona', args: { personaId: w } });
-    expect(p.reply).toMatchObject({ ok: true, reloadRequired: true, personaId: w, name: 'Werk' });
+    expect(p.reply).toMatchObject({ ok: true, takesEffectNextStart: true, personaId: w, name: 'Werk' });
     expect(p.text).toBe(t('circle.receive_personas.done_pause_reload', { name: 'Werk' }));
     expect((await a.callSkill('household', 'listPersonasHere', {})).personas.find((x) => x.id === w)?.paused).toBe(true);
     const h = await typed(a, '/hier');
@@ -53,9 +51,6 @@ describe('the persona slash commands', () => {
       `• ${t('circle.switcher.you')} — ${t('circle.receive_personas.primary')}`,
       `• Werk — ${t('circle.receive_personas.paused')}`,
     ]);
-    // the pause stops this start (restartRequired.js): the resume is typed after the next one
-    await first.shutdown?.();
-    a = await createRealHouseholdAgent(vaults);
     const r = await typed(a, '/hervat Werk');
     expect(r.reply).toMatchObject({ ok: true, personaId: w });
     expect(r.text).toBe(t('circle.receive_personas.done_resume_reload', { name: 'Werk' }));

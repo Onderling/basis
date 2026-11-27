@@ -212,10 +212,12 @@ describe('the box is revoked while it holds the address', () => {
     expect(await addressesOf(bea, web.pubKey)).toContain(web.agent.circleAddressFor(CIRCLE));
 
     // The ceremony's end on a first device: it enrolled ITSELF (every legitimate device now signs with a
-    // revocable key), so it asks for a reload. The reload is the reconnect: a delegation boot, fresh
-    // per-circle addresses announced into every roster, and the profile address registered again.
+    // revocable key). It introduced no address (the first device derives from its own delegation since its
+    // first boot), so it does not ask for a restart and the person may go on (restartRequired.js). The next
+    // start is still the reconnect below: a delegation boot, and the profile address registered again.
     expect(r.migrated, 'the first device did not enrol itself at the ceremony').toBe(true);
-    expect(r.reloadRequired).toBe(true);
+    expect(r.introduced).toEqual([]);
+    expect(r.reloadRequired).toBeUndefined();
     // The person who has been writing to the web app is known to it — by the box's hand, since their
     // greeting landed on the box — and stays known across the reload.
     expect(!!web.agent.sa.agent.security.getPeerKey(person.pubKey), 'the web app does not hold the person\'s key before the reload').toBe(true);

@@ -216,10 +216,10 @@ export function deliveryPresentation(state, { mine = true, reason = null, waitin
  * @param {() => Promise<object>|object} deps.getSettings   → `{ sendReceipts }` (the delivery store's get)
  * @param {(address: string, payload: object) => Promise<any>} deps.sendTo
  * @param {{warn?: Function}} [deps.logger]
- * @returns {(stored: { msgId, fromPeerAddr, source }) => Promise<void>}
+ * @returns {(stored: { msgId, fromPeerAddr, source, circleId?, via? }) => Promise<void>}
  */
 export function makeReceiptSender({ getSettings, sendTo, logger = console } = {}) {
-  return async function onStored({ msgId, fromPeerAddr, source, circleId = null } = {}) {
+  return async function onStored({ msgId, fromPeerAddr, source, circleId = null, via = null } = {}) {
     if (source !== 'receiver' || !msgId || !fromPeerAddr) return;
     // If the settings cannot be READ, no receipt goes out. The store's default is ON, but "we could not
     // check" is not "on": a user who turned receipts off and then hit a broken store would otherwise start
@@ -232,7 +232,13 @@ export function makeReceiptSender({ getSettings, sendTo, logger = console } = {}
     // the per-circle identity and routes it over the circle's own points. Unscoped it would leave as the
     // canonical identity, and the recipient's roster authorizer refuses that from a member who has a
     // per-circle address — verified, dropped, and the sender's chip stuck at `maybe-received` forever.
-    try { await sendTo(fromPeerAddr, { subtype: RECEIPT_MESSAGE, messageId: msgId }, circleId ? { circleId } : {}); }
+    // `via`: the place the message came from sends its own receipt back (the Nearby room speaks only as its room key,
+    // nearbyRoomBinding.js); this sender keeps the policy and never chooses an identity for it.
+    const receipt = { subtype: RECEIPT_MESSAGE, messageId: msgId };
+    try {
+      if (typeof via === 'function') await via(fromPeerAddr, receipt);
+      else await sendTo(fromPeerAddr, receipt, circleId ? { circleId } : {});
+    }
     catch (err) { logger?.warn?.('[delivery] receipt send failed (best-effort):', err?.message ?? err); }
   };
 }

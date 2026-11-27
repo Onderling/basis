@@ -536,4 +536,23 @@ describe('a settings change is a record inside the audit lane (the content line 
     expect(ids).toContain('governance:p1');
     expect(ids).not.toContain('governance:v1');
   });
+
+  it('the propose, votes and closing a KEPT settings change names are kept with it; another decision still compacts', () => {
+    // a joiner judges a settings change by the decision it names, tallied on its own device: a change whose decision
+    // compacted away is refused on every device that joins after the window (2026-11-27)
+    let clock = 0;
+    const log = new EventLog({ now: () => clock, retention: { short: 500, chat: 1000, audit: 2000 } });
+    const gov = (id, ts, circleId, body) => log.append(ev({ id: `governance:${id}`, ts, app: 'system', type: 'governance', circleId, actor: 'anna', payload: { body: { hash: id, circleId, ...body } } }));
+    gov('prop', 0, 'c1', { kind: 'propose', subject: 'gov-a' });
+    gov('vote', 1, 'c1', { kind: 'vote', subject: 'gov-a' });
+    gov('close', 2, 'c1', { kind: 'resolve', subject: 'gov-a' });
+    gov('pol', 3, 'c1', { kind: 'policy-update', subject: 'policy-v2', payload: { version: 2, proposalId: 'gov-a' } });
+    gov('other', 4, 'c1', { kind: 'vote', subject: 'gov-b' });
+    gov('elsewhere', 5, 'c2', { kind: 'vote', subject: 'gov-a' });   // the same id in another circle names nothing here
+    clock = 3000;
+    log.prune();
+    const ids = log.query().map((e) => e.id);
+    for (const kept of ['prop', 'vote', 'close', 'pol']) expect(ids, `${kept} compacted`).toContain(`governance:${kept}`);
+    for (const gone of ['other', 'elsewhere']) expect(ids, `${gone} kept`).not.toContain(`governance:${gone}`);
+  });
 });

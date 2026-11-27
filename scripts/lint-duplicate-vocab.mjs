@@ -114,18 +114,21 @@ export function checkVocabularies(files = sourceFiles()) {
     for (const file of files) {
       let src; try { src = readFileSync(file, 'utf8'); } catch { continue; }
       for (const exp of frozenExports(src)) {
-        if (sameSet(exp.keys, vocab.keys)) definers.push({ file: path.relative(ROOT, file), name: exp.name });
+        if (sameSet(exp.keys, vocab.keys)) {
+          const line = src.split('\n').findIndex((l) => new RegExp(`export\\s+const\\s+${exp.name}\\b`).test(l)) + 1;
+          definers.push({ file: path.relative(ROOT, file), name: exp.name, line: line || 1 });
+        }
       }
     }
     const offHome = definers.filter((d) => d.file !== vocab.home);
     if (offHome.length) {
       problems.push(
         `✗ vocabulary "${vocab.name}" (keys: ${vocab.keys.join(', ')}) is defined OUTSIDE its home `
-        + `${vocab.home}:\n    ${offHome.map((d) => `${d.name} in ${d.file}`).join('\n    ')}\n`
-        + `    → define it once at the home and import/re-export it elsewhere (this is the retention drift class).`,
+        + `${vocab.home}:\n    ${offHome.map((d) => `${d.file}:${d.line}: ${d.name}`).join('\n    ')}\n`
+        + `    Fix: delete the copy and import it from ${vocab.home} instead (define it once; this is the retention drift class).`,
       );
     } else if (!definers.length) {
-      problems.push(`✗ vocabulary "${vocab.name}" is registered but NOT defined at its home ${vocab.home} — fix the registry or the home.`);
+      problems.push(`✗ vocabulary "${vocab.name}" is registered but NOT defined at its home ${vocab.home}:1.\n    Fix: define it there as \`export const … = Object.freeze({ ${vocab.keys.join(', ')} })\`, or correct its home in VOCABULARIES (${path.relative(ROOT, fileURLToPath(import.meta.url))}).`);
     }
   }
   return problems;

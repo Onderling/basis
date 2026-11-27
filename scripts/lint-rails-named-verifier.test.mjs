@@ -39,15 +39,17 @@ describe('lint-rails-named-verifier', () => {
     expect(rig(src['r.js'])[0]).toMatch(/folded with rosterBindingVerifier \(roster-binding\) but ENTRY_KINDS says accepts: membership-binding/);
     expect(rig('verifyBinding = null; // nothing named')[0]).toMatch(/NO named verifier/);
     expect(rig('verifyBinding ?? membershipBindingVerifier(callSkill)')).toEqual([]);
+    expect(rig('const a = 1;\nverifyBinding ?? rosterBindingVerifier(callSkill)')[0]).toMatch(/^r\.js:2: [\s\S]*\n\s*Fix: /);
   });
 
   it('a raw makeCircleEntryRail( outside the table, or without verifyBinding, is a problem', () => {
     const calls = rawRailCalls(['a.js', 'b.js'], (f) => (f === 'a.js'
       ? 'export function makeCircleEntryRail({ eventLog }) {}\n const x = makeCircleEntryRail({ eventLog, verifyBinding: v });'
       : 'const y = makeCircleEntryRail({ eventLog });'));
-    expect(calls).toEqual([{ file: 'a.js', passesVerifier: true }, { file: 'b.js', passesVerifier: false }]);
+    expect(calls).toEqual([{ file: 'a.js', line: 2, passesVerifier: true }, { file: 'b.js', line: 1, passesVerifier: false }]);
     const problems = audit({ rails: [{ file: 'a.js', laneFile: 'm.js', laneConst: 'L' }], accepts: { k: 'roster-binding' }, read: (f) => (f === 'm.js' ? "export const L = 'k';" : 'verifyBinding ?? rosterBindingVerifier('), exists: () => true, railCalls: calls });
-    expect(problems.some((p) => /b\.js: makeCircleEntryRail\( called outside/.test(p))).toBe(true);
+    expect(problems.some((p) => /b\.js:1: makeCircleEntryRail\( called outside/.test(p))).toBe(true);
+    for (const p of problems) expect(p).toMatch(/\n\s*Fix: /);
   });
 
   it('the verifier → accepts map covers exactly the table\'s vocabulary minus none', () => {

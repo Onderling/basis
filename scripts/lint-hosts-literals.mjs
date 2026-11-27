@@ -30,6 +30,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { lineOf, whereInSelf } from './guard-where.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.dirname(HERE);
@@ -158,18 +159,19 @@ async function main() {
   for (const { dir, hosts, roots } of apps) {
     for (const r of roots) {
       for (const f of sourceFiles(r)) {
-        for (const host of undeclaredHosts(readFileSync(f, 'utf8'), hosts, used)) {
-          misses.push(`  apps/${dir}: ${host} — ${path.relative(ROOT, f)}`);
+        const src = readFileSync(f, 'utf8');
+        for (const host of undeclaredHosts(src, hosts, used)) {
+          misses.push(`  ${path.relative(ROOT, f)}:${lineOf(src, host)}: ${host} — not in apps/${dir}/manifest.js \`hosts\`.\n    Fix: add '${host}' to that manifest's \`hosts\` (the app reaches it), or take the host from config instead of a literal.`);
         }
       }
     }
   }
   for (const prefix of Object.keys(NOT_A_NETWORK_CALL)) {
-    if (!used.has(prefix)) misses.push(`  NOT_A_NETWORK_CALL '${prefix}' matches nothing any more — remove it`);
+    if (!used.has(prefix)) misses.push(`  ${whereInSelf(import.meta.url, `'${prefix}'`)}: NOT_A_NETWORK_CALL '${prefix}' matches nothing any more.\n    Fix: remove the entry.`);
   }
   if (misses.length) {
     console.error(misses.join('\n'));
-    console.error(`lint-hosts-literals: ${misses.length} problem(s) — a URL literal names a host its app's manifest does not declare in \`hosts\`, or an allow-list entry is stale`);
+    console.error(`✖ lint-hosts-literals: ${misses.length} problem(s) — a URL literal names a host its app's manifest does not declare in \`hosts\`, or an allow-list entry is stale`);
     process.exit(1);
   }
   console.log(`lint-hosts-literals: ${apps.length} apps — every hostname in a URL literal is declared in that app's \`hosts\``);

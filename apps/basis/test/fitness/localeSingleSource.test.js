@@ -11,7 +11,7 @@
  * @vitest-environment node
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
@@ -55,16 +55,7 @@ describe('FITNESS: shared locale blocks are a single shared source', () => {
 describe('FITNESS: shared locale blocks en ≡ nl by construction', () => {
   for (const block of sharedBlocks) {
     const [blockEn, blockNl] = sharedByBlock[block];
-    it(`${block}: every English leaf key exists in Dutch and vice versa`, () => {
-      const en = leafPaths(blockEn);
-      const nl = leafPaths(blockNl);
-      const missingInNl = [...en].filter((k) => !nl.has(k));
-      const missingInEn = [...nl].filter((k) => !en.has(k));
-      expect(missingInNl, `${block}: keys present in EN but missing in NL: ${missingInNl.join(', ')}`).toEqual([]);
-      expect(missingInEn, `${block}: keys present in NL but missing in EN: ${missingInEn.join(', ')}`).toEqual([]);
-    });
-
-    it(`${block}: no leaf has an empty string in either language`, () => {
+    it(`${block}: no leaf has an empty string in either language (the key check for every block is below)`, () => {
       const empties = [];
       const walk = (obj, lang, prefix = '') => {
         if (!obj || typeof obj !== 'object') return;
@@ -73,6 +64,35 @@ describe('FITNESS: shared locale blocks en ≡ nl by construction', () => {
       };
       walk(blockEn, 'en'); walk(blockNl, 'nl');
       expect(empties, `${block}: empty locale strings: ${empties.join(', ')}`).toEqual([]);
+    });
+  }
+});
+
+// EVERY locale file pair, not a hand-kept list: each shared block in src/locales (found by its `.en.json`) and each
+// shell's own bundle holds the same keys in English and in Dutch. A block in one language only is declared here with
+// its reason; a new one is red until it is.
+const ONE_LANGUAGE = {
+  'chat-hints.nl.json': 'the Dutch hint beside the manifest\'s own English one (lint-chat-hints-localised)',
+};
+describe('FITNESS: every locale file holds the same keys in en and nl', () => {
+  const dir = here('../../src/locales/');
+  const files = readdirSync(dir).filter((f) => f.endsWith('.json'));
+  const pairs = files.filter((f) => f.endsWith('.en.json'))
+    .map((f) => [`src/locales/${f}`, `../../src/locales/${f}`, `../../src/locales/${f.replace(/\.en\.json$/, '.nl.json')}`]);
+  pairs.push(['the web bundle', '../../locales/en.json', '../../locales/nl.json']);
+  pairs.push(['the mobile bundle', '../../../basis-mobile/locales/en.json', '../../../basis-mobile/locales/nl.json']);
+  it('a file in one language only is a declared one', () => {
+    const alone = files.filter((f) => !files.includes(f.endsWith('.en.json') ? f.replace(/\.en\.json$/, '.nl.json') : f.replace(/\.nl\.json$/, '.en.json')));
+    expect(alone.sort()).toEqual(Object.keys(ONE_LANGUAGE).sort());
+  });
+  for (const [name, enPath, nlPath] of pairs) {
+    it(`${name}: every English leaf key exists in Dutch and vice versa`, () => {
+      const en = leafPaths(read(enPath));
+      const nl = leafPaths(read(nlPath));
+      const missingInNl = [...en].filter((k) => !nl.has(k));
+      const missingInEn = [...nl].filter((k) => !en.has(k));
+      expect(missingInNl, `${name}: keys present in EN but missing in NL: ${missingInNl.join(', ')}`).toEqual([]);
+      expect(missingInEn, `${name}: keys present in NL but missing in EN: ${missingInEn.join(', ')}`).toEqual([]);
     });
   }
 });

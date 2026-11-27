@@ -47,7 +47,6 @@ export const OPENED_ELSEWHERE = Object.freeze({
 /** Files whose raw writes go through a storage and a key their CALLER hands them: the rows, and who seals. */
 export const WRITES_FOR_ITS_CALLER = Object.freeze({
   'apps/basis/src/household/persist.js': 'the persist adapter of every household-shaped store; sealedPersist wraps it in buildHouseholdDataSource when a strategy is given (lint-sealed-at-rest holds the shells to one)',
-  'apps/basis/src/v2/circleRules.js': "circleRules ('sealed'): localCircleRulesStore hands the IO sealedKeyValue; the IO has no default storage",
   'apps/basis/src/v2/circlePolicyStore.js': "circlePolicy ('sealed'): localCirclePolicyStore and the web shell hand the IO sealedKeyValue; circlePolicyPending ('not content') through plain storage",
   'apps/basis/src/v2/circleRecipe.js': "circleRecipe ('sealed'): localCircleRecipeStore hands the IO sealedKeyValue; the IO has no default storage",
   'apps/basis/src/v2/contactUnread.js': "contactSeenAt ('sealed'): sealedContactSeenStore, the one both shells use, hands sealedKeyValue",
@@ -56,7 +55,7 @@ export const WRITES_FOR_ITS_CALLER = Object.freeze({
   'apps/basis/src/v2/keptPicture.js': "keptCircles ('sealed'): both shells hand createKeptCircles sealedKeyValue (strict)",
   'apps/basis/src/v2/policyUpdateLane.js': "circlePolicyHead ('sealed'): sealedPolicyHeadStore, the one both shells use, hands sealedKeyValue",
   'apps/basis/src/v2/toolboxes.js': "the box's toolbox switches ('tools.on', NOT_STORAGE): a key inside the box's own vault",
-  'apps/basis-mobile/src/core/circleStoresRN.js': "circlePolicy / circleRecipe / circleRules ('sealed'): every caller of asyncKeyedIo in the file hands sealedKeyValue",
+  'apps/basis-mobile/src/core/circleStoresRN.js': "circlePolicy / circleRecipe ('sealed'): every caller of asyncKeyedIo in the file hands sealedKeyValue",
   'apps/basis/src/v2/addressFallback.js': "fallbackOffer ('sealed'): both shells hand fallbackOfferStateIo sealedKeyValue",
   'apps/basis/src/v2/enrolForgets.js': "vaultOwnerRoot ('not sealable'): the plain marker vault (forget-pending beside restore-pending)",
   'apps/basis/src/v2/onboardingFlags.js': "the first-run flags ('not content'): helpCircleProvisioned, onboardingDone, mnemonicAck, keyCardSnoozedUntil, firstOpenSeen, introCardSeen",

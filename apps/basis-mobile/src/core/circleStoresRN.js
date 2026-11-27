@@ -29,8 +29,6 @@ import {
   createUserScreenStore,
   // β.5 — per-user pin-to-top store.
   createCirclePinStore, localStoragePinIo,
-  // γ.2 — per-circle rules store factory (new in γ.2).
-  createCircleRulesStore,
   // the shared ios of the person's content stores, SEALED at rest (ledger L1083) — the same ones the web uses
   localStorageOverrideIo, localStorageAvailabilityIo, localStorageSharedWithMeIo, localStorageScreenIo,
 } from '@onderling-app/basis';
@@ -142,18 +140,6 @@ export function makeCircleRecipeStoreRN(storage) {
   return createCircleRecipeStore({
     // the recipe sealed at rest, as on web (its versions seal on their own)
     io: asyncKeyedIo(storageName('circleRecipe'), sealedKeyValue(storage, { name: 'the circle recipe' })),
-    versions,
-  });
-}
-
-/** γ.2 — per-circle rules store (`basis.circleRules.<circleId>`) with
- *  version capture.  Was inline AsyncStorage in CircleLauncherScreen up
- *  to β; now goes through the shared store factory. */
-export function makeCircleRulesStoreRN(storage) {
-  const versions = asyncStorageObjectVersions('rules', storage);
-  return createCircleRulesStore({
-    // the rules sealed at rest, as on web (their versions seal on their own)
-    ...asyncKeyedIo(storageName('circleRules'), sealedKeyValue(storage, { name: 'the circle rules' })),
     versions,
   });
 }

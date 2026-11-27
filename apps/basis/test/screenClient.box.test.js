@@ -130,6 +130,15 @@ describe('the built screen client, on the booted box over the relay', () => {
 
     const found = await page.call('tools.useTool', { toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'melk' } });
     expect(found, JSON.stringify(found).slice(0, 400)).toMatchObject({ ok: true, output: { '@type': 'ItemList' } });
+    // a page that does not ask gets no pictures; one that asks gets them by identifier, fetched by the box from the
+    // toolbox's own socket (the page cannot load that address itself), beside the same output
+    expect(found.thumbs).toBeUndefined();
+    const pictured = await page.call('tools.useTool', { toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'melk' }, pictures: true });
+    expect(pictured.output).toEqual(found.output);
+    const ids = found.output.itemListElement.map((el) => el.item.identifier);
+    expect(Object.keys(pictured.thumbs ?? {}).length, JSON.stringify({ keys: Object.keys(pictured), row: pictured.items?.[0], img: found.output.itemListElement[0].item.image }).slice(0, 600)).toBeGreaterThan(0);
+    expect(Object.keys(pictured.thumbs).every((id) => ids.includes(id))).toBe(true);
+    expect(Object.values(pictured.thumbs).every((p) => p.mime === 'image/jpeg' && typeof p.data === 'string')).toBe(true);
     // the other toolbox is ON here, and still not this page's: refused at the door
     expect(await page.call('tools.useTool', { toolbox: 'recepten', tool: 'products.choices', input: { query: 'soep' } })).toMatchObject({ ok: false, code: 'toolbox-not-yours' });
     expect(await page.call('assistant.assistant-import', {})).toMatchObject({ ok: false, code: 'op-not-allowed' });

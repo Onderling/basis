@@ -55,19 +55,21 @@ export function storeFiles(root = ROOT) {
 export function findingsIn(text) {
   const lines = text.split('\n');
   let handParsed = 0;
+  const handParsedLines = [];
   for (let i = 0; i < lines.length; i += 1) {
     // a stored value read: from a key-value store, or a FILE store's read (the companion's inbox, the relay's files)
     if (!/\bgetItem\s*\??\.?\s*\(|\breadFile(?:Sync)?\s*\(/.test(lines[i])) continue;
     if (/^\s*(\/\/|\*)/.test(lines[i])) continue;   // a comment
     for (let j = i; j < Math.min(lines.length, i + WINDOW); j += 1) {
-      if (/JSON\.parse\s*\(/.test(lines[j]) && !/^\s*(\/\/|\*)/.test(lines[j])) { handParsed += 1; break; }
+      if (/JSON\.parse\s*\(/.test(lines[j]) && !/^\s*(\/\/|\*)/.test(lines[j])) { handParsed += 1; handParsedLines.push(j + 1); break; }
     }
   }
   const gatelessPersist = [];
+  const persistLines = {};
   if (!/mapSnapshotGate/.test(text)) {
-    for (const m of text.matchAll(/class\s+(\w*Persist)\b/g)) gatelessPersist.push(m[1]);
+    for (const m of text.matchAll(/class\s+(\w*Persist)\b/g)) { gatelessPersist.push(m[1]); persistLines[m[1]] = text.slice(0, m.index).split('\n').length; }
   }
-  return { handParsed, gatelessPersist };
+  return { handParsed, handParsedLines, gatelessPersist, persistLines };
 }
 
 export function check(root = ROOT, baseline = JSON.parse(readFileSync(BASELINE, 'utf8'))) {
@@ -75,16 +77,17 @@ export function check(root = ROOT, baseline = JSON.parse(readFileSync(BASELINE, 
   const seen = new Set();
   for (const rel of storeFiles(root)) {
     if (THE_WRAPPERS.has(rel)) continue;
-    const { handParsed, gatelessPersist } = findingsIn(readFileSync(path.join(root, rel), 'utf8'));
-    for (const c of gatelessPersist) problems.push(`${rel}: persist adapter ${c} does not read through mapSnapshotGate`);
+    const { handParsed, handParsedLines, gatelessPersist, persistLines } = findingsIn(readFileSync(path.join(root, rel), 'utf8'));
+    const at = handParsedLines.map((l) => `${rel}:${l}`).join(', ');
+    for (const c of gatelessPersist) problems.push(`${rel}:${persistLines[c]}: persist adapter ${c} does not read through mapSnapshotGate.\n      Fix: read the snapshot through mapSnapshotGate before using it.`);
     if (!handParsed) continue;
     seen.add(rel);
     const entry = baseline[rel];
-    if (!entry) { problems.push(`${rel}: ${handParsed} stored value(s) parsed by hand (getItem + JSON.parse) — read through getJson, or declare it with a reason`); continue; }
-    if (!HEADS.some((h) => String(entry.note ?? '').startsWith(h))) problems.push(`${rel}: baseline note must start with one of: ${HEADS.join(' · ')}`);
-    if (handParsed > entry.count) problems.push(`${rel}: ${handParsed} parsed by hand, baseline allows ${entry.count}`);
+    if (!entry) { problems.push(`${at}: ${handParsed} stored value(s) parsed by hand (getItem + JSON.parse).\n      Fix: read through getJson instead, or declare the file in ${path.relative(root, BASELINE)} with a reason.`); continue; }
+    if (!HEADS.some((h) => String(entry.note ?? '').startsWith(h))) problems.push(`${path.relative(root, BASELINE)}: the note for ${rel} does not start with a known reason.\n      Fix: start it with one of: ${HEADS.join(' · ')}`);
+    if (handParsed > entry.count) problems.push(`${rel}: ${handParsed} parsed by hand, baseline allows ${entry.count}; the new one is among ${at}.\n      Fix: read the new value through getJson instead.`);
   }
-  for (const rel of Object.keys(baseline)) if (!seen.has(rel)) problems.push(`${rel}: stale baseline entry (nothing parsed by hand there any more) — remove it`);
+  for (const rel of Object.keys(baseline)) if (!seen.has(rel)) problems.push(`${path.relative(root, BASELINE)}: stale entry ${rel} (nothing parsed by hand there any more).\n      Fix: remove it.`);
   return problems;
 }
 

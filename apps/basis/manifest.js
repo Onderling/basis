@@ -1246,6 +1246,9 @@ export const basisManifest = {
         { id: 'restore',          kind: 'control', custody: true },
         { id: 'recovery-file',    kind: 'control', custody: true },
         { id: 'personas-receive', kind: 'control', custody: true },
+        // the person's own lock on this browser (a code or passphrase wraps the key door; the web paints the switch and
+        // "lock now", the phone says its own screen lock does this job, the box has no settings page)
+        { id: 'app-lock',         kind: 'control', custody: true },
       ],
     },
     {

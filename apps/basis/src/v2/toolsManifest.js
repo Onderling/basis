@@ -28,6 +28,8 @@ export const toolsManifest = Object.freeze({
         { name: 'toolbox', kind: 'string', required: true, schema: { minLength: 1 } },
         { name: 'tool',    kind: 'string', required: true, schema: { minLength: 1 } },
         { name: 'input',   kind: 'object', required: false },
+        // a screen (a toolbox's page) asks for the pictures as bytes; stays on the box, never sent to the toolbox
+        { name: 'pictures', kind: 'boolean', required: false },
       ],
       surfaces: {
         // the things come under a head per shop (`groupBy`, read by the shared renderer; each door paints the heads)

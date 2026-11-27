@@ -3,6 +3,7 @@
 // https://onderling.org/basis/ — so it is derived from the page's own location, never a hardcoded root.
 // (2026-09-07: the first hosted build lived under /basis/ and its QR pointed at the site root, which
 // is the website, not the app.)
+import { isRelayUrl } from './connectionPoints.js';
 
 /** The app's own base URL: origin + directory of the page (index.html and any file name stripped). */
 export function appBaseUrl(loc) {
@@ -43,7 +44,7 @@ export function parseInviteDeepLink(text) {
   const relay = params.get('relay');
   return {
     inviteUri: invite,
-    // Only a websocket endpoint is a relay. A link that names anything else names nothing.
-    relayUrl: typeof relay === 'string' && /^wss?:\/\/\S+$/.test(relay.trim()) ? relay.trim() : null,
+    // Only a usable relay address is a relay (wss, or plain ws on the own network). A link that names anything else names nothing.
+    relayUrl: isRelayUrl(relay) ? relay.trim() : null,
   };
 }

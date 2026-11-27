@@ -1,296 +1,171 @@
 # CLAUDE.md — the basis monorepo (org: Onderling)
 
-Architecture-enforcement instructions for agents working here. **The model is settled; your job is to keep
-the _code_ matching the _model_.** The recurring failure in this repo is drift — duplicated locales, mobile
-reimplementing web, cross-app copy-paste — that crept in because nothing failed when it did. Treat drift as
-a bug and, when you fix it, leave behind a check so it can't recur.
+Architecture-enforcement instructions for agents working here. **The model is settled; your job is to keep the
+_code_ matching the _model_.** The recurring failure in this repo is drift (duplicated locales, mobile reimplementing
+web, cross-app copy-paste) that crept in because nothing failed when it did. Treat drift as a bug and, when you fix
+it, leave behind a check so it can't recur.
+
+Each rule below is short on purpose: this file is loaded into every session. The cases behind the rules, with what
+each mistake cost, are in [`docs/conventions/working-lessons.md`](docs/conventions/working-lessons.md). Read the entry
+there before arguing that a case is an exception.
 
 ## The model (one sentence)
-Every interface — **AI, GUI, slash command, deterministic gate** — compiles to the same `{opId, args}` and
-hands it to `callSkill`; an app's **`manifest.js` is the single contract**, and pure projectors
-(`renderChat` · `renderSlash` · `renderGate` · `renderWeb` · `renderMobile`) turn that one declaration into
-every surface. AI and GUI are **peer compilers to the waist** — neither is privileged. The functionality the
-op names resolves *wherever it lives*: a local handler · an external agent · a model · the Solid pod · an MCP
-service · a scheduled job. Interfaces are pass-throughs; the manifest is the contract; the
-substrate is the functionality.
+Every interface (**AI, GUI, slash command, deterministic gate**) compiles to the same `{opId, args}` and hands it to
+`callSkill`; an app's **`manifest.js` is the single contract**, and pure projectors (`renderChat` · `renderSlash` ·
+`renderGate` · `renderWeb` · `renderMobile`) turn that one declaration into every surface. AI and GUI are **peer
+compilers to the waist**. The functionality the op names resolves *wherever it lives*: a local handler · an external
+agent · a model · the Solid pod · an MCP service · a scheduled job.
 
-> The model is right. **Make the architecture self-enforcing** so it stays right.
+**The five HOMES:** **Agent · Circle · Pod · Surfaces · Connectivity**, plus the type **dictionary** they all speak.
+Homes are the places, the five kinds are the grammar, the dictionary's types are the nouns. Nothing lives outside a
+home.
 
-**The five HOMES** (the design's organising frame, being made real — see `docs/architecture.md` as it
-lands): **Agent · Circle · Pod · Surfaces · Connectivity**, plus the type **dictionary** they all speak.
-Homes are the **places**, the five kinds are the **grammar**, and the dictionary's types are the **nouns**
-(that word keeps its manifest meaning exclusively). Nothing lives outside a home.
+## Read first
+- **[`docs/architecture.md`](docs/architecture.md):** the waist, the dispatch flow, the layers and the data plane (§3):
+  > **A circle owns one store; a store holds typed items; a type gets the standard verbs for free and adds its own
+  > where it needs them; and whatever the store holds is what syncs to the circle's other members.**
 
-## READ THIS FIRST — [`docs/architecture.md`](docs/architecture.md)
-The waist, the dispatch flow, the layers, and **the data plane**: how circles, stores, item types and their
-verbs actually relate (§3, "The data plane"). One sentence of it, because it decides most questions:
+  It also lists **where the runtime does not match the model yet**: read those before concluding something is unbuilt.
+- **[`docs/catalogue/`](docs/catalogue/README.md):** one page per capability area (what a person can do, where it
+  lives, what proves it, what was decided not to build). Read the area's page before ruling something absent or
+  building in it; every manifest op is on exactly one page (`lint-catalogue-ops`).
+- **`docs/agent-notes-known-gotchas.md`** before debugging a build, native or monorepo-resolution failure. When you
+  hit or introduce a new trap of that kind, record it there in the same turn.
 
-> **A circle owns one store; a store holds typed items; a type gets the standard verbs for free and adds
-> its own where it needs them; and whatever the store holds is what syncs to the circle's other members.**
-
-**And [`docs/catalogue/`](docs/catalogue/README.md)** — one page per capability area: what a person can do, where it
-lives, what proves it, what was decided not to build. Read the area's page before ruling something absent or building
-in it; every manifest op is on exactly one page (`lint-catalogue-ops`).
-
-That file also lists **where the runtime does not match the model yet** — read those before concluding
-something is unbuilt. The recurring failure here is not a wrong decision; it is a route that quietly
-stopped following a right one, and the code kept working locally the whole time.
-
-## Before you debug a build/native failure
-Check **`docs/agent-notes-known-gotchas.md`** first — known monorepo-resolution (EAS/Metro
-`nodeModulesPaths`, workspace symlinks) and Android-12 native-permission traps that pass locally
-but fail on device/CI. Don't re-bisect a trap that's already written down.
-**Keep it current:** when you hit a new build/native/monorepo-resolution trap — or *introduce* one (e.g. a new
-workspace dep that needs its `node_modules` link materialized) — record it there in the same turn. A read-first
-file only helps if it's written to.
-
-## NEVER `rm -rf node_modules` here — this tree does not survive a clean reinstall
-The install is a hand-accreted, FLAT (`.npmrc` `node-linker=hoisted`), per-app layout built with an old
-package manager, over DUAL lockfiles (`package-lock.json` AND `pnpm-lock.yaml`, both tracked) and mixed
-protocols (`workspace:`, `link:../../../feedback`, `file:`). There is NO `packageManager` pin. A clean
-reinstall on the current node/pnpm exposes latent version conflicts the original lenient install tolerated
-(`@noble/hashes` v1-vs-v2, `@scure/bip39` v1-vs-v2, `ws@7`-vs-`8` via `isomorphic-ws`, async-storage) and
-does NOT come back — this has cost multiple sessions.
-- A STALE workspace copy (an app's `node_modules/@onderling/<pkg>` doesn't reflect a source edit) -> replace
-  ONLY that one with a symlink to the source: `rm -rf apps/<app>/node_modules/@onderling/<pkg> &&
-  ln -s ../../../../packages/<pkg> apps/<app>/node_modules/@onderling/<pkg>`. Never reinstall the whole tree
-  to pick up one edit.
-- Diagnose dep conflicts with `npm run check:versions` (syncpack; internal `@onderling/*` protocol noise is
-  filtered in `.syncpackrc.json`, leaving the real external conflicts).
-- The proper fix (one package manager + one lockfile, pin `packageManager`/node, resolve the version splits)
-  is the workspace-protocol migration — a scheduled task, not a mid-work reinstall.
-- `.nvmrc` pins node (`20.19.5`); Expo/RN native versions live in
-  `packages/react-native/docs/VERSION-MATRIX.md` — do not bump without reading it.
+## Never `rm -rf node_modules` here
+The install is a flat (`node-linker=hoisted`), per-app layout over two lockfiles and mixed protocols; a clean
+reinstall exposes version conflicts and does not come back.
+- A stale workspace copy: replace ONLY that one with a symlink to the source (`rm -rf
+  apps/<app>/node_modules/@onderling/<pkg> && ln -s ../../../../packages/<pkg> apps/<app>/node_modules/@onderling/<pkg>`).
+- Dependency conflicts: `npm run check:versions`.
+- `.nvmrc` pins node; Expo/RN native versions are in `packages/react-native/docs/VERSION-MATRIX.md`: do not bump
+  without reading it.
 
 ## Invariants — a violation is a bug, not a style nit
-1. **Logic lives once, in shared code.** Web/mobile shells are **thin adapters/projectors**: platform UI +
-   the transport/bundle adapter, *nothing else* — concretely, a shell does **composition and paint** and
-   may contain **no gate, no projection, no verb**. A shell must NOT carry dispatch / resolution / routing
-   logic — that lives in shared `src/` (the basis app) or a substrate package. Writing logic in a shell that
-   already exists in shared code → STOP and call the shared one. (This is exactly what the four "duplicated
-   pairs" violated; see `apps/basis/docs/web-mobile-consolidation-plan.md`.)
-2. **web ≡ mobile ≡ box.** No shell is the "primitive" one — the box (`apps/basis/bin/device-runner.mjs`) is a
-   third shell, the same composition minus the paint. A shared string/op/behaviour must exist in ALL — ideally
-   **by construction** (one shared source they merge), not copied. New shared work lands in `src/`; each shell
-   injects only its adapter. An **empty grep on another shell is a FINDING, not a clearance** — wire the
-   equivalent, or say in the same turn that there isn't one. (5× in July 2026: the rule never failed, *noticing*
-   the violation did; 2× on the box in September 2026, days after the seam landed on web and mobile.) The
-   seams every shell composes are declared once in `scripts/shell-seams.mjs`; `lint-shell-seams` (in
-   `npm run guards`) is red when one shell lacks one — a new seam goes in that list in the same PR. A shared decision
-   function a shell HOST must call (the screen's data, a duty after an act) is a seam too, added in the PR that adds it;
-   and what a shell SAYS is compared by `lint-locale-key-parity` — a one-sided key is a gap or a declared exception.
-3. **No duplication.** A string/op/function is defined ONCE. Editing the same thing in two files (e.g. a
-   locale key in the web *and* mobile bundle) is the signal to consolidate — then add a guard so it can't
-   recur. (`circle.*` locale is now one shared source `apps/basis/src/locales/`; do the same for the rest.)
-4. **The manifest is the source of truth for surfaces.** Add an op/surface to `manifest.js`, never a
-   per-shell switch statement. After any manifest change, regenerate + commit the coverage snapshot
-   (`npm run coverage` in `apps/basis` → `docs/surface-coverage.md`). A GUI button, a tab and a slash command for the
-   same act target the same op; a nav target is only for a view that no op backs.
-5. **Three-layer dependency invariant:** `apps/` → `packages/{substrates}` → `packages/core` (the **kernel** —
-   a lean set of ports + kernel logic). Concrete adapters live *outside* the kernel (`@onderling/transports`,
-   `@onderling/pod-client`, `@onderling/vault`); nothing in the kernel depends *up* on an adapter. The dev-facing
-   **SDK is `@onderling/sdk`** (the layered facade over the platform). Substrates compose the kernel + adapters and
-   don't reinvent the kernel; apps compose substrates (kernel directly only with a justification in the app
-   README). → detail: [`architectural-layering.md`](docs/conventions/architectural-layering.md).
-6. **One agent per service-context.** Transports are routes into a single `core.Agent`; multi-scope state
-   lives in per-scope `ItemStore`/`MemberMap` *outside* the agent. N agents for N scopes is an anti-pattern.
-   → [`single-agent.md`](docs/conventions/single-agent.md).
-7. **Functionality is placed by trust + latency — never default-to-server.** Sensitive compute (pods,
-   sealing, the confidential LLM transport) stays client-side or in an **attested enclave** (Privatemode/TEE).
-   "Server-side" means *extracting* code that is already server-side (pod-hosting, proxy, private LLM), not
-   moving private data onto an untrusted host. → [`pod-independence.md`](docs/conventions/pod-independence.md).
-8. **Every user-facing string goes through `t()`** with a locale entry — hardcoded English is a defect.
+1. **Logic lives once, in shared code.** A web/mobile shell does **composition and paint** and contains **no gate,
+   no projection, no verb**; dispatch, resolution and routing live in shared `src/` (the basis app) or a substrate
+   package. Writing logic in a shell that already exists in shared code → STOP and call the shared one.
+2. **web ≡ mobile ≡ box.** No shell is the primitive one; the box (`apps/basis/bin/device-runner.mjs`) is a third
+   shell, the same composition minus the paint. A shared string/op/behaviour exists in ALL, ideally by construction
+   (one shared source), not copied. An **empty grep on another shell is a FINDING, not a clearance**: wire the
+   equivalent, or say in the same turn that there isn't one. The seams every shell composes are declared in
+   `scripts/shell-seams.mjs` (`lint-shell-seams`); a new seam, also a shared decision function a shell host must call,
+   goes in that list in the same PR. What a shell SAYS is compared by `lint-locale-key-parity`.
+3. **No duplication.** A string/op/function is defined ONCE. Editing the same thing in two files is the signal to
+   consolidate, then add a guard so it can't recur.
+4. **The manifest is the source of truth for surfaces.** Add an op/surface to `manifest.js`, never a per-shell switch
+   statement. After any manifest change, regenerate + commit the coverage snapshot (`npm run coverage` in
+   `apps/basis` → `docs/surface-coverage.md`). A GUI button, a tab and a slash command for the same act target the same op; a nav target is only
+   for a view that no op backs.
+5. **Three-layer dependency invariant:** `apps/` → `packages/{substrates}` → `packages/core` (the **kernel**: ports +
+   kernel logic). Concrete adapters live outside the kernel (`@onderling/transports`, `@onderling/pod-client`,
+   `@onderling/vault`); nothing in the kernel depends up on an adapter. The dev-facing SDK is `@onderling/sdk`. Apps
+   compose substrates (the kernel directly only with a justification in the app README).
+   → [`architectural-layering.md`](docs/conventions/architectural-layering.md).
+6. **One agent per service-context.** Transports are routes into a single `core.Agent`; multi-scope state lives in
+   per-scope `ItemStore`/`MemberMap` outside the agent. → [`single-agent.md`](docs/conventions/single-agent.md).
+7. **Functionality is placed by trust + latency, never default-to-server.** Sensitive compute (pods, sealing, the
+   confidential LLM transport) stays client-side or in an attested enclave.
+   → [`pod-independence.md`](docs/conventions/pod-independence.md).
+8. **Every user-facing string goes through `t()`** with a locale entry.
    → [`localisation.md`](docs/conventions/localisation.md).
-9. **Names are legible without the plans — and that includes REFERENCES.** A comment saying `B8`, `C4a`,
-   `L13` or `J-CS8` is unresolvable for anyone without the private plan docs, and those are gitignored, so
-   for a public reader it is unresolvable by construction. Name the thing (*"the address-fallback setting"*),
-   not its row in a list. Journey tags **and checklist ids are both guarded** now (`lint-codenames`,
-   baselined — do not grow it). Checklist ids were long recorded as unguardable because `B1`/`C3`/`L4`
-   collide with real identifiers — true of a BARE token, but the **label form** `B4 — ` is punctuation,
-   not a name, and does not collide (2026-08-03). Same for identifiers, titles and UI labels: a name
-   that only makes sense to someone who has read a plan doc is a defect. Spell journeys out in the plans
-   too, rather than inventing opaque tags to refer back to.
+9. **Names are legible without the plans, references included.** A comment, identifier, title or UI label that only
+   makes sense to someone who has read a private plan doc (`B8`, `L13`, a journey tag) is a defect: name the thing,
+   not its row in a list. Guarded by `lint-codenames` (baselined: do not grow it).
 
 ## Further conventions
-Project-wide rules beyond the invariants — concise here, full detail in [`docs/conventions/`](docs/conventions/):
-- **App READMEs** follow one scheme (built-on · deviations · honest phase table) — [`app-readme-scheme.md`](docs/conventions/app-readme-scheme.md).
-- **Web/mobile differences** are idiom or listed exceptions, never capability/vocab/consent drift — [`web-mobile-exceptions.md`](docs/conventions/web-mobile-exceptions.md).
+Full detail in [`docs/conventions/`](docs/conventions/):
+- **App READMEs** follow one scheme — [`app-readme-scheme.md`](docs/conventions/app-readme-scheme.md).
+- **Web/mobile differences** are idiom or listed exceptions, never capability, vocabulary or consent drift — [`web-mobile-exceptions.md`](docs/conventions/web-mobile-exceptions.md).
 - **Cross-app settings** split pod-side into portable `shared.json` + per-install `devices/<id>.json` — [`cross-app-settings.md`](docs/conventions/cross-app-settings.md).
-- **Tunable constants go through the parameter register** — declare with `param({key,scope,kind,default})` (from `@onderling/params`, re-exported by core/item-store), never a bare literal; `scope` drives sync, `kind` gates settability (`internal` = immutable), and the stale-param guard fails a param nobody reads. Not for unit multipliers / crypto-format / enums — [`parameters.md`](docs/conventions/parameters.md).
-- **Cross-pod references** use the `embeds: [{type, ref}]` field + a permission handshake, never inlined pod URLs — [`cross-pod-refs.md`](docs/conventions/cross-pod-refs.md).
+- **Tunable constants go through the parameter register** (`param({key,scope,kind,default})`), never a bare literal; not for unit multipliers, crypto formats or enums — [`parameters.md`](docs/conventions/parameters.md).
+- **Cross-pod references** use `embeds: [{type, ref}]` + a permission handshake, never inlined pod URLs — [`cross-pod-refs.md`](docs/conventions/cross-pod-refs.md).
 - **Pod storage layout** is canonical, owned by `@onderling/pod-onboarding` — [`storage-layout.md`](docs/conventions/storage-layout.md).
-- **This file's scope + size budget** — what belongs in `CLAUDE.md` vs `docs/`, and when to compress/enlarge it — [`doc-structure.md`](docs/conventions/doc-structure.md).
-- **Shared vocabularies** (delivery states, entry kinds, roles, label maps) — the index of what already
-  exists, and the rule that a new one needs a home + a guard — [`shared-vocabularies.md`](docs/conventions/shared-vocabularies.md).
-- **Record a decision** when a choice closes off alternatives / would be re-litigated / shapes architecture (→ `docs/decisions.md`) or org (→ private) — [`decision-log.md`](docs/conventions/decision-log.md).
-- **Read the decisions before you change a behaviour.** Before changing how a feature reads, writes or decides, grep `docs/decisions.md` for it; a decision there binds until Frits reverses it in the same file. A claim that something is absent or undesigned names what was read (the catalogue page, the manifests, `plans/` incl. `archive/`).
-- **Log your OWN judgement calls as you make them — dated rule, review on 2026-08-13.** Any choice made
-  without Frits goes into `plans/DECISIONS-FOR-REVIEW.md` **in the same turn as the change**, colour-coded
-  (🟢 · 🟡 · 🔴), stating **the risk you are taking** and **how to undo it**. Not a batch at the end — the
-  file drifted three days in July 2026 and could only be partly reconstructed. → [`decision-log.md`](docs/conventions/decision-log.md).
-- **Naming is `onderling`; NO backwards compatibility needed** — no "canopy" identifiers; break persisted/wire
-  formats freely, no dual-write / fallback / alias cruft (Frits, 2026-08-08 — standing rule; pre-launch, no
-  external users, dev state re-derives) — [`naming-and-compatibility.md`](docs/conventions/naming-and-compatibility.md).
+- **This file's scope + size budget** — [`doc-structure.md`](docs/conventions/doc-structure.md).
+- **Shared vocabularies**: the index of what exists; a new one needs a home + a guard — [`shared-vocabularies.md`](docs/conventions/shared-vocabularies.md).
+- **Record a decision** when a choice closes off alternatives, would be re-litigated or shapes the architecture (→ `docs/decisions.md`) — [`decision-log.md`](docs/conventions/decision-log.md).
+- **Read the decisions before you change a behaviour.** Grep `docs/decisions.md` first; a decision there binds until Frits reverses it in the same file. A claim that something is absent or undesigned names what was read (the catalogue page, the manifests, `plans/` incl. `archive/`).
+- **Log your OWN judgement calls as you make them**: any choice made without Frits goes into `plans/DECISIONS-FOR-REVIEW.md` in the same turn as the change, colour-coded (🟢 · 🟡 · 🔴), with the risk taken and how to undo it.
+- **Naming is `onderling`; NO backwards compatibility needed**: no "canopy" identifiers; break persisted and wire formats freely, no dual-write, fallback or alias — [`naming-and-compatibility.md`](docs/conventions/naming-and-compatibility.md).
 
 ## How to work
-- **Go through the SURFACE, never the transport.** App/shell code must not construct or drive
-  `MdnsTransport` / `BleTransport` / `NknTransport` directly. Transports are adapters behind the mesh
-  builder (`buildMeshTransports` → `createMeshAgent`) and the `Peer` façade; discoverability, advertising
-  and routing are properties the surface exposes, not knobs an app reaches past it to set. Reaching for a
-  transport is the signal that the surface is missing an affordance — add it there.
-- **The enforceability test:** *could someone on a different app version get it anyway?* If yes, call it
-  a convention/filter and put the real gate where it binds — [`enforceability.md`](docs/conventions/enforceability.md).
-- **A question put to Frits and not answered gets a ledger row with `? Needs Frits` before the session ends;
-  the table at the top of `REMAINING-WORK.md` is GENERATED from that marker (`npm run guards`), never edited.**
-- **An idea is only dropped when Frits drops it.** Silence is not rejection. If you raise an option, a
-  caveat, or a finding and it goes unanswered, it stays OPEN — carry it into the design/plan doc as an open
-  item rather than quietly dropping it because the conversation moved on. When a thread has accumulated more
-  open points than a reply can hold, **ask** which to keep rather than deciding for him.
-- **Check whether it already exists — the locale file is the fastest index.** Grep
-  `circle.en.json` for the word a *user* would see before adding any small closed vocabulary. Duplicates
-  break nothing, so nothing catches them. → [`shared-vocabularies.md`](docs/conventions/shared-vocabularies.md).
-  The same for anything that sends, holds, fans, syncs, serves or wakes: find your verb in
-  [`carrying-index.md`](docs/conventions/carrying-index.md) first — the neighbour is usually there.
-- **SEARCH before you BUILD — and before you CONCLUDE.** Before adding a cross-cutting concern (retention,
-  logging, an emitter, a per-class table, any shared vocabulary) grep the WHOLE repo for the *concept* — not
-  the exact name you have in mind — or send an Explore agent "does X already exist?". These almost always
-  already live in a substrate, and a second copy is the drift the structural guards do NOT catch. **The same
-  discipline binds a CONCLUSION**: before you claim something is missing, unbuilt, broken, or a "parallel
-  structure", grep for the thing you're about to say doesn't exist — a wrong assessment sends real work in the
-  wrong direction. *Worked examples (2026-08-06):* a count-based retention table was added to `entryKinds`
-  while a duration-based one already lived in `eventLog.js` with a full compactor (one broad
-  `grep -r "retention|compact|prune"` would have found it); and the test twin was called a "parallel
-  structure" from reading ONE test, before grepping the harness's other connection modes — which turned out to
-  cross the real transport seam over relay + NKN. **A plan/architecture note saying a thing is "being
-  completed" is NOT evidence it is unbuilt — verify against the real code.** Duplicating logic → STOP and
-  consolidate, then leave a guard so it can't recur.
-- **PROVE THE HARNESS BEFORE YOU BLAME THE PRODUCT.** A harness that reassembles the app measures
-  itself. Before reporting any defect found through one, establish that it is composed the way a SHELL
-  composes it — same factory, same options, same lifecycle. *Cost (2026-08-27):* `walk-peer` boots
-  `bootRealAgentNode` without `taskLane: true`, so it has no device log, so no membership rider, so
-  nothing fans — by design. Two "product defects" diagnosed against it (a role change that never
-  propagated, items that never crossed) were both that. A day. The shells hand their device log
-  (`circleApp.js`); the journeys' shared boot asks for it (`_app.mjs:207`); the walk harness did not.
-  **Prefer driving the real app** (`test-browser/`, two Chromium contexts, `window.onderlingSurface` /
-  `onderlingDispatch` / `onderlingCall`) over any composition you assemble yourself.
-- **A COMMENT DESCRIBES WHAT IT DESCRIBES.** The repo's comments are unusually good, which makes them
-  unusually easy to over-read. A docstring about a projection's SHAPE is not a statement about its
-  SOURCE. Quote a comment as context; quote the IMPLEMENTATION as a finding. *Cost:* "the two roster
-  ops differ in shape, not source" — from a comment about `{addr, role}` vs rich rows — reported as a
-  verified difference. Reading both bodies showed the narrow one also lacks founders and the whole
-  spine fold. Same class as the plan-doc rule above, one level lower.
-- **AFTER THE SECOND WRONG READING, INSTRUMENT.** If two attempts to explain a behaviour from the code
-  have failed, stop reading and make the running system say what it is doing — a `console.info` in the
-  path, one run, then remove it. *Cost:* three readings produced three wrong mechanisms for the founder
-  lockout; one diagnostic produced the answer in a single run, and it was a state transition
-  (`trailRows: 0 → founders:[me]`, then `trailRows: 1 → founders:[]`) that no amount of reading was
-  going to surface.
-- **A PROBE THAT CANNOT NAME ITS BRANCH IS NOT EVIDENCE.** A helper returning `null` for two different
-  reasons will eventually report the wrong one as a product failure. Make every probe say WHICH branch
-  it took. *Cost:* `getInvite` returned `null` both when the ⋯ menu had no invite item and when the
-  modal had not yet rendered its code — an hour chasing a live selector that was never wrong, and the
-  refusal it was actually hitting turned out to be a real and larger defect.
-- **SUBTRACT THE DECLARED DIFFERENCES BEFORE CALLING IT A DISAGREEMENT.** Two views of one fact often
-  differ ON PURPOSE. Read what each declares it excludes and compare like with like. *Cost:*
-  `listGroupRoster` omits the CALLER by design; comparing it to `listGroupMembers` without subtracting
-  that produced a confidently-reported "the founder is missing from the roster" that was not true.
-- **A FIX NEEDS A TEST THAT IS RED FIRST.** Write the failing test, watch it fail for the reason you
-  claim, then fix. Without that, a fix is a story about a fix — and twice this week the red test
-  disagreed with the story and was right. This is DONE's missing half: *declared · implemented · tested
-  · REACHED* presumes the test could ever have failed.
-- **Grep every identifier you introduce against the file you put it in**, especially state setters and
-  navigation helpers: they read plausibly and are named differently per screen. `src/screens/**` has no test
-  coverage, so nothing else will catch a typo there (→ `docs/agent-notes-known-gotchas.md`).
-- **DONE = declared · implemented · tested · REACHED.** A thing is not done until you can **name its
-  consumer** — the production path a person's action travels to it. A test that exercises the mechanism is
-  not a consumer. *Why this is an invariant and not advice:* on 2026-08-03 an audit found the dominant
-  remaining shape in every seam was **built-but-unadopted** — `createGrantsOverPeer`, `peerFacade`,
-  `loadProfile` and `makeAgentTrailEntry` exported with **zero consumers**, plus a
-  circle store that was mirrored with nothing writing to it and a BLE transport the app never constructs.
-  Every one passed its tests. None of them ran. **Nothing fails when a seam is left inert** — so say what
-  reaches it, or delete it.
-- **Nothing runs PARALLEL to the main components.** Everything is one of: an **event-log entry**, a
-  **projection** (a derived read-only view over the log or over sources), a **manifest op** reached through
-  the waist (`{opId, args}` → `callSkill`), an **item type + its verbs**, or a **transport/adapter behind
-  the surface**. There is no sixth kind. If a new thing does not fit one of those, that is the design
-  question — do not add it beside them and hope.
-  *Why:* a composer that routes actions but does NOT sit behind an op is **unreachable by construction** —
-  every interface compiles to `callSkill`, so nothing can get to it, and whatever inline code IS reachable
-  wins by default. That is not an accident of adoption; it is the architecture rejecting a foreign shape.
-  `grantsOverPeer` (2026-07-26) is the worked example: a real security gate that guards a path nobody walks.
-- **Do not call anything a "facade".** The word hid four different things here — a projection
-  (`peerFacade`, which is `peerRows` in all but name), a waist-composer, a package re-export for DX, and a
-  rename bridge. Say which one you mean. Naming a projection a facade also hides WHERE it belongs: a
-  projection is built where its sources are and passed DOWN, which is why `peerFacade` could not be adopted
-  at the call sites that only hold one row.
-- **Prefer a fitness function to a manual check.** When you fix drift, add the test/lint that makes the same
-  drift FAIL CI next time — and register it in the **`npm run guards` aggregate: a guard outside it does
-  not exist.** This is the roadmap's step 0 — see `REMAINING-WORK.md` "★ Architectural spine".
-  **After adding/removing/renaming a guard, run `npm run guard-index` and commit `docs/guards.md`** (the
-  generated designed-vs-built map; its `--check` fitness test fails if it is stale, same contract as the
-  surface-coverage snapshot). `npm run guard-status` prints live green/red — read a guard's OWN exit there,
-  never `cmd | tail; echo $?` (that returns the pipe's exit, not the guard's — it has masked reds).
-  **A seam is not done until something passes through it:** write the test that CROSSES it — a real socket, a
-  real boot — not unit tests either side. Two green tests flanking a dead seam is what inert wiring looks like.
-- **When two layers hold the same fact, pin the AGREEMENT, not either value.** The relay held messages 5 min
-  and the app 24 h — one system, two answers, neither chosen. A test reading both forces whoever changes one
-  to change both, or to decide on purpose that they differ.
-- **New functionality = add a manifest + projectors**, not a new app silo. Most apps dissolve into basis —
-  their `manifest.js` stays the source of truth and the app *name* becomes a nav label. **The test is whether
-  it needs its own interaction model** (Frits, 2026-07-28): pinboard and tasks do not, so they reduce to close
-  to a manifest; **folio does** — basis is a poor file manager — so it keeps a surface of its own.
-- **Ship web first, then mobile** as separate steps/commits; don't bundle both platforms in one commit.
-- **The verification ladder — which check runs when.** Rungs 0–2 (the one red-first test · the affected tests +
-  guards · the cheapest REAL thing: a relay walk, one browser spec, a throwaway profile on the real box) before
-  the PR; the CI gate (~8 min) gates the merge; the browser tail runs AFTER the merge and gates the *release*;
-  `npm run release:check` says whether it passed on the bytes about to ship. A shell/transport/box change never
-  skips rung 2 — [`verification-ladder.md`](docs/conventions/verification-ladder.md).
-- **Live-LLM tests run only with `LIVE_LLM=1` and never on a machine holding the production key.** A key file
-  on disk is not consent to spend its quota: one eval batch once used up the month and took the live bot down.
-- **Branch per feature; the trunk moves by MERGE.** `development` is the trunk (the repo default since
-  2026-09-04) and `live` will be the release branch: never commit straight onto either — `git switch -c
-  feat/<what>`, land it green, merge back. Enforced twice: `.githooks/pre-commit` refuses the commit (run
-  `git config core.hooksPath .githooks` once per clone), and `lint-branch-hygiene` fails when a protected
-  branch carries local commits that are not on its remote. Push to `live` only with guards + both suites
-  green.
-- **A device harness already exists — use it before hand-driving anything.** `apps/basis-mobile/e2e/` is a
-  **Detox** suite (real emulator or attached phone). Hand-driving with `adb input tap` is a last resort; a
-  whole afternoon went into its traps on 2026-07-30 while this suite sat unused.
-  → [`e2e/README.md`](apps/basis-mobile/e2e/README.md).
-- **Verify the RESULT, not just the dispatch** — check the skill's return value, not only that a command
-  fired (the device-run lesson; a gate can route while the op silently fails).
-- **Keep the design-doc status overview current.** When you finish, supersede, or archive a plan/design doc,
-  update its row (status + date) in `plans/DOC-STATUS.md` — the living lifecycle map of the plan corpus
-  (status · 🗄 archive-ready · the reconciliation record). Stops parallel/stale plans creeping back.
-- **Stay anchored — the plan DERIVES, it does not invent.** The *why* is [`docs/principles.md`], the *what/how*
-  is `plans/PLAN-homes.md`. Every other plan/design doc is a **derivation** from those and a **child of an
-  existing arc**, never a new authority. Resolve a fork by deriving from them and checking the invariants
-  above — never by starting a fresh direction in a new doc. If a new thing does not map to a principle **and**
-  a HOMES home, that is drift — stop and reconcile before continuing. Keep the two trackers live as you work:
-  `plans/DOC-STATUS.md` (doc lifecycle) + `plans/DECISIONS-FOR-REVIEW.md` (every autonomous call), and
-  sanity-check that mapping at each session's close (the wave-2 log in `DOC-STATUS.md` is the worked example).
+The long form of each, with its case: [`working-lessons.md`](docs/conventions/working-lessons.md).
 
-- **Shared checkout, two agents (Fable + Opus work in one `canopy-mono` clone):** a tracked file is edited only in a
-  `wt-*` worktree (`plans/tools/mk-worktree.sh`), never in the shared checkout; its branch is never switched. At session
-  start and before stopping, `git status --short` in `canopy-mono` must be empty, or the change is named in the memory
-  state file with its owner. An unowned change is reported, never stashed, never reverted blind.
-- **Never `git stash` in this repo** (two slips: 2026-10-06, 2026-11-05 — a failed `stash push` left the ref empty and `stash apply $S` applied another session's WIP). A worktree makes it unnecessary: commit the WIP on the branch, or `git diff > <scratchpad>/x.patch` + `git checkout -- <paths>` and `git apply` it back. `stash apply/pop/drop` without an explicit ref is forbidden outright.
+**Before you build or conclude**
+- **Search before you build, and before you conclude.** Grep the whole repo for the *concept*, not the name you have
+  in mind, before adding a cross-cutting concern and before claiming something is missing, unbuilt, broken or a
+  parallel structure. A plan note saying a thing is "being completed" is not evidence it is unbuilt: verify in the code.
+- **Check whether it already exists.** Grep `circle.en.json` for the word a user would see before adding a small
+  vocabulary ([`shared-vocabularies.md`](docs/conventions/shared-vocabularies.md)); for anything that sends, holds,
+  fans, syncs, serves or wakes, find your verb in [`carrying-index.md`](docs/conventions/carrying-index.md) first.
+- **Nothing runs parallel to the main components.** Everything is an event-log entry, a projection, a manifest op
+  reached through the waist, an item type + its verbs, or a transport/adapter behind the surface. There is no sixth
+  kind; a thing that fits none is a design question, not something to add beside them.
+- **New functionality = a manifest + projectors**, not a new app silo; an app keeps a surface of its own only when it
+  needs its own interaction model (folio does, pinboard and tasks do not).
+- **Go through the surface, never the transport.** App/shell code does not construct or drive a transport
+  (`MdnsTransport`, `BleTransport`, `NknTransport`); a missing affordance is added to the surface (the mesh builder,
+  the `Peer` projection).
+- **The enforceability test:** could someone on a different app version get it anyway? Then it is a convention; put
+  the real gate where it binds — [`enforceability.md`](docs/conventions/enforceability.md).
+- **Do not call anything a "facade".** Say which it is: a projection, a waist-composer, a package re-export, a rename
+  bridge.
+- **Stay anchored.** The why is `docs/principles.md`, the what/how is `plans/PLAN-homes.md`; every other plan derives
+  from those and is a child of an existing arc. A new thing that maps to no principle and no home is drift.
+
+**While you diagnose**
+- **Prove the harness before you blame the product.** A harness that reassembles the app measures itself: check it is
+  composed the way a shell composes it. Prefer driving the real app (`test-browser/`, `window.onderlingSurface` /
+  `onderlingDispatch` / `onderlingCall`).
+- **A comment describes what it describes.** Quote a comment as context; quote the implementation as a finding.
+- **After the second wrong reading, instrument.** One `console.info` in the path, one run, then remove it.
+- **A probe that cannot name its branch is not evidence.** A helper returning `null` for two reasons says which.
+- **Subtract the declared differences before calling it a disagreement.** Two views of one fact often differ on purpose.
+- **Verify the result, not just the dispatch**: the skill's return value, not only that a command fired.
+- **A device harness exists** (`apps/basis-mobile/e2e/`, Detox): use it before hand-driving with `adb`.
+
+**When is it done**
+- **A fix needs a test that is red first**, seen failing for the reason you claim.
+- **DONE = declared · implemented · tested · REACHED.** Name the consumer: the production path a person's action
+  travels to it. A test is not a consumer. Nothing fails when a seam is left inert, so say what reaches it or delete it.
+- **A seam is not done until something passes through it**: a test that crosses it (a real socket, a real boot).
+- **Prefer a fitness function to a manual check**, registered in `npm run guards`: a guard outside the aggregate does
+  not exist. After adding, removing or renaming a guard: `npm run guard-index` and commit `docs/guards.md`. Read a
+  guard's own exit (`npm run guard-status`), never `cmd | tail; echo $?`.
+- **When two layers hold the same fact, pin the agreement**, not either value.
+- **Grep every identifier you introduce against the file you put it in**; `src/screens/**` has no test coverage.
+- **The verification ladder.** Rungs 0–2 (the one red-first test · the affected tests + guards · the cheapest REAL
+  thing) before the PR; the CI gate gates the merge; the browser tail runs after the merge and gates the release. A
+  shell, transport or box change never skips rung 2 — [`verification-ladder.md`](docs/conventions/verification-ladder.md).
+- **Live-LLM tests run only with `LIVE_LLM=1`** and never on a machine holding the production key.
+
+**Git, shells and Frits**
+- **Branch per feature; the trunk moves by merge.** `development` is the trunk, `live` the release branch: never
+  commit straight onto either (`.githooks/pre-commit`, set once per clone with `git config core.hooksPath .githooks`;
+  `lint-branch-hygiene`). Push to `live` only with guards + both suites green.
+- **Ship web first, then mobile**, as separate commits.
+- **Shared checkout, two agents:** a tracked file is edited only in a worktree (`plans/tools/mk-worktree.sh`), never
+  in the shared `canopy-mono` checkout, whose branch is never switched. At session start and before stopping,
+  `git status --short` there is empty or the change is named in the state file with its owner. An unowned change is
+  reported, never stashed, never reverted blind.
+- **Never `git stash` in this repo.** Commit the WIP on the branch, or `git diff > x.patch` and apply it back.
+- **A question put to Frits and not answered gets a ledger row with `? Needs Frits` before the session ends**; the
+  table at the top of `REMAINING-WORK.md` is generated from that marker, never edited.
+- **An idea is only dropped when Frits drops it.** Silence is not rejection: an unanswered option, caveat or finding
+  stays open in the design doc. With more open points than a reply can hold, ask which to keep.
+- **Keep `plans/DOC-STATUS.md` current** when you finish, supersede or archive a plan or design doc.
 
 ## Where the truth is
-- **Doc layout (task #66 model — [`docs/repository-layout.md`](docs/repository-layout.md)):** function is encoded in
-  name/location and drives git. **Tracked/public:** `docs/**`, `README.md`, `QUICKSTART.md`, `CLAUDE.md`/`AGENTS.md`,
-  app-local `apps/*/docs/` + CHANGELOGs. **Private/local-only (gitignored, one Obsidian vault):** `plans/` (only the
-  overviews at its top — TRIAGE, INDEX, DOC-STATUS, DECISIONS-FOR-REVIEW, BACKLOG-ideas, PLAN-homes; the design of
-  record for work not done in `live/`, settled reference in `notes/`, dated task-shaped docs in `briefs/` — each brief opens
-  with a status header, `> **Status:** open · answered · building · done · **Asks:** … · **Retire when:** …`; an archived
-  plan goes to `plans/archive/<YYYY-MM>/`, the month it was archived — `lint-plans-structure` holds the shape), `_archive/`
-  (frozen NON-plan material only: old app folders, runbooks, legacy design), and root private-prefix docs (`PLAN-*`,
-  `DESIGN-*`, `REMAINING-WORK.md`, …). Guard: `npm run lint:docs` — a tracked/public file must never link into `plans/`,
-  `_archive/`, or outside the repo. New plan → `plans/`; a tracked doc links only to other tracked paths.
-- **Master todo + roadmap:** `REMAINING-WORK.md` *(private/local — the local starting point)*.
+- **Doc layout** ([`docs/repository-layout.md`](docs/repository-layout.md)): tracked/public are `docs/**`, `README.md`,
+  `QUICKSTART.md`, `CLAUDE.md`, `apps/*/docs/` and CHANGELOGs. Private and gitignored are `plans/` (overviews at its
+  top; `live/` the design of record for work not done, `notes/` settled reference, `briefs/` dated task docs that open
+  with a status header, `archive/<YYYY-MM>/`; shape held by `lint-plans-structure`), `_archive/` and root `PLAN-*`,
+  `DESIGN-*`, `REMAINING-WORK.md`. A tracked file never links into `plans/`, `_archive/` or outside the repo
+  (`npm run lint:docs`).
+- **Master todo + roadmap:** `REMAINING-WORK.md` (private).
 - **Per-app truth:** `apps/<app>/manifest.js` + app-local CHANGELOGs + `apps/*/docs/`.
-- **The architecture, in depth:** [`docs/architecture.md`](docs/architecture.md); overview in `README.md`
-  ("One manifest, every surface" + "three layers"); web/mobile detail in
+- **The architecture, in depth:** [`docs/architecture.md`](docs/architecture.md); web/mobile detail in
   `apps/basis/docs/web-mobile-consolidation-plan.md`.
 
-*The feedback app is split out (github.com/Onderling/feedback); the platform now ships as published `@onderling/*` npm packages consumed like any third party — the substrate seam is a package boundary, not a repo split (see `docs/decisions.md`). **Private paths** (`plans/`, `_archive/`, `PLAN-*`) are local-only by design; public contributors work from `docs/` — see `CONTRIBUTING.md`.)*
+*The feedback app is split out (github.com/Onderling/feedback); the platform ships as published `@onderling/*` npm
+packages (see `docs/decisions.md`). Public contributors work from `docs/` — see `CONTRIBUTING.md`.*

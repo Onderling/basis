@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { relayTexts, currentHits } from './lint-no-relay-word.mjs';
+import { relayTexts, currentHits, redMessage } from './lint-no-relay-word.mjs';
 
 describe('lint-no-relay-word — "relay" is not shown to a person', () => {
   it('finds "relay" in a text a person reads, at any depth', () => {
@@ -19,5 +19,14 @@ describe('lint-no-relay-word — "relay" is not shown to a person', () => {
   });
   it('the app shows none today', () => {
     expect(currentHits()).toEqual([]);
+  });
+});
+
+describe('lint-no-relay-word — the red message says where and what to do instead', () => {
+  it('names each hit as file:line of its key in the locale file, with a Fix line', () => {
+    const files = { 'apps/basis/src/locales/host.nl.json': '{\n  "a": { "text": "ok" },\n  "set": {\n    "relay": {\n      "text": "Welke relay?"\n    }\n  }\n}\n' };
+    const msg = redMessage(['host.nl.json set.relay'], (f) => files[f] ?? '');
+    expect(msg).toMatch(/apps\/basis\/src\/locales\/host\.nl\.json:4\b.*set\.relay/);
+    expect(msg).toMatch(/^\s*Fix: /m);
   });
 });

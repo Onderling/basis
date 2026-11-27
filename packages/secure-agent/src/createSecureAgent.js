@@ -61,7 +61,7 @@ import {
   PARAM_SCOPE,
   PARAM_KIND,
 } from '@onderling/core';
-import { isBackgroundSend } from '@onderling/core';
+import { isBackgroundSend, relayAddressRefusal } from '@onderling/core';
 import {
   NknTransport,
   RelayTransport,
@@ -2048,6 +2048,11 @@ export async function createSecureAgent(opts = {}) {
         '(sa.relay.connect({relayUrl})).',
       );
     }
+    // A plain ws address to a public host (stored before the wss rule, or handed over) is answered, not thrown, and the
+    // socket the device is on now stays: the relay transport refuses to be made for it (`relayAddressRefusal`).
+    if (relayAddressRefusal(relayUrl) === 'plain-on-public-host') {
+      return { ...relayState, refused: { url: relayUrl, reason: 'plain-ws-public' } };
+    }
     if (relayState.status === 'connected' || relayState.status === 'connecting') {
       // Same relay ⇒ the cheap no-op this has always been. A DIFFERENT one is a MOVE, and returning the old
       // state for it is how the in-app relay setting became inert: it saved, reported success, and left the
@@ -2269,6 +2274,11 @@ export async function createSecureAgent(opts = {}) {
   }
   async function addRelay(url, { awaitReady = false, identity: socketIdentity = null } = {}) {
     if (typeof url !== 'string' || !url) throw new Error('relays.add: url required');
+    // A stored plain ws address to a public host is skipped with its reason, for the default and a persona alike; no
+    // socket is made (the transport would refuse) and the caller's other relays go on.
+    if (relayAddressRefusal(url) === 'plain-on-public-host') {
+      return { ...relayEntry(url, null, false, socketIdentity ?? identity), ok: false, reason: 'plain-ws-public' };
+    }
     if (socketIdentity && socketIdentity.pubKey !== identity.pubKey) return addPersonaRelay(url, socketIdentity, { awaitReady });
     if (relayTransport && relayState.url === url) {
       if (awaitReady) await waitForSocket(relayTransport, relayReadyTimeoutMs);

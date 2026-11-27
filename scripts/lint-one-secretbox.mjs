@@ -25,18 +25,34 @@ const BASELINE = path.join(ROOT, 'scripts/one-secretbox-baseline.json');
 // a seal or open by the library itself, or the library's secretbox imported by name
 const DIRECT = /\bnacl\.secretbox(\.open)?\s*\(|import\s*\{[^}]*\bsecretbox\b[^}]*\}\s*from\s*['"]tweetnacl['"]/;
 
-/** Direct secretbox sites per file: `{ file: count }`. */
-export function directSecretbox(files, read = (f) => readFileSync(path.join(ROOT, f), 'utf8')) {
+/** Direct secretbox sites per file, as 1-based line numbers: `{ file: [line, …] }`. */
+export function directSecretboxLines(files, read = (f) => readFileSync(path.join(ROOT, f), 'utf8')) {
   const out = {};
   for (const f of files) {
     if (f === THE_PORT || f === IMPLEMENTATIONS) continue;
     let text = '';
     try { text = read(f); } catch { continue; }
-    let n = 0;
-    for (const line of text.split('\n')) if (DIRECT.test(line) && !/^\s*(\*|\/\/)/.test(line)) n += 1;
-    if (n) out[f] = n;
+    const lines = [];
+    text.split('\n').forEach((line, i) => { if (DIRECT.test(line) && !/^\s*(\*|\/\/)/.test(line)) lines.push(i + 1); });
+    if (lines.length) out[f] = lines;
   }
   return out;
+}
+
+/** Direct secretbox sites per file: `{ file: count }`. */
+export function directSecretbox(files, read) {
+  return Object.fromEntries(Object.entries(directSecretboxLines(files, read)).map(([f, ls]) => [f, ls.length]));
+}
+
+/** The red message for files that grew: what is wrong, each site as file:line, and what to do instead. */
+export function redMessage(grew, lines) {
+  const out = ['✖ lint-one-secretbox: a secretbox is sealed or opened outside the port (crypto/secretbox.js) — it runs in pure JS again:'];
+  for (const g of grew) {
+    out.push(`  ${g.file}: ${g.now} site(s), baseline ${g.was}`);
+    for (const l of lines[g.file] ?? []) out.push(`    ${g.file}:${l}`);
+  }
+  out.push(`Fix: call secretboxSeal(msg, nonce, key) / secretboxOpen(box, nonce, key) from ${THE_PORT} instead of nacl.secretbox / nacl.secretbox.open.`);
+  return out.join('\n');
 }
 
 /** What grew against the baseline: `[{file, now, was}]` (a new file has was = 0). */
@@ -45,13 +61,13 @@ export function grewAgainst(now, baseline) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const now = directSecretbox(shippedSources());
+  const lines = directSecretboxLines(shippedSources());
+  const now = Object.fromEntries(Object.entries(lines).map(([f, ls]) => [f, ls.length]));
   let baseline = {};
   try { baseline = JSON.parse(readFileSync(BASELINE, 'utf8')); } catch { baseline = {}; }
   const grew = grewAgainst(now, baseline);
   if (grew.length) {
-    console.error('lint-one-secretbox: a secretbox is sealed or opened outside the port (crypto/secretbox.js):');
-    for (const g of grew) console.error(`  • ${g.file}: ${g.now} (baseline ${g.was})`);
+    console.error(redMessage(grew, lines));
     process.exit(1);
   }
   if (process.argv.includes('--update')) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { auditDescriptions, shrunkBaseline, unreadFiles, auditGeneric, auditHelpPhrases, helpPhraseKeys, unreadBesideFiles } from './lint-op-descriptions.mjs';
+import { auditDescriptions, shrunkBaseline, unreadFiles, auditGeneric, auditHelpPhrases, helpPhraseKeys, unreadBesideFiles, descriptionsFile, unreadMessage } from './lint-op-descriptions.mjs';
 
 // one app, two ops; `params` per op
 const declared = { lists: { addToList: ['list', 'text'], listLists: [] }, tasks: { addTask: ['title'] } };
@@ -59,7 +59,7 @@ describe('lint-op-descriptions', () => {
     const atomWords = { en: { add: { what: 'Make {{a_noun}}.' }, list: { what: 'Show your {{nouns}}.' } }, nl: { add: { what: 'Maak {{a_noun}}.' } } };
     const names = { 'household.note': { en: { one: 'note', other: 'notes' }, nl: { one: 'notitie', other: 'notities' } } };
     const p = auditGeneric({ generic, atomWords, names, owed: ['pinboard.lend'] });
-    expect(p).toEqual(['the generic verb `list` has no sentence (nl), and household.note uses it']);
+    expect(p).toEqual(['apps/basis/src/locales/circle.nl.json: the generic verb `list` has no sentence (nl), and household.note uses it.\n    Fix: add settings.verb_what.list in apps/basis/src/locales/circle.nl.json.']);
     const p2 = auditGeneric({ generic, atomWords: { ...atomWords, nl: { ...atomWords.nl, list: { what: 'Laat je {{nouns}} zien.' } } }, names: {}, owed: [] });
     expect(p2.some((x) => /household\.note has no names \(en\)/.test(x))).toBe(true);
     expect(p2.some((x) => /pinboard\.lend has no names \(nl\)/.test(x))).toBe(true);
@@ -72,6 +72,42 @@ describe('lint-op-descriptions', () => {
     const p = auditGeneric({ generic, atomWords, names, owed: ['household.note', 'gone.thing'] });
     expect(p.some((x) => /baseline owes household\.note, which now has its words/.test(x))).toBe(true);
     expect(p.some((x) => /baseline owes gone\.thing, which is no generic noun/.test(x))).toBe(true);
+  });
+});
+
+describe('a red line names the file to open and says what to do', () => {
+  const manifestFiles = { lists: 'apps/lists/manifest.js', tasks: 'apps/tasks-v0/manifest.js', keys: 'apps/basis/src/v2/keyManifest.js' };
+  const fixed = (x) => /\n {4}Fix: \S/.test(x);
+  it('the descriptions file sits beside the manifest that declares the app', () => {
+    expect(descriptionsFile('apps/tasks-v0/manifest.js', 'nl')).toBe('apps/tasks-v0/descriptions.nl.json');
+    expect(descriptionsFile('apps/basis/src/v2/keyManifest.js', 'en')).toBe('apps/basis/src/v2/keyManifest.descriptions.en.json');
+  });
+  it('every description problem names the descriptions file (or the baseline) and has a Fix line', () => {
+    const nl = { addToList: { what: 'Zet iets op een lijst — nu.', params: { list: 'welke lijst', gone: 'x' } }, ghostOp: { what: 'Niets.' } };
+    const p = auditDescriptions({ declared, files: { lists: { nl, en: goodEn } }, baseline: ['gone'], manifestFiles });
+    expect(p.find((x) => /lists\.listLists has no `what` \(nl\)/.test(x))).toMatch(/^apps\/lists\/descriptions\.nl\.json: /);
+    expect(p.find((x) => /ghostOp/.test(x))).toMatch(/^apps\/lists\/descriptions\.nl\.json: .*\n {4}Fix: .*apps\/lists\/manifest\.js/);
+    expect(p.find((x) => /tasks has no descriptions/.test(x))).toMatch(/apps\/tasks-v0\/descriptions\.en\.json/);
+    expect(p.find((x) => /baseline lists gone/.test(x))).toMatch(/^scripts\/op-descriptions-baseline\.json: .*\n {4}Fix: run node scripts\/lint-op-descriptions\.mjs --update/);
+    expect(p.length).toBeGreaterThan(4);
+    expect(p.every(fixed)).toBe(true);
+  });
+  it('a generic-ops problem names the manifest, the locale or the baseline, with a Fix line', () => {
+    const generic = [{ app: 'lists', noun: 'note', atoms: ['add'] }];
+    const p = auditGeneric({ generic, atomWords: { en: {}, nl: {} }, names: {}, owed: ['gone.thing'], manifestFiles });
+    expect(p.find((x) => /lists\.note has no names \(en\)/.test(x))).toMatch(/^apps\/lists\/manifest\.js: /);
+    expect(p.find((x) => /generic verb `add` has no sentence \(nl\)/.test(x))).toMatch(/^apps\/basis\/src\/locales\/circle\.nl\.json: /);
+    expect(p.find((x) => /baseline owes gone\.thing/.test(x))).toMatch(/^scripts\/op-descriptions-baseline\.json: /);
+    expect(p.every(fixed)).toBe(true);
+  });
+  it('a help-phrase problem names the shared locale or the baseline, with a Fix line', () => {
+    const p = auditHelpPhrases({ keys: ['lists.addToList'], frozen: ['lists.gone'], describe: () => null, manifestFiles });
+    expect(p.find((x) => /NEW help phrase/.test(x))).toMatch(/^apps\/basis\/src\/locales\/circle\.\{en,nl\}\.json: .*\n {4}Fix: .*apps\/lists\/descriptions\.en\.json/);
+    expect(p.find((x) => /no locale has any more/.test(x))).toMatch(/^scripts\/op-descriptions-baseline\.json: /);
+    expect(p.every(fixed)).toBe(true);
+  });
+  it('an unread words file names itself and the reader to import it in', () => {
+    expect(unreadMessage('apps/calendar/descriptions.nl.json')).toMatch(/^apps\/calendar\/descriptions\.nl\.json: .*\n {4}Fix: import it in apps\/basis\/src\/v2\/opDescriptions\.js/);
   });
 });
 

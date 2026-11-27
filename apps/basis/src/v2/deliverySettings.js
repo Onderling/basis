@@ -23,7 +23,7 @@ import { storageName } from './storageRegister.js';   // every storage name from
 import { jsonKv } from './localStoreSeal.js';
 import { CHAT_KIND } from './conversationKinds.js';
 import {
-  DELIVERY, DELIVERY_TERMINAL, DELIVERY_LABELS, DELIVERY_REASON_LABELS, DELIVERY_WAITING_ENTRY, DELIVERY_WAITING_LABEL, isDeliveryState, shouldSendReceipt, receiveReceipt, RECEIPT_MESSAGE,
+  DELIVERY, DELIVERY_TERMINAL, DELIVERY_LABELS, DELIVERY_REASON_LABELS, DELIVERY_WAITING_ENTRY, DELIVERY_WAITING_LABEL, DELIVERY_RELAY_GAVE_UP_HINT, isDeliveryState, shouldSendReceipt, receiveReceipt, RECEIPT_MESSAGE,
 } from './deliveryState.js';
 
 /** Both settings, with their defaults. Only an explicit boolean changes one. */
@@ -162,10 +162,17 @@ export const DELIVERY_PRESENTATION = Object.freeze({
 });
 
 /** How to draw one state, or null when it should not appear. Pairs with `deliveryLabelFor`. */
-export function deliveryPresentation(state, { mine = true, reason = null, waiting = null } = {}) {
+export function deliveryPresentation(state, { mine = true, reason = null, waiting = null, relayGaveUp = null } = {}) {
   if (!mine || !isDeliveryState(state)) return null;
   const p = DELIVERY_PRESENTATION[state];
   if (!p?.show) return null;
+  // THE RELAY GAVE UP (the map's `relayGaveUpOf`): the relay's word, not this device's, so the rung stays (glyph, tone,
+  // words) and a retry hint sits BESIDE it (`hintKey`), with a tap that re-sends under the same id. Not on a terminal
+  // state (it has its own words and retry) nor on `stored` (a receipt outranks it). decisions.md 2026-07-29 + 2026-11-26.
+  if (relayGaveUp && state !== DELIVERY.STORED && !DELIVERY_TERMINAL.includes(state)) {
+    const base = deliveryPresentation(state, { mine, reason, waiting });
+    return { ...base, retryable: true, hintKey: DELIVERY_RELAY_GAVE_UP_HINT };
+  }
   // WHO IT STILL WAITS FOR (the map's `waitingOf`): while some recipients wait for an address, the bubble says how many
   // it was sent to, in place of the rung's words; a failure's words win over it, and the rung's return once nobody waits.
   // The shape (glyph, tone, retry) stays the state's: the side fact changes the words, never the claim.

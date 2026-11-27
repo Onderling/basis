@@ -52,6 +52,9 @@ const FILES = [
  */
 const SAME_SEAL = { sealedLocalBackend: ['sealedLocalBackend', 'sealedNamedBackend'] };
 
+/** Where each wrapper is defined, for the Fix line. */
+const SEAL_HOME = { sealedLocalBackend: 'apps/basis/src/v2/localStoreSeal.js', sealedLocalVault: 'apps/basis/src/v2/localStoreSeal.js', sealedBlobStore: 'apps/basis/src/v2/attachmentBlobStore.js' };
+
 /** Sealed by realAgent instead, so the shell hands it over bare. Matched on the store name. */
 const SEALED_ELSEWHERE = /basis.agent-registry|storageName\('agentRegistry'\)/;   // by its name, or its register id
 
@@ -78,7 +81,7 @@ for (const { path, factory, wrapper } of FILES) {
     // an unrelated call cannot vouch for one.
     const window = lines.slice(Math.max(0, i - 3), i + 4).join('\n');
     if ((SAME_SEAL[wrapper] ?? [wrapper]).some((w) => window.includes(`${w}(`))) return; // the ordinary, correct shape
-    problems.push({ path, line: i + 1, text: line.slice(0, 120) });
+    problems.push({ path, line: i + 1, text: `${line.slice(0, 120)}\n      Fix: wrap the ${factory}(…) construction in ${wrapper}(…) within three lines of it (${SEAL_HOME[wrapper] ?? 'apps/basis/src/v2/localStoreSeal.js'}); if it is genuinely sealed somewhere else, say so where the exemption is listed (SEALED_ELSEWHERE in scripts/lint-sealed-at-rest.mjs).` });
   });
 }
 

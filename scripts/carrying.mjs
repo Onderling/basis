@@ -100,3 +100,36 @@ export function checkCarrying({ read, files, carriers = CARRIERS, serverFiles = 
   }
   return { unlisted, unknownRow, unreached, inert: rows.filter((r) => r.inert).length, rows: rows.length };
 }
+
+/** The 1-based line of the first line holding `needle` in a text (1 when none does). */
+function lineHolding(text, needle) {
+  const i = String(text).split('\n').findIndex((l) => l.includes(needle));
+  return i < 0 ? 1 : i + 1;
+}
+
+/**
+ * The red lines for a `checkCarrying` result: what is wrong, where (file:line) and what to do instead.
+ * @param {ReturnType<typeof checkCarrying>} r
+ * @param {{ read: (rel: string) => string, indexPath?: string, carriersPath?: string }} o
+ * @returns {string[]}
+ */
+export function carryingMessages(r, { read, indexPath = 'docs/conventions/carrying-index.md', carriersPath = 'scripts/carrying.mjs' }) {
+  const at = (rel, needle) => { let t = ''; try { t = read(rel); } catch { /* missing: its top */ } return `${rel}:${lineHolding(t, needle)}`; };
+  const out = [];
+  if (r.unlisted.length) {
+    out.push(`\n✖ lint-carrying: ${r.unlisted.length} server route(s)/store(s) not in the carrying index:`);
+    for (const u of r.unlisted) out.push(`  ${at(u.file, u.id)}: ${u.kind} ${u.id}`);
+    out.push(`  Fix: open ${indexPath} (the neighbour is usually there) and use that mechanism instead; if it is a new one, give it a row and declare it in ${carriersPath} CARRIERS.`);
+  }
+  if (r.unknownRow.length) {
+    out.push(`\n✖ lint-carrying: ${r.unknownRow.length} declared carrier(s) name a row the index does not have:`);
+    for (const u of r.unknownRow) out.push(`  ${at(carriersPath, `'${u.id}'`)}: ${u.id} → "${u.row}"`);
+    out.push(`  Fix: point the carrier at the row's first-column text as it stands in ${indexPath}, or add that row.`);
+  }
+  if (r.unreached.length) {
+    out.push(`\n✖ lint-carrying: ${r.unreached.length} row(s) say a file uses them that does not (DONE = reached):`);
+    for (const u of r.unreached) out.push(`  ${at(indexPath, u.row)}: "${u.row}" — ${u.consumer ?? ''} ${u.why}`);
+    out.push('  Fix: name the real consumer in "Used today by", or move the row to the inert table.');
+  }
+  return out;
+}

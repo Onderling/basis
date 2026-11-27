@@ -5,7 +5,7 @@
  * it cannot go blind silently.
  */
 import { describe, it, expect } from 'vitest';
-import { auditManifest, loadManifests, auditPlacedAgreement, auditWhat, judgeWhat, shrunkWhatBaseline } from './lint-manifest-scopes.mjs';
+import { auditManifest, loadManifests, auditPlacedAgreement, auditWhat, judgeWhat, shrunkWhatBaseline, redLine } from './lint-manifest-scopes.mjs';
 import { verbKind } from '../packages/app-manifest/src/atoms.js';
 
 const ok = (ops) => ({ app: 'x', hosts: [], operations: ops });
@@ -92,6 +92,32 @@ describe('lint-manifest-scopes', () => {
 });
 
 
+describe('lint-manifest-scopes: a red line names the file to open and what to do', () => {
+  const FILES = { x: 'apps/x/manifest.js', tools: 'apps/basis/src/v2/toolsManifest.js' };
+  it('an op problem names the manifest file and has a Fix line', () => {
+    const [p] = auditManifest(ok([{ id: 'addThing', verb: 'add' }]));
+    const line = redLine({ file: FILES.x, app: 'x', ...p });
+    expect(line).toMatch(/^apps\/x\/manifest\.js: x\.addThing: writing op/);
+    expect(line).toMatch(/\n {4}Fix: add writes: \{ scope: /);
+    for (const q of auditManifest({ app: 'x', operations: [{ id: 'r', verb: 'register' }], domainVerbs: ['help'] })) expect(q.message).toMatch(/\n {4}Fix: /);
+    expect(auditManifest({ app: 'x', operations: [] })[0].message).toMatch(/\n {4}Fix: declare the network hosts/);
+  });
+  it('a weight problem names the manifest, a stale baseline entry the baseline file and --update', () => {
+    const owed = auditWhat(ok([{ id: 'addTask', verb: 'add', writes: { scope: 'circle' } }])).map((o) => ({ app: 'x', ...o }));
+    const [red] = judgeWhat({ owed, baseline: {}, files: FILES });
+    expect(red).toMatch(/^apps\/x\/manifest\.js: x\.addTask: /);
+    expect(red).toMatch(/\n {4}Fix: declare what it writes: writes\.what = /);
+    const [stale] = judgeWhat({ owed: [], baseline: { what: ['x.gone'] }, files: FILES });
+    expect(stale).toMatch(/^scripts\/manifest-what-baseline\.json: baseline x\.gone: no longer owes what/);
+    expect(stale).toMatch(/\n {4}Fix: run node scripts\/lint-manifest-scopes\.mjs --update/);
+  });
+  it("an '@placed' disagreement names the manifest and has a Fix line", () => {
+    const [p] = auditPlacedAgreement([{ app: 'tools', hosts: ['@placed'], operations: [] }], new Set(), FILES);
+    expect(p).toMatch(/^apps\/basis\/src\/v2\/toolsManifest\.js: tools declares '@placed'/);
+    expect(p).toMatch(/\n {4}Fix: /);
+  });
+});
+
 describe("the reserved host word '@placed' (L1035)", () => {
   const base = { app: 'x', itemTypes: [], operations: [] };
   it("is accepted as a host; any other '@' word is not", () => {
@@ -139,7 +165,7 @@ describe('lint-manifest-scopes: what an op writes, and what a device read hands 
     const baseline = { what: ['x.a', 'x.gone'], reveals: [] };
     const red = judgeWhat({ owed, baseline });
     // owed and baselined: quiet; owed and not baselined: red; a bad word: red; a baseline entry no longer owed: red
-    expect(red.map((r) => r.split(':')[0]).sort()).toEqual(['baseline x.gone', 'x.b', 'x.c']);
+    expect(red.map((r) => r.replace(/^[^:]+: /, '').split(':')[0]).sort()).toEqual(['baseline x.gone', 'x.b', 'x.c']);
     expect(shrunkWhatBaseline({ owed, baseline })).toEqual({ what: ['x.a'], reveals: [] });
   });
 });

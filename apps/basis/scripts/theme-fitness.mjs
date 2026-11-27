@@ -26,7 +26,12 @@ const defined = new Set([...themeCss.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) =>
 const used = new Set([...circleCss.matchAll(/var\((--[a-z0-9-]+)/g)].map((m) => m[1]));
 const undef = [...used].filter((v) => !defined.has(v));
 if (undef.length) {
-  console.error(`✗ circle.css uses undefined vars: ${undef.join(', ')}`);
+  console.error('✗ circle.css uses undefined vars (each falls back to a hardcoded colour that ignores the theme):');
+  const cssLines = circleCss.split('\n');
+  for (const v of undef) {
+    cssLines.forEach((l, i) => { if (l.includes(`var(${v}`)) console.error(`   apps/basis/web/v2/circle.css:${i + 1}: ${v}`); });
+  }
+  console.error('  Fix: use a token web/v2/theme.css defines instead (--card, --paper-2, --ink, …), or add the new one to src/v2/theme.js and regenerate.');
   failed = true;
 } else {
   console.log(`✓ all ${used.size} custom properties used in circle.css are defined`);
@@ -38,7 +43,14 @@ const stripped = circleCss
   .replace(/var\(--[a-z0-9-]+\s*,\s*#[0-9a-fA-F]{3,8}\)/g, 'var(--x)');
 const liveHex = stripped.match(/#[0-9a-fA-F]{3,8}\b/g) || [];
 if (liveHex.length) {
-  console.error(`✗ live hex colours in circle.css (use tokens): ${[...new Set(liveHex)].join(' ')}`);
+  console.error('✗ live hex colours in circle.css:');
+  const hexes = new Set(liveHex);
+  circleCss.split('\n').forEach((l, i) => {
+    const code = l.replace(/\/\*.*?\*\//g, '').replace(/var\(--[a-z0-9-]+\s*,\s*#[0-9a-fA-F]{3,8}\)/g, '');
+    const here = (code.match(/#[0-9a-fA-F]{3,8}\b/g) || []).filter((h) => hexes.has(h));
+    if (here.length) console.error(`   apps/basis/web/v2/circle.css:${i + 1}: ${here.join(' ')}`);
+  });
+  console.error('  Fix: use a theme token, var(--…), instead of the hex value.');
   failed = true;
 } else {
   console.log('✓ no live hex colours in circle.css — all colour comes from tokens');
@@ -67,8 +79,9 @@ for (const rel of jsFiles) {
   });
 }
 if (offenders.length) {
-  console.error(`✗ live hex colours in web JS (use var(--token), or mark '// hex-ok: <reason>'):`);
+  console.error(`✗ live hex colours in web JS:`);
   offenders.forEach((o) => console.error('   ' + o));
+  console.error("  Fix: use var(--token) instead, or mark the line '// hex-ok: <reason>' when the hex is deliberate.");
   failed = true;
 } else {
   console.log(`✓ no live hex colours in ${jsFiles.length} web JS files`);

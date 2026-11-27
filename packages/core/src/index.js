@@ -60,7 +60,7 @@ export {
 // NOT circleLink: the verifier supplies a fresh nonce — see the header of addressPossession.js.
 export {
   ADDRESS_NONCE_BYTES, ADDRESS_CHALLENGE_TTL_MS, newAddressChallenge,
-  addressPossessionMessage, relayNameOf, relayOwnNames, isPrivateRelayName, signAddressPossession, signAddressPossessionFromSeed,
+  addressPossessionMessage, relayNameOf, relayOwnNames, isPrivateRelayName, relayAddressRefusal, signAddressPossession, signAddressPossessionFromSeed,
   circleAddressSigner, verifyAddressPossession,
 } from './identity/addressPossession.js';
 export { hashHex, hmacBase64Url } from './hashHex.js';
@@ -75,7 +75,7 @@ export {
 // (SDK pod layer), not kernel identity. Import them from '@onderling/pod-client'.
 // `core` no longer re-exports them (guarded by test/layering.enforcement.test.js).
 // AgentIdentity / Bootstrap (kernel identity) stay here.
-export { CloudBackup }                 from './identity/CloudBackup.js';
+export { CloudBackup, derivePassphraseKey, PROD_ARGON_OPTS } from './identity/CloudBackup.js';
 export { CloudAdapter, MemoryAdapter } from './identity/CloudAdapter.js';
 export {
   generateMnemonic,

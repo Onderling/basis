@@ -176,7 +176,11 @@ const fresh = violations.filter((v) => !known.has(siteKey(v)));
 
 if (fresh.length) {
   console.error(`\n✗ lint:unreached — ${fresh.length} export(s) that NOTHING reaches:\n`);
-  for (const v of fresh) console.error(`   - ${v.file}  →  ${v.symbol}`);
+  for (const v of fresh) {
+    let text = ''; try { text = readFileSync(path.join(ROOT, v.file), 'utf8'); } catch { /* gone: its top */ }
+    const i = text.split('\n').findIndex((l) => /^\s*export\b/.test(l) && new RegExp(`\\b${v.symbol}\\b`).test(l));
+    console.error(`   - ${v.file}:${i + 1 || 1}  →  ${v.symbol}`);
+  }
   console.error(`
 An export with no consumer outside its own package is an INERT SEAM. It passes its tests, it reads as
 capability in every plan that cites it, and it never runs. Three of those cost a day to find by hand.

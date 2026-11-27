@@ -63,11 +63,25 @@ describe('lint-entry-kinds-complete', () => {
       { file: 'd.js', laneConst: 'D_LANE', lane: null },
     ] });
     expect(problems).toEqual(expect.arrayContaining([
-      expect.stringMatching(/b\.js: appends to lane 'ghost', which is not a declared/),
-      expect.stringMatching(/c\.js: appends to lane 'note', whose kind accepts nothing/),
-      expect.stringMatching(/d\.js: appends to D_LANE, which that manifest does not define/),
+      expect.stringMatching(/b\.js:\d+: appends to lane 'ghost', which is not a declared/),
+      expect.stringMatching(/c\.js:\d+: appends to lane 'note', whose kind accepts nothing/),
+      expect.stringMatching(/d\.js:\d+: appends to D_LANE, which that manifest does not define/),
     ]));
     expect(problems).toHaveLength(3);
     expect(problems.filter((p) => /a\.js/.test(p))).toEqual([]);
+  });
+  it('every red message names a file:line and says what to do instead', () => {
+    const kindsText = "export const ENTRY_KINDS = Object.freeze({\n  bare: K(LANE.X),\n  'partial': K(LANE.Y),\n});";
+    const problems = audit({
+      rows: { bare: null, partial: '{ signs: SIGNS.CIRCLE }' },
+      unknown: 'nope', vocab: VOCAB, mirrored: { bare: null },
+      manifestLanes: [{ file: 'apps/x/m.js', laneConst: 'NO_LANE', lane: null }],
+      kindsText, readFile: () => 'const a = 1;\n  appends: [{ lane: NO_LANE }],',
+    });
+    expect(problems.length).toBeGreaterThan(4);
+    for (const p of problems) { expect(p).toMatch(/\.js:\d+/); expect(p).toMatch(/\n\s*Fix: /); }
+    expect(problems.find((p) => /'bare': no binding/.test(p))).toMatch(/entryKinds\.js:2:/);
+    expect(problems.find((p) => /'partial'/.test(p))).toMatch(/entryKinds\.js:3:/);
+    expect(problems.find((p) => /NO_LANE/.test(p))).toMatch(/apps\/x\/m\.js:2:/);
   });
 });

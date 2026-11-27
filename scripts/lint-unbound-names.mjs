@@ -65,7 +65,14 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   }
   if (found.length) {
     console.error(`\n✖ lint-unbound-names: ${found.length} entry point(s) use a name nothing defines — a ReferenceError waiting for the line to run:`);
-    for (const f of found) console.error(`  ${f.rel}: ${f.names.join(', ')}`);
+    for (const f of found) {
+      let text = ''; try { text = readFileSync(path.join(ROOT, f.rel), 'utf8'); } catch { /* reported as is */ }
+      const lines = text.split('\n');
+      for (const n of f.names) {
+        const i = /^\w+$/.test(n) ? lines.findIndex((l) => !/^\s*(\/\/|\*)/.test(l) && new RegExp(`\\b${n}\\b`).test(l)) : -1;
+        console.error(`  ${f.rel}:${i + 1 || 1}: ${n}`);
+      }
+    }
     console.error('\nFix: import it (or define it). A Node entry point is not bundled, so nothing else will refuse it.\n');
     process.exit(1);
   }

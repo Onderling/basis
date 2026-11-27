@@ -1480,9 +1480,14 @@ persona the device was handed writes its own registry entry at boot, so its circ
 strongest door the platform offers: the OS keystore on mobile (Android Keystore / iOS Keychain,
 device-only — never a cloud keychain backup, because the phrase re-derives it anywhere and a synced copy
 would be one more place the secret lives); on the web, the seed sits in IndexedDB only encrypted under a
-**non-extractable** WebCrypto key, so copying the browser profile yields ciphertext plus a key handle
-that cannot travel. Stated honestly: the web door protects against disk and backup readout, not against
-code running inside the same origin; and on hosts with no key door at all (a headless Node agent), the
+**non-extractable** WebCrypto key. Stated honestly: its bytes cannot be read by script, but the browser
+writes it into the profile on disk and any code on the origin can use it, so without a lock a copied
+profile opens the seed. **The browser lock** (optional, the person's choice): the person's code or
+passphrase wraps the door's key (one slot, Argon2id), so the door has four states, `empty` · `open` (no
+lock) · `locked` · `unlocked`. A locked door holds no usable key and answers `KeyLocked`, never "no
+identity". The web shell asks the door before it builds the agent: on `locked` it paints the lock screen
+and nothing starts until the secret opens it, and the same open door is handed to the agent. The phone
+and the box have no lock (their doors answer `unlocked`). On hosts with no key door at all (a headless Node agent), the
 gain is containment — the recovery artifact the product promises "exists only in your hands" is off the
 disk — not hardware secrecy. An install that predates this custody model has its stored phrase adopted
 into the door on first boot, read-back-verified before the cleartext is deleted: a keystore that loses

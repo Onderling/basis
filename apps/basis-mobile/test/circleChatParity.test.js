@@ -62,8 +62,8 @@ describe('circle chat — no inbox, card-fan parity (web ≡ mobile)', () => {
     expect(webShell).toMatch(/waiting: deliveryStateMap\.waitingOf/);   // the in-place repaint too
     expect(launcher).toMatch(/waitingOf\?\.\(msgId\)/);
     expect(launcher).toMatch(/<DeliveryChip [^>]*waiting=\{deliveryWaiting\}/);
-    expect(webView).toMatch(/deliveryPresentation\(state, \{ reason, waiting \}\)/);
-    expect(mobileChip).toMatch(/deliveryPresentation\(state, \{ reason, waiting \}\)/);
+    expect(webView).toMatch(/deliveryPresentation\(state, \{ reason, waiting, relayGaveUp \}\)/);
+    expect(mobileChip).toMatch(/deliveryPresentation\(state, \{ reason, waiting, relayGaveUp \}\)/);
     expect(webView).toMatch(/tr\(p\.labelKey, p\.labelVars\)/);
     expect(mobileChip).toMatch(/t\(p\.labelKey, p\.labelVars\)/);
   });

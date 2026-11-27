@@ -89,7 +89,6 @@ export const STORAGE = Object.freeze({
   circlePolicy:           row('basis.circlePolicy.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
   circlePolicyHead:       row('basis.circlePolicyHead.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
   circlePolicyPending:    row('basis.circlePolicyPending.', 'prefix', [W, M], 'throwaway', 'not content: a pending flag ({pending: bool}) per circle', k('json')),
-  circleRules:            row('basis.circleRules.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
   circleRulesPending:     row('basis.circleRulesPending.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
   circleRecipe:           row('basis.circleRecipe.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),
   circleRecipePending:    row('basis.circleRecipePending.', 'prefix', [W, M], 'throwaway', 'sealed', k('json')),

@@ -71,7 +71,7 @@ import { alphaViewMode, isAlphaTab, ALPHA_FALLBACK_TAB } from '../../src/v2/alph
 import { runPendingForget, markerVaultOver, circleIdsFrom } from '../../src/v2/enrolForgets.js';
 import { checkPhraseForThisDevice, startDeviceOver, readStartOverMark, cancelStartOver, cancelStartOverAsks, wipeKeyValueStorage, deleteDatabases, restorePhraseWithoutAgent, START_OVER_PENDING_KEY } from '../../src/v2/startOver.js';
 import { isBasisStorageKey, isBasisDatabase, BASIS_DB_NAMES } from '../../src/v2/basisStorageNames.js';
-import { pickRootKeyStore } from '../../src/core/agent/ownerRootCustody.js';
+import { pickRootKeyStore, openKeyDoorAtBoot } from '../../src/core/agent/ownerRootCustody.js';
 import { makeBrowserVault } from '@onderling/secure-agent';
 import { DEFAULT_PERSONA } from '../../src/v2/contactPersona.js';
 import { contactAddSheetModel, addContactAs, contactLensModel, changeContactLens, contactThreadSelfFor } from '../../src/v2/contactLens.js';
@@ -112,7 +112,7 @@ import { removeMemberDoor, changeRulesDoor, changeRoleDoor, changeSettingsDoor, 
 // routing fallback: a global address seen in two contexts collapses two personas into one person.
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../src/v2/addressSharing.js';
 import {
-  createConnectionPoints, adoptExistingRelay, adoptInheritedPoint, localStorageConnectionPointsIo, recordJoinedCirclePoints, POINT_KIND,
+  createConnectionPoints, pointAddErrorKey, adoptExistingRelay, adoptInheritedPoint, localStorageConnectionPointsIo, recordJoinedCirclePoints, POINT_KIND,
   // Used at module scope to pick the boot relay; it was never imported, so loading the web shell threw
   // `bootRelayUrl is not defined` before anything rendered — a BLANK PAGE, not a degraded one.
   bootRelayUrl, bootRelayUrls,
@@ -889,6 +889,31 @@ import { makeGiveUpConsumers } from '../../src/v2/deliveryGiveUp.js';
 // The SHARED security-status report — the same function mobile reaches through the builtins table.
 import { securityStatus } from '../../src/core/localBuiltins.js';
 import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../../src/v2/circleMembrane.js';
+
+// the key door this tab built at its start (the browser lock): one object, so an opened door stays open in this tab;
+// `appLockOn`: whether the person's lock is on (read at the start, changed by the settings switch)
+let keyDoor = null;
+let appLockOn = false;
+// THE OTHER TABS of this browser: a door key opened in one tab lives in that tab only, so "lock now", or the lock
+// switched on or off, in one tab tells the others; each drops its door key and reloads (onto the lock screen, or, after
+// an off, into an open door). The lock is for
+// someone else at the same computer, and a second tab left open would be their way in. No channel: this tab only.
+// ONE channel object per tab: a message reaches every OTHER object of the same name, this tab's own included.
+let keyDoorTabs = null;
+const tabsChannel = () => { try { keyDoorTabs ??= new BroadcastChannel('onderling-key-door'); } catch { /* none */ } return keyDoorTabs; };
+function tellOtherTabsLocked() {
+  try { tabsChannel()?.postMessage('locked'); } catch { /* this tab only */ }
+}
+function listenForOtherTabsLocking() {
+  try {
+    const c = tabsChannel();
+    if (c) c.onmessage = (e) => {
+      if (e?.data !== 'locked') return;
+      try { keyDoor?.lock?.(); } catch { /* reloading anyway */ }
+      window.location.reload();
+    };
+  } catch { /* this tab only */ }
+}
 
 // actor label stamped on local chat-message events. Real WebID/
 // peer-display wiring lands with peer broadcast.
@@ -3676,10 +3701,10 @@ async function showContactThread(contactId, { draft = '' } = {}) {
     // self-cleaning: once this thread is no longer the one on screen (a tab, another thread), the subscription ends itself
     if (_activeContactThread?.leave !== unsubscribeDelivery) { unsubscribeDelivery(); return; }
     if (!thread.messages.some((x) => x.messageId === msgId)) return;
-    paintDeliveryChip(rootEl, msgId, state, { tr: t, onRetryDelivery, reason: deliveryStateMap.reasonOf(msgId), bubbleClass: 'cc-cthread__bubble', metaClass: 'cc-cthread__meta' });
+    paintDeliveryChip(rootEl, msgId, state, { tr: t, onRetryDelivery, reason: deliveryStateMap.reasonOf(msgId), relayGaveUp: deliveryStateMap.relayGaveUpOf(msgId), bubbleClass: 'cc-cthread__bubble', metaClass: 'cc-cthread__meta' });
   });
   const rerender = () => renderContactThread(rootEl, {
-    deliveryStateFor, deliveryReasonFor, onRetryDelivery,
+    deliveryStateFor, deliveryReasonFor, deliveryRelayGaveUpFor: (msgId) => deliveryStateMap.relayGaveUpOf(msgId), onRetryDelivery,
     cannotWrite: !!thread.sendTo?.blocked,
     attachMenu: contactAttach, onAttachCommand: onContactAttach,
     // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
@@ -4267,7 +4292,8 @@ function showConnectionPoints() {
   /** Record it, then dial it. Both halves are reported: a point that is listed but not connected is a
    *  different (and recoverable) state from one that was never accepted at all. */
   async function addRelayByHand(url, pointsStore, redraw) {
-    if (!pointsStore.addManually(url)?.ok) { addError = 'circle.nearbyScreen.point_add_invalid'; redraw(); return; }
+    const added = pointsStore.addManually(url);
+    if (!added?.ok) { addError = pointAddErrorKey(added?.reason); redraw(); return; }
     addError = null; redraw();
     try {
       const r = await _peerAgent?.addRelay?.(url, { awaitReady: true });
@@ -5550,6 +5576,29 @@ async function showMyData(opts) {
     // disconnect the pod (the `signout` op, through the waist), then read the state again; a bot's /koppel link, pasted
     onSignOut: () => Promise.resolve(rawCallSkill('basis', 'signout', {})).catch(() => null).then(() => again()),
     onLinkBot: typeof _openBotLink === 'function' ? _openBotLink : null,
+    // The person's lock on this browser: host acts onto the key door. The code goes ONLY into the door's own calls
+    // below; nothing here logs it, stores it or hands it to the waist (no op), and a failure is reported by code alone.
+    appLock: typeof keyDoor?.setLock === 'function' ? {
+      on: appLockOn,
+      set: async (code) => {
+        try { await keyDoor.setLock(code); } catch { return { ok: false, code: 'failed' }; }
+        // another open tab holds the door's old shape: it reloads onto the lock screen
+        tellOtherTabsLocked();
+        appLockOn = true; again(); return { ok: true };
+      },
+      clear: async (code) => {
+        // asked once, and checked on a SECOND door object: a wrong code never touches this tab's open door
+        const probe = pickRootKeyStore({ fallbackVault: makeBrowserVault(storageName('vaultOwnerRoot')) });
+        if (!(await probe.unlock(code).catch(() => false))) return { ok: false, code: 'wrong' };
+        try { await keyDoor.clearLock(); } catch { return { ok: false, code: 'failed' }; }
+        // another open tab still holds the locked shape's door key: a seed it wrote now would be sealed under a key the
+        // store no longer uses and lost at the next read. It reloads and finds the open door.
+        tellOtherTabsLocked();
+        appLockOn = false; again(); return { ok: true };
+      },
+      // the door key leaves this tab's memory, and every other tab's; the reload opens on the lock screen
+      lockNow: () => { tellOtherTabsLocked(); keyDoor.lock(); window.location.reload(); },
+    } : null,
     onSignIn, podIssuerDefault: podAuth.resolveIssuer()?.url ?? null, podIssuers: podAuth.KNOWN_ISSUERS, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, thisDeviceId: circleHouseholdAgent?.myDeviceId?.() ?? null, deviceName: browserDeviceName(globalThis.navigator?.userAgent), onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
@@ -8441,6 +8490,7 @@ function showCircle(id, circle, policy) {
       deliveryStateFor: (msgId) => deliveryStateMap.get(msgId),
       deliveryReasonFor: (msgId) => deliveryStateMap.reasonOf(msgId),
       deliveryWaitingFor: (msgId) => deliveryStateMap.waitingOf?.(msgId) ?? null,
+      deliveryRelayGaveUpFor: (msgId) => deliveryStateMap.relayGaveUpOf(msgId),
       localActor: LOCAL_ACTOR,
       // δ.2 — retry on the failed icon tap.  Re-fires the SAME msgId
       // (idempotent receiver-side dedup).  Looks up the original text
@@ -8729,6 +8779,7 @@ function showCircle(id, circle, policy) {
       tr: t,
       reason: deliveryStateMap.reasonOf(msgId),
       waiting: deliveryStateMap.waitingOf?.(msgId) ?? null,
+      relayGaveUp: deliveryStateMap.relayGaveUpOf(msgId),
       onRetryDelivery: (retryId) => {
         const evt = eventLog.query({ excludeMuted: true }).find((e) => e.id === retryId);
         const text = evt?.payload?.text;
@@ -9027,8 +9078,7 @@ function showFolio(id) {
   loadCaps();   // resolve the capability matrix, then re-render.
 }
 
-// Circle rules document (boards 3B/3C) — editor persists per circle
-// (basis.circleRules.<id>); "preview" shows the Agree/Decline consent screen.
+// Circle rules document: "preview" shows the Agree/Decline consent screen.
 // Threading the consent into the real join flow is the follow-on.
 // THE CIRCLE'S RULES: the screen reads the circle's rules head (what the invite carries and a joiner agrees to) and
 // saves through the circle's rule for changing them (governanceDoors.js): where any admin may, written at once and
@@ -9662,6 +9712,42 @@ function openStartOverPage() {
   try { window.sessionStorage.setItem(START_OVER_PAGE_KEY, '1'); } catch { /* the page opens on this load only */ }
   window.location.reload();
 }
+
+// THE LOCK SCREEN (the browser lock): painted at an open when the person locked their Basis in this browser, before
+// the agent exists, so nothing of theirs is behind it. One field, the wrong-code line, and the way out of a forgotten
+// code (the start-over page). The shell paints and passes what was typed; `openKeyDoorAtBoot` asks, the door decides.
+// "Opening" is painted, and the browser given a frame to show it, BEFORE the slow derivation blocks the page.
+function keyDoorLockScreen() {
+  const root = document.getElementById('circle-root') ?? document.body;
+  const el = (tag, attrs = {}, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); n.append(...kids); return n; };
+  const said = el('p', { role: 'alert', class: 'lock-screen__said', 'data-testid': 'lock-said' });
+  // autocomplete off (best effort, browsers differ): a code the browser saved and fills in undoes the lock
+  const field = el('input', { type: 'password', class: 'lock-screen__field', autocomplete: 'off', 'aria-label': t('circle.lock.field'), 'data-testid': 'lock-field' });
+  const open = el('button', { type: 'submit', class: 'cc-btn cc-btn--primary', 'data-testid': 'lock-open' }, t('circle.lock.open'));
+  const forgot = el('button', { type: 'button', class: 'cc-btn cc-btn--link', 'data-testid': 'lock-forgot' }, t('circle.lock.forgot'));
+  forgot.addEventListener('click', () => openStartOverPage());
+  const form = el('form', { class: 'lock-screen__form' }, el('label', {}, t('circle.lock.field'), field), open, said);
+  const page = el('section', { class: 'lock-screen', 'data-testid': 'lock-screen' }, el('h2', {}, t('circle.lock.title')), form, forgot);
+  let answer = null;
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!answer) return;
+    const give = answer; answer = null;
+    open.disabled = true; said.textContent = t('circle.lock.opening');
+    const typed = field.value;
+    requestAnimationFrame(() => setTimeout(() => give(typed), 0));
+  });
+  root.replaceChildren(page);
+  return {
+    ask: ({ wrong }) => new Promise((resolve) => {
+      answer = resolve; open.disabled = false;
+      said.textContent = wrong ? t('circle.lock.wrong') : '';
+      if (wrong) field.value = '';
+      field.focus();
+    }),
+    close: () => page.remove(),
+  };
+}
 // The clear takes only what is Basis's by name (basisStorageNames.js): the origin is shared with the public site and the
 // toolbox screen pages. A delete another tab blocks fails the start-over with 'blocked' ("close the other tabs").
 async function wipeThisBrowser() {
@@ -9747,6 +9833,20 @@ async function boot() {
     try { asked = window.sessionStorage.getItem(START_OVER_PAGE_KEY) === '1'; window.sessionStorage.removeItem(START_OVER_PAGE_KEY); } catch { /* no page asked */ }
     if (mark || asked) { await initAppLocale().catch(() => {}); showStartOver({ mark }); return; }
   } catch { /* the ordinary boot */ }
+  // THE KEY DOOR, next (the browser lock): built ONCE here and asked before anything else starts. A locked door paints
+  // the lock screen and the boot waits for the person's secret: no relay socket, no sync, no store opened before it.
+  // The same door, open, is the agent's (an opened door's key lives in that one object).
+  keyDoor = pickRootKeyStore({ fallbackVault: makeBrowserVault(storageName('vaultOwnerRoot')) });
+  try {
+    if ((await keyDoor.status()) === 'locked') {
+      await initAppLocale().catch(() => {});
+      const screen = keyDoorLockScreen();
+      await openKeyDoorAtBoot(keyDoor, { askSecret: screen.ask });
+      screen.close();
+    }
+    appLockOn = (await keyDoor.status()) === 'unlocked' && typeof keyDoor.setLock === 'function';
+    listenForOtherTabsLocking();
+  } catch (e) { console.warn(`[key door] could not be asked at the start: ${e?.message ?? e}`); }
   // THE SIGNATURE CHECK: WebCrypto's batch behind the one strict rule, after its self-test (the vectors, an honest and a
   // tampered signature); a browser without Ed25519 in WebCrypto keeps tweetnacl. Reads then check ahead in one batch.
   try { const eq = await installWebSignatureEquation(globalThis.crypto?.subtle); console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`); } catch { /* tweetnacl stays */ }
@@ -9838,6 +9938,8 @@ async function boot() {
 
   try {
     const agent = await createRealHouseholdAgent({
+      // the key door the boot asked (and, when locked, opened with the person's secret): the agent reads THIS one
+      rootKeyStore: keyDoor,
       // the person's one availability record: away matches no offering (the post matcher, on this device)
       availability: () => availabilityStore.get(),
       // the agent's own lines (list and calendar defaults, task confirmations, a paused circle) in the person's language

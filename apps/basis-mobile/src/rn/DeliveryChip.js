@@ -12,11 +12,12 @@ import { deliveryPresentation } from '../../../basis/src/v2/deliverySettings.js'
 import { t } from '../core/localisation.js';
 import { useTheme } from '../screens/v2/themeContext.js';
 
-export default function DeliveryChip({ state, reason = null, waiting = null, rowId, onRetry = null, testIDPrefix = 'circle-delivery' }) {
+export default function DeliveryChip({ state, reason = null, waiting = null, relayGaveUp = null, rowId, onRetry = null, testIDPrefix = 'circle-delivery' }) {
   const theme = useTheme();
-  const p = deliveryPresentation(state, { reason, waiting });
+  const p = deliveryPresentation(state, { reason, waiting, relayGaveUp });
   if (!p) return null;
-  const label = t(p.labelKey, p.labelVars);
+  // the relay's give-up: its words BESIDE the rung's, and the chip a retry (the shared presentation decides; web the same)
+  const label = p.hintKey ? `${t(p.labelKey, p.labelVars)} · ${t(p.hintKey)}` : t(p.labelKey, p.labelVars);
   const line = `${p.glyph} ${label}`;
   const styles = stylesFor(theme);
   return p.retryable ? (

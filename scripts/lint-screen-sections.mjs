@@ -10,6 +10,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { whereIn } from './guard-where.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -68,14 +69,16 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   const problems = [];
   for (const [screen, sections] of Object.entries(SCREEN_SECTIONS)) {
     const files = SCREEN_FILES[screen];
-    if (!files) { problems.push(`${screen}: declared, but no files say where each shell paints it (SCREEN_FILES)`); continue; }
+    if (!files) { problems.push(`${whereIn('apps/basis/src/v2/screenSections.js', screen)}: ${screen} is declared, but no files say where each shell paints it.\n    Fix: add a SCREEN_FILES row for it in ${path.relative(ROOT, fileURLToPath(import.meta.url))} ({ web: [...], mobile: [...] }).`); continue; }
     for (const shell of ['web', 'mobile']) {
       const text = (files[shell] ?? []).map((f) => readFileSync(path.join(ROOT, f), 'utf8')).join('\n');
-      for (const m of missingIn(text, screen, sections.map((s) => s.id), files.via ?? null)) problems.push(`${screen} · ${shell}: lacks ${m}`);
+      for (const m of missingIn(text, screen, sections.map((s) => s.id), files.via ?? null)) {
+        problems.push(`${(files[shell] ?? []).join(', ') || '(no file)'}: ${screen} · ${shell} lacks ${m} (the file holds no such text, so there is no line to name).\n    Fix: paint the screen from ${files.via ? `${files.via}(…)` : `sectionsOf('${screen}')`} instead of a hand-made list, so every declared section is there.`);
+      }
     }
   }
   if (problems.length) {
-    console.error('lint-screen-sections:');
+    console.error('✖ lint-screen-sections:');
     for (const p of problems) console.error(`  • ${p}`);
     process.exit(1);
   }

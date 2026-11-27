@@ -168,7 +168,7 @@ describe('peer redeem — over the relay the invite names (2026-09-08)', () => {
     send({ adminPeerAddr: 'admin', groupId: 'c', code: 'ABC' });
     await Promise.resolve();
     expect(sent).toHaveLength(2);
-    expect(sent[0].opts).toEqual({ scope: { points: ['ws://their-box:8787'], requireAliasCapable: true } });
-    expect(sent[1].opts).toEqual({ scope: { requireAliasCapable: true } });
+    expect(sent[0].opts).toEqual({ guarantee: 'now', scope: { points: ['ws://their-box:8787'], requireAliasCapable: true } });
+    expect(sent[1].opts).toEqual({ guarantee: 'now', scope: { requireAliasCapable: true } });
   });
 });

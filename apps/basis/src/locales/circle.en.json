@@ -3645,6 +3645,10 @@
       "text": "No admin is online right now — try again later. The invitation stays valid.",
       "doc": "The no-admin-online notice at join (J-NP2). Without it this failure is indistinguishable from a broken invite, and nobody retries."
     },
+    "join_no_own_route": {
+      "text": "Your join could not be sent: this device has no connection that carries your own address. Set a connection point in Settings, Connection, and try again. The invitation stays valid.",
+      "doc": "At join, when the redeem found no route that carries the joiner's own address (no relay, no local network) within the wait: it was withdrawn, never sent another way. Not the admin's absence; the joiner's fix is a connection point."
+    },
     "delivery_section": {
       "text": "Delivery",
       "doc": "My-data section for the two delivery settings."

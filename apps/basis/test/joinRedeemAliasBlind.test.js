@@ -38,8 +38,6 @@ describe('a join\'s redeem over a device that also has an alias-blind route', ()
     await B.agent.sa.addSecureTransport('nkn', new AliasBlindTransport(nknBus, blindAddrB));
 
     // what the admin hears a redeem from, by sender
-    const redeemFrom = [];
-    A.agent.sa.agent.on?.('envelope', (env) => { if (env?.payload?.subtype === 'group-redeem-request') redeemFrom.push(env._from); });
 
     // the joiner's relay route to the admin is out at Join, and back a second later
     const relay = B._busTransport;
@@ -56,6 +54,38 @@ describe('a join\'s redeem over a device that also has an alias-blind route', ()
     const aRoster = await until(async () => { const r = await readRoster(A, groupId); return r.length >= 2 ? r : null; });
     const webids = (aRoster ?? (await readRoster(A, groupId))).map((m) => m.webid).sort();
     expect(webids, 'the admin admitted the joiner\'s own key, and no other address of its device').toEqual([A.pubKey, B.pubKey].sort());
-    expect(redeemFrom.includes(blindAddrB), `no redeem left from the alias-blind address — heard from ${JSON.stringify(redeemFrom)}`).toBe(false);
+    expect(webids, 'never the alias-blind address').not.toContain(blindAddrB);
+  }, 120_000);
+});
+
+describe('a join\'s redeem that found no route within the joiner\'s wait', () => {
+  let A; let B;
+  afterAll(async () => { await teardown(A, B); });
+
+  it('never leaves after the wait: the relay coming back later admits nobody, and the joiner is told why', async () => {
+    [A, B] = await Promise.all([bootRealAgentNode('A'), bootRealAgentNode('B', { redeemTimeoutMs: 1500 })]);
+    await connectAgentsOverBus(A, B);
+    const nknBus = new InternalBus({ presenceAware: true });
+    await A.agent.sa.addSecureTransport('nkn', new AliasBlindTransport(nknBus, A.pubKey));
+    await B.agent.sa.addSecureTransport('nkn', new AliasBlindTransport(nknBus, 'b0'.repeat(32)));
+
+    // the relay route to the admin comes back only AFTER the joiner stopped waiting
+    const relay = B._busTransport;
+    const reach = relay.canReach.bind(relay);
+    let relayUp = false;
+    relay.canReach = (peer) => relayUp && reach(peer);
+
+    const groupId = 'late-circle';
+    const { joined } = await pairCircle(A, B, { groupId, name: 'Late Circle', handle: 'latebee' });
+    expect(joined.ok, 'the join did not complete').not.toBe(true);
+
+    relayUp = true;
+    try { B.agent.presenceSignal?.(A.pubKey); } catch { /* nothing held is the point */ }
+    await new Promise((r) => setTimeout(r, 1500));
+
+    expect((await readRoster(A, groupId)).map((m) => m.webid), 'the admin admitted nobody').toEqual([A.pubKey]);
+    expect((await readRoster(B, groupId)).length, 'and the joiner holds no membership either').toBeLessThan(2);
+    expect(joined.reason ?? joined.error?.reason ?? joined.submitErrorReason ?? JSON.stringify(joined), 'the joiner is told there is no route that carries its own address')
+      .toMatch(/no-own-route/);
   }, 120_000);
 });

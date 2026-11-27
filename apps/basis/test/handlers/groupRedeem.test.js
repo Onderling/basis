@@ -6,7 +6,46 @@ import {
   makeHandleGroupRedeemRequest,
   makeHandleGroupRedeemResponse,
   makeSendGroupRedeemRequest,
+  REDEEM_REPLY_BOUND_MS,
+  REDEEM_WAIT_MS,
 } from '../../src/core/handlers/groupRedeem.js';
+
+describe('makeSendGroupRedeemRequest — a redeem with no route that carries its own address', () => {
+  it('is tried again within the wait, never after it, and the joiner is told no-own-route (not "admin offline")', async () => {
+    const sendPeer = vi.fn(async () => ({ held: false, delivered: false, reason: 'no-eligible-route' }));
+    const send = makeSendGroupRedeemRequest({
+      sendPeer, pendingMap: new Map(), timeoutMs: 60, retryMs: 10,
+      logger: { info: () => {}, warn: () => {}, error: () => {} },
+    });
+    const err = await send({ adminPeerAddr: 'admin', groupId: 'c', code: 'ABC' }).catch((e) => e);
+    expect(err?.reason).toBe('no-own-route');
+    const tries = sendPeer.mock.calls.length;
+    expect(tries, 'tried again within the wait').toBeGreaterThan(1);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(sendPeer.mock.calls.length, 'and not once after it').toBe(tries);
+  });
+
+  it('a route that exists but cannot carry this self (the send path\'s scopedOut) ends as no-own-route', async () => {
+    const send = makeSendGroupRedeemRequest({
+      sendPeer: async () => { throw Object.assign(new Error('Peer transport not connected (mode=both).'), { scopedOut: true }); },
+      pendingMap: new Map(), timeoutMs: 30, retryMs: 10,
+      logger: { info: () => {}, warn: () => {}, error: () => {} },
+    });
+    expect((await send({ adminPeerAddr: 'admin', groupId: 'c', code: 'ABC' }).catch((e) => e))?.reason).toBe('no-own-route');
+  });
+
+  it('no route of any kind ("not connected": the admin is not reachable) is tried again, and ends as no admin online', async () => {
+    const sendPeer = vi.fn(async () => { throw new Error('Peer transport not connected (mode=both).'); });
+    const send = makeSendGroupRedeemRequest({
+      sendPeer, pendingMap: new Map(), timeoutMs: 40, retryMs: 10,
+      logger: { info: () => {}, warn: () => {}, error: () => {} },
+    });
+    const err = await send({ adminPeerAddr: 'admin', groupId: 'c', code: 'ABC' }).catch((e) => e);
+    expect(err?.reason).toBeUndefined();
+    expect(String(err?.message)).toMatch(/did not respond/);
+    expect(sendPeer.mock.calls.length).toBeGreaterThan(1);
+  });
+});
 
 function reqDeps(overrides = {}) {
   return {
@@ -53,6 +92,10 @@ describe('makeHandleGroupRedeemRequest', () => {
     });
     await makeHandleGroupRedeemRequest(d)('peer-A', validRequest());
     expect(warns.some((w) => /\[group-redeem\] the answer to peer-A.*unknown-address/.test(w)), JSON.stringify(warns)).toBe(true);
+  });
+
+  it('the admin\'s bound on its answer is under the joiner\'s wait (one fact, two layers: pinned together)', () => {
+    expect(REDEEM_REPLY_BOUND_MS).toBeLessThan(REDEEM_WAIT_MS);
   });
 
   it('drops requests missing required fields', async () => {
@@ -195,7 +238,7 @@ describe('makeSendGroupRedeemRequest — Phase 4 (#271)', () => {
       code:       'JOIN-XYZ',
       shareCard:  true,
       peerDisplay: 'Bob',
-    }), { scope: { requireAliasCapable: true } });
+    }), { guarantee: 'now', scope: { requireAliasCapable: true } });
 
     // Simulate inbound response.
     const [[entry]] = [[...pendingMap.entries()]];
@@ -232,7 +275,7 @@ describe('makeSendGroupRedeemRequest — Phase 4 (#271)', () => {
       pendingMap,
     });
     await expect(send({ adminPeerAddr: 'app.x', groupId: 'g', code: 'C' }))
-      .rejects.toThrow(/Failed to reach admin over NKN/);
+      .rejects.toThrow(/^Failed to reach admin: NKN down$/);
     expect(pendingMap.size).toBe(0);
   });
 });

@@ -41,7 +41,7 @@ describe('localStoragePolicyIo', () => {
     const io = localStoragePolicyIo(storage);
     await io.save('c1', { pod: 'shared' });
     expect(await io.load('c1')).toEqual({ pod: 'shared' });
-    expect(map.has('cc.circlePolicy.c1')).toBe(true);
+    expect(map.has('basis.circlePolicy.c1')).toBe(true);
   });
 
   it('load returns null for missing / corrupt entries', async () => {
@@ -76,7 +76,7 @@ describe('createMemberOverrideStore', () => {
     const io = localStorageOverrideIo(storage);
     await io.save('c1', { chatOff: true });
     expect(await io.load('c1')).toEqual({ chatOff: true });
-    expect(map.has('cc.circleOverride.c1')).toBe(true);
+    expect(map.has('basis.circleOverride.c1')).toBe(true);
   });
 });
 

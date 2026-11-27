@@ -84,7 +84,7 @@ test.describe('the add-a-device ceremony leaves nothing of the former self', () 
     expect(phrase, 'the phrase is readable on A').toBeTruthy();
 
     const enrolled = await A2.page.evaluate(async ([uri, words]) => {
-      localStorage.setItem('onderling.enrollOffer', uri);
+      localStorage.setItem('basis.enrollOffer', uri);
       return window.onderlingCall('household', 'enrollDevice', { mnemonic: words, label: 'enrol-walk' });
     }, [offer.uri, phrase]);
     expect(enrolled?.ok, JSON.stringify(enrolled)).toBe(true);

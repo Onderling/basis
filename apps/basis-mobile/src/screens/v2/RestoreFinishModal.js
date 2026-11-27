@@ -49,7 +49,8 @@ export default function RestoreFinishModal({ visible, callSkill, onClose }) {
   const submit = (input) => {
     const runner = runnerRef.current;
     if (!runner || !inst) return;
-    runner.resume(FLOW, inst, { input }).then((r) => setInst(r)).catch(() => finish());
+    // "Not now" ends with no last screen: the flow closes at once (the shared decision, web parity)
+    runner.resume(FLOW, inst, { input }).then((r) => (restoreFinishOutcome(r).closeAtOnce ? finish() : setInst(r))).catch(() => finish());
   };
   const pickFile = async () => {
     try {
@@ -111,6 +112,7 @@ export default function RestoreFinishModal({ visible, callSkill, onClose }) {
   } else if (view) {
     // the one shared decision of which sentence ends which branch (web parity by construction)
     const { messageKey, retry, retiredCount } = restoreFinishOutcome(inst);
+    if (!messageKey) return null;   // a branch with no last screen closes in `submit`; never paint an empty key
     body = (
       <View>
         <Text style={styles.body}>{t(messageKey)}</Text>

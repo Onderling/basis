@@ -9,8 +9,8 @@
  * `Project Files/Substrates/substrate-candidates.md`).
  *
  * Default `dbName` for tasks-v0 callers is `'tasks-cache'`; basis
- * web composition passes `{dbName:'cc-tasks-cache', storeName:'items'}`
- * to keep the IDB database isolated from pinboard's `'cc-pinboard-cache'`.
+ * web composition passes `{dbName:'basis.tasks', storeName:'items'}`
+ * to keep the IDB database isolated from pinboard's `'basis.pinboard'`.
  *
  * See the pinboard original for the storage-shape rationale + browser-only
  * contract (`globalThis.indexedDB` is required).

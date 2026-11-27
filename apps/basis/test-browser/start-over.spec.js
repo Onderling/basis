@@ -15,9 +15,10 @@
 import { test, expect } from '@playwright/test';
 import { bootPeer, teardown, gotoCircles, createCircle } from './peerHarness.js';
 import { isBasisStorageKey, isBasisDatabase } from '../src/v2/basisStorageNames.js';
+import { storageName } from '../src/v2/storageRegister.js';
 
 const call = (page, app, op, args = {}) => page.evaluate(([a, o, g]) => window.onderlingCall(a, o, g), [app, op, args]);
-const MARK = 'cc-owner-root:start-over-pending';
+const MARK = 'basis.owner-root:start-over-pending';
 const FOREIGN = { 'site-cookie-consent': 'yes', 'onderling-screen:test-grant': 'kept' };
 // the phrase, once the agent answers: `{phrase}` or `{none: <what the call said>}` (a probe names its branch)
 const phraseOf = async (page, timeout = 90_000) => {
@@ -53,6 +54,8 @@ test.describe('start this device over from your phrase', () => {
     const before = await storageNow(A.page);
     expect(before.keys.filter((k) => !isBasisStorageKey(k)), 'every storage key a real boot writes is Basis\'s by name').toEqual([]);
     expect(before.dbs.filter((n) => !isBasisDatabase(n)), 'every database a real boot opens is Basis\'s by name').toEqual([]);
+    // the key door the boot opened is the register's row, not the vault package's own default name
+    expect(before.dbs, 'the key door is opened under the register\'s name').toContain(storageName('rootKeyDb'));
 
     // the rest of the origin: the public site's key and a toolbox screen page's pairing
     await A.page.evaluate((f) => { for (const [k, v] of Object.entries(f)) window.localStorage.setItem(k, v); }, FOREIGN);
@@ -63,7 +66,7 @@ test.describe('start this device over from your phrase', () => {
     await expect(A.page.locator('[data-testid="start-over"]')).toBeVisible({ timeout: 30_000 });
     await expect(A.page.locator('[data-testid="start-over"]'), 'the page speaks words, not locale keys').not.toContainText('circle.start_over.');
     const marked = await storageNow(A.page);
-    expect(marked.keys.filter((k) => k.startsWith('cc-chat-id:')).length, 'nothing was cleared by the mark').toBeGreaterThan(0);
+    expect(marked.keys.filter((k) => k.startsWith('basis.chat-id:')).length, 'nothing was cleared by the mark').toBeGreaterThan(0);
     await A.page.locator('[data-testid="start-over-cancel"]').click();
     // any mark: cancel says first that the device may already be cleared, and asks
     await A.page.locator('[data-testid="start-over-cancel-yes"]').click();

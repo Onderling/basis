@@ -79,7 +79,7 @@ test('step 0: link, claim the companion, give the bot the agenda files, the link
 
     // the person's app: a fresh identity on this walk's relay
     const ctx = await browser.newContext({ locale: 'nl-NL' });
-    await ctx.addInitScript((url) => { try { localStorage.setItem('cc.relayUrl', url); } catch { /* */ } }, relay.url);
+    await ctx.addInitScript((url) => { try { localStorage.setItem('basis.relayUrl', url); } catch { /* */ } }, relay.url);
     const page = await ctx.newPage();
     cleanup.push(() => ctx.close());
     await page.goto(appUrl);

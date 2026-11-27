@@ -1,5 +1,5 @@
 /**
- * The person's own model setting is sealed at rest (ledger L1083). `cc.userLlmDefault` holds the person's own model
+ * The person's own model setting is sealed at rest (ledger L1083). `basis.userLlmDefault` holds the person's own model
  * endpoint WITH its API key; it was plain JSON in localStorage (web) and AsyncStorage (phone). Now one shared io seals it
  * with the device content key, both shells use it, and an old plain value is rewritten sealed the first time it is read
  * with the key present — so a key does not sit in plain text until someone edits the setting.
@@ -29,7 +29,7 @@ describe.each([
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY }));
     const { s, store } = make();
     await store.set(CFG);
-    const raw = s._m.get('cc.userLlmDefault');
+    const raw = s._m.get('basis.userLlmDefault');
     expect(raw).toBeTruthy();
     expect(raw).not.toContain(SECRET);
     expect((await store.get()).apiKey).toBe(SECRET);
@@ -39,28 +39,28 @@ describe.each([
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY }));
     const { s, store } = make();
     await store.set(CFG);
-    const sealed = s._m.get('cc.userLlmDefault');
+    const sealed = s._m.get('basis.userLlmDefault');
     setShellContentSeal(null);
     expect((await store.get()).preset).toBe('off');
     await store.set({ preset: 'local-ollama' });
-    expect(s._m.get('cc.userLlmDefault')).toBe(sealed);
+    expect(s._m.get('basis.userLlmDefault')).toBe(sealed);
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY }));
     expect((await store.get()).apiKey).toBe(SECRET);
   });
 
   it('an old PLAIN value is read once and rewritten sealed at that read, with no edit by the person', async () => {
     const { s, store } = make();
-    s._m.set('cc.userLlmDefault', JSON.stringify({ ...CFG, cacheSecret: 'x' }));
+    s._m.set('basis.userLlmDefault', JSON.stringify({ ...CFG, cacheSecret: 'x' }));
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY }));
     expect((await store.get()).apiKey).toBe(SECRET);
-    expect(s._m.get('cc.userLlmDefault')).not.toContain(SECRET);
+    expect(s._m.get('basis.userLlmDefault')).not.toContain(SECRET);
     expect((await store.get()).apiKey).toBe(SECRET);
   });
 
   it('the value never reaches a log', async () => {
     const spies = ['log', 'info', 'warn', 'error'].map((k) => vi.spyOn(console, k).mockImplementation(() => {}));
     const { s, store } = make();
-    s._m.set('cc.userLlmDefault', JSON.stringify(CFG));
+    s._m.set('basis.userLlmDefault', JSON.stringify(CFG));
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY }));
     await store.get(); await store.set(CFG);
     setShellContentSeal(null); await store.get(); await store.set(CFG);

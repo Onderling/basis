@@ -173,7 +173,7 @@ async function loadMdnsTransport() {   // (batch 7) unused — kept one release 
  * @param {object}  [opts.householdManifest]   merge an extra manifest into the catalogue
  * @param {object}  [opts.chatVault]           secure-agent chat-side vault (e.g. VaultMemory in tests, VaultAsyncStorage on RN)
  * @param {object}  [opts.hostVault]           host-side vault (defaults inside factory to makeBrowserVault)
- * @param {object}  [opts.asyncStorage]        when provided AND chatVault/hostVault are NOT, synthesises two VaultAsyncStorage instances (cc-chat-id: + cc-host-id: prefixes). RN runtime path; vitest can pass a mock AsyncStorage to exercise it.
+ * @param {object}  [opts.asyncStorage]        when provided AND chatVault/hostVault are NOT, synthesises two VaultAsyncStorage instances (basis.chat-id: + basis.host-id: prefixes). RN runtime path; vitest can pass a mock AsyncStorage to exercise it.
  * @param {object}  [opts.registryBackend]      the registry's persistent local StorageBackend
  * @param {function}[opts.provisionRegistryMedium] `(strategy) => medium|null` — the registry's sealed pod mirror
  * @param {function}[opts.onRegistryKeyMismatch] the pod's registry is sealed under a different key (the carrier held)
@@ -239,8 +239,8 @@ export async function bootAgentBundle(opts = {}) {
   //
   // if the caller passed `opts.asyncStorage` but no explicit
   // vaults, synthesise VaultAsyncStorage instances under the same
-  // prefix convention the web factory uses ('cc-chat-id:' /
-  // 'cc-host-id:').  This is the canonical RN-runtime path; vitest
+  // prefix convention the web factory uses ('basis.chat-id:' /
+  // 'basis.host-id:').  This is the canonical RN-runtime path; vitest
   // tests use it with a mock AsyncStorage.
   const chatVault = opts.chatVault
     ?? (opts.asyncStorage
@@ -251,7 +251,7 @@ export async function bootAgentBundle(opts = {}) {
       ? new VaultAsyncStorage({ prefix: storageName('vaultHostId'), asyncStorage: opts.asyncStorage })
       : undefined);
   // The OWNER ROOT — and it was missing (2026-07-30). Two vaults were synthesised here and this third one
-  // was not, so `realAgent` fell back to its `makeBrowserVault('cc-owner-root:')`, which on React Native
+  // was not, so `realAgent` fell back to its `makeBrowserVault('basis.owner-root:')`, which on React Native
   // finds no `localStorage` and quietly returns a **VaultMemory**. A new owner root was therefore minted on
   // every launch, and two things followed:
   //
@@ -283,19 +283,19 @@ export async function bootAgentBundle(opts = {}) {
   // to apps/pinboard/src/lib/persistPicker.js → AsyncStoragePersist).
   const pinboardPersistDb = opts.pinboardPersistDb
     ?? (opts.asyncStorage
-      ? { dbName: storageName('pinboardPhone'), asyncStorage: opts.asyncStorage }
+      ? { dbName: storageName('pinboard'), asyncStorage: opts.asyncStorage }
       : undefined);
 
   // Parallel synthesis for tasks-v0 — without this, the tasks
   // CachingDataSource is in-memory only and every cold boot loses any
   // user-added tasks + re-runs the 4-seed dance (the data-loss bug
-  // behind the `cc.firstBootSeeded.v1` flag in App.js).
+  // behind the `basis.firstBootSeeded.v1` flag in App.js).
   // createRealHouseholdAgent threads `opts.tasksPersistDb` into
   // createBrowserMultiCircleTasksAgent → buildBundle → tasks-v0's own
   // persistPicker (mirrors pinboard's three-adapter shape).
   const tasksPersistDb = opts.tasksPersistDb
     ?? (opts.asyncStorage
-      ? { dbName: storageName('tasksPhone'), asyncStorage: opts.asyncStorage }
+      ? { dbName: storageName('tasks'), asyncStorage: opts.asyncStorage }
       : undefined);
 
   // OBJ-2 S1e (mobile) — persist the household store across reloads, same shape
@@ -303,12 +303,12 @@ export async function bootAgentBundle(opts = {}) {
   // new HouseholdStore({ dataSource }) → buildHouseholdDataSource → AsyncStoragePersist.
   const householdPersistDb = opts.householdPersistDb
     ?? (opts.asyncStorage
-      ? { dbName: storageName('householdPhone'), asyncStorage: opts.asyncStorage }
+      ? { dbName: storageName('household'), asyncStorage: opts.asyncStorage }
       : undefined);
   // #36 — persist the parameter register's settings (retention etc.) across app opens (AsyncStorage), parity
   // with web circleApp's `settingsPersistDb`.
   const settingsPersistDb = opts.settingsPersistDb
-    ?? (opts.asyncStorage ? { dbName: storageName('settingsPhone'), asyncStorage: opts.asyncStorage } : undefined);
+    ?? (opts.asyncStorage ? { dbName: storageName('settings'), asyncStorage: opts.asyncStorage } : undefined);
 
   let agent;
   try {
@@ -336,7 +336,7 @@ export async function bootAgentBundle(opts = {}) {
       householdPersistDb,
       settingsPersistDb,
       // Held messages + the dead-address verdict survive a launch (AsyncStorage, like the settings cache).
-      outboxPersistDb: opts.asyncStorage ? { dbName: storageName('outboxPhone'), asyncStorage: opts.asyncStorage } : undefined,
+      outboxPersistDb: opts.asyncStorage ? { dbName: storageName('outbox'), asyncStorage: opts.asyncStorage } : undefined,
       // Push subscriptions: their own device-local store (never the pod, never a sibling).
       pinboardPushPersistDb: opts.asyncStorage ? { dbName: storageName('pushDevice'), asyncStorage: opts.asyncStorage } : undefined,
       pinboardControlAgent: opts.pinboardControlAgent,   // S4 — multi-member sealing router (redeem/leave)

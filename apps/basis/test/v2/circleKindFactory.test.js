@@ -44,7 +44,7 @@ const PENDING_KINDS = [
 ];
 
 const STORAGE_KINDS = [
-  { name: 'recipe', io: localStorageCircleRecipePendingIo, local: createCircleRecipePendingStoreLocal, prefix: 'cc.circleRecipePending.' },
+  { name: 'recipe', io: localStorageCircleRecipePendingIo, local: createCircleRecipePendingStoreLocal, prefix: 'basis.circleRecipePending.' },
 ];
 
 describe('circle triplet · anti-drift guard (one factory, three kinds)', () => {

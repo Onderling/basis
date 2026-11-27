@@ -104,7 +104,7 @@ export function createAvailabilityStore({ load, save } = {}) {
 }
 
 /**
- * load/save for availability, SEALED at rest (ledger L1083: the person's away windows), key `cc.availability`, over
+ * load/save for availability, SEALED at rest (ledger L1083: the person's away windows), key `basis.availability`, over
  * localStorage (web) or AsyncStorage (phone). A read before the content key WAITS for it: "no availability" read too
  * early would let a match go to someone who is away.
  */

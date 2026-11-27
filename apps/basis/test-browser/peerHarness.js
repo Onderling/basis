@@ -45,21 +45,21 @@ const INTERESTING = /redeem|group-member|pair|joinedGroup|relay connected|peer t
 // ── per-peer mode seeding ──────────────────────────────────────────────────────
 // The localStorage keys the harness seeds (via addInitScript, BEFORE the app boots)
 // to put each client in a configured mode. Discovered from product code, not guessed:
-//   - LANG      'circle.app.lang'          — web boots en-US headless otherwise.
-//   - RELAY_URL 'cc.relayUrl'              — relayPref STORAGE_KEY, read at boot in
+//   - LANG      'basis.app.lang'          — web boots en-US headless otherwise.
+//   - RELAY_URL 'basis.relayUrl'              — relayPref STORAGE_KEY, read at boot in
 //                                            web/v2/circleApp.js (localStorageRelayIo().load()).
-//   - TRANSPORT 'cc-chat-id:cc-transport-mode' — the /transport-mode vault key
+//   - TRANSPORT 'basis.chat-id:cc-transport-mode' — the /transport-mode vault key
 //                                            ('cc-transport-mode') under the chat-identity
-//                                            VaultLocalStorage prefix ('cc-chat-id:').
+//                                            VaultLocalStorage prefix ('basis.chat-id:').
 // NOTE on transport mode: the app also DERIVES the effective mode from which transports
 // actually connect (connectPeerTransport: relay present → 'relay'/'both', else 'nkn').
 // So the real per-client knob is whether a relayUrl is seeded + whether NKN's CDN lib
-// loads. Seeding 'cc-chat-id:cc-transport-mode' is a best-effort hint; the load-bearing
+// loads. Seeding 'basis.chat-id:cc-transport-mode' is a best-effort hint; the load-bearing
 // lever is `relayUrl`. A relayUrl is ALSO passed as the `?relay=` boot param (belt & braces).
 export const LS_KEYS = Object.freeze({
-  lang:      'circle.app.lang',
-  relayUrl:  'cc.relayUrl',
-  transport: 'cc-chat-id:cc-transport-mode',
+  lang:      'basis.app.lang',
+  relayUrl:  'basis.relayUrl',
+  transport: 'basis.chat-id:cc-transport-mode',
 });
 
 /** The relay URL a relay/both peer defaults to when a spec doesn't pass one — set by the relay fixture. */

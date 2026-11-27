@@ -150,7 +150,7 @@ export function createCircleKindPendingStore({ load, save, remove } = {}) {
  * cache, keyed `<keyPrefix><circleId>`.  `keyPrefix` is the ONLY thing
  * that differs between kinds — the on-disk key must not change.
  *
- * @param {string} keyPrefix  e.g. 'cc.circlePolicyPending.'
+ * @param {string} keyPrefix  e.g. 'basis.circlePolicyPending.'
  * @param {Storage} [storage] window.localStorage or an injected shim
  * @returns {{ load: Function, save: Function, remove: Function }}
  */

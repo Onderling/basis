@@ -46,18 +46,18 @@ afterEach(() => setShellContentSeal(null));
 
 /** [name, make(storage) → {write(), read()}] — `write` stores something carrying MARK, `read` reads it back. */
 const STORES = [
-  ['cc.circlePolicyHead.*', (s) => { const h = sealedPolicyHeadStore(s); return { write: () => h.write('c1', { version: 2, statement: { text: MARK } }), read: async () => (await h.read('c1'))?.statement?.text }; }],
-  ['cc.circleRecipePending.*', (s) => { const p = createCircleRecipePendingStoreLocal(s); return { write: () => p.set('c1', { name: MARK }), read: async () => (await p.get('c1'))?.name }; }],
-  ['cc.circleOverride.*', (s) => { const o = createMemberOverrideStore(localStorageOverrideIo(s)); return { write: () => o.update('c1', { chatOff: true }), read: async () => ((await o.get('c1'))?.chatOff === true ? MARK : 'not kept'), mark: 'chatOff' }; }],
-  ['cc.availability', (s) => { const a = createAvailabilityStore(localStorageAvailabilityIo(s)); return { write: () => a.update({ holiday: { active: true, until: '2099-01-01' } }), read: async () => ((await a.get()).holiday.until === '2099-01-01' ? MARK : 'not kept'), mark: '2099-01-01' }; }],
-  ['cc.sharedWithMe', (s) => { const w = createSharedWithMeStore(localStorageSharedWithMeIo(s)); return { write: () => w.add({ sealed: { id: 'r1', text: MARK }, itemMeta: { title: MARK }, from: 'x', receivedAt: 1 }), read: async () => JSON.stringify(await w.list()) }; }],
-  ['cc.userScreens', (s) => { const u = localUserScreenStore(s); return { write: () => u.set({ screens: [{ id: 'p1', name: MARK, blocks: [] }], activeId: 'p1' }), read: async () => (await u.get()).screens[0]?.name }; }],
-  ['cc.contactNames', (s) => { const n = sealedContactNameStore(s); return { write: () => n.remember([{ contactId: 'k1', name: MARK }]), read: async () => (await n.read()).k1?.name }; }],
-  ['cc.sharedDisclosure.*', (s) => { const io = localStorageDisclosureShareIo(s); return { write: () => createDisclosureShareMemo(io).set('c1', 'p1', { name: MARK }), read: async () => (await createDisclosureShareMemo(io).get('c1', 'p1'))?.name }; }],
-  ['cc.actionFrequency', (s) => { const io = actionFrequencyIo(s); return { write: () => io.save({ [MARK]: { add: 3 } }), read: async () => Object.keys((await io.load()) ?? {})[0] }; }],
+  ['basis.circlePolicyHead.*', (s) => { const h = sealedPolicyHeadStore(s); return { write: () => h.write('c1', { version: 2, statement: { text: MARK } }), read: async () => (await h.read('c1'))?.statement?.text }; }],
+  ['basis.circleRecipePending.*', (s) => { const p = createCircleRecipePendingStoreLocal(s); return { write: () => p.set('c1', { name: MARK }), read: async () => (await p.get('c1'))?.name }; }],
+  ['basis.circleOverride.*', (s) => { const o = createMemberOverrideStore(localStorageOverrideIo(s)); return { write: () => o.update('c1', { chatOff: true }), read: async () => ((await o.get('c1'))?.chatOff === true ? MARK : 'not kept'), mark: 'chatOff' }; }],
+  ['basis.availability', (s) => { const a = createAvailabilityStore(localStorageAvailabilityIo(s)); return { write: () => a.update({ holiday: { active: true, until: '2099-01-01' } }), read: async () => ((await a.get()).holiday.until === '2099-01-01' ? MARK : 'not kept'), mark: '2099-01-01' }; }],
+  ['basis.sharedWithMe', (s) => { const w = createSharedWithMeStore(localStorageSharedWithMeIo(s)); return { write: () => w.add({ sealed: { id: 'r1', text: MARK }, itemMeta: { title: MARK }, from: 'x', receivedAt: 1 }), read: async () => JSON.stringify(await w.list()) }; }],
+  ['basis.userScreens', (s) => { const u = localUserScreenStore(s); return { write: () => u.set({ screens: [{ id: 'p1', name: MARK, blocks: [] }], activeId: 'p1' }), read: async () => (await u.get()).screens[0]?.name }; }],
+  ['basis.contactNames', (s) => { const n = sealedContactNameStore(s); return { write: () => n.remember([{ contactId: 'k1', name: MARK }]), read: async () => (await n.read()).k1?.name }; }],
+  ['basis.sharedDisclosure.*', (s) => { const io = localStorageDisclosureShareIo(s); return { write: () => createDisclosureShareMemo(io).set('c1', 'p1', { name: MARK }), read: async () => (await createDisclosureShareMemo(io).get('c1', 'p1'))?.name }; }],
+  ['basis.actionFrequency', (s) => { const io = actionFrequencyIo(s); return { write: () => io.save({ [MARK]: { add: 3 } }), read: async () => Object.keys((await io.load()) ?? {})[0] }; }],
   ['cc.circleSkill.*', (s) => { const io = circleOfferingDraftIo(s); return { write: () => io.save('c1', { offers: [MARK] }), read: async () => (await io.load('c1'))?.offers?.[0] }; }],
-  ['cc.agentRequestQueue', (s) => { const io = sealedJsonIo(s); const st = createAgentRequestStore({ io: { load: (k) => io.load(k), save: (k, v) => io.save(k, v) } }); return { write: () => st.save({ id: 'q1', circleId: 'c1', label: MARK, requestedAt: 1 }), read: async () => JSON.stringify(await st.listForCircle('c1')) }; }],
-  ['onderling.mappings:*', (s) => { const m = localStorageMappingsStore(sealedKeyValue(s, { strict: true })); return { write: () => m.write('pod://x/a', { label: MARK }), read: async () => (await m.read('pod://x/a'))?.bytes?.label }; }],
+  ['basis.agentRequestQueue', (s) => { const io = sealedJsonIo(s); const st = createAgentRequestStore({ io: { load: (k) => io.load(k), save: (k, v) => io.save(k, v) } }); return { write: () => st.save({ id: 'q1', circleId: 'c1', label: MARK, requestedAt: 1 }), read: async () => JSON.stringify(await st.listForCircle('c1')) }; }],
+  ['basis.mappings:*', (s) => { const m = localStorageMappingsStore(sealedKeyValue(s, { strict: true })); return { write: () => m.write('pod://x/a', { label: MARK }), read: async () => (await m.read('pod://x/a'))?.bytes?.label }; }],
 ];
 
 describe.each(STORES)('%s', (_name, make) => {
@@ -77,18 +77,18 @@ describe('stores read at the first frame wait for the key, and nothing seeds or 
     const s = memStorage();
     seal();
     await localUserScreenStore(s).set({ screens: [{ id: 'mine', name: MARK, blocks: [] }], activeId: 'mine' });
-    const before = s._m.get('cc.userScreens');
+    const before = s._m.get('basis.userScreens');
     setShellContentSeal(null);
     let done = null;
     const t = (k) => k;
     const seeding = ensureVandaagBook({ store: localUserScreenStore(s), t }).then((b) => { done = b; });
     await tick();
     expect(done).toBeNull();                            // "not read yet", never an empty book
-    expect(s._m.get('cc.userScreens')).toBe(before);    // nothing written
+    expect(s._m.get('basis.userScreens')).toBe(before);    // nothing written
     seal();
     await seeding;
     expect(done.screens.map((p) => p.name)).toEqual([MARK]);   // the person's own book, not a seeded one
-    expect(s._m.get('cc.userScreens')).toBe(before);
+    expect(s._m.get('basis.userScreens')).toBe(before);
   });
 
   it('the availability and the contact names: a read before the key waits, then gives the kept value', async () => {
@@ -113,18 +113,18 @@ describe('stores read at the first frame wait for the key, and nothing seeds or 
     const s = memStorage();
     seal();
     await createSharedWithMeStore(localStorageSharedWithMeIo(s)).add({ sealed: { id: 'r1' }, from: 'x', receivedAt: 1 });
-    const before = s._m.get('cc.sharedWithMe');
+    const before = s._m.get('basis.sharedWithMe');
     setShellContentSeal(null);
     expect(await createSharedWithMeStore(localStorageSharedWithMeIo(s)).list()).toEqual([]);
     await createSharedWithMeStore(localStorageSharedWithMeIo(s)).clear().catch(() => {});
-    expect(s._m.get('cc.sharedWithMe')).toBe(before);
+    expect(s._m.get('basis.sharedWithMe')).toBe(before);
   });
 
   it('an old PLAIN value is resealed once, at its first read with the key', async () => {
     const s = memStorage();
-    s._m.set('cc.availability', JSON.stringify({ holiday: { active: true, until: '2099-01-01' } }));
+    s._m.set('basis.availability', JSON.stringify({ holiday: { active: true, until: '2099-01-01' } }));
     seal();
     expect((await createAvailabilityStore(localStorageAvailabilityIo(s)).get()).holiday.active).toBe(true);
-    expect(s._m.get('cc.availability')).not.toContain('2099-01-01');
+    expect(s._m.get('basis.availability')).not.toContain('2099-01-01');
   });
 });

@@ -10,7 +10,7 @@ import { storageName } from '../../../basis/src/v2/storageRegister.js';   // eve
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { nearbyAskedKey } from '../../../basis/src/v2/nearbyLevel.js';
 
-const KEY = storageName('nearbyAllowsPhone');
+const KEY = storageName('nearbyAllows');
 let cached = null;
 AsyncStorage.getItem(KEY)
   .then((raw) => { try { cached = raw ? JSON.parse(raw) : null; } catch { cached = null; } })
@@ -44,7 +44,7 @@ export function writeNearbyAllows(next) {
  * Who this device enters the Nearby room as, when several selves are ticked in the header: the last answer, kept per
  * device as the question's default (nothing more durable). The rule is the shared `nearbyRoomSelf`.
  */
-const SELF_KEY = storageName('nearbySelfPhone');
+const SELF_KEY = storageName('nearbySelf');
 let roomSelf = null;
 AsyncStorage.getItem(SELF_KEY).then((raw) => { if (typeof raw === 'string' && raw) roomSelf = raw; }).catch(() => {});
 export function readNearbySelf() { return roomSelf; }
@@ -56,8 +56,8 @@ export function writeNearbySelf(id) {
 
 /** The Nearby first-use question's device mark, per self (`nearbyAskedKey`): was this self asked on this device? */
 export async function readNearbyAsked(selfId) {
-  try { return (await AsyncStorage.getItem(`${storageName('nearbyAskedPhone')}${selfId}`)) === '1'; } catch { return true; }
+  try { return (await AsyncStorage.getItem(`${storageName('nearbyAsked')}${selfId}`)) === '1'; } catch { return true; }
 }
 export function markNearbyAsked(selfId) {
-  AsyncStorage.setItem(`${storageName('nearbyAskedPhone')}${selfId}`, '1').catch(() => {});
+  AsyncStorage.setItem(`${storageName('nearbyAsked')}${selfId}`, '1').catch(() => {});
 }

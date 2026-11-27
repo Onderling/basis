@@ -85,7 +85,7 @@ describe('createCirclePinStore', () => {
 });
 
 describe('localStoragePinIo', () => {
-  it('round-trips through a Storage-like backend at cc.circlePinned', async () => {
+  it('round-trips through a Storage-like backend at basis.circlePinned', async () => {
     const map = new Map();
     const storage = {
       getItem: (k) => (map.has(k) ? map.get(k) : null),
@@ -94,15 +94,15 @@ describe('localStoragePinIo', () => {
     const io = localStoragePinIo(storage);
     await io.save({ c1: true });
     expect(await io.load()).toEqual({ c1: true });
-    expect(map.has('cc.circlePinned')).toBe(true);
+    expect(map.has('basis.circlePinned')).toBe(true);
   });
 
   it('an old plain value is read once and resealed', async () => {
-    const map = new Map([['cc.circlePinned', JSON.stringify({ c9: true })]]);
+    const map = new Map([['basis.circlePinned', JSON.stringify({ c9: true })]]);
     const storage = { getItem: (k) => (map.has(k) ? map.get(k) : null), setItem: (k, v) => map.set(k, v) };
     expect(await localStoragePinIo(storage).load()).toEqual({ c9: true });
-    expect(map.get('cc.circlePinned')).not.toContain('c9');
-    expect(JSON.parse(openStoredValue(SEAL, 'cc.circlePinned', map.get('cc.circlePinned')))).toEqual({ c9: true });
+    expect(map.get('basis.circlePinned')).not.toContain('c9');
+    expect(JSON.parse(openStoredValue(SEAL, 'basis.circlePinned', map.get('basis.circlePinned')))).toEqual({ c9: true });
   });
 
   it('load returns null for missing / corrupt entries', async () => {

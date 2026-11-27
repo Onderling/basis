@@ -1,7 +1,7 @@
 /**
  * basis v2 — δ.1 localStorage adapter tests for the screen-blocks cache.
  *
- * Verifies the wire-level keys (`cc.screenBlocksCache.<screenId>`), JSON
+ * Verifies the wire-level keys (`basis.screenBlocksCache.<screenId>`), JSON
  * round-trip, and the missing-key / clear semantics.  Uses a vi-mock
  * `storage` rather than jsdom so the test is fast + node-portable.
  */
@@ -29,12 +29,12 @@ beforeEach(() => setShellContentSeal(seal));
 afterEach(() => setShellContentSeal(null));
 
 describe('localStorageScreenBlocksCacheIo · δ.1', () => {
-  it('writes to cc.screenBlocksCache.<id>, sealed (the JSON opens with the content key)', async () => {
+  it('writes to basis.screenBlocksCache.<id>, sealed (the JSON opens with the content key)', async () => {
     const s = memStorage();
     const io = localStorageScreenBlocksCacheIo(s);
     const blocks = [{ blockId: 'b1', type: 'noticeboard', status: 'ok' }];
     await io.save('s1', blocks);
-    expect(openStoredValue(seal, 'cc.screenBlocksCache.s1', s._backing.get('cc.screenBlocksCache.s1'))).toBe(JSON.stringify(blocks));
+    expect(openStoredValue(seal, 'basis.screenBlocksCache.s1', s._backing.get('basis.screenBlocksCache.s1'))).toBe(JSON.stringify(blocks));
   });
 
   it('reads back the same shape', async () => {
@@ -52,7 +52,7 @@ describe('localStorageScreenBlocksCacheIo · δ.1', () => {
 
   it('returns null when stored JSON is corrupt', async () => {
     const s = memStorage();
-    s.setItem('cc.screenBlocksCache.s3', 'not json');
+    s.setItem('basis.screenBlocksCache.s3', 'not json');
     const io = localStorageScreenBlocksCacheIo(s);
     expect(await io.load('s3')).toBeNull();
   });
@@ -62,7 +62,7 @@ describe('localStorageScreenBlocksCacheIo · δ.1', () => {
     const io = localStorageScreenBlocksCacheIo(s);
     await io.save('s4', [{ blockId: 'b' }]);
     await io.remove('s4');
-    expect(s._backing.has('cc.screenBlocksCache.s4')).toBe(false);
+    expect(s._backing.has('basis.screenBlocksCache.s4')).toBe(false);
     expect(await io.load('s4')).toBeNull();
   });
 

@@ -157,7 +157,7 @@ import { SURFACE_NUDGE_SUBTYPE } from '../../v2/surfaceNudge.js'; // the reading
 import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';
 import { COMPANION_GRANT_OUTCOMES } from '../../v2/companionGrant.js';   // the words a grant to a node's agent ends on   // pairing: how the grant reaches the view that asked for it
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
-import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, seedFromString, seedToString, createKeyHolder } from '@onderling/vault';
+import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, dropUnopenable, seedFromString, seedToString, createKeyHolder } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
 import { createSecureMeshAgent, samePoint } from '@onderling/secure-agent';
 import { createBrowserMultiCircleTasksAgent } from '@onderling-app/tasks/browser';
@@ -283,7 +283,7 @@ async function giveFreshSeedIfShared(vault, forbiddenPubKeys, healed) {
   } catch { /* an unreadable vault is restoreOrGenerate's case, not this one */ }
 }
 
-import { restoreOwnerRoot, handPersonasInto, personaWireAt, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
+import { restoreOwnerRoot, handPersonasInto, personaWireAt, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY, RESTORE_KEY_CHECK } from './ownerRootRestore.js';
 import { createPersonaRuntime } from './personaRuntime.js';
 import { personaVault, PERSONA_SLOT_KEYS, HELD_PERSONAS_VAULT_KEY, PAUSED_PERSONAS_VAULT_KEY, RECOVERY_SEAL_VAULT_KEY, RECOVERY_SEAL_LABEL } from './personaVault.js';
 import { circleIdsFrom } from '../../v2/enrolForgets.js';
@@ -408,7 +408,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // (shopping/errand/repair/schedule items + tasks + contacts).
   //
   // OBJ-2 S1e — restart-survival: when the shell passes `householdPersistDb`
-  // (web → `{ dbName: 'cc-household-state' }` IndexedDB; mobile →
+  // (web → `{ dbName: 'basis.household' }` IndexedDB; mobile →
   // `{ dbName, asyncStorage }` AsyncStorage; node → `{ path }`), back the
   // store with a persistent `CachingDataSource` so items survive a reload.
   // Default (undefined) → in-memory `MemorySource`, unchanged.  The actual
@@ -549,11 +549,37 @@ export async function createRealHouseholdAgent(opts = {}) {
   // `rotate`, so a vault opened at boot (a trust registry, the grants) keeps working after the reseal in the same session,
   // and no read or write crosses the switch. Nothing inside a rotation may read a sealed vault (it would wait on itself).
   const atRestHolder = createKeyHolder(atRestKey);
+  // The chat vault's backing, named here (it is sealed further down) because the first start after a phrase restore
+  // proves the key in force on it before any vault drops a thing.
+  const chatVaultBacking = opts.chatVault ?? pickVault(storageName('vaultChatId'));
+  // THE PROOF BEFORE A DROP. The sentinel binds to the root's fingerprint, never to the at-rest key, so a passing
+  // migration says nothing about the key. The restore sealed its KEY CHECK (`RESTORE_KEY_CHECK`) into the chat vault
+  // under its own key: it opens under the key in force only when that key is the restore's. Absent or unopenable: no
+  // proof, nothing is dropped, and the start says the key could not be read, as it would without this.
+  let restoreKeyProof = null;
+  const restoreKeyProven = () => {
+    restoreKeyProof ??= (async () => {
+      try { return (await new VaultEncrypted({ backing: chatVaultBacking, key: atRestHolder.current() }).get(RESTORE_KEY_CHECK)) != null; }
+      catch { return false; }   // sealed under another key
+    })();
+    return restoreKeyProof;
+  };
   const sealedVault = async (backing) => {
     // the sentinel's read is the boot's first read of a sealed vault: a storage error there is the same "could not read"
     // as a key's, said with the same words (L1115), never the generic failure
     try { await migrateVaultToEncrypted({ backing, key: atRestHolder.current(), fingerprint: rootFingerprint }); }
     catch (err) { throw new KeyUnreadable('vault-sentinel', err); }
+    // the first start after a phrase restore: the same person's phrase keeps the sentinel (same root), but the restore
+    // enrolled a new device id and so a new at-rest key; what the previous key sealed opens no more and goes now, before
+    // anything reads it (another person's phrase resets the whole vault above, for the same reason). A restore starts
+    // this device clean, whoever's phrase: the unsealed content goes by the forget note the restore also leaves.
+    if (restorePendingAtBoot) {
+      let proven = false;
+      try { proven = await restoreKeyProven(); } catch (err) { throw new KeyUnreadable('vault-sentinel', err); }
+      if (!proven) throw new KeyUnreadable('vault-sentinel', new Error('the key in force opens nothing the restore wrote'));
+      try { await dropUnopenable({ backing, key: atRestHolder.current() }); }
+      catch (err) { throw new KeyUnreadable('vault-sentinel', err); }
+    }
     sealedBackings.push(backing);
     return new VaultEncrypted({ backing, key: atRestHolder });
   };
@@ -593,7 +619,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // - bus: shared with hostAgent so chatAgent.invoke(hostAgent.address)
   //        works in-process via InternalBus
   // - vault: opt.chatVault wins (tests inject VaultMemory); otherwise
-  //   picker chooses VaultLocalStorage by prefix 'cc-chat-id:'
+  //   picker chooses VaultLocalStorage by prefix 'basis.chat-id:'
   // - auditLog: persistent under 'cc-audit'; autoLogs identity.rotate /
   //   mute / claim.sign / caps.issue / peer.connect
   // - muteListVaultKey: persistent peer mute across reloads
@@ -612,8 +638,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // silently here). An entry that exists but cannot be read (a plaintext write that
   // slipped past the sealed layer) is unrecoverable either way — re-deriving from the
   // root is the one repair that keeps the person reachable at their roster addresses.
-  const chatVaultBacking = opts.chatVault ?? pickVault(storageName('vaultChatId'));
-  const chatVault = await sealedVault(chatVaultBacking);
+  const chatVault = await sealedVault(chatVaultBacking);   // its backing is named above, by the restore's key proof
 
   // ── CONTENT at rest ────────────────────────────────────────────────────────────────────────────
   // Key material was already sealed here; a person's own words were not. Their lists, messages and
@@ -905,7 +930,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // device-revocation ceremony rotates that vault's secret, and every previously written trust entry
     // becomes undecryptable — safe (an unreadable tier falls closed to the lowest) but lossy, and it
     // surfaced as a decryption error the moment a walk did a ceremony and a grant in one account.
-    // Mirrors the host gate, which already keeps `cc-host-trust:` separate.
+    // Mirrors the host gate, which already keeps `basis.host-trust:` separate.
     // SEALED like the key vaults: who is trusted at which tier is metadata about people, and it is read after the key
     trustRegistry: { vault: await sealedVault(opts.peerTrustVault ?? pickVault(storageName('vaultPeerTrust'))) },
     // RATE LIMIT ON (the R1 go-live line, 2026-08-21) — the flood defence at the receive boundary,
@@ -6158,11 +6183,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     },
     // Mirrors `opts.pinboardPersistDb` below.  Browser passes
     // `{dbName:'cc-tasks-state', storeName:'items'}` (IDB); mobile
-    // gets `{dbName:'cc-tasks-cache', asyncStorage}` (AsyncStorage)
+    // gets `{dbName:'basis.tasks', asyncStorage}` (AsyncStorage)
     // synthesised by basis-mobile/agentBundle.js.  Without it,
     // the tasks cache stays Map-only and every reload re-seeds the
     // 4 demo tasks (the data-loss bug behind the
-    // `cc.firstBootSeeded.v1` workaround in App.js).
+    // `basis.firstBootSeeded.v1` workaround in App.js).
     persistDb: opts.tasksPersistDb,
     contentSeal,                       // its list is content too — sealed on the way to disk
     label: 'TasksCircle(cc)',
@@ -6323,7 +6348,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * in-process.  Boots 110 real pinboard skills; ~6 surface via chat
    * ops today, the rest reachable via agent.callSkill('pinboard', …).
    *
-   * Separate identity vault prefix (`cc-pinboard-id:`) so pinboard's per-
+   * Separate identity vault prefix (`basis.pinboard-id:`) so pinboard's per-
    * circle identity is isolated from chat + tasks (decision #2).
    * IndexedDBPersist via opts.persistDb keeps the local cache alive
    * across page reloads.
@@ -10413,7 +10438,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     get transportMode() { return sa.transportMode; },
     setTransportMode:    sa.setTransportMode,
 
-    // The slash handlers persist the relay URL here (key: cc-relay-url).
+    // The slash handlers persist the relay URL here (key: basis.relay-url).
     // The transport MODE moved to the parameter register (device scope) —
     // boot applies it and the set-param hook applies a live flip.
     vault: sa.identity?.vault ?? sa.vault ?? null,

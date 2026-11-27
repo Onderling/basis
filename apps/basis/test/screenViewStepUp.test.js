@@ -9,7 +9,7 @@ import { SCREEN_STEP_UP_SUBTYPE, SCREEN_STEP_UP_TTL_MS, SCREEN_STEP_UP_UNANSWERE
 function connected() {
   const timers = [];
   let onPeer = null;
-  const storage = new Map([['onderling.screen.BOT', JSON.stringify({ botAddress: 'BOT', relayUrl: 'wss://r', tokens: [{ skill: 'assistant.assistant-rotate' }] })]]);
+  const storage = new Map([['basis.screen.BOT', JSON.stringify({ botAddress: 'BOT', relayUrl: 'wss://r', tokens: [{ skill: 'assistant.assistant-rotate' }] })]]);
   const view = createScreenView({
     link: `https://basis.example/app${screenAddressFor('BOT')}`,
     storage: { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) },

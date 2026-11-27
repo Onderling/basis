@@ -70,10 +70,10 @@ describe('an old plain value is resealed at the start', () => {
 
     it(`the availability, when the key is already there (${label})`, async () => {
       seal();
-      const s = make({ 'cc.availability': AWAY });
+      const s = make({ 'basis.availability': AWAY });
       const io = localStorageAvailabilityIo(s);
       await tick();
-      expect(isPlainJson(s._m.get('cc.availability'))).toBe(false);
+      expect(isPlainJson(s._m.get('basis.availability'))).toBe(false);
       expect((await io.load()).holiday.from).toBe('2026-12-01');
     });
   }
@@ -106,11 +106,11 @@ describe('an old plain value is resealed at the start', () => {
   // the sweep: every strict store of a person's content declares the keys it owns
   for (const [label, make, key] of [
     ['the action frequency', actionFrequencyIo, ACTION_FREQ_KEY],
-    ['the ask-match skips', sealedAskMatchSkipsIo, 'cc.askMatchSkips'],
-    ['the member overrides', localStorageOverrideIo, 'cc.circleOverride.c1'],
-    ['the circle pins', localStoragePinIo, 'cc.circlePinned'],
-    ['shared with me', localStorageSharedWithMeIo, 'cc.sharedWithMe'],
-    ['the page book', localStorageScreenIo, 'cc.userScreens'],
+    ['the ask-match skips', sealedAskMatchSkipsIo, 'basis.askMatchSkips'],
+    ['the member overrides', localStorageOverrideIo, 'basis.circleOverride.c1'],
+    ['the circle pins', localStoragePinIo, 'basis.circlePinned'],
+    ['shared with me', localStorageSharedWithMeIo, 'basis.sharedWithMe'],
+    ['the page book', localStorageScreenIo, 'basis.userScreens'],
     ['contact names', sealedContactNameStore, CONTACT_NAMES_KEY],
     ['contact seen-marks', sealedContactSeenStore, CONTACT_SEEN_KEY],
   ]) {

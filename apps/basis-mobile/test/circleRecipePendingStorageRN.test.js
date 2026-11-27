@@ -2,7 +2,7 @@
  * basis-mobile · γ-next.recipe — AsyncStorage adapter round-trip.
  *
  * Mirrors `apps/basis/test/v2/circleRecipePendingStorage.test.js`
- * so the wire-level key shape (`cc.circleRecipePending.<circleId>`) is
+ * so the wire-level key shape (`basis.circleRecipePending.<circleId>`) is
  * identical on both surfaces.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -33,7 +33,7 @@ describe('γ-next.recipe — circleRecipePendingStorageRN', () => {
   it('round-trips a recipe through save / load', async () => {
     const io = asyncStorageCircleRecipePendingIo(storage);
     await io.save('g1', { id: 'r1', name: 'Circle', blocks: [] });
-    expect(openStoredValue(SEAL, 'cc.circleRecipePending.g1', storage.map.get('cc.circleRecipePending.g1'))).toBe(JSON.stringify({ id: 'r1', name: 'Circle', blocks: [] }),
+    expect(openStoredValue(SEAL, 'basis.circleRecipePending.g1', storage.map.get('basis.circleRecipePending.g1'))).toBe(JSON.stringify({ id: 'r1', name: 'Circle', blocks: [] }),
     );
     expect(await io.load('g1')).toEqual({ id: 'r1', name: 'Circle', blocks: [] });
   });
@@ -44,7 +44,7 @@ describe('γ-next.recipe — circleRecipePendingStorageRN', () => {
   });
 
   it('returns null when stored JSON is corrupt', async () => {
-    await storage.setItem('cc.circleRecipePending.g2', 'not json');
+    await storage.setItem('basis.circleRecipePending.g2', 'not json');
     const io = asyncStorageCircleRecipePendingIo(storage);
     expect(await io.load('g2')).toBeNull();
   });
@@ -53,7 +53,7 @@ describe('γ-next.recipe — circleRecipePendingStorageRN', () => {
     const io = asyncStorageCircleRecipePendingIo(storage);
     await io.save('g3', { id: 'r' });
     await io.remove('g3');
-    expect(storage.map.has('cc.circleRecipePending.g3')).toBe(false);
+    expect(storage.map.has('basis.circleRecipePending.g3')).toBe(false);
     expect(await io.load('g3')).toBeNull();
   });
 

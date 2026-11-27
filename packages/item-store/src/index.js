@@ -132,6 +132,7 @@ export {
 export {
   ENTRY_KINDS, VIEWER_FACING_SYSTEM_KINDS, LANE, RETAIN, UNKNOWN_KIND, RETENTION_DEFAULTS,
   entryKind, isSystemKind, isAuditKind, retentionOf, retentionOfEntry, RECORD_STATEMENTS, retentionWindowFor,
+  RECORD_DECISION_KINDS, keptDecisionKeys, isKeptDecision,   // the decisions a kept settings change names
   conversationKinds, kindWakes, governanceWakes,
   SIGNS, SUBJECT, ACCEPTS, SYNC, bindingOf,   // the binding columns — declared 2026-09-15, read by a fitness test until the rails read them
   isMirroredKind,   // what the person's own history mirror keeps (docs/decisions.md 2026-11-13)

@@ -127,14 +127,14 @@ describe('a strict store never writes over a value it could not open (L1115)', (
   it('a NON-strict store keeps what it could not open too; an overwritable one (a cache) does not', async () => {
     const s = memStorage();
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY_A }));
-    await sealedKeyValue(s).setItem('cc.circlePolicy.c1', '{"pod":"mine"}');
+    await sealedKeyValue(s).setItem('basis.circlePolicy.c1', '{"pod":"mine"}');
     await sealedKeyValue(s).setItem('cc.blocks', '{"n":1}');
-    const before = s._m.get('cc.circlePolicy.c1');
+    const before = s._m.get('basis.circlePolicy.c1');
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY_B }));
     const policy = sealedKeyValue(s, { name: 'the circle policy' });
-    await expect(policy.getItem('cc.circlePolicy.c1')).rejects.toThrow();
-    await expect(policy.setItem('cc.circlePolicy.c1', '{"pod":null}')).rejects.toBeInstanceOf(StoredValueUnreadable);
-    expect(s._m.get('cc.circlePolicy.c1')).toBe(before);
+    await expect(policy.getItem('basis.circlePolicy.c1')).rejects.toThrow();
+    await expect(policy.setItem('basis.circlePolicy.c1', '{"pod":null}')).rejects.toBeInstanceOf(StoredValueUnreadable);
+    expect(s._m.get('basis.circlePolicy.c1')).toBe(before);
     const cache = sealedKeyValue(s, { name: 'the page blocks cache', overwritable: true });
     await expect(cache.getItem('cc.blocks')).rejects.toThrow();
     await cache.setItem('cc.blocks', '{"n":2}');

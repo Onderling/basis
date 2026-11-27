@@ -64,7 +64,7 @@ describe('the box at rest', () => {
 
     const first = await boot();
     first.deviceLog.append({ id: 'box-at-rest-1', type: 'chat', ts: Date.now(), payload: { kind: 'chat-message', text: LOG_WORDS } });
-    await first.stores.circlePolicyKv.setItem('cc.circlePolicy.c1', JSON.stringify({ note: POLICY_WORDS }));
+    await first.stores.circlePolicyKv.setItem('basis.circlePolicy.c1', JSON.stringify({ note: POLICY_WORDS }));
     await first.dm.write('mem://contact-dm/t1', JSON.stringify({ text: DM_WORDS }));
     await first.threads.write('mem://basis/bot-threads/t1', JSON.stringify({ id: 't1', pending: { text: THREAD_WORDS } }));
     // the own-devices store: what the box plans to do, and for whom
@@ -89,7 +89,7 @@ describe('the box at rest', () => {
     const second = await boot();
     try {
       expect(JSON.stringify(second.deviceLog.query({})), 'the device log came back').toContain(LOG_WORDS);
-      expect(await second.stores.circlePolicyKv.getItem('cc.circlePolicy.c1'), 'the policy came back').toContain(POLICY_WORDS);
+      expect(await second.stores.circlePolicyKv.getItem('basis.circlePolicy.c1'), 'the policy came back').toContain(POLICY_WORDS);
       expect(JSON.stringify(await second.dm.read('mem://contact-dm/t1')), 'the DM state came back').toContain(DM_WORDS);
       expect(JSON.stringify(await second.threads.read('mem://basis/bot-threads/t1')), 'the thread row came back').toContain(THREAD_WORDS);
       const again = createIntentionBook({ store: createOwnDevicesStore({ dataSource: second.own }), actor: 'bot' });

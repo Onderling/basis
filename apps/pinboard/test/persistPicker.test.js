@@ -73,7 +73,7 @@ describe('persistPicker', () => {
   it('{asyncStorage, dbName} picks AsyncStoragePersist (RN)', async () => {
     const picked = await pickPersist({
       asyncStorage: makeMockAsyncStorage(),
-      dbName:       'cc-pinboard-cache',
+      dbName:       'basis.pinboard',
     });
     expect(picked.kind).toBe('async');
     expect(picked.persist.constructor.name).toBe('AsyncStoragePersist');

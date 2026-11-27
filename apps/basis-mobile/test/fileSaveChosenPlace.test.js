@@ -27,6 +27,17 @@ describe('saveFileToChosenPlace', () => {
     expect(fs.written.get(r.uri)).toBe('JVBERi0=');
     expect(fs.writeAsStringAsync.mock.calls[0][2].encoding).toBe('base64');
   });
+  it('TEXT (the recovery file) is written as UTF-8 text where the person chooses, never handed to the share sheet', async () => {
+    // "Save file" for the recovery file opened Android's share sheet as text (chat apps, mail, "Copy text"); nothing
+    // was kept on the phone (a walk, 2026-11-27). Written as text, a name with letters outside ASCII survives as is.
+    const fs = fakeSaf();
+    fs.EncodingType.UTF8 = 'utf8';
+    const text = '{"v":1,"naam":"Anna Ögren"}';
+    const r = await saveFileToChosenPlace({ text, name: 'onderling-recovery.json', mime: 'application/json' }, { fs });
+    expect(r).toEqual({ ok: true, uri: 'content://tree/Downloads/onderling-recovery#application/json', name: 'onderling-recovery' });
+    expect(fs.written.get(r.uri)).toBe(text);
+    expect(fs.writeAsStringAsync.mock.calls[0][2].encoding).toBe('utf8');
+  });
   it('the person closes the picker: nothing written, said as such', async () => {
     const fs = fakeSaf({ granted: false });
     expect(await saveFileToChosenPlace({ dataB64: 'QQ==', name: 'a.txt', mime: 'text/plain' }, { fs })).toEqual({ ok: false, error: 'not-chosen' });

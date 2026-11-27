@@ -5,7 +5,7 @@
  *   1. `policyOf` no longer defaults to `{}` (→ 'closed', deny-by-default). With a circle whose persisted
  *      policy is `sharePosture:'canonical'`, `shareItemIntoCircle`/`unshareItemFromCircle` pass a `policyOf`
  *      that resolves THAT posture — sourced from the module-level `makeCirclePolicyStoreRN` (same
- *      `cc.circlePolicy.<id>` keys the launcher writes), mirroring web's `_circlePolicy`.
+ *      `basis.circlePolicy.<id>` keys the launcher writes), mirroring web's `_circlePolicy`.
  *   2. The signed-in member's WebID is threaded as `by` (share initiator) + `recipient` (read subject),
  *      mirroring web's `by ?? LOCAL_ACTOR` / `recipient ?? circleOwnerWebId`.
  *
@@ -55,7 +55,7 @@ describe('mobile share path threads live posture + signed-in identity (objective
   it('shareItemIntoCircle threads the circle\'s LIVE sharePosture via policyOf (not {}) + the WebID as `by`', async () => {
     const store = mockAsyncStorage();
     // Persist circle A's policy BEFORE wiring the store — the launcher writes these same keys.
-    await store.setItem('cc.circlePolicy.A', JSON.stringify({ sharePosture: 'canonical' }));
+    await store.setItem('basis.circlePolicy.A', JSON.stringify({ sharePosture: 'canonical' }));
     initCirclePods(store);
     setCirclePodSession(signedInSession());
 
@@ -87,7 +87,7 @@ describe('mobile share path threads live posture + signed-in identity (objective
 
   it('unshareItemFromCircle threads the LIVE posture via policyOf', async () => {
     const store = mockAsyncStorage();
-    await store.setItem('cc.circlePolicy.A', JSON.stringify({ sharePosture: 'canonical' }));
+    await store.setItem('basis.circlePolicy.A', JSON.stringify({ sharePosture: 'canonical' }));
     initCirclePods(store);
     setCirclePodSession(signedInSession());
 

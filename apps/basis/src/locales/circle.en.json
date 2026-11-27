@@ -9587,10 +9587,6 @@
         "text": "Other (enter URL)",
         "doc": "Mobile settings wizard: the custom-relay option."
       },
-      "provider_inrupt": {
-        "text": "Inrupt Pod Spaces",
-        "doc": "Settings wizard (phone): a pod provider (a product name)."
-      },
       "handle_placeholder": {
         "text": "e.g. alice",
         "doc": "Settings wizard (phone): the handle placeholder."

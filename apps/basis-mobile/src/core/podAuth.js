@@ -38,18 +38,41 @@ import { resolveIssuer as _resolveIssuer, DEFAULT_ISSUER } from '@onderling/oidc
  * @param {object} args.session   OidcSessionRN instance (already restored from SecureStore)
  * @returns {object} podAuth-shaped object
  */
-export function buildMobilePodAuth({ hook, session }) {
+export function buildMobilePodAuth({ hook, session, hookNow = null, chooseIssuer = null, readyWithinMs = 20000 }) {
+  // the hook as it is NOW (its state changes after the issuer prop does); without a getter, the one handed in
+  const current = () => (typeof hookNow === 'function' ? hookNow() : hook) ?? hook;
   return {
+    // the system browser comes back to the app, so the sign-in completes here: the `signin` op waits for it and says
+    // how it ended (localBuiltins.js); the web's navigates away instead
+    completesInPlace: true,
     /**
      * Begin OAuth sign-in flow.  Returns a promise that resolves
      * AFTER the user completes (or cancels) the system browser
      * prompt — different from web's startSignIn which throws a
      * full-page redirect.
+     *
+     * THE CHOSEN PROVIDER: the hook's issuer is its PROP (useOidcSignIn), so the provider asked for is handed to the
+     * screen that makes the hook (`chooseIssuer`), and the sign-in waits until the hook is ready FOR that provider (its
+     * own discovery and client, `hook.issuer`). Until 2026-11-27 the choice never reached the hook: every sign-in went
+     * to the default provider.
      */
     async startSignIn({ issuer } = {}) {
       const resolved = _resolveIssuer(issuer ?? DEFAULT_ISSUER?.url);
-      const result = await hook.signIn({
-        issuer: resolved?.url ?? issuer,
+      const want = resolved?.url ?? issuer ?? null;
+      if (typeof chooseIssuer === 'function' && want) {
+        chooseIssuer(want);
+        const until = Date.now() + readyWithinMs;
+        for (;;) {
+          const h = current();
+          if (h?.issuer === want && h?.ready) break;
+          if (Date.now() >= until) {
+            throw Object.assign(new Error(`the sign-in at ${want} could not start: ${h?.lastError?.message ?? 'the provider did not answer'}`), { code: 'ISSUER_NOT_READY', issuer: want });
+          }
+          await new Promise((r) => setTimeout(r, 50));
+        }
+      }
+      const result = await current().signIn({
+        issuer: want,
       });
       // hook.signIn returns the FLAT token object ({accessToken, refreshToken, idToken, expiresAt, webid},
       // per completeSignIn + the package README) — adopt `result` itself, NOT `result.tokens` (which never

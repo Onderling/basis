@@ -122,4 +122,34 @@ describe('Bundle F P6 — buildMobilePodAuth', () => {
     expect(adopted?.accessToken).toBe('AT');
     expect(adopted?.webid).toBe('https://alice.solid.example/profile/card#me');
   });
+
+  // The phone walk (2026-11-27): every provider the person picked ended at Inrupt, because the hook's issuer is its
+  // PROP and the chosen one never reached it. A sign-in with another provider hands the hook that provider, waits until
+  // the hook is ready FOR it (its own discovery and client), and only then signs in.
+  it('a sign-in with another provider switches the hook to THAT provider and waits until it is ready for it', async () => {
+    const LOCAL = 'http://127.0.0.1:3000';
+    let state = { issuer: 'https://login.inrupt.com', ready: true };
+    const signedInAt = [];
+    const hookNow = () => ({ ...state, signIn: async () => { signedInAt.push(state.issuer); return { type: 'cancel' }; } });
+    const chosen = [];
+    const chooseIssuer = (url) => {
+      chosen.push(url);
+      state = { issuer: url, ready: false };   // the prop changed: a new discovery and client are under way
+      setTimeout(() => { state = { issuer: url, ready: true }; }, 30);
+    };
+    const pa = buildMobilePodAuth({ hook: hookNow(), hookNow, chooseIssuer, session: fakeSession() });
+    await pa.startSignIn({ issuer: LOCAL });
+    expect(chosen).toEqual([LOCAL]);
+    expect(signedInAt, 'signed in at the chosen provider, once it was ready').toEqual([LOCAL]);
+  });
+
+  it('a provider that never becomes ready says so, and signs in nowhere', async () => {
+    let state = { issuer: 'https://login.inrupt.com', ready: true, lastError: null };
+    const signedInAt = [];
+    const hookNow = () => ({ ...state, signIn: async () => { signedInAt.push(state.issuer); return null; } });
+    const chooseIssuer = (url) => { state = { issuer: url, ready: false, lastError: new Error('discovery failed') }; };
+    const pa = buildMobilePodAuth({ hook: hookNow(), hookNow, chooseIssuer, session: fakeSession(), readyWithinMs: 60 });
+    await expect(pa.startSignIn({ issuer: 'solidcommunity' })).rejects.toMatchObject({ code: 'ISSUER_NOT_READY' });
+    expect(signedInAt).toEqual([]);
+  });
 });

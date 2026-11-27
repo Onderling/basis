@@ -232,7 +232,13 @@ export default function ChatScreen({
   // OidcSessionRN holds tokens in SecureStore (restored on mount).
   // `buildMobilePodAuth` adapts both into the podAuth shape that
   // localBuiltins (signin / signout / whoami) consumes.
-  const authHook = useBasisAuth();
+  // THE CHOSEN PROVIDER reaches the hook as its prop (its issuer is a prop and re-discovers when it changes): a sign-in
+  // asks for a provider (`chooseIssuer`) and waits until the hook is ready for it (`hookNow`, podAuth.js). Until
+  // 2026-11-27 the hook was made with no issuer, so every choice signed in at the default provider.
+  const [authIssuer, setAuthIssuer] = useState(undefined);   // undefined = the package's default provider
+  const authHook = useBasisAuth(authIssuer ? { issuer: authIssuer } : {});
+  const authHookRef = useRef(authHook);
+  authHookRef.current = authHook;
   // 5.4c — prefer the App-owned sessionRef so the v2 circle launcher
   // shares this OidcSessionRN.  Standalone mounts (older tests, future
   // harnesses) fall back to a screen-local ref.
@@ -248,7 +254,10 @@ export default function ChatScreen({
     sessionRef.current?.restoreFromVault?.().catch(() => { /* fresh install */ });
   }, [sessionRefProp, sessionRef]);
   const podAuth = useMemo(() => {
-    const base = buildMobilePodAuth({ hook: authHook, session: sessionRef.current });
+    const base = buildMobilePodAuth({
+      hook: authHook, session: sessionRef.current,
+      hookNow: () => authHookRef.current, chooseIssuer: (url) => setAuthIssuer(url),
+    });
     // 5.4c — fire onSessionChanged after operations that mutate the
     // session, so App.js can refresh the circle launcher's podWriter
     // ref without ChatScreen needing to know about it.
@@ -273,6 +282,7 @@ export default function ChatScreen({
   const podAuthRef = useRef(podAuth);
   podAuthRef.current = podAuth;
   const stablePodAuth = useMemo(() => ({
+    completesInPlace: true,   // podAuth.js: the signin op waits for the phone's sign-in and says how it ended
     startSignIn: (...a) => podAuthRef.current.startSignIn(...a),
     signOut: (...a) => podAuthRef.current.signOut(...a),
     getCurrentSession: (...a) => podAuthRef.current.getCurrentSession?.(...a),

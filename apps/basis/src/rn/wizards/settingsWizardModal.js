@@ -26,17 +26,16 @@ import {
   Body, Field, Actions, ErrorBanner, WizardTheme, wizardPalette,
 } from './_kit.js';
 import { isRelayUrl } from '../../v2/connectionPoints.js';
+import { KNOWN_ISSUERS } from '@onderling/oidc-session-rn';   // the one provider list (no Expo deps on this entry)
 
 // Pod sign-in section (Bundle I, 2026-05-27).  Mirrors
 // apps/tasks-mobile/src/screens/PodSettingsScreen.jsx: status row,
 // issuer picker, sign-in / sign-out buttons.  Without provisioned
 // creds (pending), startSignIn returns a "no issuer redirect"
 // style error — UI surfaces it without crashing.
-const KNOWN_ISSUERS = [
-  { id: 'inrupt',         labelKey: 'circle.wizard.settings.provider_inrupt',  url: 'https://login.inrupt.com' },
-  { id: 'solidcommunity', label: 'SolidCommunity.net', url: 'https://solidcommunity.net' },
-  { id: 'solidweb',       label: 'SolidWeb.org',       url: 'https://solidweb.org' },
-];
+// The providers offered are the sign-in package's ONE list (Inrupt, SolidCommunity, SolidWeb; product names, not
+// translated); My data offers the same list beside its free address field. Until 2026-11-27 this wizard kept a copy.
+
 
 export default function SettingsWizardModal({
   visible, theme = null, callSkill, onClose, t,
@@ -300,7 +299,7 @@ export default function SettingsWizardModal({
                               accessibilityState={{ selected: pickerIssuer === iss.id }}
                             >
                               <View style={[styles.radio, pickerIssuer === iss.id && styles.radioOn]} />
-                              <Text style={styles.radioLabel}>{iss.labelKey ? t(iss.labelKey) : iss.label}</Text>
+                              <Text style={styles.radioLabel}>{iss.label}</Text>
                             </TouchableOpacity>
                           ))}
                           <TouchableOpacity

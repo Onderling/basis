@@ -157,7 +157,7 @@ describe('peer redeem — the admin returns ITS OWN circleAddress on the respons
 });
 
 describe('peer redeem — over the relay the invite names (2026-09-08)', () => {
-  it('with relayUrl the request is scoped to that relay; without it the send is unscoped, as before', async () => {
+  it('with relayUrl the request is scoped to that relay; either way only a route that carries its own address', async () => {
     const sent = [];
     const send = makeSendGroupRedeemRequest({
       sendPeer: async (addr, payload, opts) => { sent.push({ addr, payload, opts }); },
@@ -168,7 +168,7 @@ describe('peer redeem — over the relay the invite names (2026-09-08)', () => {
     send({ adminPeerAddr: 'admin', groupId: 'c', code: 'ABC' });
     await Promise.resolve();
     expect(sent).toHaveLength(2);
-    expect(sent[0].opts).toEqual({ scope: { points: ['ws://their-box:8787'] } });
-    expect(sent[1].opts).toBeUndefined();
+    expect(sent[0].opts).toEqual({ scope: { points: ['ws://their-box:8787'], requireAliasCapable: true } });
+    expect(sent[1].opts).toEqual({ scope: { requireAliasCapable: true } });
   });
 });

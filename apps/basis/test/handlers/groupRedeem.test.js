@@ -30,6 +30,31 @@ describe('makeHandleGroupRedeemRequest', () => {
     expect(() => makeHandleGroupRedeemRequest({ callSkill: vi.fn() })).toThrow(/sendPeer required/);
   });
 
+  it('an answer that never settles is bounded: the admit still follows, and a line names it', async () => {
+    const warns = [];
+    const onAdmitted = vi.fn(async () => {});
+    const d = reqDeps({
+      sendPeer: vi.fn(() => new Promise(() => {})),   // the joiner's address leads nowhere: the send never settles
+      onAdmitted,
+      replyBoundMs: 20,
+      logger: { info: () => {}, warn: (...a) => warns.push(a.join(' ')), error: () => {} },
+    });
+    const handle = makeHandleGroupRedeemRequest(d);
+    await handle('peer-A', validRequest());
+    expect(onAdmitted).toHaveBeenCalledWith({ circleId: 'g-1', newMemberWebid: 'peer-A' });
+    expect(warns.some((w) => /\[group-redeem\] the answer to peer-A/.test(w)), `a line names the stuck answer — got ${JSON.stringify(warns)}`).toBe(true);
+  });
+
+  it('an answer the send reports as not delivered gets a line', async () => {
+    const warns = [];
+    const d = reqDeps({
+      sendPeer: vi.fn(async () => ({ held: true, delivered: false, reason: 'unknown-address' })),
+      logger: { info: () => {}, warn: (...a) => warns.push(a.join(' ')), error: () => {} },
+    });
+    await makeHandleGroupRedeemRequest(d)('peer-A', validRequest());
+    expect(warns.some((w) => /\[group-redeem\] the answer to peer-A.*unknown-address/.test(w)), JSON.stringify(warns)).toBe(true);
+  });
+
   it('drops requests missing required fields', async () => {
     const d = reqDeps();
     const handle = makeHandleGroupRedeemRequest(d);
@@ -170,7 +195,7 @@ describe('makeSendGroupRedeemRequest — Phase 4 (#271)', () => {
       code:       'JOIN-XYZ',
       shareCard:  true,
       peerDisplay: 'Bob',
-    }));
+    }), { scope: { requireAliasCapable: true } });
 
     // Simulate inbound response.
     const [[entry]] = [[...pendingMap.entries()]];

@@ -33,6 +33,13 @@
  */
 
 import { inviteRefusalOf } from '../../v2/inviteRefusals.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+/**
+ * How long the admin waits on its answer to a redeem before it goes on with the admit (the address propagation, the
+ * roster step): under the joiner's 30 s wait, so an answer that is stuck is named while the joiner still waits.
+ */
+export const REDEEM_REPLY_BOUND_MS = param({ key: 'groupRedeem.replyBoundMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 20_000 });
 /**
  * The admin's own display name IN THIS CIRCLE, read the way every screen reads it: their row on the
  * roster, found by the per-circle address they answer on. No profile store is consulted directly, so this
@@ -64,6 +71,7 @@ export function makeHandleGroupRedeemRequest({
   // The agent's invite-exchange registrations (`agent.inviteExchange`): the one reply to a well-formed request (its answer
   // when it proved its code, else its refusal) may go back on the person key (the send gate's person-key allowlist).
   inviteExchange = null,
+  replyBoundMs = REDEEM_REPLY_BOUND_MS,
 } = {}) {
   if (typeof callSkill !== 'function') throw new Error('makeHandleGroupRedeemRequest: callSkill required');
   if (typeof sendPeer  !== 'function') throw new Error('makeHandleGroupRedeemRequest: sendPeer required');
@@ -146,13 +154,22 @@ export function makeHandleGroupRedeemRequest({
         if (reply.ok) inviteExchange?.answerProvenRequest?.(fromAddr);
         else inviteExchange?.refuseParsedRequest?.(fromAddr);
       } catch { /* the gate then records 'none' */ }
-      await sendPeer(fromAddr, {
-        type:    'p2p-chat',
-        subtype: 'group-redeem-response',
-        requestId,
-        ...reply,
-        sentAt:  Date.now(),
-      });
+      // The answer is bounded and never silent: a send that does not settle, or settles undelivered, is named, and the
+      // admit's own steps below go on either way (the membership is already real).
+      const who = String(fromAddr).slice(0, 16);
+      let bound = null;
+      const sent = await Promise.race([
+        Promise.resolve(sendPeer(fromAddr, {
+          type:    'p2p-chat',
+          subtype: 'group-redeem-response',
+          requestId,
+          ...reply,
+          sentAt:  Date.now(),
+        })),
+        new Promise((resolve) => { bound = setTimeout(() => resolve({ stuck: true }), replyBoundMs); }),
+      ]).finally(() => clearTimeout(bound));
+      if (sent?.stuck) logger.warn?.(`[group-redeem] the answer to ${who}… did not settle within ${Math.round(replyBoundMs / 1000)} s`);
+      else if (sent && typeof sent === 'object' && sent.delivered === false) logger.warn?.(`[group-redeem] the answer to ${who}… was not delivered: ${sent.reason ?? (sent.held ? 'held' : 'unknown')}`);
       publishEvent?.({
         app: 'pinboard', type: 'notification',
         payload: {
@@ -336,9 +353,11 @@ export function makeSendGroupRedeemRequest({
         sentAt: Date.now(),
       };
       const as = asPersona ? { sendAs: asPersona } : {};
-      if (typeof relayUrl === 'string' && relayUrl) await sendPeer(adminPeerAddr, request, { scope: { points: [relayUrl] }, ...as });
-      else if (asPersona) await sendPeer(adminPeerAddr, request, as);
-      else await sendPeer(adminPeerAddr, request);
+      // A redeem leaves AS the self that joins, or not at all: only over a route that carries that address. A route
+      // that cannot (NKN: its sender is its own native address) would make the admin admit an address of this device
+      // that nobody can reach, and its answer would go nowhere. No such route now → the send is held, not re-signed.
+      const points = typeof relayUrl === 'string' && relayUrl ? { points: [relayUrl] } : {};
+      await sendPeer(adminPeerAddr, request, { scope: { ...points, requireAliasCapable: true }, ...as });
     } catch (err) {
       const entry = pendingMap.get(requestId);
       if (entry) {

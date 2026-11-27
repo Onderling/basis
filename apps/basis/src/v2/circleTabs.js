@@ -30,6 +30,7 @@
  */
 
 import { isFeatureEnabled, CIRCLE_FEATURES } from './circlePolicy.js';
+import { isAlphaAction } from './alphaSurface.js';
 
 /**
  * Canonical tab id ↔ feature key ↔ locale-key triples, in render order. `built: false` = no shell paints a surface for
@@ -49,9 +50,20 @@ const TAB_DEFS = [
 /** Features whose surface is not built on either shell (their tab definition says `built: false`). */
 const SURFACELESS = new Set(TAB_DEFS.filter((d) => d.built === false).map((d) => d.feature));
 
+/**
+ * Features with no tab whose surface is a circle-menu action: House rules lives in the ⋯ menu as "rules". While that
+ * action is hidden for the alpha (`HIDDEN_CIRCLE_ACTIONS`), the feature has nowhere to show, so its switch hides too;
+ * putting the action back brings both.
+ */
+export const FEATURE_SURFACE_ACTION = Object.freeze({ houseRules: 'rules' });
+
 /** Does this feature have somewhere to show what it holds? A feature that does not is not offered — not as a tab, not
  *  as a settings toggle, not as an entry in the composer's "+". */
-export function featureHasSurface(feature) { return !SURFACELESS.has(feature); }
+export function featureHasSurface(feature) {
+  if (SURFACELESS.has(feature)) return false;
+  const action = FEATURE_SURFACE_ACTION[feature];
+  return action ? isAlphaAction(action) : true;
+}
 
 /** The features a circle's settings offer as toggles: every circle feature that has a surface. */
 export function offeredFeatures() { return CIRCLE_FEATURES.filter(featureHasSurface); }

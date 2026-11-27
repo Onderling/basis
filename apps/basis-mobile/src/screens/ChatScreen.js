@@ -282,6 +282,7 @@ export default function ChatScreen({
   const podAuthRef = useRef(podAuth);
   podAuthRef.current = podAuth;
   const stablePodAuth = useMemo(() => ({
+    completesInPlace: true,   // podAuth.js: the signin op waits for the phone's sign-in and says how it ended
     startSignIn: (...a) => podAuthRef.current.startSignIn(...a),
     signOut: (...a) => podAuthRef.current.signOut(...a),
     getCurrentSession: (...a) => podAuthRef.current.getCurrentSession?.(...a),

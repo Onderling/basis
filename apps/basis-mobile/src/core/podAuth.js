@@ -42,6 +42,9 @@ export function buildMobilePodAuth({ hook, session, hookNow = null, chooseIssuer
   // the hook as it is NOW (its state changes after the issuer prop does); without a getter, the one handed in
   const current = () => (typeof hookNow === 'function' ? hookNow() : hook) ?? hook;
   return {
+    // the system browser comes back to the app, so the sign-in completes here: the `signin` op waits for it and says
+    // how it ended (localBuiltins.js); the web's navigates away instead
+    completesInPlace: true,
     /**
      * Begin OAuth sign-in flow.  Returns a promise that resolves
      * AFTER the user completes (or cancels) the system browser

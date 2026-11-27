@@ -332,10 +332,16 @@ export function createNearbyRoomBinding({
     if (mine.card)                             await sendTo(address, { subtype: CARD_MESSAGE, card: mine.card }, 'greet:card');
     for (const invite of mine.invites.values()) await sendTo(address, { subtype: INVITE_MESSAGE, invite }, 'greet:invite');
   }
-  let greetChain = Promise.resolve();
+  const greetings = new Set();   // the greetings still under way (`settled` waits for them)
+  // ONE GREETING PER PEER, each on its own: a peer that never answers waits out its own handshake and holds up no
+  // other peer's greeting (one chain for the whole room made every later greeting wait behind it, and it grew)
   const onPeers = (peers) => {
     const ids = new Set((peers ?? []).map(peerId).filter(Boolean));
-    for (const id of ids) if (!known.has(id)) { known.add(id); greetChain = greetChain.then(() => greet(id)); }
+    for (const id of ids) if (!known.has(id)) {
+      known.add(id);
+      const g = Promise.resolve().then(() => greet(id)).catch((err) => report(err, 'greet'));
+      greetings.add(g); g.finally(() => greetings.delete(g));
+    }
     for (const id of known) if (!ids.has(id)) known.delete(id);
     sweep();
   };
@@ -494,7 +500,7 @@ export function createNearbyRoomBinding({
     heldCards: () => { sweep(); return [...heldCards.values()]; },
     presenceOf: (from) => presence.get(from) ?? null,
     /** Wait for in-flight newcomer greetings (tests). */
-    settled: () => greetChain,
+    settled: () => Promise.all([...greetings]),
     close() {
       try { unsubscribePeers?.(); } catch { /* best-effort */ }
       for (const s of Object.values(subs)) s.clear();

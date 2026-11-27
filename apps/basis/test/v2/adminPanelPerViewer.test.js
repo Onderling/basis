@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The admin panel tells a member the truth: what the GATE refuses them, the panel greys.
  *

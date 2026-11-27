@@ -101,6 +101,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `deriveCircleRoot` | function | [`core.md`](core.md#derivecircleroot) |
 | `deriveCircleSeed` | function | [`core.md`](core.md#derivecircleseed) |
 | `deriveDeviceSeed` | function | [`core.md`](core.md#derivedeviceseed) |
+| `derivePassphraseKey` | function | [`core.md`](core.md#derivepassphrasekey) |
 | `derivePersonKeySeed` | function | [`core.md`](core.md#derivepersonkeyseed) |
 | `derivePersonLinkKeySeed` | function | [`core.md`](core.md#derivepersonlinkkeyseed) |
 | `deriveVaultAtRestKeyFrom` | function | [`core.md`](core.md#derivevaultatrestkeyfrom) |
@@ -228,6 +229,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `PolicyEngine` | class | [`core.md`](core.md#policyengine) |
 | `processSignatureMemo` | function | [`core.md`](core.md#processsignaturememo) |
 | `processVerdictMemo` | function | [`core.md`](core.md#processverdictmemo) |
+| `PROD_ARGON_OPTS` | constant | [`core.md`](core.md#prod_argon_opts) |
 | `publish` | function | [`core.md`](core.md#publish) |
 | `publishes` | function | [`core.md`](core.md#publishes) |
 | `pullPeerList` | function | [`core.md`](core.md#pullpeerlist) |
@@ -247,6 +249,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `registerTunnelOpen` | function | [`core.md`](core.md#registertunnelopen) |
 | `registerTunnelOw` | function | [`core.md`](core.md#registertunnelow) |
 | `registerTunnelReceiveSealed` | function | [`core.md`](core.md#registertunnelreceivesealed) |
+| `relayAddressRefusal` | function | [`core.md`](core.md#relayaddressrefusal) |
 | `relayNameOf` | function | [`core.md`](core.md#relaynameof) |
 | `relayOwnNames` | function | [`core.md`](core.md#relayownnames) |
 | `REPLY_CODES` | constant | [`core.md`](core.md#reply_codes) |

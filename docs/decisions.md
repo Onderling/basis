@@ -826,6 +826,17 @@ What it costs: a sender never learns from the ladder that a message actually arr
 exists, and still arrives — but only from a peer who chose to send receipts. That is the honest position:
 the only positive evidence we have is evidence somebody chose to give us.
 
+**Addition, 2026-11-26: a relay's give-up never moves the ladder.** A relay that drops a message it held (its
+time limit, a cap, or the over-rate resends running out) reports it to the sender, and the app used to answer with
+`failed`. But that report is the relay's word, not this device's knowledge: the message may have reached the other
+side some other way, and `failed` under-claims exactly as `sent` over-claimed. So the relay's report never changes the
+delivery state. The bubble keeps the rung it had and gets a retry hint beside it, a side fact on the delivery map
+(`relayGaveUpOf`). It is not a rung, not a reason, never synced and not logged: it is this device's own view. Both
+shells paint it from the one shared presentation (`deliveryPresentation`). The box has no bubble, so it only logs the
+report. A later real receipt moves the bubble on and clears the hint. A retry re-sends under the SAME message id, so
+a receiver that already has the message keeps one copy. `failed` stays for what this device itself knows: its own
+hold queue let the message go.
+
 ### 2 · Reachability-on-this-circle is answered ABOVE the send path
 
 An NKN-only member of a relay circle dropped out silently: a relay reports it can reach anyone, so the
@@ -2309,3 +2320,26 @@ own links).
 **Alternatives:** *a sealed store per circle* for the proofs (proposed first): a second place beside the log, named in
 every forget list. *Restore the kept copy always*: a take-back of one change would wipe a later allowed one. *Judge a
 served head as an act*: the joiner case above. **Residuals** are in `docs/conventions/enforceability.md`.
+
+## 2026-11-26 — A person can lock their own Basis in the browser: optional, a short code allowed, no lock on the phone or the box (Frits decided; Fable briefed, Opus built)
+
+**What:** in the web app a person may switch on a lock and choose a code or a passphrase. From then on the app asks
+for it at every open, a reload included, before anything starts. The lock is real: the secret wraps the browser key
+door's key (one slot of the passphrase kind, the key derived by Argon2id at 46 MiB and t 2, parameters stored in the
+slot), so while it is locked no key in the browser can be used, also not from the developer tools or a copied profile.
+A short code is allowed, with a plain line that it stops someone at the computer and not someone who copies the
+browser's files. A forgotten code is not recoverable from the device: the way out is "start over" with the recovery
+phrase, reachable from the lock screen. Switching the lock on re-keys the door once; the old key is deleted only after
+a read back through the new slot. To change the code: switch it off and on again.
+
+**Why:** today whoever has the browser profile has the keys, and anyone at the computer opens the app. A lock that is
+only a screen in front of the app would stop neither: the key must not be usable while locked. Optional, because a
+person alone at their own computer may not want it; a short code allowed, because a lock nobody switches on protects
+nobody (Frits, 2026-11-26).
+
+**Not on the phone or the box:** the phone's key sits in the OS keystore behind the phone's own screen lock; the box
+starts unattended and has no person to ask. Both doors answer `unlocked` and have nothing to open.
+
+**Alternatives:** *a code screen without the wrap*: stops nobody who opens the developer tools. *The backup's 64 MiB at
+t 3*: about two seconds at every open in a browser (measured 2.08 s). *A passkey*, *an idle lock*, *changing the code
+in place*: later, in the full design; the slot format (an array with a `kind`) leaves room for them.

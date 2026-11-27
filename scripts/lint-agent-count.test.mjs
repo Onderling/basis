@@ -40,4 +40,16 @@ describe('lint-agent-count', () => {
     expect(docAgreementProblems('<!-- lint-agent-count: in-process = hostAgent -->', ['hostAgent', 'x']).join('\n')).toMatch(/does not name x/);
     expect(docAgreementProblems('nothing', ['hostAgent']).join('\n')).toMatch(/no .* marker/);
   });
+  it('every red message names a file:line and says what to do instead', () => {
+    const more = `${TODAY}\nconst x = await createBrowserNewAgent({ bus });\nadoptInProcess(x.agent);`;
+    const all = [
+      ...agentCountProblems(more, ['hostAgent'], { 'new Agent({': 1, 'new InternalTransport(bus': 1 }),
+      ...agentCountProblems('const adoptInProcess = (peer) => {};', ['hostAgent'], { 'new Agent({': 1, 'new InternalTransport(bus': 1 }),
+      ...docAgreementProblems('<!-- lint-agent-count: in-process = hostAgent -->', ['hostAgent', 'x']),
+      ...docAgreementProblems('nothing', ['hostAgent']),
+    ];
+    expect(all.length).toBeGreaterThan(5);
+    for (const p of all) { expect(p).toMatch(/[\w/.-]+\.(js|mjs|md):\d+/); expect(p).toMatch(/Fix: /); }
+    expect(all.join('\n')).toMatch(/realAgent\.js:5: .*x\.agent/);
+  });
 });

@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A CIRCLE'S LISTS ARE A TAB BESIDE TASKS (walk rows 62/64; Frits: "a tab in the circle, the settings switch = that
  * tab"). The tab is the lists feature's surface: on, the circle shows a Lists tab after Tasks; off, no tab. The tab

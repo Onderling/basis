@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * FITNESS — every URI scheme this product BUILDS must be one the OS will hand back to it.
  *

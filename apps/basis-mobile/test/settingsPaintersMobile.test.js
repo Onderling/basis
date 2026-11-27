@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The settings painters on mobile paint ITS section and nothing else, and the old My data page keeps every section no
  * group took, in its order. `src/screens/**` cannot be rendered under vitest, so the paint is pinned as source text (as
@@ -53,6 +54,7 @@ const OWN_TITLE = {
   'restore': ACT,
   'recovery-file': ACT,
   'personas-receive': ACT,
+  'app-lock': 'circle.lock.section_title',
   'storage': 'circle.mydata.storage',
   'own-actions': 'circle.params.key.ownActions_record',
 };

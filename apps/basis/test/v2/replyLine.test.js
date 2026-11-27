@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * replyLine — one worded line per op family, from what the op returned. The words are the locale's (the key and its
  * values are checked here); the day and time are written in the locale's own date language.

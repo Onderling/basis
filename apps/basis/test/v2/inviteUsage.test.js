@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * THE OPEN INVITE KEEPS UP. A walk (2026-11-05) held the invite open while someone joined: "0 of 6 places used" after
  * 45 s, and nothing told the inviter. On the membership lane's signal an open invite re-reads its count and names each

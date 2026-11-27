@@ -40,6 +40,14 @@ describe('guard-run', () => {
     expect(always).toBeLessThan(skip);
   });
 
+  it('guards.mjs starts the INSTALLED vitest, never one fetched by npx at run time', () => {
+    // the root has no vitest of its own: `npx vitest` there downloads whatever the registry serves that minute
+    const code = readFileSync(new URL('guards.mjs', import.meta.url), 'utf8').split('\n').filter((l) => !/^\s*(\/\/|\*)/.test(l)).join('\n');
+    expect(code).not.toMatch(/['"`]npx['"`]/);
+    expect(code).toMatch(/spawnSync\(VITEST, \['run', 'scripts\/', '--root', ROOT/);
+    expect(code).toMatch(/const VITEST = path\.join\(ROOT, 'apps\/basis\/node_modules\/\.bin\/vitest'\)/);
+  });
+
   it('byteCompare orders by code unit, not by locale', () => {
     expect(['b', 'B', 'a', '_', 'A'].sort(byteCompare)).toEqual(['A', 'B', '_', 'a', 'b']);
   });

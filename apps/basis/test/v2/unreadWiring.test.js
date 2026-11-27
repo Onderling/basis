@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * Unread is what OTHERS said (`countsAsUnread`), and the circle you LEAVE is seen (`seenOnLeave`) — the shared rule,
  * wired in both launchers: they pass this person's refs ('me' + `ownAddresses()`) and subscribe the leave to the

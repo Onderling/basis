@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A household bot has no app switch: what it holds is its lists and what each list's lines are (plain, chore,
  * appointment) — the template composes the plugins that needs, and nothing names an "app" to the household. `/apps`

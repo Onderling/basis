@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * Mobile Contacten paints the help bot as a contact the same way web does — by construction, through the shared
  * `withHelpContact` / `contactOpenTarget` / `tileCircles` (mobile screens cannot render under vitest, so these pin

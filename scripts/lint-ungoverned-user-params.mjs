@@ -30,6 +30,7 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { lineOf } from './guard-where.mjs';
 
 const ROOT = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
 const sh = (cmd) => execSync(cmd, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -55,14 +56,14 @@ const sites = new Map();      // key -> ["file", …]  (kind:user declaration si
 const governed = new Set();   // key                 (kind:user register entries)
 
 for (const f of tracked().filter(isSource)) {
-  let src;
-  try { src = stripComments(readFileSync(path.join(ROOT, f), 'utf8')); } catch { continue; }
+  let src; let raw;
+  try { raw = readFileSync(path.join(ROOT, f), 'utf8'); src = stripComments(raw); } catch { continue; }
   for (const m of src.matchAll(USER_OBJ_RE)) {
     const lit = m[0];
     if (!isUserKind(lit)) continue;
     const key = keyOf(lit);
     if (!key) continue;
-    if (precededByParam(src, m.index)) sites.set(key, [...(sites.get(key) ?? []), f]);
+    if (precededByParam(src, m.index)) sites.set(key, [...(sites.get(key) ?? []), `${f}:${lineOf(raw, key)}`]);
     else governed.add(key);
   }
 }

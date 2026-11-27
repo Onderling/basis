@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A message the system has given up on must stop looking fine — on BOTH shells.
  *
@@ -45,7 +46,8 @@ describe('both give-ups land on a state the person can act on', () => {
 
   it("a relay give-up says WHAT was lost: the person's own message (a bubble) or lane traffic, its kind, and for whom", () => {
     const known = new Map([['m9', 'maybe-received']]);
-    const map = { get: (id) => known.get(id), set: (id, st) => known.set(id, st) };
+    const hints = new Map();
+    const map = { get: (id) => known.get(id), set: (id, st) => known.set(id, st), setRelayGaveUp: (id, r) => hints.set(id, r) };
     const warn = vi.fn();
     const c = makeGiveUpConsumers({ deliveryMap: map, onWarn: warn });
     c.onUndelivered({ msgId: 'm9', reason: 'bucket-full', to: 'GQl69DfbE5twD1fsXYZ', subtype: 'circle-chat' });
@@ -58,14 +60,16 @@ describe('both give-ups land on a state the person can act on', () => {
     expect(bubble, 'never the whole address').not.toMatch(/GQl69DfbE5twD1fsXYZ/);
     expect(control).toMatch(/control/);
     expect(control).toMatch(/circle-governance-broadcast/);
-    expect(known.get('m9')).toBe('failed');
+    expect(known.get('m9'), "the relay's word never sets failed (deliveryRelayGaveUp.test.js)").toBe('maybe-received');
+    expect(hints.get('m9')).toBe('bucket-full');
+    expect(hints.has('env-7'), 'lane traffic has no bubble to hint on').toBe(false);
   });
 
-  it('a relay give-up marks the message failed', () => {
+  it('a relay give-up never marks the message failed: the relay\'s word, not this device\'s', () => {
     const m = mapSpy();
     const warn = vi.fn();
     makeGiveUpConsumers({ deliveryMap: m, onWarn: warn }).onUndelivered({ msgId: 'm2', reason: 'expired' });
-    expect(m.calls).toEqual([['m2', 'failed']]);
+    expect(m.calls).toEqual([]);
     expect(String(warn.mock.calls[0][0])).toMatch(/relay gave up.*expired/);
   });
 
@@ -93,7 +97,7 @@ describe('it cannot make things worse', () => {
   it('still REPORTS when the delivery map throws', () => {
     // the map failing is exactly when the log is the only record left
     const warn = vi.fn();
-    const throwing = { set: () => { throw new Error('map gone'); } };
+    const throwing = { get: () => 'maybe-received', set: () => { throw new Error('map gone'); }, setRelayGaveUp: () => { throw new Error('map gone'); } };
     expect(() => makeGiveUpConsumers({ deliveryMap: throwing, onWarn: warn })
       .onUndelivered({ msgId: 'm3', reason: 'capacity' })).not.toThrow();
     expect(warn).toHaveBeenCalled();

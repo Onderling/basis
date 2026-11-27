@@ -118,6 +118,23 @@ export function isPrivateRelayName(name) {
 }
 
 /**
+ * Why a client may NOT dial this relay address, or `null` when it may. A relay is dialled over TLS (`wss:`); a plain
+ * `ws:` address is allowed only to a name that cannot be a public relay (`isPrivateRelayName`: the device itself, the
+ * home network, a compose service). Plain ws to a public host lets anyone on the path, not only the relay, read and
+ * rewrite the relay protocol: which addresses a device registers, its proofs, the control frames.
+ * @param {unknown} url
+ * @returns {null | 'not-websocket' | 'plain-on-public-host'}
+ */
+export function relayAddressRefusal(url) {
+  if (typeof url !== 'string') return 'not-websocket';
+  let u;
+  try { u = new URL(url.trim()); } catch { return 'not-websocket'; }
+  if (u.protocol === 'wss:') return null;
+  if (u.protocol !== 'ws:' || !u.host) return 'not-websocket';
+  return isPrivateRelayName(u.host) ? null : 'plain-on-public-host';
+}
+
+/**
  * Which names a relay answers to. Its names are its OPERATOR's (`names`, RELAY_NAMES), never the caller's: the Host
  * header is written by whoever dials, so a hostile relay dialling an honest one would choose it. When names are
  * configured, only they count. Without them the Host is used only for a private name (`isPrivateRelayName`), which keeps

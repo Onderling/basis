@@ -14,7 +14,7 @@ before the next is started.
 | # | Rung | What it checks | Who runs it, when | Time |
 |---|---|---|---|---|
 | 0 | **The one test** | the test you wrote red-first for the thing you are changing (a unit test, a relay walk, one browser spec) | you, while working — every edit | seconds to 2 min |
-| 1 | **The affected tests + the guards** | the tests your change reaches (`npx vitest related <changed files> --run` in the package), ALWAYS with the tests that read source as text, which `related` cannot follow: the package's `test/fitness` folder, every `*Parity.test.js`, and at the root the guards' self-tests (`lint-*.test.mjs`, run by `npm run guards`), then `npm run guards` at the root. The WHOLE package suite (`npx vitest run`) only when the change touches a shared table or register, a package's exports, the kernel (`packages/core`) or a rail; otherwise rung 3 is the whole-suite run | you, before pushing | 1–8 min |
+| 1 | **The affected tests + the guards** | the tests your change reaches (`npx vitest related <changed files> --run` in the package), ALWAYS with the tests that read source as text, which `related` cannot follow: the package's `test/fitness` folder, every `*Parity.test.js`, every test tagged `@reads-source` (`git grep -l @reads-source -- '*.test.*'` in the package; `lint-source-reading-tests` keeps an untagged one red), and at the root the guards' self-tests (`lint-*.test.mjs`, run by `npm run guards`), then `npm run guards` at the root. The WHOLE package suite (`npx vitest run`) only when the change touches a shared table or register, a package's exports, the kernel (`packages/core`) or a rail; otherwise rung 3 is the whole-suite run | you, before pushing | 1–8 min |
 | 2 | **The cheapest real thing** | the change on a REAL composition: the relay walks in `apps/basis/test/*.relay.test.js` (real agents over a real relay), one browser spec (`npx playwright test test-browser/<spec>.spec.js`), a headless browser against the published app, a throwaway profile against the real box | you, when the change touches a shell, a transport, or the box — before opening the PR | 1–10 min |
 | 3 | **The gate** (CI) | the guards, every package suite, the live-pod tier, the e2e journeys — on the PR's merge result | GitHub, on every PR and every push to `development`/`live` | ~8 min |
 | 4 | **The tail** (CI) | the browser suite, eight shards — the only thing that tests a **shell composition** | GitHub, after a merge to `development` or `live`, or by hand (`workflow_dispatch`) — never on a PR | 10–20 min |
@@ -32,6 +32,11 @@ one in ten skipped runs turns out red in CI after two weeks, the whole suite com
 - 2026-11-26, from the first two weeks measured (the retro's follow-up): of 100 red whole-suite runs the first form of
   this rung would have missed 24; 11 of them were tests that read source as text outside `test/fitness` (the Parity
   tests in `apps/basis-mobile`, the guards' self-tests). Those are in the row above since this date.
+
+**Reading a red suite:** run a package's suite as `node scripts/suite.mjs <package dir> [vitest args]`
+from the repo root. It prints every failing file, its failing tests and the first line of each failure, after the
+count. Read those files and run them alone; never rerun the whole suite on a count alone (the retro counted 29 of 134
+red suites rerun that way). With `SUITE_LOG=<file>` each run appends one JSON line, for the next retro's miss count.
 
 **One by-hand step before a release: the walks that need the public network.** Every browser in the suite is launched
 hermetic (no host but this machine), so a walk that rides the public NKN network (`walk-transports.spec.js`: which

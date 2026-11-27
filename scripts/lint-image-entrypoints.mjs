@@ -16,6 +16,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { lineOf } from './guard-where.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -44,11 +45,11 @@ export function entrypoints(root = ROOT) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const files = entrypoints();
-  const found = files.map((rel) => ({ rel, bare: bareImports(readFileSync(path.join(ROOT, rel), 'utf8')) }))
+  const found = files.map((rel) => { const src = readFileSync(path.join(ROOT, rel), 'utf8'); return { rel, src, bare: bareImports(src) }; })
     .filter((f) => f.bare.length);
   if (found.length) {
     console.error(`\n✖ lint-image-entrypoints: ${found.length} image entrypoint(s) import a bare package — resolved from deploy/, it is not there in the image:`);
-    for (const f of found) console.error(`  ${f.rel}: ${f.bare.join(', ')}`);
+    for (const f of found) for (const b of f.bare) console.error(`  ${f.rel}:${lineOf(f.src, `'${b}'`) === 1 ? lineOf(f.src, `"${b}"`) : lineOf(f.src, `'${b}'`)}: ${b}`);
     console.error('\nFix: load it through the package that declares it (a relative import of that package), never from the entrypoint.\n');
     process.exit(1);
   }

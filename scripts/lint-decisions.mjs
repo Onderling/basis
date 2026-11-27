@@ -35,13 +35,16 @@ export function decisionsProblems(decisionsText, archText) {
   const es = entries(decisionsText);
   let prev = null;
   for (const e of es) {
-    if (!e.date) { out.push(`${DECISIONS}:${e.line} has no date in its heading: ${e.heading.slice(0, 80)}`); continue; }
-    if (prev && e.date < prev.date) out.push(`${DECISIONS}:${e.line} (${e.date}) comes after ${prev.date} (line ${prev.line}) — entries are in date order`);
+    if (!e.date) { out.push(`${DECISIONS}:${e.line} has no date in its heading: ${e.heading.slice(0, 80)}\n    Fix: put the day it was decided in the heading (YYYY-MM-DD), as the other entries do.`); continue; }
+    if (prev && e.date < prev.date) out.push(`${DECISIONS}:${e.line} (${e.date}) comes after ${prev.date} (line ${prev.line}) — entries are in date order.\n    Fix: move the entry to its place by date, or correct the date if it is wrong.`);
     prev = e;
   }
   const have = new Set(es.map((e) => e.date).filter(Boolean));
+  const archLines = String(archText).split('\n');
   for (const d of citedDecisions(archText)) {
-    if (!have.has(d)) out.push(`${ARCH} cites a decision of ${d}, and ${DECISIONS} has no entry of that date — record it there`);
+    if (have.has(d)) continue;
+    const i = archLines.findIndex((l) => new RegExp(`decided (?:on )?${d}`, 'i').test(l));
+    out.push(`${ARCH}:${i + 1} cites a decision of ${d}, and ${DECISIONS} has no entry of that date.\n    Fix: record the decision in ${DECISIONS} under that date, or correct the date the architecture cites.`);
   }
   return out;
 }
@@ -49,7 +52,7 @@ export function decisionsProblems(decisionsText, archText) {
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const problems = decisionsProblems(readFileSync(path.join(ROOT, DECISIONS), 'utf8'), readFileSync(path.join(ROOT, ARCH), 'utf8'));
   if (problems.length) {
-    console.error('lint-decisions:');
+    console.error('✖ lint-decisions:');
     for (const p of problems) console.error(`  • ${p}`);
     process.exit(1);
   }

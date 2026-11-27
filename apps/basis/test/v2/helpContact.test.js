@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The help bot is a contact (L435): Contacten shows ONE synthetic row for it — bot-only, never fanned, no card, no
  * address — whose tap opens the help circle's conversation (the onboarding thread), and the launcher no longer paints

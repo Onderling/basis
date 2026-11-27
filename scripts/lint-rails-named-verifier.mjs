@@ -101,7 +101,7 @@ export function rawRailCalls(files, read) {
       if (i < 0) break;
       if (src.slice(Math.max(0, i - 16), i).includes('function ')) { at = i + 1; continue; }   // the definition
       const argText = src.slice(i, src.indexOf('});', i) + 3);
-      calls.push({ file: f, passesVerifier: /verifyBinding/.test(argText) });
+      calls.push({ file: f, line: src.slice(0, i).split('\n').length, passesVerifier: /verifyBinding/.test(argText) });
       at = i + 1;
     }
   }
@@ -110,22 +110,28 @@ export function rawRailCalls(files, read) {
 
 export function audit({ rails, accepts, read, exists, railCalls }) {
   const problems = [];
+  const at = (f, needle) => {
+    let t = ''; try { t = read(f) ?? ''; } catch { /* missing: its top */ }
+    const i = String(t).split('\n').findIndex((l) => l.includes(needle));
+    return `${f}:${i + 1 || 1}`;
+  };
+  const FIX_RAIL = 'Fix: name the verifier as `verifyBinding ?? <namedVerifier>(…)` in the rail (or hand it at composition), one that agrees with ENTRY_KINDS `accepts` for the lane.';
   for (const r of rails) {
-    if (!exists(r.file)) { problems.push(`${r.file}: rail module missing`); continue; }
+    if (!exists(r.file)) { problems.push(`${r.file}:1: rail module missing.\n    Fix: point its RAILS row at where the rail lives now, or remove the row.`); continue; }
     const lane = exists(r.laneFile) ? parseLane(read(r.laneFile), r.laneConst) : null;
-    if (!lane) { problems.push(`${r.laneFile}: ${r.laneConst} not found`); continue; }
-    if (!(lane in accepts)) { problems.push(`${r.file}: lane kind '${lane}' is not a declared ENTRY_KINDS row`); continue; }
+    if (!lane) { problems.push(`${r.laneFile}:1: ${r.laneConst} not found.\n    Fix: export the lane constant there, or correct laneFile / laneConst in the RAILS row.`); continue; }
+    if (!(lane in accepts)) { problems.push(`${at(r.laneFile, r.laneConst)}: lane kind '${lane}' is not a declared ENTRY_KINDS row.\n    Fix: declare '${lane}' in ENTRY_KINDS with its accepts level, or fold the rail onto a declared lane.`); continue; }
     let verifier = namedDefault(read(r.file));
     if (!verifier && r.composedIn) verifier = exists(r.composedIn.file) ? namedAtComposition(read(r.composedIn.file), r.composedIn.handle) : null;
-    if (!verifier) { problems.push(`${r.file}: constructed with NO named verifier (no \`verifyBinding ?? <name>(\` default${r.composedIn ? `, and ${r.composedIn.file} hands it no \`${r.composedIn.handle} = <name>(\`` : ''})`); continue; }
+    if (!verifier) { problems.push(`${at(r.file, 'verifyBinding')}: constructed with NO named verifier (no \`verifyBinding ?? <name>(\` default${r.composedIn ? `, and ${r.composedIn.file} hands it no \`${r.composedIn.handle} = <name>(\`` : ''}).\n    ${FIX_RAIL}`); continue; }
     const level = VERIFIER_ACCEPTS[verifier];
-    if (!level) { problems.push(`${r.file}: verifier '${verifier}' is not one of the named verifiers (${Object.keys(VERIFIER_ACCEPTS).join(', ')})`); continue; }
-    if (accepts[lane] !== level) problems.push(`${r.file}: lane '${lane}' is folded with ${verifier} (${level}) but ENTRY_KINDS says accepts: ${accepts[lane]}`);
+    if (!level) { problems.push(`${at(r.file, verifier)}: verifier '${verifier}' is not one of the named verifiers (${Object.keys(VERIFIER_ACCEPTS).join(', ')}).\n    ${FIX_RAIL}`); continue; }
+    if (accepts[lane] !== level) problems.push(`${at(r.file, verifier)}: lane '${lane}' is folded with ${verifier} (${level}) but ENTRY_KINDS says accepts: ${accepts[lane]}.\n    ${FIX_RAIL}`);
   }
   const known = new Set(rails.map((r) => r.file));
   for (const c of railCalls) {
-    if (!known.has(c.file)) problems.push(`${c.file}: makeCircleEntryRail( called outside the RAILS table — a rail this guard does not know`);
-    else if (!c.passesVerifier) problems.push(`${c.file}: makeCircleEntryRail( called without verifyBinding`);
+    if (!known.has(c.file)) problems.push(`${c.file}:${c.line}: makeCircleEntryRail( called outside the RAILS table — a rail this guard does not know.\n    Fix: add a RAILS row for it (file, laneFile, laneConst), so its verifier is checked.`);
+    else if (!c.passesVerifier) problems.push(`${c.file}:${c.line}: makeCircleEntryRail( called without verifyBinding.\n    Fix: pass verifyBinding to it.`);
   }
   return problems;
 }

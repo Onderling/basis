@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 // Fitness guard — every user-facing settings/screen label the B surfaces render
 // MUST resolve to a real string in BOTH locales. A missing key would leak a raw
 // i18n path onto the screen (e.g. "CIRCLE.SETTINGS.VIEW", "circle.settings.opt.chat"),

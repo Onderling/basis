@@ -20,6 +20,19 @@ describe('lint-catalogue-ops', () => {
     expect(p.some((x) => /baseline lists tasks.old, which no manifest declares/.test(x))).toBe(true);
   });
 
+  it('every red message says what to do instead; one on a page or in the baseline names its file:line', () => {
+    const texts = {
+      'a.md': '# A\n<!-- catalogue-ops\ntasks: addTask gone\n-->\n',
+      'b.md': '# B\n\n<!-- catalogue-ops\ntasks: addTask\n-->\n',
+      baseline: '{\n  "owed": [\n    "tasks.addTask",\n    "tasks.old"\n  ]\n}\n',
+    };
+    const p = auditCatalogue({ declared, pages: { 'a.md': ['tasks.addTask', 'tasks.gone'], 'b.md': ['tasks.addTask'] }, baseline: ['tasks.addTask', 'tasks.old'], texts });
+    for (const x of p) expect(x).toMatch(/\n\s*Fix: /);
+    expect(p.find((x) => /names tasks\.gone/.test(x))).toMatch(/docs\/catalogue\/a\.md:3:/);
+    expect(p.find((x) => /named on 2 pages/.test(x))).toMatch(/docs\/catalogue\/b\.md:4/);
+    expect(p.find((x) => /baseline lists tasks\.old/.test(x))).toMatch(/scripts\/catalogue-ops-baseline\.json:4:/);
+  });
+
   // --update may only SHRINK the debt: a new op on no page is never written into the baseline, it stays red
   it('--update removes placed and gone entries, and never adds a new unplaced op', () => {
     const declared2 = new Set(['tasks.addTask', 'tasks.claimTask', 'tasks.brandNew']);

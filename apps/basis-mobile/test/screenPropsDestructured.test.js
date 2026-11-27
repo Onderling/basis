@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * FITNESS — every prop App.js hands a screen must be DESTRUCTURED by that screen.
  *

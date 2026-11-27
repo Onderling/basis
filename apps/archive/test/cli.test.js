@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * cli.test.js — spawn-as-subprocess tests for the `archive` CLI.
  *

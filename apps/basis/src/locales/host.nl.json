@@ -332,6 +332,10 @@
       "text": "Ongeldig adres van een verbindingspunt. Moet beginnen met ws:// of wss://",
       "doc": "/set-relay met een ongeldig URL-schema."
     },
+    "plain_ws_public": {
+      "text": "Dit adres is niet beveiligd. Een verbindingspunt buiten je eigen apparaat of thuisnetwerk begint met wss://",
+      "doc": "/set-relay met een onbeveiligd ws://-adres naar een publieke host; zo'n punt gaat alleen over wss://."
+    },
     "cleared": {
       "text": "✓ Verbindingspunt gewist. NKN blijft actief.",
       "doc": "/set-relay --clear is gelukt."

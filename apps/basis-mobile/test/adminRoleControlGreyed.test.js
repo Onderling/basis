@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The phone paints a role change that cannot stand (the last admin, alone in the circle) greyed with its reason, as the
  * web panel does — the shared decision (`roleControlFor`) says `disabled` and `reasonKey`; the screen must honour both.

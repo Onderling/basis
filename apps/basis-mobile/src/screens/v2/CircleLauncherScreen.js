@@ -79,7 +79,7 @@ import {
   // Nearby model + label helpers (the action map + banner rule are SHARED with web — invariant 3).
   buildNearbyModel, NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS,
   nearbyVisibilityKey, createNearbyScreen, POINT_SOURCE_LABELS, POINT_STATUS_LABELS, pointStatus,
-  createConnectionPoints, adoptExistingRelay,
+  createConnectionPoints, pointAddErrorKey, adoptExistingRelay,
   // "My things" private notes-list.
   myThingsFromListFiles,
   // circle-scoped event stream + per-row action chips.
@@ -3714,6 +3714,12 @@ function CircleDetail({
     deliveryTick;
     return deliveryStateMapRef.current.waitingOf?.(msgId) ?? null;
   }, [deliveryTick]);
+  // the relay gave up on it (the map's `relayGaveUpOf`): a retry hint beside the rung, never a rung of its own
+  const deliveryRelayGaveUpFor = useCallback((msgId) => {
+    // eslint-disable-next-line no-unused-expressions
+    deliveryTick;
+    return deliveryStateMapRef.current.relayGaveUpOf?.(msgId) ?? null;
+  }, [deliveryTick]);
   const [composerText, setComposerText] = useState('');
   // The "+" — mobile had no attach affordance at all, so a phone could not put a photo or an
   // appointment in a conversation by any route. Same projected entries as web, narrowed the same way.
@@ -5283,6 +5289,7 @@ function CircleDetail({
             deliveryStateFor,
             deliveryReasonFor,
             deliveryWaitingFor,
+            deliveryRelayGaveUpFor,
             localActor: 'me',
             onRetryDelivery,
             onBubbleButton,
@@ -5627,6 +5634,7 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
   const deliveryState = isLocalChat ? deliveryStateFor(row.id) : null;
   const deliveryReason = isLocalChat && typeof deliveryOpts?.deliveryReasonFor === 'function' ? deliveryOpts.deliveryReasonFor(row.id) : null;
   const deliveryWaiting = isLocalChat && typeof deliveryOpts?.deliveryWaitingFor === 'function' ? deliveryOpts.deliveryWaitingFor(row.id) : null;
+  const deliveryRelayGaveUp = isLocalChat && typeof deliveryOpts?.deliveryRelayGaveUpFor === 'function' ? deliveryOpts.deliveryRelayGaveUpFor(row.id) : null;
   // Bulletin restyle (web parity) — my own chat messages align right on --me-bg
   // (no border); everyone else's + the bot's stay left on --bot-bg + --bot-line.
   // Same gate the delivery icon uses: a locally-authored chat-message.
@@ -5774,7 +5782,7 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
       ) : null}
       {/* Delivery state: the ONE chip (rn/DeliveryChip.js) that the contact thread's own bubbles paint too, over the
           SHARED presentation table (deliverySettings.js) the web bubble reads. */}
-      <DeliveryChip state={deliveryState} reason={deliveryReason} waiting={deliveryWaiting} rowId={row.id} onRetry={onRetryDelivery} />
+      <DeliveryChip state={deliveryState} reason={deliveryReason} waiting={deliveryWaiting} relayGaveUp={deliveryRelayGaveUp} rowId={row.id} onRetry={onRetryDelivery} />
     </View>
   );
 }
@@ -5853,7 +5861,8 @@ function ConnectionPointsHost({ bundle, onBack }) {
   // Record it, then dial it. Both halves are reported: a point that is listed but not connected is a
   // different (and recoverable) state from one that was never accepted at all.
   const addByHand = useCallback(async (url) => {
-    if (!storeRef.current?.addManually(url)?.ok) { setAddError('circle.nearbyScreen.point_add_invalid'); return; }
+    const added = storeRef.current?.addManually(url);
+    if (!added?.ok) { setAddError(pointAddErrorKey(added?.reason)); return; }
     setAddError(null);
     try {
       const r = await bundle?.agent?.addRelay?.(url, { awaitReady: true });

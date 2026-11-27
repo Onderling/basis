@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * buildMeshTransports — the shared RN mesh transport builder (T5.2d/T5.3c).
  *
@@ -59,7 +60,7 @@ beforeEach(() => {
 describe('buildMeshTransports', () => {
   it('builds mdns + ble + relay when all are available', async () => {
     const { mdns, ble, relay, perms } = await buildMeshTransports({
-      identity, relayUrl: 'ws://relay.test',
+      identity, relayUrl: 'wss://relay.test',
     });
     expect(mdns).toBeTruthy();
     // the name follows the LAN key: the builder hands only the prefix, never a slice of the agent's key
@@ -99,7 +100,7 @@ describe('buildMeshTransports', () => {
 
   it('enable flags skip individual transports', async () => {
     const { mdns, ble, relay } = await buildMeshTransports({
-      identity, enable: { mdns: false, ble: false }, relayUrl: 'ws://relay.test',
+      identity, enable: { mdns: false, ble: false }, relayUrl: 'wss://relay.test',
     });
     expect(mdns).toBeNull();
     expect(ble).toBeNull();

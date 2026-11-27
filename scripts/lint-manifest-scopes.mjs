@@ -38,6 +38,7 @@ import { fileURLToPath } from 'node:url';
 import { verbKind, WRITE_SCOPES, WRITE_WHATS, REVEALS } from '../packages/app-manifest/src/atoms.js';
 import { allManifests } from '../apps/basis/src/v2/manifestSources.js';
 import { externalOrigins, PLACED_HOSTS } from '../apps/basis/src/core/agent/egressGate.js';
+import { manifestFileByApp } from './guard-where.mjs';
 
 const CLASSIFY = 'classify this verb: read or write';
 
@@ -52,51 +53,62 @@ const CLASSIFY = 'classify this verb: read or write';
  * @param {object[]} manifests @param {Set<string>} gateExternal
  * @returns {string[]} problems
  */
-export function auditPlacedAgreement(manifests, gateExternal) {
+export function auditPlacedAgreement(manifests, gateExternal, files = {}) {
   const declared = new Set((manifests ?? []).filter((m) => Array.isArray(m?.hosts) && m.hosts.includes(PLACED_HOSTS)).map((m) => m.app));
   const problems = [];
-  for (const app of declared) if (!gateExternal.has(app)) problems.push(`${app} declares '${PLACED_HOSTS}' but the egress gate does not treat it as reaching outside`);
-  for (const app of gateExternal) if (!declared.has(app)) problems.push(`the egress gate treats ${app} as reaching outside but its manifest does not declare '${PLACED_HOSTS}'`);
+  for (const app of declared) if (!gateExternal.has(app)) problems.push(`${fileOf(files, app)}: ${app} declares '${PLACED_HOSTS}' but the egress gate (${EGRESS_GATE}) does not treat it as reaching outside.\n    Fix: remove '${PLACED_HOSTS}' from its \`hosts\` if it reaches nothing outside, or make the egress gate read this manifest.`);
+  for (const app of gateExternal) if (!declared.has(app)) problems.push(`${fileOf(files, app)}: the egress gate (${EGRESS_GATE}) treats ${app} as reaching outside but its manifest does not declare '${PLACED_HOSTS}'.\n    Fix: add '${PLACED_HOSTS}' to its \`hosts\`, or take it off the egress gate's list.`);
   return problems;
+}
+
+const EGRESS_GATE = 'apps/basis/src/core/agent/egressGate.js';
+const FIX = '\n    Fix: ';
+/** An app's manifest file from the map, `apps/<app>/manifest.js` when the map has none. */
+const fileOf = (files, app) => files?.[app] ?? `apps/${app}/manifest.js`;
+
+/** One red line: the manifest file, the app (and op), and the problem with its Fix line. */
+export function redLine({ file, app, opId, message }) {
+  return `${file}: ${app}${opId ? `.${opId}` : ''}: ${message}`;
 }
 
 export function auditManifest(manifest) {
   const problems = [];
   if (!Array.isArray(manifest?.hosts)) {
-    problems.push({ opId: null, message: 'no `hosts` array — declare the network hosts this app reaches (`hosts: []` for none)' });
+    problems.push({ opId: null, message: `no \`hosts\` array.${FIX}declare the network hosts this app reaches at the manifest's top level (\`hosts: []\` for none).` });
   } else {
     manifest.hosts.forEach((h, i) => {
       if (typeof h !== 'string' || h.trim() === '') {
-        problems.push({ opId: null, message: `hosts[${i}] must be a non-empty host name (got ${JSON.stringify(h)})` });
+        problems.push({ opId: null, message: `hosts[${i}] must be a non-empty host name (got ${JSON.stringify(h)}).${FIX}write the host name there, or remove the entry.` });
       } else if (h.startsWith('@') && h !== PLACED_HOSTS) {
         // one reserved word only: '@placed' (the hosts a box's operator places); any other '@' word is no host and no claim
-        problems.push({ opId: null, message: `hosts[${i}] '${h}' is not a host; the only reserved word is '${PLACED_HOSTS}'` });
+        problems.push({ opId: null, message: `hosts[${i}] '${h}' is not a host; the only reserved word is '${PLACED_HOSTS}'.${FIX}write the host name, or '${PLACED_HOSTS}' for the hosts a box's operator places.` });
       }
     });
   }
   if (Array.isArray(manifest?.domainVerbs)) {
-    problems.push({ opId: null, message: `\`domainVerbs\` is a list — make it a map and ${CLASSIFY} ({ verb: 'read' | 'write' })` });
+    problems.push({ opId: null, message: `\`domainVerbs\` is a list.${FIX}make it a map and ${CLASSIFY} ({ verb: 'read' | 'write' }).` });
   }
   for (const op of manifest?.operations ?? []) {
     const id = op?.id ?? '(no id)';
     const kind = verbKind(manifest, op?.verb);
     if (kind === null) {
-      problems.push({ opId: id, message: `domain verb '${op.verb}' is not in the \`domainVerbs\` map — ${CLASSIFY}` });
+      problems.push({ opId: id, message: `domain verb '${op.verb}' is not in the \`domainVerbs\` map.${FIX}${CLASSIFY}: add ${op.verb}: 'read' or 'write' to the manifest's \`domainVerbs\`.` });
       continue;
     }
     if (op?.writes !== undefined) {
       const scope = op.writes?.scope;
       if (!op.writes || typeof op.writes !== 'object' || !WRITE_SCOPES.includes(scope)) {
-        problems.push({ opId: id, message: `writes.scope must be one of ${WRITE_SCOPES.join(' | ')} (got ${JSON.stringify(op.writes)})` });
+        problems.push({ opId: id, message: `writes.scope must be one of ${WRITE_SCOPES.join(' | ')} (got ${JSON.stringify(op.writes)}).${FIX}set writes: { scope: ${WRITE_SCOPES.map((s) => `'${s}'`).join(' | ')} } on the op, the widest place it writes.` });
       }
     } else if (kind === 'write' || op?.appends !== undefined) {
       const why = op?.appends !== undefined ? 'appends' : (op?.verb ? `verb '${op.verb}'` : 'no verb');
-      problems.push({ opId: id, message: `writing op (${why}) has no \`writes: { scope }\` declaration` });
+      problems.push({ opId: id, message: `writing op (${why}) has no \`writes: { scope }\` declaration.${FIX}add writes: { scope: ${WRITE_SCOPES.map((s) => `'${s}'`).join(' | ')} } to the op, the widest place it writes.` });
     }
   }
   return problems;
 }
 
+const BASELINE_REL = 'scripts/manifest-what-baseline.json';
 const BASELINE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'manifest-what-baseline.json');
 
 /**
@@ -111,13 +123,13 @@ export function auditWhat(manifest) {
     const id = op?.id ?? '(no id)';
     if (op?.writes && typeof op.writes === 'object') {
       const what = op.writes.what;
-      if (what === undefined) owed.push({ opId: id, kind: 'what', message: `declare what it writes: writes.what = ${WRITE_WHATS.join(' | ')}` });
-      else if (!WRITE_WHATS.includes(what)) owed.push({ opId: id, kind: 'bad', message: `writes.what must be one of ${WRITE_WHATS.join(' | ')} (got ${JSON.stringify(what)})` });
+      if (what === undefined) owed.push({ opId: id, kind: 'what', message: `a writing op with no writes.what.${FIX}declare what it writes: writes.what = ${WRITE_WHATS.join(' | ')}.` });
+      else if (!WRITE_WHATS.includes(what)) owed.push({ opId: id, kind: 'bad', message: `writes.what must be one of ${WRITE_WHATS.join(' | ')} (got ${JSON.stringify(what)}).${FIX}set writes.what to one of ${WRITE_WHATS.join(' | ')}.` });
     }
     if (op?.reveals !== undefined && !REVEALS.includes(op.reveals)) {
-      owed.push({ opId: id, kind: 'bad', message: `reveals must be one of ${REVEALS.join(' | ')} (got ${JSON.stringify(op.reveals)})` });
+      owed.push({ opId: id, kind: 'bad', message: `reveals must be one of ${REVEALS.join(' | ')} (got ${JSON.stringify(op.reveals)}).${FIX}set reveals to one of ${REVEALS.join(' | ')}.` });
     } else if (op?.reveals === undefined && op?.writes === undefined && op?.group === 'device' && verbKind(manifest, op?.verb) === 'read') {
-      owed.push({ opId: id, kind: 'reveals', message: `a read in the device group says what it hands out: reveals = ${REVEALS.join(' | ')}` });
+      owed.push({ opId: id, kind: 'reveals', message: `a read in the device group with no \`reveals\`.${FIX}a read in the device group says what it hands out: reveals = ${REVEALS.join(' | ')}.` });
     }
   }
   return owed;
@@ -127,21 +139,23 @@ export function auditWhat(manifest) {
  * The verdict against the baseline: the lines that are red. Owed and baselined is quiet (debt, visible); owed and not
  * baselined is red; a bad word is red; a baseline entry that is no longer owed (filled in, or the op gone) is red until
  * `--update` removes it.
- * @param {{ owed: {app: string, opId: string, kind: string, message?: string}[], baseline: {what?: string[], reveals?: string[]} }} a
+ * @param {{ owed: {app: string, opId: string, kind: string, message?: string}[], baseline: {what?: string[], reveals?: string[]},
+ *   files?: Record<string, string> }} a  files: each app's manifest file (repo-relative)
  * @returns {string[]}
  */
-export function judgeWhat({ owed, baseline }) {
+export function judgeWhat({ owed, baseline, files = {} }) {
   const red = [];
   const held = { what: new Set(baseline?.what ?? []), reveals: new Set(baseline?.reveals ?? []) };
   const now = { what: new Set(), reveals: new Set() };
   for (const o of owed) {
     const key = `${o.app}.${o.opId}`;
-    if (o.kind === 'bad') { red.push(`${key}: ${o.message ?? 'unknown word'}`); continue; }
+    const line = (message) => redLine({ file: fileOf(files, o.app), app: o.app, opId: o.opId, message });
+    if (o.kind === 'bad') { red.push(line(o.message ?? 'unknown word')); continue; }
     now[o.kind].add(key);
-    if (!held[o.kind].has(key)) red.push(`${key}: ${o.message ?? `owes ${o.kind}`}`);
+    if (!held[o.kind].has(key)) red.push(line(o.message ?? `owes ${o.kind}`));
   }
   for (const kind of ['what', 'reveals']) {
-    for (const key of held[kind]) if (!now[kind].has(key)) red.push(`baseline ${key}: no longer owes ${kind} — run with --update`);
+    for (const key of held[kind]) if (!now[kind].has(key)) red.push(`${BASELINE_REL}: baseline ${key}: no longer owes ${kind}.${FIX}run node scripts/lint-manifest-scopes.mjs --update (it only removes entries).`);
   }
   return red;
 }
@@ -163,16 +177,17 @@ export async function loadManifests() {
 
 async function main() {
   const manifests = await loadManifests();
+  const files = await manifestFileByApp(manifests.map((m) => m.manifest));
   let opCount = 0;
   const redManifests = new Set();
   for (const { app, manifest } of manifests) {
     for (const p of auditManifest(manifest)) {
       redManifests.add(app);
       if (p.opId) opCount += 1;
-      console.error(`  ${app}${p.opId ? `.${p.opId}` : ''}: ${p.message}`);
+      console.error(`  ${redLine({ file: fileOf(files, app), app, ...p })}`);
     }
   }
-  const agreement = auditPlacedAgreement(manifests.map((m) => m.manifest), externalOrigins(manifests.map((m) => m.manifest)));
+  const agreement = auditPlacedAgreement(manifests.map((m) => m.manifest), externalOrigins(manifests.map((m) => m.manifest)), files);
   for (const p of agreement) console.error(`  ${p}`);
   const owed = manifests.flatMap(({ app, manifest }) => auditWhat(manifest).map((o) => ({ app, ...o })));
   const baseline = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : { what: [], reveals: [] };
@@ -182,7 +197,7 @@ async function main() {
     console.log(`lint-manifest-scopes: baseline shrunk what ${(baseline.what ?? []).length} → ${next.what.length}, reveals ${(baseline.reveals ?? []).length} → ${next.reveals.length} (it never grows)`);
     return;
   }
-  const redWhat = judgeWhat({ owed, baseline });
+  const redWhat = judgeWhat({ owed, baseline, files });
   for (const line of redWhat) console.error(`  ${line}`);
   if (redManifests.size || agreement.length || redWhat.length) {
     console.error(`lint-manifest-scopes: ${opCount} op problem(s) in ${redManifests.size} of ${manifests.length} manifest(s); ${agreement.length} '${PLACED_HOSTS}' disagreement(s); ${redWhat.length} weight problem(s)`);

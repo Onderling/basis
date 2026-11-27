@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The Me screen and the member card, as a phone walk found them (2026-10-08):
  *   - Handle / Display name sat EMPTY for seconds after opening Me, editable, with Save live — what someone typed

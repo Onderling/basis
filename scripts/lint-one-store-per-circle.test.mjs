@@ -32,7 +32,8 @@ describe('lint-one-store-per-circle', () => {
       try { execFileSync(process.execPath, [SCRIPT], { cwd: ROOT, encoding: 'utf8' }); }
       catch (err) { failed = true; stderr = String(err.stderr ?? ''); }
       expect(failed, 'the guard refuses a second per-circle store registry').toBe(true);
-      expect(stderr).toMatch(/secondStore\.js builds a per-circle store registry/);
+      expect(stderr).toMatch(/secondStore\.js:2: builds a per-circle store registry/);
+      expect(stderr).toMatch(/Fix: /);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -54,6 +55,8 @@ describe('lint-one-store-per-circle', () => {
       try { execFileSync(process.execPath, [copy], { cwd: ROOT, encoding: 'utf8' }); }
       catch (err) { stderr = String(err.stderr ?? ''); }
       expect(stderr).toMatch(/does not exist|no longer builds one/);
+      expect(stderr).toMatch(/\.mjs:\d+: ALLOWED names/);
+      expect(stderr).toMatch(/Fix: /);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

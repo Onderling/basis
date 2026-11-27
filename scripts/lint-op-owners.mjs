@@ -9,6 +9,7 @@
  * skills the in-process agents register at runtime, which include ops no manifest declares, is the fitness test
  * apps/basis/test/fitness/inProcessSkillOwners.test.js.)
  */
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -30,18 +31,27 @@ export function opCollisions(manifests) {
   return Object.fromEntries([...owners].filter(([, a]) => a.length > 1));
 }
 
-/** Every difference from the baseline, as messages. */
+/** Where the baseline is declared, as file:line, so a stale entry points at the line to edit. */
+function baselineAt() {
+  const self = fileURLToPath(import.meta.url);
+  const i = readFileSync(self, 'utf8').split('\n').findIndex((l) => l.startsWith('export const OP_OWNER_BASELINE'));
+  return `${path.relative(ROOT, self)}:${i + 1}`;
+}
+
+const ONE_OWNER = 'Fix: keep the op in the one manifest whose handler owns it and remove it from the other(s); an app that needs it calls that op instead of declaring its own.';
+
+/** Every difference from the baseline, as messages: what is wrong, then what to do instead. */
 export function opOwnerProblems(collisions, baseline = OP_OWNER_BASELINE) {
   const out = [];
   for (const [op, owners] of Object.entries(collisions)) {
     const known = baseline[op];
-    if (!known) { out.push(`a NEW op declared by more than one manifest: ${op} (${owners.join(' + ')}) — one owner per op`); continue; }
+    if (!known) { out.push(`a NEW op declared by more than one manifest: ${op} (manifests ${owners.join(' + ')}) — one owner per op.\n    ${ONE_OWNER}`); continue; }
     const added = owners.filter((o) => !known.includes(o));
-    if (added.length) out.push(`${op} gained an owner: ${added.join(', ')} — one owner per op`);
+    if (added.length) out.push(`${op} gained an owner: ${added.join(', ')} — one owner per op.\n    ${ONE_OWNER}`);
   }
   for (const [op, known] of Object.entries(baseline)) {
     const now = collisions[op] ?? [];
-    if (now.length < known.length) out.push(`${op} has fewer owners than the baseline (${now.join(' + ') || 'none'}) — shrink OP_OWNER_BASELINE`);
+    if (now.length < known.length) out.push(`${baselineAt()}: ${op} has fewer owners than the baseline (${now.join(' + ') || 'none'}).\n    Fix: shrink OP_OWNER_BASELINE to match — remove the gone owner(s), or the entry when one owner is left.`);
   }
   return out;
 }
@@ -50,7 +60,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   const { allManifests } = await import(pathToFileURL(path.join(ROOT, 'apps/basis/src/v2/manifestSources.js')).href);
   const problems = opOwnerProblems(opCollisions(allManifests()));
   if (problems.length) {
-    console.error('lint-op-owners:');
+    console.error('✖ lint-op-owners:');
     for (const p of problems) console.error(`  • ${p}`);
     process.exit(1);
   }

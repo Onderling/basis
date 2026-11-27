@@ -1115,6 +1115,30 @@ the substrate for `CloudBackup.test.js`.
 
 ## `src/identity/CloudBackup.js`
 
+### `PROD_ARGON_OPTS`
+
+**Kind:** constant · **Import:** `PROD_ARGON_OPTS` from `'@onderling/core'`
+
+The backup's Argon2id cost (m in KiB = 64 MiB, t 3, p 1), for `derivePassphraseKey`. The browser's key door uses
+a lower cost of its own (`@onderling/vault` PASSPHRASE_SLOT_PARAMS), since it runs at every open of the app.
+
+### `derivePassphraseKey`
+
+**Kind:** function · **Import:** `derivePassphraseKey` from `'@onderling/core'`
+
+```js
+derivePassphraseKey(passphrase, salt, opts)
+```
+
+The repo's one passphrase derivation, public: a 32-byte key from a passphrase by Argon2id (the backup's own
+function). The browser's key door gets it as an option, since `@onderling/vault` sits below core and cannot import it.
+
+**Parameters**
+
+- `passphrase` `string` — @param {Uint8Array} salt @param {{ m: number, t: number, p: number }} opts
+
+**Returns:** `Uint8Array`
+
 ### `CloudBackup`
 
 **Kind:** class · **Import:** `CloudBackup` from `'@onderling/core'`
@@ -1258,6 +1282,25 @@ A name that cannot be a relay on the public internet: `localhost` or another sin
 such as `relay`), or a loopback, private-range, link-local or
 shared-range (100.64/10: carrier NAT, Tailscale) address literal, with any port. Only such a name may be taken from
 the Host a connection came in on; a public name must be configured by the relay's operator.
+
+### `relayAddressRefusal`
+
+**Kind:** function · **Import:** `relayAddressRefusal` from `'@onderling/core'`
+
+```js
+relayAddressRefusal(url)
+```
+
+Why a client may NOT dial this relay address, or `null` when it may. A relay is dialled over TLS (`wss:`); a plain
+`ws:` address is allowed only to a name that cannot be a public relay (`isPrivateRelayName`: the device itself, the
+home network, a compose service). Plain ws to a public host lets anyone on the path, not only the relay, read and
+rewrite the relay protocol: which addresses a device registers, its proofs, the control frames.
+
+**Parameters**
+
+- `url` `unknown`
+
+**Returns:** `null | 'not-websocket' | 'plain-on-public-host'`
 
 ### `relayOwnNames`
 

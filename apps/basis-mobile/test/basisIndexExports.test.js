@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * Fitness guard — every name the mobile screens import from '@onderling-app/basis' must actually be
  * exported by that entry.

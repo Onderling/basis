@@ -31,8 +31,8 @@ describe('every text input takes its colours from the theme', () => {
     screen("import { View, TextInput } from 'react-native';\nexport default () => <TextInput value=\"x\" />;\n");
     const { code, out } = run();
     expect(code).toBe(1);
-    expect(out).toMatch(/Some\.js: a raw <TextInput>/);
-    expect(out).toMatch(/Some\.js: imports TextInput from react-native/);
+    expect(out).toMatch(/Some\.js:2: a raw <TextInput>: use ThemedTextInput instead/);
+    expect(out).toMatch(/Some\.js:1: imports TextInput from react-native: import ThemedTextInput instead/);
   });
   it('is not fooled by a comment that mentions TextInput', () => {
     screen("// the TextInput stays mounted\nimport ThemedTextInput from './ThemedTextInput.js';\nexport default () => <ThemedTextInput />;\n");

@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The box receives a report the moment it is fanned, through the lane table every shell spreads (the box included):
  * an admin's box admits a filed report on its governance rail. The box also routes live governance statements itself,

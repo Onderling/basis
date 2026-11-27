@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The circle-rows view stands in for a circle store as the backing store of a task store, so it must offer every method the
  * task store calls on its backing store. A verb it lacks fails only when a person reaches it (a claim on a circle post

@@ -47,25 +47,43 @@ export function declaredOps(manifests = allManifests()) {
   return out;
 }
 
+/** The 1-based line in a page where its catalogue-ops block names `app.op` (null when not found). */
+function lineOnPage(text, appOp) {
+  const dot = appOp.indexOf('.');
+  const app = appOp.slice(0, dot), op = appOp.slice(dot + 1);
+  const i = String(text ?? '').split('\n').findIndex((l) => {
+    const m = l.match(/^\s*([A-Za-z0-9_-]+)\s*:\s*(.*)$/);
+    return m && m[1] === app && m[2].split(/\s+/).includes(op);
+  });
+  return i < 0 ? null : i + 1;
+}
+
 /**
- * @param {{ declared: Set<string>, pages: Record<string, string[]>, baseline: string[] }} a
- * @returns {string[]} problems
+ * @param {{ declared: Set<string>, pages: Record<string, string[]>, baseline: string[], texts?: Record<string, string> }} a
+ *   texts: the pages' text by name, and the baseline file's as `baseline`, so a problem can name its line
+ * @returns {string[]} problems: what is wrong (with file:line where there is one), then a Fix line
  */
-export function auditCatalogue({ declared, pages, baseline }) {
+export function auditCatalogue({ declared, pages, baseline, texts = {} }) {
   const problems = [];
+  const onPage = (page, op) => { const l = lineOnPage(texts[page], op); return `docs/catalogue/${page}${l ? `:${l}` : ''}`; };
+  const inBaseline = (op) => {
+    const i = String(texts.baseline ?? '').split('\n').findIndex((l) => l.includes(`"${op}"`));
+    return `scripts/catalogue-ops-baseline.json${i < 0 ? '' : `:${i + 1}`}`;
+  };
+  const RUN_UPDATE = 'Fix: run node scripts/lint-catalogue-ops.mjs --update (it only removes entries).';
   const where = new Map();
   for (const [page, ops] of Object.entries(pages)) {
     for (const op of ops) {
-      if (!declared.has(op)) problems.push(`${page} names ${op}, which no manifest declares`);
+      if (!declared.has(op)) problems.push(`${onPage(page, op)}: names ${op}, which no manifest declares.\n    Fix: correct the op id to the one the manifest declares, or remove it from the block.`);
       where.set(op, [...(where.get(op) ?? []), page]);
     }
   }
-  for (const [op, ps] of where) if (ps.length > 1) problems.push(`${op} is named on ${ps.length} pages (${ps.join(', ')}); one page per op`);
+  for (const [op, ps] of where) if (ps.length > 1) problems.push(`${op} is named on ${ps.length} pages (${ps.map((pg) => onPage(pg, op)).join(', ')}); one page per op.\n    Fix: keep it on the page of the area it belongs to and remove it from the other block(s).`);
   const owed = new Set(baseline);
-  for (const op of declared) if (!where.has(op) && !owed.has(op)) problems.push(`${op} is on no catalogue page (add it to its area's catalogue-ops block)`);
+  for (const op of declared) if (!where.has(op) && !owed.has(op)) problems.push(`${op} is on no catalogue page (an op a manifest declares; no file names it yet).\n    Fix: add it to the catalogue-ops block of its area's page in docs/catalogue/.`);
   for (const op of owed) {
-    if (where.has(op)) problems.push(`baseline lists ${op}, which is now on ${where.get(op).join(', ')}: run with --update`);
-    else if (!declared.has(op)) problems.push(`baseline lists ${op}, which no manifest declares any more: run with --update`);
+    if (where.has(op)) problems.push(`${inBaseline(op)}: baseline lists ${op}, which is now on ${where.get(op).join(', ')}.\n    ${RUN_UPDATE}`);
+    else if (!declared.has(op)) problems.push(`${inBaseline(op)}: baseline lists ${op}, which no manifest declares any more.\n    ${RUN_UPDATE}`);
   }
   return problems;
 }
@@ -81,16 +99,20 @@ export function shrunkBaseline({ declared, pages, baseline }) {
   return [...new Set(baseline)].filter((op) => declared.has(op) && !named.has(op)).sort();
 }
 
-function readPages() {
+function readPages(texts = {}) {
   const pages = {};
   if (!existsSync(PAGES)) return pages;
-  for (const f of readdirSync(PAGES).filter((x) => x.endsWith('.md') && x !== 'README.md')) pages[f] = opsOnPage(readFileSync(path.join(PAGES, f), 'utf8'));
+  for (const f of readdirSync(PAGES).filter((x) => x.endsWith('.md') && x !== 'README.md')) {
+    texts[f] = readFileSync(path.join(PAGES, f), 'utf8');
+    pages[f] = opsOnPage(texts[f]);
+  }
   return pages;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const declared = declaredOps();
-  const pages = readPages();
+  const texts = {};
+  const pages = readPages(texts);
   if (process.argv.includes('--update')) {
     const before = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')).owed ?? [] : [];
     const owed = shrunkBaseline({ declared, pages, baseline: before });
@@ -99,7 +121,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(0);
   }
   const baseline = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')).owed ?? [] : [];
-  const problems = auditCatalogue({ declared, pages, baseline });
+  if (existsSync(BASELINE)) texts.baseline = readFileSync(BASELINE, 'utf8');
+  const problems = auditCatalogue({ declared, pages, baseline, texts });
   if (problems.length) {
     console.error(`✖ lint-catalogue-ops: ${problems.length} problem(s)`);
     for (const p of problems.slice(0, 40)) console.error(`  ${p}`);

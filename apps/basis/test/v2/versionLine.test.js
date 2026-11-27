@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /** The version line both shells paint: the tag, or the dev word — and both shells paint it. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

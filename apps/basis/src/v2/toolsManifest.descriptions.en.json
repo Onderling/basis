@@ -4,7 +4,8 @@
     "params": {
       "toolbox": "which toolbox",
       "tool": "which tool",
-      "input": "what you ask"
+      "input": "what you ask",
+      "pictures": "with the pictures (for a screen)"
     }
   },
   "pickThing": {

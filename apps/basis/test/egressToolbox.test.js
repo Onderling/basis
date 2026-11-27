@@ -39,6 +39,15 @@ describe('a toolbox call through the gate', () => {
     expect(inner).toHaveBeenCalledWith('tools', 'useTool', { toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'melk' } }, ctx);
   });
 
+  it('a screen\'s ask for pictures reaches the box\'s handler (it fetches them; the ask never goes to the toolbox); only a plain true', async () => {
+    const { inner, gated } = make();
+    const ctx = { caller: 'telegram:7', via: 'screen' };
+    await gated('tools', 'useTool', { toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'melk' }, pictures: true }, ctx);
+    expect(inner).toHaveBeenLastCalledWith('tools', 'useTool', { toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'melk' }, pictures: true }, ctx);
+    await gated('tools', 'useTool', { toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'melk' }, pictures: 'yes' }, ctx);
+    expect(inner).toHaveBeenLastCalledWith('tools', 'useTool', { toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'melk' } }, ctx);
+  });
+
   it('a toolbox that is not on is refused before the call', async () => {
     const { inner, gated, records } = make();
     const r = await gated('tools', 'useTool', { toolbox: 'elders', tool: 't', input: {} }, { caller: 'telegram:7' });

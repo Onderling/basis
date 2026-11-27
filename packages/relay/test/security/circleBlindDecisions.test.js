@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * LAYER 1 — no accept/reject decision in the relay is made on the basis of circle knowledge.
  *

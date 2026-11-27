@@ -58,8 +58,9 @@ export function directChecks(files, read = (f) => readFileSync(path.join(ROOT, f
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const hits = directChecks(shippedSources());
   if (hits.length) {
-    console.error('lint-one-signature-check: a signature is checked outside verifyEd25519Strict (the strict rule):');
+    console.error('✖ lint-one-signature-check: a signature is checked outside verifyEd25519Strict (the strict rule):');
     for (const h of hits) console.error(`  • ${h}`);
+    console.error('  Fix: call verifyEd25519Strict(msg, sig, key) from packages/core/src/crypto/ed25519Strict.js instead of the library\'s own verify.');
     process.exit(1);
   }
   console.log('lint-one-signature-check: every Ed25519 check goes through verifyEd25519Strict');

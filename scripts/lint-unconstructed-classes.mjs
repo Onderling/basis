@@ -29,6 +29,7 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { lineAt, whereInSelf } from './guard-where.mjs';
 
 const ROOT = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
 const sh = (cmd) => execSync(cmd, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, cwd: ROOT });
@@ -58,8 +59,9 @@ const files = sh('git ls-files').split('\n').filter(Boolean).filter((f) => /\.[c
 // Every exported class in the scanned trees, with where it is declared.
 const declared = new Map();
 for (const f of files.filter((f) => SCANNED.some((d) => f.startsWith(d)) && !isTest(f))) {
-  for (const m of readFileSync(path.join(ROOT, f), 'utf8').matchAll(/^export class (\w+)/gm)) {
-    declared.set(m[1], f);
+  const text = readFileSync(path.join(ROOT, f), 'utf8');
+  for (const m of text.matchAll(/^export class (\w+)/gm)) {
+    declared.set(m[1], `${f}:${lineAt(text, m.index)}`);
   }
 }
 
@@ -91,14 +93,15 @@ const fresh = findings.filter((n) => !known.has(n));
 const gone  = base.filter((n) => !findings.includes(n));
 
 if (staleRows.length) {
-  console.error(`\n✗ ${staleRows.length} EXPECTED row(s) name a class that no longer exists: ${staleRows.join(', ')}`);
-  console.error('  Remove the row — an exemption must not outlive its subject.\n');
+  console.error(`\n✗ ${staleRows.length} EXPECTED row(s) name a class that no longer exists:`);
+  for (const r of staleRows) console.error(`  ${whereInSelf(import.meta.url, r)}: ${r}`);
+  console.error('  Fix: remove the row — an exemption must not outlive its subject.\n');
   process.exit(1);
 }
 if (fresh.length) {
   console.error(`\n✗ ${fresh.length} NEW exported class(es) that nothing ever constructs:\n`);
-  for (const n of fresh) console.error(`  ${n}  (${declared.get(n)})`);
-  console.error('\nGive it a consumer, retire it, or — if it is a port/abstract/adapter — add it to EXPECTED with the reason.\n');
+  for (const n of fresh) console.error(`  ${declared.get(n)}: ${n}`);
+  console.error('\nFix: give it a consumer, retire it, or — if it is a port/abstract/adapter — add it to EXPECTED with the reason.\n');
   process.exit(1);
 }
 if (gone.length) console.log(`✓ unconstructed classes: ${gone.length} resolved (${gone.join(', ')}) — run with --update to shrink the baseline`);

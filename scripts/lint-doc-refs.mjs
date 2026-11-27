@@ -17,6 +17,7 @@
 import { execSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { lineOf } from './guard-where.mjs';
 
 const sh = (cmd) => execSync(cmd, { encoding: 'utf8' }).trim();
 const tracked = sh('git ls-files').split('\n').filter(Boolean);
@@ -36,7 +37,7 @@ const warn = [];
 const notes = [];
 
 // 1. private trees must never be tracked
-for (const f of tracked) if (PRIVATE_TREE.test(f)) hard.push(`tracked file inside a private tree: ${f}`);
+for (const f of tracked) if (PRIVATE_TREE.test(f)) hard.push(`${f}: tracked file inside a private tree (untrack it: git rm --cached "${f}")`);
 
 // 2 + 3. tracked markdown links: no private/ignored targets, and no dangling relative links
 for (const f of tracked) {
@@ -48,12 +49,13 @@ for (const f of tracked) {
     const raw = m[1].trim();
     const target = raw.split('#')[0].trim();
     if (!target || /^(https?:|mailto:|#)/.test(target)) continue;
-    if (BAD_TARGET.test(target)) { hard.push(`${f}: link into private/ignored path -> ${raw}`); continue; }
+    const at = `${f}:${lineOf(body, `(${m[1]}`) }`;
+    if (BAD_TARGET.test(target)) { hard.push(`${at}: link into private/ignored path -> ${raw}`); continue; }
     if (ALLOW_BROKEN.has(target) || /^\.+$/.test(target) || /[ {}|<>]/.test(target)) continue;
     const full = target.startsWith('/')
       ? join(process.cwd(), target.replace(/%20/g, ' '))
       : join(dir, target.replace(/%20/g, ' '));
-    if (!existsSync(full)) hard.push(`${f}: broken relative link -> ${raw}`);
+    if (!existsSync(full)) hard.push(`${at}: broken relative link -> ${raw}`);
   }
 }
 

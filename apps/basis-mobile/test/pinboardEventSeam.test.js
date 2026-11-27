@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The noticeboard's refresh-on-arrival listens where the event is exposed: the AGENT's `onPinboardEvent` (realAgent
  * returns it). The launcher passed `bundle.onPinboardEvent`, which the bundle never had — so on the phone the listener

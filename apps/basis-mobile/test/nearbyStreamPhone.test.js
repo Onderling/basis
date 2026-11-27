@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * The phone's Conversation tab paints the same stream as web: chat lines, and a card for each question asked here and
  * each circle offered here, in the order `nearbyStream` gives (shared code, never the painter); each tab's label says

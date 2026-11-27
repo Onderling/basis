@@ -50,7 +50,7 @@ import { createNotUnderstood, isNotUnderstood } from '../../v2/notUnderstood.js'
 import { log as structuredLog } from '@onderling/logger';
 import { createRosterReadCache, isRosterRead } from '../../v2/rosterReadCache.js';
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../v2/addressSharing.js';
-import { contactRelayScope } from '../../v2/connectionPoints.js';
+import { contactRelayScope, isRelayUrl } from '../../v2/connectionPoints.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity, sealStrategyForRecipients } from '../../v2/sharedCopyOpener.js'; // seal-to-self for settings + recipient-widened seal for view lanes
 import { contentSealStrategy } from '../../v2/contentAtRest.js';   // the device's content-at-rest key — a person's own words on their own disk
@@ -2649,7 +2649,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       let points = [];
       try { points = opts.circlePointsFor?.(cid) ?? []; } catch { points = []; }
       for (const url of points) {
-        if (typeof url === 'string' && /^wss?:\/\//.test(url)) wanted.set(`${url}@${rt.chatId.pubKey}`, { url, identity: rt.chatId });
+        if (isRelayUrl(url)) wanted.set(`${url}@${rt.chatId.pubKey}`, { url, identity: rt.chatId });
       }
     }
     for (const { url, identity } of wanted.values()) {

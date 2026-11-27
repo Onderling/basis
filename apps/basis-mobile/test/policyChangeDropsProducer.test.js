@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * A POLICY WRITE THAT CHANGES WHERE OR HOW A CIRCLE KEEPS ITS DATA DROPS WHAT WAS BUILT FROM THE OLD ONE. A circle's pod
  * producer is built from its policy (the pod, the posture) and kept per circle; a policy write dropped the cached

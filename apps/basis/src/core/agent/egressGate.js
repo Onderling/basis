@@ -67,11 +67,12 @@ export function wrapCallSkillWithEgressGate(callSkill, { isExternalEgress, gateI
     // A TOOLBOX'S TOOL (L1035): exactly the tool and its input leave; a toolbox that is not on is refused before the
     // call; every call is recorded (who, which toolbox, which tool, how it ended), never the words.
     if (toolCall && toolOps.has(opId)) {
-      const { toolbox, tool, input } = args ?? {};
+      // `pictures` (a screen's ask, a plain true) is for the box's own handler, which fetches them; it never goes out
+      const { toolbox, tool, input, pictures } = args ?? {};
       const note = (outcome) => { try { toolCall.record?.({ person: ctx?.caller ?? ctx?.person ?? null, toolbox: toolbox ?? null, tool: tool ?? null, outcome }); } catch { /* the record never breaks a call */ } };
       if (typeof toolCall.isOn === 'function' && !(await toolCall.isOn(toolbox))) { note('refused'); return { ok: false, code: 'toolbox-off', name: toolbox ?? '' }; }
       let res;
-      try { res = await call(appOrigin, opId, { toolbox, tool, ...(input !== undefined ? { input } : {}) }, ctx); } catch (e) { note('failed'); throw e; }
+      try { res = await call(appOrigin, opId, { toolbox, tool, ...(input !== undefined ? { input } : {}), ...(pictures === true ? { pictures } : {}) }, ctx); } catch (e) { note('failed'); throw e; }
       note(res?.ok === false ? (res?.code === 'toolbox-off' || res?.code === 'tool-not-offered' || res?.code === 'toolbox-no-key' ? 'refused' : 'failed') : 'ok');
       return res;
     }

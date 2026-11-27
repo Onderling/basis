@@ -26,4 +26,17 @@ describe('lint-architecture-date', () => {
   it('skips the "moved" check when there is no base to compare with', () => {
     expect(architectureDateProblems(doc('2026-11-05', 'new'), null, '2026-11-12')).toEqual([]);
   });
+  it('every red message names the file:line and says what to do instead', () => {
+    const cases = [
+      architectureDateProblems('# Architecture\n', null, '2026-11-12'),
+      architectureDateProblems(doc('2026-12-01'), null, '2026-11-12'),
+      architectureDateProblems(doc('2026-11-05', 'new'), doc('2026-11-05', 'old'), '2026-11-12'),
+    ];
+    for (const ps of cases) {
+      expect(ps.length).toBe(1);
+      expect(ps[0]).toMatch(/docs\/architecture\.md:\d+/);
+      expect(ps[0]).toMatch(/Fix: /);
+    }
+    expect(cases[1][0]).toMatch(/docs\/architecture\.md:3\b/);
+  });
 });

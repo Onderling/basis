@@ -1,3 +1,4 @@
+// @reads-source: this test reads source as text, so rung 1 runs it (docs/conventions/verification-ladder.md).
 /**
  * THE RECOVERY PHRASE NEVER SHOWS BY ITSELF. It is the owner root: on screen in a café is a key handed to whoever
  * looks. The phone used to open the full phrase on every start until "Written down" was tapped ("Later" stored

@@ -16,7 +16,7 @@
 import { isReservedName } from './storageRegister.js';
 import { jsonKv } from './localStoreSeal.js';
 import { reportNotReadable } from '@onderling/local-store';
-import { readToolboxCard, callTool, readItemList, fetchThumbs } from './toolboxClient.js';
+import { readToolboxCard, callTool, readItemList, fetchThumbs, thumbIdsInOrder } from './toolboxClient.js';
 import { firstPartyFirstWords } from '@onderling/app-manifest';
 import { GATE_WORDS } from './gateWords.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
@@ -214,7 +214,8 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
      * A member uses a tool of an ON toolbox. Refused before anything leaves when the toolbox is off or not placed, the
      * tool is not one its card offered, or its key is not on the box. A list of things comes back as choices (`items`).
      * `pictures`: the asking door shows pictures (the box then fetches them); false for a words door. `forScreen`: the
-     * caller is a connected screen (a toolbox's page), which gets the toolbox's own `output` beside `items`.
+     * caller is a connected screen (a toolbox's page), which gets the toolbox's own `output` beside `items`, and its
+     * pictures as `thumbs: {identifier: {mime, data}}` (never on the rows). `toolPicturesFor` decides `pictures`.
      */
     async useTool({ toolbox, tool, input } = {}, { pictures = true, forScreen = false } = {}) {
       const n = String(toolbox ?? '').trim();
@@ -234,9 +235,29 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
       const items = pictures ? await fetchThumbs(list.items, { endpoint: live.endpoint, key, fetch }) : list.items.map(({ image, ...x }) => x);
       // `output`: the toolbox's own answer, unchanged, ONLY for a screen (a toolbox's page builds on it); a chat door gets
       // `items` alone (half the bytes, and none of the shops' image addresses the rows dropped)
-      return { ok: true, name: n, title: live.title, tool, items, ...(forScreen ? { output: r.output } : {}) };
+      if (!forScreen) return { ok: true, name: n, title: live.title, tool, items };
+      // a screen's pictures ride ONCE, as a map by the thing's identifier (what its page finds in `output`); its order is
+      // `thumbIdsInOrder` over the same list, which `screenAnswerFits` reads again from `output` when it must shrink it
+      const thumbs = {};
+      const byId = new Map(items.filter((x) => x?.thumb && x.ref?.ref).map((x) => [x.ref.ref, x.thumb]).reverse());
+      for (const id of thumbIdsInOrder(items)) if (byId.has(id)) thumbs[id] = byId.get(id);
+      const rows = items.map(({ thumb, ...x }) => x);
+      return { ok: true, name: n, title: live.title, tool, items: rows, output: r.output, ...(Object.keys(thumbs).length ? { thumbs } : {}) };
     },
   };
+}
+
+/**
+ * Whether a tool call's answer carries pictures. A screen (a toolbox's own page) only when it asks (`pictures: true`):
+ * its page cannot load the toolbox's image address itself, and a page that paints no picture should not pay for the
+ * bytes. A chat door when it shows photos (`canSendPhoto(chatId)`: Telegram yes, the in-app thread no), whatever the
+ * call says.
+ * @param {{pictures?: boolean}} args @param {{via?: string, chatId?: string}} ctx @param {(chatId: string) => boolean} canSendPhoto
+ * @returns {boolean}
+ */
+export function toolPicturesFor(args, ctx, canSendPhoto) {
+  if (ctx?.via === 'screen') return args?.pictures === true;
+  return canSendPhoto?.(ctx?.chatId) === true;
 }
 
 const PARAM = /^[A-Za-z][A-Za-z0-9_-]{0,31}$/;

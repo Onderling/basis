@@ -4,7 +4,8 @@
  * nothing anywhere to show a list — screen walk, 2026-10-22). One source: the tab definitions' `built` flag.
  */
 import { describe, it, expect } from 'vitest';
-import { offeredFeatures } from '../../src/v2/circleTabs.js';
+import { offeredFeatures, FEATURE_SURFACE_ACTION } from '../../src/v2/circleTabs.js';
+import { isAlphaAction } from '../../src/v2/alphaSurface.js';
 import { attachEntriesFor } from '../../src/v2/attachEntries.js';
 
 describe('offered features', () => {
@@ -12,7 +13,17 @@ describe('offered features', () => {
     const f = offeredFeatures();
     for (const gone of ['notes', 'calendar']) expect(f).not.toContain(gone);
     // lists have a surface: the circle's Lists tab
-    for (const kept of ['chat', 'noticeboard', 'tasks', 'lists', 'houseRules', 'memberDirectory']) expect(f).toContain(kept);
+    for (const kept of ['chat', 'noticeboard', 'tasks', 'lists', 'memberDirectory']) expect(f).toContain(kept);
+  });
+
+  it('a feature whose surface is a circle-menu action is offered exactly when that action is: the switch and the menu hide together', () => {
+    // House rules has no tab: its surface is the circle menu's "rules" action. Hidden for the alpha (raw on the phone,
+    // 2026-11-27), a switch for it would turn on something nobody can open. Reinstating the action brings both back.
+    for (const [feature, action] of Object.entries(FEATURE_SURFACE_ACTION)) {
+      expect(offeredFeatures().includes(feature), `${feature}'s switch follows the "${action}" action`).toBe(isAlphaAction(action));
+    }
+    expect(FEATURE_SURFACE_ACTION.houseRules).toBe('rules');
+    expect(offeredFeatures()).not.toContain('houseRules');
   });
 
   it("the '+' leaves out an entry whose op requires a feature with no surface", () => {

@@ -9585,10 +9585,6 @@
         "text": "Anders (voer URL in)",
         "doc": "Mobile settings wizard: the custom-relay option."
       },
-      "provider_inrupt": {
-        "text": "Inrupt Pod Spaces",
-        "doc": "Settings wizard (phone): a pod provider (a product name)."
-      },
       "handle_placeholder": {
         "text": "bijv. alice",
         "doc": "Settings wizard (phone): the handle placeholder."

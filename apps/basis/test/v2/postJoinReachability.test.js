@@ -66,6 +66,16 @@ describe('makeCircleReachable — the two steps, independently', () => {
     expect(out).toMatchObject({ registered: true, bound: 1 });
   });
 
+  it('hands the JOINED circle to the presence hook: a substrate list that has not caught up cannot leave it out', async () => {
+    // Found on two phones (2026-11-27): the mobile shell's hook took no circle and registered what `listMyCircles`
+    // returned at that instant, which did not hold the just-joined circle yet; its address never reached the relay
+    // and nothing crossed until a restart. Web and the box bound the circle themselves; now the step hands it over.
+    const calls = [];
+    const agent = { callSkill: joiningCallSkill(), registerPeerAddress: () => {}, identity: { pubKey: 'pk-me' } };
+    await makeCircleReachable({ agent, circleId: 'rt3', registerCirclePresence: (ids) => calls.push(ids) });
+    expect(calls).toEqual([['rt3']]);
+  });
+
   it('a failing registration does not prevent the binding, or vice versa', async () => {
     // Independent on purpose: half-applied reachability produces "some people can be messaged and some
     // cannot" with no visible cause, which is the worst version of this to debug.

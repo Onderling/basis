@@ -10,7 +10,7 @@ import { allManifests } from '../../src/v2/manifestSources.js';
 import hintsNl from '../../src/locales/chat-hints.nl.json' with { type: 'json' };
 
 const DROPPED = [
-  ['folio', 'watchStop'], ['pinboard', 'broadcastCircleRules'], ['pinboard', 'getLatestPostAddedAt'],
+  ['folio', 'watchStop'], ['pinboard', 'getLatestPostAddedAt'],
   ['pinboard', 'listCirclePostsSince'], ['pinboard', 'listConsentingPeers'], ['pinboard', 'listOfferingCategories'],
   ['agents', 'listDataVersions'], ['agents', 'grantRole'], ['tasks', 'revokeTask'], ['tasks', 'getDagTree'],
   ['tasks', 'listMyMasteredTasks'], ['tasks', 'listClaimConflicts'], ['tasks', 'clearInbox'], ['tasks', 'clearInboxItem'],
@@ -30,8 +30,4 @@ describe('the model\'s tool list leaves out what a model must not reach alone', 
       expect(hintsNl?.[app]?.[op] ?? null).toBeNull();
     });
   }
-  it('the rules fan is background: never a person\'s act (no strip, no record)', () => {
-    const decl = manifests.find((m) => m.app === 'pinboard').operations.find((o) => o.id === 'broadcastCircleRules');
-    expect(decl.surfaces?.actState).toBe('none');
-  });
 });

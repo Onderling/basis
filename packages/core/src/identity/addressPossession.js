@@ -90,36 +90,58 @@ function hostPart(name) {
 }
 
 /**
- * A name that cannot be a relay on the public internet: `localhost` or another single-label name (a compose service
- * such as `relay`), or a loopback, private-range, link-local or
- * shared-range (100.64/10: carrier NAT, Tailscale) address literal, with any port. Only such a name may be taken from
- * the Host a connection came in on; a public name must be configured by the relay's operator.
+ * Which part of the home network a host is, or `null` when it may be on the public internet. The one rule for "the home
+ * network, never the internet"; its kinds let a caller narrow it in a line of its own (the toolbox page does):
+ *   - `loopback`: `localhost`, 127/8, `::1`;
+ *   - `private`: 10/8, 172.16/12, 192.168/16, unique-local IPv6 (fc00::/7);
+ *   - `link-local`: 169.254/16, fe80::/10;
+ *   - `shared`: 100.64/10, carrier NAT and Tailscale: the neighbours on a carrier's network share it;
+ *   - `local-name`: a `.local` name (mDNS), one label before it;
+ *   - `single-label`: a name with no dot, such as a compose service (`relay`): no public name has that shape.
+ * A port (`host:port`, `[v6]:port`) is allowed; an IPv4-mapped IPv6 literal is read as its IPv4 address.
+ * @param {unknown} name
+ * @returns {null | 'loopback' | 'private' | 'link-local' | 'shared' | 'local-name' | 'single-label'}
  */
-export function isPrivateRelayName(name) {
+export function homeNetworkKind(name) {
   const h = hostPart(name);
-  if (!h) return false;
-  if (h === 'localhost') return true;
-  if (/^[a-z0-9-]+$/.test(h) && !/^\d+$/.test(h)) return true;   // a single-label name (a compose service, `relay`): no public relay
+  if (!h) return null;
+  if (h === 'localhost') return 'loopback';
+  if (/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.local$/.test(h)) return 'local-name';
+  if (/^[a-z0-9-]+$/.test(h) && !/^\d+$/.test(h)) return 'single-label';
   const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
   if (v4) {
     const [a, b] = [Number(v4[1]), Number(v4[2])];
-    if ([a, b, Number(v4[3]), Number(v4[4])].some((n) => n > 255)) return false;
-    return a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
-      || (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127);
+    if ([a, b, Number(v4[3]), Number(v4[4])].some((n) => n > 255)) return null;
+    if (a === 127) return 'loopback';
+    if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) return 'private';
+    if (a === 169 && b === 254) return 'link-local';
+    if (a === 100 && b >= 64 && b <= 127) return 'shared';
+    return null;
   }
   if (h.includes(':')) {
-    if (h === '::1') return true;
-    if (/^f[cd][0-9a-f]{0,2}:/.test(h)) return true;           // fc00::/7, unique local
-    if (/^fe[89ab][0-9a-f]?:/.test(h)) return true;            // fe80::/10, link-local
+    if (h === '::1') return 'loopback';
+    if (/^f[cd][0-9a-f]{0,2}:/.test(h)) return 'private';       // fc00::/7, unique local
+    if (/^fe[89ab][0-9a-f]?:/.test(h)) return 'link-local';     // fe80::/10, link-local
     const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(h);
-    return mapped ? isPrivateRelayName(mapped[1]) : false;
+    return mapped ? homeNetworkKind(mapped[1]) : null;
   }
-  return false;
+  return null;
+}
+
+/**
+ * A host in the home network, never the internet (any kind of `homeNetworkKind`), with any port. The relay uses it
+ * whole: only such a name may be taken from the Host a connection came in on (a public name must be configured by the
+ * relay's operator), and only such a name may be dialled over plain `ws:`.
+ * @param {unknown} name
+ * @returns {boolean}
+ */
+export function isHomeNetworkHost(name) {
+  return homeNetworkKind(name) !== null;
 }
 
 /**
  * Why a client may NOT dial this relay address, or `null` when it may. A relay is dialled over TLS (`wss:`); a plain
- * `ws:` address is allowed only to a name that cannot be a public relay (`isPrivateRelayName`: the device itself, the
+ * `ws:` address is allowed only to a name that cannot be a public relay (`isHomeNetworkHost`: the device itself, the
  * home network, a compose service). Plain ws to a public host lets anyone on the path, not only the relay, read and
  * rewrite the relay protocol: which addresses a device registers, its proofs, the control frames.
  * @param {unknown} url
@@ -131,13 +153,13 @@ export function relayAddressRefusal(url) {
   try { u = new URL(url.trim()); } catch { return 'not-websocket'; }
   if (u.protocol === 'wss:') return null;
   if (u.protocol !== 'ws:' || !u.host) return 'not-websocket';
-  return isPrivateRelayName(u.host) ? null : 'plain-on-public-host';
+  return isHomeNetworkHost(u.host) ? null : 'plain-on-public-host';
 }
 
 /**
  * Which names a relay answers to. Its names are its OPERATOR's (`names`, RELAY_NAMES), never the caller's: the Host
  * header is written by whoever dials, so a hostile relay dialling an honest one would choose it. When names are
- * configured, only they count. Without them the Host is used only for a private name (`isPrivateRelayName`), which keeps
+ * configured, only they count. Without them the Host is used only for a private name (`isHomeNetworkHost`), which keeps
  * the dev relay, the tests and a home-network box working with no setting; a public name that is not configured is
  * refused.
  * @param {{names?: string[]}} [o]
@@ -152,7 +174,7 @@ export function relayOwnNames({ names = [] } = {}) {
     if (own.has(n)) return true;
     if (own.size) return false;   // configured: those names only (the box's LAN or compose name goes in the list too)
     const h = typeof host === 'string' && host ? host.trim().toLowerCase() : 'localhost';
-    return n === h && isPrivateRelayName(n);
+    return n === h && isHomeNetworkHost(n);
   };
 }
 

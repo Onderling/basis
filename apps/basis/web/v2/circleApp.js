@@ -426,9 +426,6 @@ import { feedHouseholdRoster, makeCircleReachable } from '../../src/v2/household
 // γ-next.recipe — receiver + pending-cache substrate for the recipe broadcast.
 import { makeCircleRecipePeerHandler } from '../../src/v2/circleRecipeReceiver.js';
 import { createCircleRecipePendingStoreLocal } from '../../src/v2/circleRecipePendingStorage.js';
-// γ-next.rules — receiver + pending-cache substrate for the rules broadcast.
-import { makeCircleRulesPeerHandler } from '../../src/v2/circleRulesReceiver.js';
-import { createCircleRulesPendingStoreLocal } from '../../src/v2/circleRulesPendingStorage.js';
 // γ-next.policy — receiver + pending-cache substrate for the policy broadcast.
 // δ.1 — per-screen materialized-blocks cache (cache-first render + bg refresh).
 import { createScreenBlocksCacheLocal } from '../../src/v2/screenBlocksCacheStorage.js';
@@ -1258,11 +1255,6 @@ const DEFAULT_SCREEN_RECIPE = Object.freeze({
 // `incomingRecipe` opt.  localStorage now; pod-sync swap is the
 // same shape as the other stores.
 const circleRecipePendingStore = createCircleRecipePendingStoreLocal();
-// γ-next.rules — per-circle "incoming rules" cache.  Receiver writes
-// here on every valid circle-rules-broadcast envelope; the rules
-// editor reads on mount + passes the cached doc via γ.4's
-// `incomingRules` opt.  Same shape as the recipe store.
-const circleRulesPendingStore = createCircleRulesPendingStoreLocal();
 // δ.1 — per-screen materialized-blocks cache.  The Screens view-mode
 // reads this on open to render instantly while the fresh materialize
 // runs in the background; on result the view swaps + the cache
@@ -1554,8 +1546,8 @@ function circleOnJoined({ circleId, invite = null }) {
     // Rule 1 — the joined circle's connection point(s), from what the invite carried (its pod and/or its relay),
     // recorded FIRST so presence and the pull below aim at the circle's relay. Best-effort: never blocks a join.
     recordPoints: ({ invite: inv, circleId: cid }) => recordJoinedCirclePoints({ store: getConnectionPoints(), invite: inv, circleId: cid }),
-    // The new circle is not in `circlesCache` yet, so pass it explicitly rather than waiting for a refresh.
-    registerCirclePresence: () => registerCirclePresence(_peerAgent, [circleId]),
+    // The new circle is not in `circlesCache` yet: the shared step hands it over (`[circleId]`) and it is unioned in.
+    registerCirclePresence: (ids) => registerCirclePresence(_peerAgent, ids),
     pullLanes: (cid) => pullCircleLanes({ membership: memCatchUpShell, gov: govCatchUpShell, key: keyCatchUpShell, task: itemsCatchUpShell, chat: chatCatchUpShell }, cid, { callSkill: rawCallSkill }),
     // its posture is not known until its policy arrives (the policy lane's write clears the mark)
     markPolicyPending: (cid) => policyStore.markPending(cid),
@@ -10352,15 +10344,6 @@ async function boot() {
         dedup:        circleRecipeDedup,
         logger:       console,
       });
-      // γ-next.rules — rules-broadcast receiver.  Stashes inbound rules
-      // docs per-circle; the rules editor pulls on mount + passes via
-      // γ.4's `incomingRules` opt.
-      const circleRulesDedup    = new Set();
-      const circleRulesHandler  = makeCircleRulesPeerHandler({
-        pendingStore: circleRulesPendingStore,
-        dedup:        circleRulesDedup,
-        logger:       console,
-      });
       const sendToPeerForCU = (addr, env) =>
         (typeof agent?.sendPeerMessage === 'function')
           ? agent.sendPeerMessage(addr, env)
@@ -10390,7 +10373,6 @@ async function boot() {
           // skill call and the router does not await handlers, so it delays the bubble, not the receive loop.
           'delivery-receipt':        blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), (from, payload) => { ensureNearbyRoom(agent)?.onReceipt(from, payload); applyIncomingReceipt(payload, from); }),
           'circle-recipe-broadcast':  circleRecipeHandler,
-          'circle-rules-broadcast':   circleRulesHandler,
           'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog, rail: govShellRail, onLanded: circleLanes.landedCarrier?.governance, onChange: (cid) => {
             // A landed statement may be a rules-update — fold it into the local rules head (cheap
             // pre-scan; no-op for vote churn), then re-render.

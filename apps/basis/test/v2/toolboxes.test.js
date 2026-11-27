@@ -213,16 +213,17 @@ describe('a toolbox page\'s placed address: https, or loopback on the same devic
 
 /**
  * A PAGE ON PLAIN HTTP IN THE HOME NETWORK, AS THE OPERATOR'S CHOICE (ledger L1183, Frits 2026-11-22). Only with an
- * explicit `"pageOverHttp": "home-network"` in the placed file, and only on a private address (10/8, 172.16/12,
- * 192.168/16, a `.local` name); the yes covers that choice, and the card says the risk before it. Every other http
+ * explicit `"pageOverHttp": "home-network"` in the placed file, and only on a host of the home network (core's
+ * `homeNetworkKind`) minus the shared range (100.64/10), loopback and a single-label name; the yes covers that choice, and the card says the risk before it. Every other http
  * address stays refused, with the choice or without it.
  */
 describe('a toolbox page on plain http in the home network, as the operator\'s explicit choice', () => {
   const HOME = { pageOverHttp: 'home-network' };
   const pageOf = async (page, extra = {}) => { const h = harness({ placed: [{ ...PLACED, page, ...extra }] }); await on(h); return h.ops.pageOf('boodschappen'); };
 
-  it('with the choice: a private address or a .local name is kept', async () => {
-    for (const page of ['http://192.168.1.5:8080/', 'http://10.0.0.7/b/', 'http://172.16.4.2:8710/', 'http://172.31.255.1/', 'http://tablet.local:8710/']) {
+  it('with the choice: a private, link-local or unique-local address, or a .local name is kept', async () => {
+    for (const page of ['http://192.168.1.5:8080/', 'http://10.0.0.7/b/', 'http://172.16.4.2:8710/', 'http://172.31.255.1/', 'http://tablet.local:8710/',
+      'http://169.254.3.4/', 'http://[fd00::5]:8710/']) {
       expect(await pageOf(page, HOME), page).toEqual({ page, ops: [] });
     }
   });
@@ -233,7 +234,7 @@ describe('a toolbox page on plain http in the home network, as the operator\'s e
 
   it('with the choice, a public address, a look-alike, a userinfo trick, another value of the choice stay refused', async () => {
     for (const page of ['http://box.home.example/', 'http://172.32.0.1/', 'http://11.0.0.1/', 'http://192.168.1.5.evil.example/',
-      'http://local/', 'http://evil.example@192.168.1.5/', 'http://192.168.1.5@evil.example/', 'http://8.8.8.8/']) {
+      'http://local/', 'http://100.64.0.1:8710/', 'http://[::1]:8710/', 'http://127.0.0.2/', 'http://evil.example@192.168.1.5/', 'http://192.168.1.5@evil.example/', 'http://8.8.8.8/']) {
       expect(await pageOf(page, HOME), page).toBeNull();
     }
     expect(await pageOf('http://192.168.1.5/', { pageOverHttp: 'yes' })).toBeNull();

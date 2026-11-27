@@ -11,10 +11,10 @@ describe('relayAddressRefusal: wss outside local development', () => {
     }
   });
 
-  it('lets plain ws through on loopback, a private range, a link-local or shared range, or a single-label name', () => {
+  it('lets plain ws through on loopback, a private range, a link-local or shared range, a .local name or a single-label name', () => {
     for (const u of [
       'ws://localhost:8787', 'ws://127.0.0.1:8787', 'ws://[::1]:8787', 'ws://10.0.0.5:8787', 'ws://172.16.3.4:8787',
-      'ws://192.168.2.20:8787', 'ws://169.254.1.1:8787', 'ws://100.73.134.19:8787', 'ws://[fd12::1]:8787', 'ws://relay:8787',
+      'ws://192.168.2.20:8787', 'ws://169.254.1.1:8787', 'ws://100.64.0.1:8787', 'ws://[fd12::1]:8787', 'ws://relay:8787', 'ws://box.local:8787',
     ]) {
       expect(relayAddressRefusal(u), u).toBe(null);
     }

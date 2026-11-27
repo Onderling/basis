@@ -20,7 +20,6 @@ import { buildCircleLanes } from './circleLanes.js';
 import { blockedFirst, blockedAll } from './directDoors.js';
 import { makeCircleGovernancePeerHandler } from './circleLogReceiver.js';
 import { makeCircleRecipePeerHandler } from './circleRecipeReceiver.js';
-import { makeCircleRulesPeerHandler } from './circleRulesReceiver.js';
 import { makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin } from './circleAddressAnnounce.js';
 import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse } from '../core/handlers/groupRedeem.js';
 import { makeHandleCalendarInvite } from '../core/handlers/calendarInvite.js';
@@ -50,7 +49,6 @@ import { landedNoticeboardHandler } from './noticeboardCarry.js';
  * @param {Function} [o.applyIncomingReceipt] the delivery-receipt reducer; null → no `delivery-receipt` entry
  * @param {object|null} [o.nearbyRoom]     the Nearby room binding (its handlers, its receipt hook)
  * @param {{pendingStore: object, dedup?: Set}|null} [o.recipe]  the circle recipe stash; null → no entry
- * @param {{pendingStore: object, dedup?: Set}|null} [o.rules]   the circle rules stash; null → no entry
  * @param {{addMainBubble: Function}|null} [o.calendar]  the calendar's on-screen heads-up; null → no calendar entries
  * @param {Function|null} [o.deliverToContactThread] where a peer's file or post reply lands; null → neither entry
  * @param {Function} [o.notePeer]          a first file or reply makes the sender a contact row
@@ -66,7 +64,7 @@ export function buildInboundWiring({
   contactChannel = null, onContactReply = null, onContactMessage = null,
   pendingRedeems = null, onAdmitted = null, grantSealedAudience = null,
   applyIncomingReceipt = null, nearbyRoom = null,
-  recipe = null, rules = null, calendar = null,
+  recipe = null, calendar = null,
   deliverToContactThread = null, notePeer = () => {},
   sharedWithMeStore = null, noticeboardLanded = false,
   logger = console,
@@ -123,9 +121,6 @@ export function buildInboundWiring({
     } : {}),
     ...(recipe?.pendingStore ? {
       'circle-recipe-broadcast': makeCircleRecipePeerHandler({ pendingStore: recipe.pendingStore, dedup: recipe.dedup ?? new Set(), logger }),
-    } : {}),
-    ...(rules?.pendingStore ? {
-      'circle-rules-broadcast': makeCircleRulesPeerHandler({ pendingStore: rules.pendingStore, dedup: rules.dedup ?? new Set(), logger }),
     } : {}),
     ...(calendar ? {
       'calendar-invite': blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleCalendarInvite({ callSkill, publishEvent, addMainBubble: calendar.addMainBubble ?? (() => {}) })),

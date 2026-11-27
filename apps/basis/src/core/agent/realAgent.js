@@ -5088,8 +5088,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       // THE SELF-ENROLL MIGRATION (the per-ceremony custody cutover): a ROOT-custody device that
       // just proved the phrase migrates itself — reseal EVERY sealed vault from the root-derived
       // key to its own delegation-derived one, write the delegation blob (pre-signed record
-      // included), and flip the key door + marker. The running agent still holds the old key in
-      // its wrappers, so the reply asks for a reload; the next boot is a delegation boot.
+      // included), and flip the key door + marker. Every sealed vault reads the one key holder the
+      // reseal switches, so the running agent goes on under the new key; it asks for a restart only
+      // when the cutover introduced addresses (see the reply below). The next boot is a delegation boot.
       let migrated = false;
       const introduced = [];
       // Once per session: the migration leaves this running agent waiting for its reload (the vaults
@@ -5188,7 +5189,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         ...(Object.keys(personaKeyVersions).length ? { personaKeyVersions } : {}),
         ...(personaKeysAlone.length ? { personaKeysAlone } : {}),
         ...(personaKeysUndone.length ? { personaKeysUndone } : {}),
-        ...(migrated ? { migrated: true, reloadRequired: true, introduced } : {}),
+        // a restart only when the cutover INTRODUCED addresses (an old device): that process is a former self from here
+        // (restartRequired.js). A device enrolled from its first boot moves nothing, so the person goes on in this start;
+        // only the root stays in this process's memory until its next start.
+        ...(migrated ? { migrated: true, introduced, ...(introduced.length ? { reloadRequired: true } : {}) } : {}),
       })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'revoke-failed' })]; }
   }, { visibility: 'private' });   // retires a device's keys everywhere: owner-only, phrase-proven

@@ -74,7 +74,13 @@ describe('the custody cutover — delegation boots without the root', () => {
     });
     expect(r.ok).toBe(true);
     expect(r.migrated).toBe(true);
-    expect(r.reloadRequired).toBe(true);
+    // a device that minted its own delegation at its first boot moves no address at the cutover: the process is still
+    // the same person (every sealed vault reads the one key holder the reseal switched), so no restart is asked and the
+    // person goes on in this start (restartRequired.js)
+    expect(r.introduced).toEqual([]);
+    expect(r.reloadRequired).toBeUndefined();
+    expect(dev.restartRequired()).toBe(false);
+    expect((await dev.callSkill('agents', 'createProfile', { name: 'Na de intrekking' }))?.created, 'a write in the same start').toBe(true);
 
     const mode = await readCustodyMode(ownerRootVault);
     expect(mode.mode).toBe('delegation');

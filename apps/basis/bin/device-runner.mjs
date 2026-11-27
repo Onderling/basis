@@ -1849,7 +1849,7 @@ if (card?.payload) {
 }
 console.log(`  walk log  ${walkLogFile}\n`);
 
-const stop = async () => {
+const stop = async (code = 0) => {
   hostTick.stop();
   try { await tgRunner?.stop?.(); } catch { /* stopping is best-effort */ }
   // The stores write behind a short debounce (200 ms in the file adapters, 400 ms for the device log,
@@ -1861,10 +1861,18 @@ const stop = async () => {
   // counting this box as a holder of its addresses BEFORE the process is gone — never a window in which a frame for
   // them is handed to a box that has stopped reading. Bounded per socket inside the transport.
   try { await agent.sa?.shutdown?.(); } catch { /* stopping is best-effort */ }
-  process.exit(0);
+  process.exit(code);
 };
-process.on('SIGINT', stop);
-process.on('SIGTERM', stop);
+process.on('SIGINT', () => stop(0));
+process.on('SIGTERM', () => stop(0));
+// An op's result asked for a restart (restartRequired.js): this process is the box's former self, and the waist already
+// refuses its writes. The box stops cleanly (saves flushed, sockets closed) and exits non-zero, as the Telegram watchdog
+// does, so the container's restart policy starts it fresh. Phone twin: RestartRequiredScreen.js; the web reloads.
+agent.onRestartRequired?.(({ cause }) => {
+  console.error(`device-runner: ${cause ?? 'an op'} asked for a restart — stopping so the box starts again`);
+  try { walkLog({ kind: 'restart-required', cause: cause ?? null }); } catch { /* the stop below is what matters */ }
+  stop(1).catch(() => process.exit(1));
+});
 
 /** A frame's key names, two levels deep (`a`, `b.c`) — names only, for the testing-only shape log. */
 function frameKeyNames(payload) {

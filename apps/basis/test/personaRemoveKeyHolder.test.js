@@ -62,10 +62,13 @@ describe('removing the key-holder', () => {
   }, 120_000);
 
   it('a paused self is no next key-holder: removing the primary with only a paused one beside it is the last self', async () => {
-    const { phone, phrase, w, agent } = await laptop();
-    expect(await agent.callSkill('household', 'pausePersona', { personaId: w })).toMatchObject({ ok: true });
-    expect(await agent.callSkill('household', 'removePersonaHere', { mnemonic: phrase, personaId: 'default' })).toMatchObject({ ok: false, error: 'last-self' });
-    await phone.shutdown?.(); await agent.shutdown?.();
+    const { phone, phrase, w, lap, agent } = await laptop();
+    expect(await agent.callSkill('household', 'pausePersona', { personaId: w })).toMatchObject({ ok: true, reloadRequired: true });
+    // the pause stops this start (restartRequired.js); the next one runs without Werk
+    await agent.shutdown?.();
+    const next = await boot(lap);
+    expect(await next.callSkill('household', 'removePersonaHere', { mnemonic: phrase, personaId: 'default' })).toMatchObject({ ok: false, error: 'last-self' });
+    await phone.shutdown?.(); await next.shutdown?.();
   }, 120_000);
 
   it('the last self cannot be removed — that is retiring the device', async () => {

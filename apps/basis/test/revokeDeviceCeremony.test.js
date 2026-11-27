@@ -106,24 +106,22 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
       deviceId,
     });
     expect(wrong.outcome === 'wrong-phrase' || wrong.outcome === 'invalid-phrase').toBe(true);
-    // A device this registry never saw still revokes (derivation-based; the loss-takeover case is
-    // exactly a device that wasn't here) — the reply's `known:false` is the shell's typo signal.
-    const unseen = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: 'never-enrolled-here' });
-    expect(unseen.ok).toBe(true);
-    expect(unseen.known).toBe(false);
-    // The first ceremony that proves the phrase on a root-custody device cuts its custody over — once. Since
-    // 2026-09-16 the first device already holds its own root-signed delegation from its first boot (the grants
-    // floor's retirement), so the cutover keeps its derivation seed and its addresses: nothing is introduced and
-    // nothing of A's is retired. Later ceremonies in this session do not migrate it again.
-    expect(unseen.migrated, 'the first ceremony cut the first device over').toBe(true);
-    expect(unseen.introduced ?? [], 'no address moves — the device was enrolled from its first boot').toEqual([]);
 
     // ── THE CEREMONY, on the surviving device. ──
     const r = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId, circleIds: [GROUP] });
     expect(r.ok).toBe(true);
     // THE LOSS-TAKEOVER CASE, pinned: A never saw the enrolled device's record (its registry is local; the record healed
-    // onto A2's) — it revokes from the wire id alone, deriving that device's seed and so its per-circle address.
+    // onto A2's) — it revokes from the wire id alone, deriving that device's seed and so its per-circle address. A device
+    // this registry never saw still revokes (derivation-based); the reply's `known:false` is the shell's typo signal.
     expect(r.known, 'A never held the revoked device\'s record').toBe(false);
+    // The first ceremony that proves the phrase on a root-custody device cuts its custody over. Since 2026-09-16 the
+    // first device already holds its own root-signed delegation from its first boot (the grants floor's retirement), so
+    // the cutover keeps its derivation seed and its addresses: nothing is introduced and nothing of A's is retired. The
+    // cutover asks for a restart, and from its result on this start writes nothing (restartRequired.js).
+    expect(r.migrated, 'the first ceremony cut the first device over').toBe(true);
+    expect(r.reloadRequired).toBe(true);
+    expect(r.introduced ?? [], 'no address moves — the device was enrolled from its first boot').toEqual([]);
+    expect(A.agent.restartRequired(), 'the cutover stopped this start').toBe(true);
     expect(r.circles).toBeGreaterThanOrEqual(1);
     expect(r.revokedIn.map((x) => x.circleId)).toContain(GROUP);
     // what is retired first is the address the revoked device's OWN seed derives (a device from before the circle root
@@ -138,7 +136,6 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     const rec = props[DEVICE_DELEGATIONS_KEY]?.value?.[deviceId] ?? props[DEVICE_DELEGATIONS_KEY]?.[deviceId];
     expect(rec?.revoked).toBe(true);
 
-    expect(r.migrated, 'a second ceremony before the reload must not migrate the device again').toBeUndefined();
     // The thief's device was a FULL device: it presented the persona's one address. The re-key moved the persona past
     // it — every row carries the NEW address, and the old one (which the thief's device still holds) is gone.
     expect(addrA2).toBe(addrA);
@@ -151,10 +148,9 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     expect(await until(async () => { const row = await rowFor(B, A.pubKey); return live(row).includes(addrNext) && !live(row).includes(addrA) ? true : null; }, { timeout: 15000, step: 100 }),
       `the member did not move on B: ${JSON.stringify(await rowFor(B, A.pubKey))}`).toBe(true);
 
-    // idempotent: revoking again is still ok (the tombstone already stands) — and does not re-key a second time
+    // a second ceremony before the restart is refused (the cutover stopped this start) — and re-keys nothing
     const again = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId, circleIds: [GROUP] });
-    expect(again.ok).toBe(true);
-    expect(again.rekey ?? null, 'a second ceremony for the same device re-keyed again').toBeNull();
+    expect(again).toMatchObject({ ok: false, code: 'restart-required' });
     expect(A.agent.circleAddressFor(GROUP)).toBe(addrNext);
 
     // ── THE FLOOR IS GONE (2026-09-16): the SHARED profile key — the one signature the stolen device still

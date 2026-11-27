@@ -6390,6 +6390,27 @@ function _restoreOverlay() {
   return { wrap, card, close: () => wrap.remove() };
 }
 
+// THE RESTART STOP (restartRequired.js): an op's result asked for a restart, so this page is the device's former self and
+// the waist refuses every write. Over every other card, no close; its one button reloads the page, which is the web's
+// restart (the page cannot be left running as the former self, as the phone cannot). Phone twin:
+// RestartRequiredScreen.js; the box exits.
+function showRestartStop() {
+  if (document.getElementById('cc-restart-stop')) return;
+  const { wrap, card } = _restoreOverlay();
+  wrap.id = 'cc-restart-stop';
+  wrap.style.zIndex = '9500';
+  const h = document.createElement('h3');
+  h.textContent = t('circle.restart_required.title');
+  const p = document.createElement('p');
+  p.textContent = t('circle.restart_required.body');
+  const go = document.createElement('button');
+  go.type = 'button';
+  go.className = 'cc-btn cc-btn--primary';
+  go.textContent = t('circle.restart_required.reload');
+  go.addEventListener('click', () => { try { window.location.reload(); } catch { /* */ } });
+  card.append(h, p, go);
+}
+
 // PERSONAS ON THIS DEVICE — the restore picker (and any time): the person's personas this device does not run yet,
 // ticked, then handed over with the phrase typed here (the one moment the root is in hand). A reload runs them.
 async function showReceivePersonas() {
@@ -10165,6 +10186,8 @@ async function boot() {
       if (restoreFinishApplies({ restorePending: agent.restorePending?.() === true, offerPending: offerPendingAtBoot })) setTimeout(() => showRestoreFinishFlow(), 0);
       // …an add-a-device from an offer is not a restore: drop the note without the flow (the offer brings the circles)
       else if (agent.restorePending?.()) agent.dismissRestorePending?.().catch?.(() => {});
+      // an op's result asked for a restart: the stop, over everything (restartRequired.js)
+      agent.onRestartRequired?.(() => showRestartStop());
       // basis's ops reach the waist from here on: the drawer's rows, and anything else that dispatches
       // `callSkill('basis', …)`, now land in the table below instead of the agent's bare default.
       rawCallSkill = withCalendarOutbound(agent.callSkill, {

@@ -124,6 +124,7 @@ import { backfillContactPersonas } from '../../v2/contactPersona.js';   // conta
 import { bookRowsOf } from '../../v2/contactsSource.js';   // a listContacts reply's rows, whole
 import { KEEP_DAYS_KEY, roomRetentionMs, makeRoomKeeper, earlierInTheRoom } from '../../v2/nearbyKept.js';
 import { recordOwnAction, ownRetentionMs, OWN_RECORD_KEY, OWN_KEEP_WEEKS_KEY, ownActionRows, ownActionsExport, OWN_ACTION_KIND, noteOwnOutcome } from '../../ownActions.js';   // the person's own acts, at the outer waist
+import { createRestartState, restartRefusal, asksRestart } from '../../v2/restartRequired.js';   // after a reloadRequired result the waist refuses writes until a new start
 import { circleActRefusal, writeIntoRefusal, gateRefusalKey } from '../../v2/circleActGate.js';   // a person's write in a circle asks that circle's capability set, at the outer waist
 import { keptPolicyChangesOf, requestKeptPolicyChanges } from '../../v2/keptPolicyChanges.js';   // a write into another circle judged as its receivers judge it
 import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
@@ -7855,6 +7856,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   const TASK_BY_ID_OPS = new Set(['claimTask', 'completeTask', 'reassignTask', 'removeTask', 'editTask', 'unclaimTask']);
   /** The reads a door's person sees people in: the chores' open and own reads, and the agenda. */
   const READER_READS = new Set(['tasks.listOpen', 'tasks.listMine', 'calendar.listEvents']);
+  // Set by the outer waist when an op's result says `reloadRequired`; this process then writes nothing (restartRequired.js).
+  const restartState = createRestartState();
   const callSkill = async (appOrigin, opId, args, ctx = {}) => {
     // this call's words: the language it carries (a door's `/taal`), else the bot's own
     const tr = translatorFor(ctx?.lang);
@@ -10016,6 +10019,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         deviceLog: opts.deviceLog, enabled: paramsService.register.valueOf(OWN_RECORD_KEY) !== false,
         app: appOrigin, op: opId, args, ctx, result, threw, error, manifests: allManifests(),
       });
+      // after a restart-required result nothing writes as the former self, whichever surface asks (restartRequired.js)
+      const stopped = restartRefusal(restartState, allManifests(), appOrigin, opId);
+      if (stopped) { record(stopped, false); return stopped; }
       // a person's act that writes in a circle asks that circle's capability set HERE, where no tap can walk around it
       // (L1042; the shell hands in only its stores, `circleCapabilityInputs`); refused, it is recorded as refused
       const refusal = await circleActRefusal({
@@ -10026,8 +10032,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       let result;
       try { result = await callSkill(appOrigin, opId, args, ctx); } catch (err) { record(null, true, err); throw err; }
       record(result, false);
+      // this process is now the device's former self: the shells stop (restartRequired.js)
+      if (asksRestart(result)) restartState.set(`${appOrigin}.${opId}`);
       return result;
     },
+    /** Has an op's result asked for a restart in this process? (restartRequired.js) A screen mounted later asks this. */
+    restartRequired: () => restartState.required,
+    /** The shell's stop: `fn` is called once when a restart is required (at once if it already is). Returns an unsubscribe. */
+    onRestartRequired: (fn) => restartState.on(fn),
     // The person's own record, for My data (ownActions.js): the rows, one file to save, and the wipe (this kind only).
     ownActionRows: () => ownActionRows(opts.deviceLog),
     exportOwnActions: () => ownActionsExport(ownActionRows(opts.deviceLog)),

@@ -48,7 +48,7 @@ function pageAddressOk(s, { overHttp = null } = {}) {
 export const PAGE_OVER_HTTP_HOME = 'home-network';
 
 /** A private IPv4 address (10/8, 172.16/12, 192.168/16) or a `.local` name: the home network, never the internet. */
-function privateHomeHost(host) {
+export function privateHomeHost(host) {
   const h = String(host ?? '').toLowerCase();
   if (/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.local$/.test(h)) return true;
   const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);

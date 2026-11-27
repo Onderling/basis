@@ -227,6 +227,35 @@ export function retentionOf(kind) { return entryKind(kind).retain; }
  */
 export const RECORD_STATEMENTS = Object.freeze({ governance: Object.freeze(['policy-update']) });
 
+/**
+ * THE DECISIONS A KEPT SETTINGS CHANGE NAMES are kept with it: a settings change names the proposal that decided it
+ * (`payload.proposalId`), and every device that receives the change tallies that proposal itself, from its propose,
+ * votes and closing (never from a recorded outcome alone). Compacted, those leave a joiner after the audit window with
+ * a change it must refuse. Statements on the same lane whose subject is a named proposal id, in the same circle.
+ */
+export const RECORD_DECISION_KINDS = Object.freeze({ governance: Object.freeze(['propose', 'vote', 'resolve']) });
+
+/** `${circleId}|${proposalId}` for every proposal a record settings change in `entries` names (the prune's lookup). */
+export function keptDecisionKeys(entries = []) {
+  const out = new Set();
+  for (const e of Array.isArray(entries) ? entries : []) {
+    const body = e?.payload?.body;
+    if (!RECORD_STATEMENTS[e?.type]?.includes(body?.kind)) continue;
+    const id = body?.payload?.proposalId;
+    const circleId = e?.circleId ?? body?.circleId ?? null;
+    if (typeof id === 'string' && id && circleId) out.add(`${circleId}|${id}`);
+  }
+  return out;
+}
+
+/** Is this entry part of a decision a kept settings change names (`keptDecisionKeys`)? */
+export function isKeptDecision(entry, keys) {
+  const body = entry?.payload?.body;
+  if (!RECORD_DECISION_KINDS[entry?.type]?.includes(body?.kind)) return false;
+  const circleId = entry?.circleId ?? body?.circleId ?? null;
+  return !!(keys && circleId && typeof body?.subject === 'string' && keys.has(`${circleId}|${body.subject}`));
+}
+
 /** Retention class for one log ENTRY: its kind's row, unless the statement it carries is named in `RECORD_STATEMENTS`. */
 export function retentionOfEntry(entry) {
   const kept = RECORD_STATEMENTS[entry?.type];

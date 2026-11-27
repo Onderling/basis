@@ -2292,6 +2292,13 @@ proposal that decided it, and the lanes' tips. They are rare and small.
 every vote forever for no reader. **Not migrated:** circles whose older changes already compacted keep what they hold
 (fresh circles before the alpha); a device holding only a head treats everything older as unknown.
 
+**Addition (2026-11-27, Fable ruled):** the propose, votes and closing of the decision a KEPT settings change names
+(`payload.proposalId`, same circle) are kept with it and do not compact (`keptDecisionKeys` / `isKeptDecision` beside
+`RECORD_STATEMENTS`, read by the same prune). A device that receives a settings change tallies its decision itself and
+never takes a recorded outcome alone, so a joiner after the audit window refused every voted change whose decision had
+compacted. Other decisions keep compacting. A governance serve that withholds statements it cannot vouch for now says
+how many and which kinds.
+
 ## 2026-11-21 — The items lane judges what it applies; each device keeps its own proofs; a served head is taken only when asked (Fable ruled)
 
 **Status:** settled and built (`contentJudge.js`, `contentJudgments.js`, `keptPolicyChanges.js`, `itemsRail.js`,

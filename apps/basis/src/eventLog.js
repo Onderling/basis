@@ -23,6 +23,7 @@
 import { matchesFilter } from './filter.js';
 import {
   ENTRY_KINDS, isSystemKind, isAuditKind, kindWakes, retentionOf, retentionOfEntry, RETENTION_DEFAULTS,
+  keptDecisionKeys, isKeptDecision,
 } from '@onderling/item-store';
 import { log } from '@onderling/logger';
 
@@ -520,8 +521,11 @@ export class EventLog {
     const before = this.#events.length;
     const keep = [];
     const fold = [];
+    // the decisions a kept settings change names (its propose, votes, closing): kept with it, a joiner tallies them
+    const decisions = keptDecisionKeys(this.#events);
     for (const e of this.#events) {
       if (e.type === 'audit-summary') { keep.push(e); continue; }   // a fold never expires
+      if (isKeptDecision(e, decisions)) { keep.push(e); continue; }
       const cls = retentionOfEntry(e);   // a record statement inside an audit lane (`RECORD_STATEMENTS`) never expires
       // RECORD-class kinds never expire — the entry IS the record. Membership (the roster refolds from
       // these; one dropping away silently changes who-is-in on rebuild) and chat messages (the

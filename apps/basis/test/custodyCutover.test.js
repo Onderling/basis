@@ -74,7 +74,26 @@ describe('the custody cutover — delegation boots without the root', () => {
     });
     expect(r.ok).toBe(true);
     expect(r.migrated).toBe(true);
-    expect(r.reloadRequired).toBe(true);
+    // a device that minted its own delegation at its first boot moves no address at the cutover: the process is still
+    // the same person (every sealed vault reads the one key holder the reseal switched), so no restart is asked and the
+    // person goes on in this start (restartRequired.js)
+    expect(r.introduced).toEqual([]);
+    expect(r.reloadRequired).toBeUndefined();
+    expect(dev.restartRequired()).toBe(false);
+    expect((await dev.callSkill('agents', 'createProfile', { name: 'Na de intrekking' }))?.created, 'a write in the same start').toBe(true);
+    // …and a PEER met after the revoke in that same start is kept: the peer-binding snapshot is not frozen when the
+    // process goes on (every sealed vault writes under the key the reseal switched to)
+    const other = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() });
+    const otherKey = other.identity.chat.pubKey;
+    // what the hello gate does on a first greeting: the key is bound, then the agent says `peer`
+    dev.sa.agent.security.registerPeer(otherKey, otherKey);
+    dev.sa.agent.emit?.('peer', { address: otherKey, pubKey: otherKey });
+    expect(!!dev.sa.agent.security.getPeerKey(otherKey), 'the peer is known in this start').toBe(true);
+    await new Promise((res) => { setTimeout(res, 800); });   // past the bindings' save debounce
+    await dev.shutdown?.();
+    const next = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault, rootKeyStore, chatVault });
+    expect(!!next.sa.agent.security.getPeerKey(otherKey), 'the peer met after the revoke is still known at the next start').toBe(true);
+    await next.shutdown?.(); await other.shutdown?.();
 
     const mode = await readCustodyMode(ownerRootVault);
     expect(mode.mode).toBe('delegation');

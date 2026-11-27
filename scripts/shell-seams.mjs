@@ -41,6 +41,12 @@ export const SEAMS = Object.freeze([
   // box swept its own named paths from 2026-09-14; web and mobile did not, and nothing failed — which is exactly
   // why this is a seam and not a convention. All three read ONE list now (`src/v2/enrolForgets.js`); a shell
   // supplies only how its storage is reached.
+  // THE RESTART STOP: after an op whose result asks for a restart (a phrase restore, an enrolment, a persona paused,
+  // removed or received) the running process is the device's former self. The waist refuses its writes by itself; each
+  // shell stops as it can (`restartRequired.js`): the phone paints a screen that cannot be dismissed, the web paints the
+  // same with a reload, the box exits for its supervisor. The phone walk went on as the old person and lost what was
+  // written after (2026-11-27).
+  { id: 'restart-required-stop', pattern: /onRestartRequired\??\.?\(/, why: 'a shell that goes on after a restart-required result runs as the device\'s former self: the person sees nothing say why every save is refused, and the box keeps answering as who it was' },
   { id: 'enrol-forgets-the-throwaway-self', pattern: /runPendingForget\(/, why: 'a device that keeps a former self\'s content greets it in every circle and warns about rows it cannot open, for ever — read the ceremony\'s note as the FIRST awaited act of boot, before any store is touched' },
   // A FUNCTION profile's inbox is a door (the household bot on its own node): the shell that can run one reads the
   // profile's kind and composes the door; a shell that ran one without it would leave the bot deaf on its inbox.
@@ -451,7 +457,7 @@ export const SEAMS = Object.freeze([
 /** A shell is a file SET: the files that together compose the substrate for that surface. */
 export const SHELLS = Object.freeze([
   { name: 'web',    files: ['apps/basis/web/v2/circleApp.js', 'apps/basis/web/v2/circleNearby.js', 'apps/basis/web/v2/circleMij.js', 'apps/basis/web/v2/circleLauncher.js'] },
-  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/core/phoneInboundWiring.js', 'apps/basis-mobile/src/core/phoneAppOps.js', 'apps/basis-mobile/src/core/phonePodReadBack.js', 'apps/basis-mobile/src/core/phonePodSession.js', 'apps/basis-mobile/src/core/circleMedia.js', 'apps/basis-mobile/src/core/circlePods.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/src/screens/v2/CircleAdminPanelScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMijScreen.js', 'apps/basis-mobile/App.js'] },
+  { name: 'mobile', files: ['apps/basis-mobile/App.js', 'apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/core/phoneInboundWiring.js', 'apps/basis-mobile/src/core/phoneAppOps.js', 'apps/basis-mobile/src/core/phonePodReadBack.js', 'apps/basis-mobile/src/core/phonePodSession.js', 'apps/basis-mobile/src/core/circleMedia.js', 'apps/basis-mobile/src/core/circlePods.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/src/screens/v2/CircleAdminPanelScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMijScreen.js', 'apps/basis-mobile/App.js'] },
   { name: 'box',    files: ['apps/basis/bin/device-runner.mjs', 'apps/basis/src/telegram/runner.js'] },   // the runner is the box's Telegram door
 ]);
 

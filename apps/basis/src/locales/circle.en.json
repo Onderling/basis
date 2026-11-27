@@ -8926,6 +8926,12 @@
       "doc": "Fallback notice body."
     }
   },
+  "restart_required": {
+    "title": "Basis has to start again",
+    "body": "Basis has to start again to finish this. Close Basis completely and open it again. Until then nothing is saved here.",
+    "how": "How: open the list of recent apps, swipe Basis away, then open Basis again.",
+    "reload": "Start again"
+  },
   "receive_personas": {
     "close": "Close",
     "remove_rekey_failed": "That did not fully work: the persona was taken off this device, but the device's key could not move over. The next start asks for your recovery phrase.",

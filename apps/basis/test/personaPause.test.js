@@ -26,7 +26,7 @@ describe('pause a persona on this device', () => {
     expect(phone.servedOwnLanes(), 'control: while Werk runs, its own lane is served').toContain(`own-devices:${w}`);
 
     const paused = await phone.callSkill('household', 'pausePersona', { personaId: w });
-    expect(paused, JSON.stringify(paused)).toMatchObject({ ok: true, reloadRequired: true });
+    expect(paused, JSON.stringify(paused)).toMatchObject({ ok: true, takesEffectNextStart: true });
     expect(deviceLog.query({}).some((e) => e?.type === 'settings-change' && e?.payload?.op === 'pause-persona' && e?.payload?.target?.ref === w), 'logged as a settings change').toBe(true);
     const here = await phone.callSkill('household', 'listPersonasHere', {});
     expect(here.personas.find((p) => p.id === w)?.paused, 'the screen says paused').toBe(true);
@@ -41,7 +41,7 @@ describe('pause a persona on this device', () => {
     expect(await again.siblingDevicesOf(w), 'nor carried to its devices').toEqual([]);
     expect(((await again.callSkill('agents', 'listAgents', {}))?.items ?? []).map((r) => r.agentId), 'its registry row stays').toContain(w);
 
-    expect((await again.callSkill('household', 'resumePersona', { personaId: w }))).toMatchObject({ ok: true, reloadRequired: true });
+    expect((await again.callSkill('household', 'resumePersona', { personaId: w }))).toMatchObject({ ok: true, takesEffectNextStart: true });
     await again.shutdown?.();
     const back = await boot(d);
     expect(back.persona(w), 'resumed: it runs again').toBeTruthy();

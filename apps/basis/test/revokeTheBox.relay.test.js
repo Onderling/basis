@@ -212,17 +212,19 @@ describe('the box is revoked while it holds the address', () => {
     expect(await addressesOf(bea, web.pubKey)).toContain(web.agent.circleAddressFor(CIRCLE));
 
     // The ceremony's end on a first device: it enrolled ITSELF (every legitimate device now signs with a
-    // revocable key), so it asks for a reload. The reload is the reconnect: a delegation boot, fresh
-    // per-circle addresses announced into every roster, and the profile address registered again.
+    // revocable key). It introduced no address (the first device derives from its own delegation since its
+    // first boot), so it does not ask for a restart and the person may go on (restartRequired.js). The next
+    // start is still the reconnect below: a delegation boot, and the profile address registered again.
     expect(r.migrated, 'the first device did not enrol itself at the ceremony').toBe(true);
-    expect(r.reloadRequired).toBe(true);
+    expect(r.introduced).toEqual([]);
+    expect(r.reloadRequired).toBeUndefined();
     // The person who has been writing to the web app is known to it — by the box's hand, since their
     // greeting landed on the box — and stays known across the reload.
     expect(!!web.agent.sa.agent.security.getPeerKey(person.pubKey), 'the web app does not hold the person\'s key before the reload').toBe(true);
-    // A greeting that lands AFTER the ceremony resealed the vaults must not cost the snapshot: this
-    // running agent still writes under the old key, and a write now would replace the carried-over
-    // snapshot with one the next boot cannot open (CI found it: the person's binding saved late, gone
-    // after the reload). The ceremony wrote the snapshot once, just before the reseal, and froze it.
+    // A greeting that lands AFTER the ceremony resealed the vaults must not cost the snapshot (CI found it on
+    // 2026-09-14: the person's binding saved late, gone after the reload, when a write after the reseal still went
+    // under the old key). The ceremony writes the snapshot just before the reseal; every sealed vault now writes
+    // under the key the reseal switched to, so the snapshot thaws after it and a later save is kept too.
     web.agent.sa.agent.emit?.('peer', { address: bea.pubKey, pubKey: bea.pubKey });
     await new Promise((res) => { setTimeout(res, 600); });
     oldWebAddr = web.agent.circleAddressFor(CIRCLE);

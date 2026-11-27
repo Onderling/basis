@@ -878,6 +878,10 @@ export async function finalSubmit({
   const ownField = state.handle;
   state.handle = joinName(state);
   try {
+    // THE PERSON'S ONE ACT (actState.js `oneAct`): from here to the redeem's answer is one tap, so the act strip paints
+    // its real end. Step by step it painted the local redeem's invalid-or-expired-code, which is how a join from another
+    // device is MEANT to begin (it sends the wizard to the admin over the peer path), on a join that then worked.
+    const joinSteps = async () => {
     // J-CP1 (S4, 2026-07-29) — be ON the circle's endpoint before asking its admin for anything.
     // Best-effort: a join that would have worked over a shared transport must not start failing
     // because a relay was unreachable, so a dial failure is logged and the chain continues.
@@ -898,7 +902,11 @@ export async function finalSubmit({
       if (bound?.reason === 'already-in-as') throw alreadyInAsError(bound.personaId);
       if (!bound?.ok) throw Object.assign(new Error(`persona-not-bound: ${bound?.reason ?? 'unknown'}`), { reason: 'persona-not-bound' });
     }
-    const result = await runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink);
+    return runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink);
+    };
+    const result = typeof callSkill?.asOneAct === 'function'
+      ? await callSkill.asOneAct({ appOrigin: 'pinboard', opId: 'redeemMembershipCode', args: { groupId: state.invite?.groupId ?? null } }, joinSteps)
+      : await joinSteps();
     // carry the joiner's declined caps out with the success envelope so the host records
     // them into the member's prefs (`override.capabilityOptOuts`), feeding the gate's admin ∩ user set.
     if (result && Array.isArray(state.capabilityOptOuts) && state.capabilityOptOuts.length) {

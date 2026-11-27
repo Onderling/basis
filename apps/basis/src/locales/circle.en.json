@@ -9003,7 +9003,6 @@
     "empty_body": "The phrase brings back who you are, not the list of circles you were in. That list lives on your pod, or in a recovery file you saved. If you have neither, someone in each circle can invite you again; you come back as the same member.",
     "source_file": "Load a recovery file",
     "source_later": "Not now",
-    "later_title": "Fine. You can load a file later under My data.",
     "intent_question": "Could anyone else still use your old phone?",
     "intent_broken": "No, it broke or I wiped it",
     "intent_lost": "Maybe, it is lost or stolen",

@@ -6959,7 +6959,8 @@ function showRestoreFinishFlow() {
     }
 
     // terminal: say what happened, by the branch that was walked (the one shared decision — `restoreFinishView.js`)
-    const { messageKey, retry, retiredCount } = restoreFinishOutcome(inst);
+    const { messageKey, retry, retiredCount, closeAtOnce } = restoreFinishOutcome(inst);
+    if (closeAtOnce) return finish();   // "Not now": no last screen to tap away
     card.appendChild(para(t(messageKey)));
     if (retiredCount > 0) card.appendChild(para(`${t('circle.restore_finish.done_devices')} ${retiredCount}`, 'muted'));
     card.appendChild(button(retry ? t('circle.enroll.retry') : t('common.close', { defaultValue: 'Sluiten' }), () => {

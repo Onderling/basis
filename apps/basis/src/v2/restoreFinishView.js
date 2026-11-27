@@ -4,7 +4,8 @@
  * manifest (`restore-finish`) and run by the shared flow runner; a shell paints this and nothing it decides itself.
  *
  * @param {object} inst   the flow instance at its end
- * @returns {{ messageKey: string, retry: boolean, retiredCount: number }}
+ * @returns {{ messageKey: string|null, retry: boolean, retiredCount: number, closeAtOnce: boolean }}
+ *   `closeAtOnce` — the branch ends with no last screen ("Not now"): the shell closes the flow, `messageKey` is null;
  *   `retry` — a retire ran and did not succeed: offer to try again; `retiredCount` — the devices a LOST-phone retire
  *   took out (said under the message; 0 otherwise).
  */
@@ -13,8 +14,9 @@ export function restoreFinishOutcome(inst) {
   const retireOutcome = inst?.steps?.retire?.outcome;
   const sourceOutcome = inst?.steps?.source?.outcome;
   let messageKey;
-  if (sourceOutcome === 'later') messageKey = 'circle.restore_finish.later_title';
-  else if (sourceOutcome === 'not-your-file') messageKey = 'circle.restore_finish.err_not_yours';
+  // "Not now": the flow closes at once, no last screen (the file can be loaded any time from My data's own action)
+  if (sourceOutcome === 'later') return { messageKey: null, retry: false, retiredCount: 0, closeAtOnce: true };
+  if (sourceOutcome === 'not-your-file') messageKey = 'circle.restore_finish.err_not_yours';
   else if (sourceOutcome === 'unreadable-file') messageKey = 'circle.restore_finish.err_unreadable';
   else if (produces.intent === 'adding') messageKey = 'circle.restore_finish.done_adding';
   else if (retireOutcome === 'ok') messageKey = produces.intent === 'lost' ? 'circle.restore_finish.done_loud' : 'circle.restore_finish.done_quiet';
@@ -22,5 +24,5 @@ export function restoreFinishOutcome(inst) {
   else messageKey = 'circle.restore_finish.err_failed';
   const retired = inst?.steps?.retire?.out?.retiredDevices;
   const retiredCount = retireOutcome === 'ok' && produces.intent === 'lost' && Array.isArray(retired) ? retired.length : 0;
-  return { messageKey, retry: !!retireOutcome && retireOutcome !== 'ok', retiredCount };
+  return { messageKey, retry: !!retireOutcome && retireOutcome !== 'ok', retiredCount, closeAtOnce: false };
 }

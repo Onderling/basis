@@ -1013,6 +1013,11 @@ export async function finalSubmit({
       // again later. The state keeps the decoded invite, so retrying is the same wizard, same step.
       state.submitErrorKey = 'circle.nearbyScreen.join_no_admin';
       state.submitErrorReason = 'admin-unreachable';
+    } else if (err?.reason === 'no-own-route') {
+      // the redeem found no route that carries this self's own address (no relay, no local network up): it was held
+      // and withdrawn, never sent another way. Said as it is, with the fix the joiner has: a connection point.
+      state.submitErrorKey = 'circle.nearbyScreen.join_no_own_route';
+      state.submitErrorReason = 'no-own-route';
     } else if (/rules-acceptance-required/.test(String(err?.message ?? ''))) {
       // The admitting device's rules gate: this circle's agreements must be accepted before joining.
       // The wizard's consent step normally guarantees the acceptance rides the redeem, so this reaches
@@ -1191,7 +1196,9 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
           ...circleAddressArg,
           ...rulesArg,   // the remote path carries the SAME acceptance (task #80) — the admin forwards it onto the join it signs
         });
-      } catch {
+      } catch (err) {
+        // no route that carries this self's own address: not the admin's absence, and the joiner can fix it
+        if (err?.reason === 'no-own-route') throw err;
         throw adminUnreachableError();     // could not even reach them — the clearest offline signal
       }
       if (peerReply?.error === 'handle-taken') throw handleTakenError();

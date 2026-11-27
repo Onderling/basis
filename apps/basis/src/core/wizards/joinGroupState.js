@@ -878,6 +878,11 @@ export async function finalSubmit({
   const ownField = state.handle;
   state.handle = joinName(state);
   try {
+    // THE PERSON'S ONE ACT (actState.js `asOneAct`): from here to the redeem's answer is one tap, so the act strip paints
+    // its real end. Step by step it painted the local redeem's invalid-or-expired-code, which is how a join from another
+    // device is MEANT to begin (it sends the wizard to the admin over the peer path), on a join that then worked. The
+    // steps make their calls through the waist the act hands them (`cs`), so only THESE calls are inside the act.
+    const joinSteps = async (cs = callSkill) => {
     // J-CP1 (S4, 2026-07-29) — be ON the circle's endpoint before asking its admin for anything.
     // Best-effort: a join that would have worked over a shared transport must not start failing
     // because a relay was unreachable, so a dial failure is logged and the chain continues.
@@ -891,14 +896,18 @@ export async function finalSubmit({
     const refused = secondPersonaRefusal(state);
     if (refused) throw alreadyInAsError(refused.personaId);
     if (asPersona && state.invite?.groupId) {
-      const bound = await callSkill('household', 'bindCirclePersona', {
+      const bound = await cs('household', 'bindCirclePersona', {
         circleId: state.invite.groupId, personaId: asPersona,
         ...(typeof state.invite.relayUrl === 'string' && state.invite.relayUrl ? { relayUrl: state.invite.relayUrl } : {}),
       }).catch((err) => ({ ok: false, reason: err?.message ?? 'bind-failed' }));
       if (bound?.reason === 'already-in-as') throw alreadyInAsError(bound.personaId);
       if (!bound?.ok) throw Object.assign(new Error(`persona-not-bound: ${bound?.reason ?? 'unknown'}`), { reason: 'persona-not-bound' });
     }
-    const result = await runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink);
+    return runFinalSubmitChain(state, cs, sendPeerRedeem, circleAddressFor, signCircleLink);
+    };
+    const result = typeof callSkill?.asOneAct === 'function'
+      ? await callSkill.asOneAct({ appOrigin: 'pinboard', opId: 'redeemMembershipCode', args: { groupId: state.invite?.groupId ?? null } }, joinSteps)
+      : await joinSteps();
     // carry the joiner's declined caps out with the success envelope so the host records
     // them into the member's prefs (`override.capabilityOptOuts`), feeding the gate's admin ∩ user set.
     if (result && Array.isArray(state.capabilityOptOuts) && state.capabilityOptOuts.length) {
@@ -928,6 +937,9 @@ export async function finalSubmit({
     // device's address across every circle it is in and re-read the roster — work that grows with how
     // many circles you have and says nothing about whether the join worked. The stage lives here, where
     // the chain is; both wizards render it (`joinSubmitLabelKey`), neither decides it.
+    // "Connecting" waits for this device's address on the relay and the members' addresses bound, NOT for the
+    // circle's lanes: `makeCircleReachable` starts that pull and settles without it (an open circle repaints when
+    // the answer lands, however late the other members answer).
     state.submitStage = 'connecting';
     if (typeof onStage === 'function') { try { onStage(state.submitStage); } catch { /* cosmetic */ } }
     if (result && result.groupId && typeof onJoined === 'function') {
@@ -1004,6 +1016,11 @@ export async function finalSubmit({
       // again later. The state keeps the decoded invite, so retrying is the same wizard, same step.
       state.submitErrorKey = 'circle.nearbyScreen.join_no_admin';
       state.submitErrorReason = 'admin-unreachable';
+    } else if (err?.reason === 'no-own-route') {
+      // the redeem found no route that carries this self's own address (no relay, no local network up): it was held
+      // and withdrawn, never sent another way. Said as it is, with the fix the joiner has: a connection point.
+      state.submitErrorKey = 'circle.nearbyScreen.join_no_own_route';
+      state.submitErrorReason = 'no-own-route';
     } else if (/rules-acceptance-required/.test(String(err?.message ?? ''))) {
       // The admitting device's rules gate: this circle's agreements must be accepted before joining.
       // The wizard's consent step normally guarantees the acceptance rides the redeem, so this reaches
@@ -1182,7 +1199,9 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
           ...circleAddressArg,
           ...rulesArg,   // the remote path carries the SAME acceptance (task #80) — the admin forwards it onto the join it signs
         });
-      } catch {
+      } catch (err) {
+        // no route that carries this self's own address: not the admin's absence, and the joiner can fix it
+        if (err?.reason === 'no-own-route') throw err;
         throw adminUnreachableError();     // could not even reach them — the clearest offline signal
       }
       if (peerReply?.error === 'handle-taken') throw handleTakenError();

@@ -153,7 +153,7 @@ import { networkInterfaces }                 from 'node:os';
 import { WebSocketServer }                   from 'ws';
 import {
   MAX_ENVELOPE_BYTES, senderVerdict,
-  newAddressChallenge, verifyAddressPossession, relayOwnNames, isPrivateRelayName, ADDRESS_CHALLENGE_TTL_MS,
+  newAddressChallenge, verifyAddressPossession, relayOwnNames, isHomeNetworkHost, ADDRESS_CHALLENGE_TTL_MS,
 } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND }    from '@onderling/core';
 import { MultiRecipientQueue }               from './MultiRecipientQueue.js';
@@ -952,7 +952,7 @@ export async function startRelay(opts = {}) {
         if (!verifyAddressPossession({ address, nonce, proof, relay: msg.relay, isOwnRelayName })) {
           socket.send(JSON.stringify({ type: 'error', message: 'PROOF_INVALID', address }));
           logLine(`[relay] proof-rejected ${shortId(address)}${typeof msg.relay === 'string' && !isOwnRelayName(msg.relay) ? ` (it names another relay: ${String(msg.relay).slice(0, 60)})` : ''}`);
-          if (!saidSetRelayNames && typeof msg.relay === 'string' && !isOwnRelayName(msg.relay) && !isPrivateRelayName(msg.relay)) {
+          if (!saidSetRelayNames && typeof msg.relay === 'string' && !isOwnRelayName(msg.relay) && !isHomeNetworkHost(msg.relay)) {
             saidSetRelayNames = true;
             logLine('[relay] a proof named a public name this relay was not given: if it is this relay\'s own, set RELAY_NAMES (the relay never takes a public name from the Host header)');
           }

@@ -3645,6 +3645,10 @@
       "text": "No admin is online right now — try again later. The invitation stays valid.",
       "doc": "The no-admin-online notice at join (J-NP2). Without it this failure is indistinguishable from a broken invite, and nobody retries."
     },
+    "join_no_own_route": {
+      "text": "Your join could not be sent: this device has no connection that carries your own address. Set a connection point in Settings, Connection, and try again. The invitation stays valid.",
+      "doc": "At join, when the redeem found no route that carries the joiner's own address (no relay, no local network) within the wait: it was withdrawn, never sent another way. Not the admin's absence; the joiner's fix is a connection point."
+    },
     "delivery_section": {
       "text": "Delivery",
       "doc": "My-data section for the two delivery settings."
@@ -7414,7 +7418,7 @@
       "doc": "S5 — heading of the reveal-mnemonic dialog."
     },
     "mnemonic_warn": {
-      "text": "Write these words down and keep them somewhere safe. Anyone with this phrase can restore your identity. It is shown only once.",
+      "text": "Write these words down and keep them somewhere safe. Anyone with this phrase can restore your identity. Open it only where nobody can look along.",
       "doc": "S5 — reveal-mnemonic warning."
     },
     "mnemonic_none": {
@@ -7618,7 +7622,7 @@
       "doc": "J-CS10 — name the escape rather than leaving a dead end (the companion node; relay diversity)."
     },
     "pod_local_consequence": {
-      "text": "Everything here lives on this device only. If you lose it or reinstall, your recovery phrase brings back who you are — not your circles or your conversations. Connect a pod, or export a recovery file, to be able to pick this up somewhere else.",
+      "text": "Everything here lives on this device only. If you lose it or reinstall, your recovery phrase brings back who you are, not the list of your circles. That list comes back from a pod or from a recovery file you saved; without either, someone in each circle invites you again.",
       "doc": "Said where the state is shown, not only when someone tries to leave with it (2026-08-02). A wipe-and-restore walk proved the phrase brings back the identity and no circles; someone who learns that at the moment they switch devices learns it too late to act on."
     },
     "receive_personas": "Personas on this device",
@@ -9607,7 +9611,7 @@
         "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
       },
       "ack_lost": {
-        "text": "I understand my current identity and local data will be LOST.",
+        "text": "I understand that this device stops being who it is now, and that what that person has here is out of reach afterwards.",
         "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
       },
       "ack_undone": {
@@ -9619,7 +9623,7 @@
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
       "title": {
-        "text": "Restore from mnemonic",
+        "text": "Restore from recovery phrase",
         "doc": "Mobile restore wizard heading."
       },
       "confirm_title": {
@@ -9793,7 +9797,7 @@
     }
   },
   "boot_content_unreadable": {
-    "text": "Your data on this device could not be opened. Nothing was changed: it is all still here. Try again; if this keeps happening, restore from your recovery phrase (that starts this device over and brings your circles back).",
+    "text": "Your data on this device could not be opened. Nothing was changed: it is all still here. Try again; if this keeps happening, restore from your recovery phrase (that starts this device over; your circles come back from a pod, a recovery file or a new invitation).",
     "doc": "Launcher (ledger L1115): the content key is stored but could not be read at the start; nothing was minted or written. Try again first, the phrase second."
   },
   "boot_retry": {

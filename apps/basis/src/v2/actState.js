@@ -136,19 +136,42 @@ export function createActState({ now = () => Date.now(), setTimer = setTimeout, 
 export function wrapCallSkillWithActState(callSkill, { store, manifestsByOrigin } = {}) {
   if (typeof callSkill !== 'function' || !store) return callSkill;
   // the call's context (a self it is made as, the selves it reads for) is passed on, never dropped
-  return async function callSkillWithActState(appOrigin, opId, args, ctx) {
+  const wrapped = async function callSkillWithActState(appOrigin, opId, args, ctx) {
     const call = (c) => (c === undefined ? callSkill(appOrigin, opId, args) : callSkill(appOrigin, opId, args, c));
     if (!store.recentlyInteracted() || !isActOp(manifestsByOrigin, appOrigin, opId)) return call(ctx);
     // The act this strip follows is a TAP: say so to the waist, so the person's own record (ownActions.js) names the
     // same act the strip paints. A door a turn already named (slash, phrase, model) is kept.
-    const tapped = ctx && typeof ctx === 'object' ? (ctx.door ? ctx : { ...ctx, door: 'tap' }) : { door: 'tap' };
     const token = store.begin({ appOrigin, opId, args });
     let result;
-    try { result = await call(tapped); }
+    try { result = await call(tappedCtx(ctx)); }
     catch (err) { store.end(token, { error: err }); throw err; }
     store.end(token, { result });
     return result;
   };
+  /**
+   * A person's ONE act made of several waist calls (a join: the code tried here first, the admin asked over the peer
+   * path when this device holds no code, the joined circle recorded): followed as one act with the end `fn` really has.
+   * `fn(callSkill)` is handed the waist to make THAT act's calls with: each goes straight down as the person's tap and
+   * paints nothing of its own, so an inner answer is not the act's (the local redeem's invalid-or-expired-code is how a
+   * join from another device is meant to begin) and a call after the tap's window is still part of it. Being inside the
+   * act travels with those calls, never with the clock: every other call through this waist meanwhile is judged on its
+   * own, as before. `fn` rejecting is the act failing; its resolved value is judged by `actFailed`. With no tap in the
+   * window (a turn started it), `fn` gets this waist unchanged and nothing is followed.
+   */
+  wrapped.asOneAct = (meta, fn) => {
+    if (!store.recentlyInteracted()) return fn(wrapped);
+    // a write inside the act is the person's tap (their own record names it); a read passes as it came
+    const inner = (appOrigin, opId, args, ctx) => (isActOp(manifestsByOrigin, appOrigin, opId)
+      ? callSkill(appOrigin, opId, args, tappedCtx(ctx))
+      : (ctx === undefined ? callSkill(appOrigin, opId, args) : callSkill(appOrigin, opId, args, ctx)));
+    return store.track(meta, Promise.resolve().then(() => fn(inner)));
+  };
+  return wrapped;
+}
+
+/** The context a person's tap travels with: the caller's own, with door 'tap' unless a turn already named its door. */
+function tappedCtx(ctx) {
+  return ctx && typeof ctx === 'object' ? (ctx.door ? ctx : { ...ctx, door: 'tap' }) : { door: 'tap' };
 }
 
 /**

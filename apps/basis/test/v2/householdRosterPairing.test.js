@@ -138,7 +138,28 @@ describe('makeCircleReachable — a fresh joiner PULLS the circle\'s lanes (2026
       pullLanes: async (cid) => { order.push(`pull:${cid}`); },
     });
     expect(order).toEqual(['register', 'pull:k1']);
-    expect(r).toMatchObject({ registered: true, pulled: true });
+    expect(r).toMatchObject({ registered: true });
+    await expect(r.pulling).resolves.toBe(true);
+  });
+  it('settles while the pull is still out: the join waits for its address and its binding, not for the answer', async () => {
+    // A pull is answered by the circle's other members, who may be offline for hours (the relay holds the request).
+    // On a phone the wizard sat 63 s on "connecting" waiting for it; an open circle repaints when the late answer
+    // lands (the browser walk walk-late-pull-repaint), so nothing needs the wait.
+    const order = [];
+    let release;
+    const pending = new Promise((res) => { release = res; });
+    const step = makeCircleReachable({
+      agent: mk(), circleId: 'k1',
+      registerCirclePresence: async () => { order.push('register'); },
+      pullLanes: async (cid) => { order.push(`pull:${cid}`); await pending; },
+    });
+    const settled = await Promise.race([step.then(() => 'settled'), new Promise((res) => setTimeout(() => res('waiting'), 200))]);
+    expect(settled, 'the post-join step waited for the pull').toBe('settled');
+    const r = await step;
+    expect(order, 'the pull still left, after the register').toEqual(['register', 'pull:k1']);
+    expect(r).toMatchObject({ registered: true });
+    release();
+    await expect(r.pulling).resolves.toBe(true);
   });
   it('records the circle\'s CONNECTION POINTS from the invite FIRST — before presence, before the pull (2026-09-21)', async () => {
     // The point used to be recorded by the shells' `onDispatched`, after `onJoined` had already registered presence
@@ -154,7 +175,8 @@ describe('makeCircleReachable — a fresh joiner PULLS the circle\'s lanes (2026
       pullLanes: async (cid) => { order.push(`pull:${cid}`); },
     });
     expect(order).toEqual(['points:k1:wss://kring.example', 'register', 'pull:k1']);
-    expect(r).toMatchObject({ points: ['relay'], registered: true, pulled: true });
+    expect(r).toMatchObject({ points: ['relay'], registered: true });
+    await expect(r.pulling).resolves.toBe(true);
     // without an invite (a create, a follow) or without the seam: nothing recorded, nothing broken
     expect((await makeCircleReachable({ agent: mk(), circleId: 'k1', recordPoints: () => { throw new Error('never'); } })).points).toEqual([]);
     expect((await makeCircleReachable({ agent: mk(), circleId: 'k1', invite })).points).toEqual([]);
@@ -162,11 +184,11 @@ describe('makeCircleReachable — a fresh joiner PULLS the circle\'s lanes (2026
   it('a pull that fails costs the join nothing — stated, not swallowed', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const r = await makeCircleReachable({ agent: mk(), circleId: 'k1', pullLanes: async () => { throw new Error('no peer'); } });
-    expect(r.pulled).toBe(false);
+    await expect(r.pulling).resolves.toBe(false);
     expect(warn.mock.calls.some(([m]) => /could not pull its lanes/.test(String(m)))).toBe(true);
     warn.mockRestore();
   });
   it('without a pull seam nothing is pulled and nothing breaks (a host from before)', async () => {
-    expect((await makeCircleReachable({ agent: mk(), circleId: 'k1' })).pulled).toBe(false);
+    await expect((await makeCircleReachable({ agent: mk(), circleId: 'k1' })).pulling).resolves.toBe(false);
   });
 });

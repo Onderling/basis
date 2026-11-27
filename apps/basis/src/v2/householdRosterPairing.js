@@ -197,7 +197,8 @@ export async function bindCircleAddressKeysFor({ agent, circleId } = {}) {
  *   the pull left with no points for the circle, over a transport that held no alias of ours, signed as the
  *   canonical self, and was refused at the admin (the joiner never got the creator's person key on two
  *   relays). The pair-roster join has no `onDispatched`, so a pair circle never recorded its point at all.
- * @returns {Promise<{points: string[], registered: boolean, bound: number, skipped: number, pulled: boolean}>}
+ * @returns {Promise<{points: string[], registered: boolean, bound: number, skipped: number, pulling: Promise<boolean>}>}
+ *   settles once presence and the binding are done; `pulling` settles when the pull is answered (true) or failed (false)
  */
 export async function makeCircleReachable({ agent, circleId, invite = null, recordPoints = null, registerCirclePresence, pullLanes, markPolicyPending = null } = {}) {
   // a JOINED circle's posture is not known until its policy arrives: marked first, before anything can write in it
@@ -209,7 +210,9 @@ export async function makeCircleReachable({ agent, circleId, invite = null, reco
   }
   let registered = false;
   if (typeof registerCirclePresence === 'function') {
-    try { await registerCirclePresence(); registered = true; }
+    // the JOINED circle is handed over: the substrate's list may not hold it yet, and a shell that registered only
+    // that list left the new circle's address off the relay until a restart (every shell unions what it is given)
+    try { await registerCirclePresence(circleId ? [circleId] : []); registered = true; }
     catch (err) {
       // Best-effort, but NOT silent (review, 2026-07-30). A join that succeeds while registration fails
       // leaves the member on the roster at an address their own device never announced — reachable by
@@ -226,12 +229,15 @@ export async function makeCircleReachable({ agent, circleId, invite = null, reco
   let bound = { bound: 0, skipped: 0 };
   try { bound = await bindCircleAddressKeysFor({ agent, circleId }); }
   catch { /* a roster read that fails must not undo the registration above */ }
-  let pulled = false;
-  if (typeof pullLanes === 'function') {
-    try { await pullLanes(circleId); pulled = true; }
-    catch (err) {
+  // The pull is STARTED here and not awaited: it is answered by the circle's other members, who may be offline for hours
+  // (the relay holds the request), and an open circle repaints when the answer lands (the browser walk
+  // walk-late-pull-repaint). Awaited, it held the join wizard on "connecting" for a minute on a phone. The presence
+  // register and the binding above stay awaited: a join that closes before its address is on the relay is unreachable.
+  const pulling = typeof pullLanes === 'function'
+    ? Promise.resolve().then(() => pullLanes(circleId)).then(() => true, (err) => {
       if (typeof console !== 'undefined') console.warn(`[circle] joined ${circleId} but could not pull its lanes — the roster fills in at the next reconnect: ${err?.message ?? err}`);
-    }
-  }
-  return { points, registered, bound: bound.bound ?? 0, skipped: bound.skipped ?? 0, pulled };
+      return false;
+    })
+    : Promise.resolve(false);
+  return { points, registered, bound: bound.bound ?? 0, skipped: bound.skipped ?? 0, pulling };
 }

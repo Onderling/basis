@@ -155,6 +155,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `hashHex` | function | [`core.md`](core.md#hashhex) |
 | `hasRoleBundle` | function | [`core.md`](core.md#hasrolebundle) |
 | `hmacBase64Url` | function | [`core.md`](core.md#hmacbase64url) |
+| `homeNetworkKind` | function | [`core.md`](core.md#homenetworkkind) |
 | `ImagePart` | function | [`core.md`](core.md#imagepart) |
 | `IN_PROCESS_SENDER` | constant | [`core.md`](core.md#in_process_sender) |
 | `IndexedDBSource` | class | [`core.md`](core.md#indexeddbsource) |
@@ -168,8 +169,8 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `isDiscoverability` | function | [`core.md`](core.md#isdiscoverability) |
 | `isEd25519PubKey` | function | [`core.md`](core.md#ised25519pubkey) |
 | `isEnvelope` | function | [`core.md`](core.md#isenvelope) |
+| `isHomeNetworkHost` | function | [`core.md`](core.md#ishomenetworkhost) |
 | `isKnownRole` | function | [`core.md`](core.md#isknownrole) |
-| `isPrivateRelayName` | function | [`core.md`](core.md#isprivaterelayname) |
 | `isReservedProfileLabel` | function | [`core.md`](core.md#isreservedprofilelabel) |
 | `isSelfPersonKeyStatement` | function | [`core.md`](core.md#isselfpersonkeystatement) |
 | `isStandardRole` | function | [`core.md`](core.md#isstandardrole) |

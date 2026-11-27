@@ -3650,6 +3650,10 @@
       "text": "Er is nu geen beheerder online — probeer het later opnieuw. De uitnodiging blijft geldig.",
       "doc": "The no-admin-online notice at join (J-NP2). Without it this failure is indistinguishable from a broken invite, and nobody retries."
     },
+    "join_no_own_route": {
+      "text": "Je aanmelding kon niet worden verstuurd: dit apparaat heeft geen verbinding die je eigen adres draagt. Stel een verbindingspunt in bij Instellingen, Verbinding, en probeer het opnieuw. De uitnodiging blijft geldig.",
+      "doc": "At join, when the redeem found no route that carries the joiner's own address (no relay, no local network) within the wait: it was withdrawn, never sent another way. Not the admin's absence; the joiner's fix is a connection point."
+    },
     "delivery_section": {
       "text": "Bezorging",
       "doc": "My-data section for the two delivery settings."
@@ -7416,7 +7420,7 @@
       "doc": "S5 — heading of the reveal-mnemonic dialog."
     },
     "mnemonic_warn": {
-      "text": "Schrijf deze woorden op en bewaar ze ergens veilig. Iedereen met deze zin kan jouw identiteit herstellen. Hij wordt maar één keer getoond.",
+      "text": "Schrijf deze woorden op en bewaar ze ergens veilig. Iedereen met deze zin kan jouw identiteit herstellen. Open hem alleen waar niemand kan meekijken.",
       "doc": "S5 — reveal-mnemonic warning."
     },
     "mnemonic_none": {
@@ -7620,7 +7624,7 @@
       "doc": "J-CS10 — name the escape rather than leaving a dead end."
     },
     "pod_local_consequence": {
-      "text": "Alles hier staat alleen op dit apparaat. Raak je het kwijt of installeer je opnieuw, dan haalt je herstelzin terug wie je bent — niet je kringen of je gesprekken. Koppel een pod, of exporteer een herstelbestand, om hier ergens anders mee verder te kunnen.",
+      "text": "Alles hier staat alleen op dit apparaat. Raak je het kwijt of installeer je opnieuw, dan haalt je herstelzin terug wie je bent, niet de lijst van je kringen. Die lijst komt terug uit een pod of uit een herstelbestand dat je hebt bewaard; heb je geen van beide, dan nodigt iemand in elke kring je opnieuw uit.",
       "doc": "Said where the state is shown, not only when someone tries to leave with it (2026-08-02). A wipe-and-restore walk proved the phrase brings back the identity and no circles; someone who learns that at the moment they switch devices learns it too late to act on."
     },
     "receive_personas": "Persona's op dit apparaat",
@@ -9604,7 +9608,7 @@
         "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
       },
       "ack_lost": {
-        "text": "Ik begrijp dat mijn huidige identiteit en lokale gegevens VERLOREN gaan.",
+        "text": "Ik begrijp dat dit apparaat niet meer is wie het nu is, en dat ik daarna niet meer bij de gegevens van die persoon hier kan.",
         "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
       },
       "ack_undone": {
@@ -9790,7 +9794,7 @@
     }
   },
   "boot_content_unreadable": {
-    "text": "Je gegevens op dit apparaat konden niet worden geopend. Er is niets veranderd: alles staat er nog. Probeer het opnieuw; blijft dit gebeuren, herstel dan met je herstelzin (dat begint dit apparaat opnieuw en haalt je kringen terug).",
+    "text": "Je gegevens op dit apparaat konden niet worden geopend. Er is niets veranderd: alles staat er nog. Probeer het opnieuw; blijft dit gebeuren, herstel dan met je herstelzin (dat begint dit apparaat opnieuw; je kringen komen terug uit een pod, een herstelbestand of een nieuwe uitnodiging).",
     "doc": "Launcher (ledger L1115): the content key is stored but could not be read at the start; nothing was minted or written. Try again first, the phrase second."
   },
   "boot_retry": {

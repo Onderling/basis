@@ -33,6 +33,21 @@
  */
 
 import { inviteRefusalOf } from '../../v2/inviteRefusals.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+/** How long a joiner waits for the admin's answer to its redeem; no try of it is made after the wait. */
+export const REDEEM_WAIT_MS = param({ key: 'groupRedeem.waitMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });
+/** How often, within the wait, a redeem that found no route carrying the joiner's own address is tried again. */
+export const REDEEM_RETRY_MS = param({ key: 'groupRedeem.retryMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2_000 });
+
+/** The send path's answer when no transport may carry the send (the secure agent's "not connected"): no route, not a refusal. */
+const isNoRouteError = (err) => /Peer transport not connected/i.test(String(err?.message ?? ''));
+
+/**
+ * How long the admin waits on its answer to a redeem before it goes on with the admit (the address propagation, the
+ * roster step): under the joiner's 30 s wait, so an answer that is stuck is named while the joiner still waits.
+ */
+export const REDEEM_REPLY_BOUND_MS = param({ key: 'groupRedeem.replyBoundMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 20_000 });
 /**
  * The admin's own display name IN THIS CIRCLE, read the way every screen reads it: their row on the
  * roster, found by the per-circle address they answer on. No profile store is consulted directly, so this
@@ -64,6 +79,7 @@ export function makeHandleGroupRedeemRequest({
   // The agent's invite-exchange registrations (`agent.inviteExchange`): the one reply to a well-formed request (its answer
   // when it proved its code, else its refusal) may go back on the person key (the send gate's person-key allowlist).
   inviteExchange = null,
+  replyBoundMs = REDEEM_REPLY_BOUND_MS,
 } = {}) {
   if (typeof callSkill !== 'function') throw new Error('makeHandleGroupRedeemRequest: callSkill required');
   if (typeof sendPeer  !== 'function') throw new Error('makeHandleGroupRedeemRequest: sendPeer required');
@@ -146,13 +162,28 @@ export function makeHandleGroupRedeemRequest({
         if (reply.ok) inviteExchange?.answerProvenRequest?.(fromAddr);
         else inviteExchange?.refuseParsedRequest?.(fromAddr);
       } catch { /* the gate then records 'none' */ }
-      await sendPeer(fromAddr, {
+      // The answer is bounded and never silent: a send that does not settle, or settles undelivered, is named, and the
+      // admit's own steps below go on either way (the membership is already real).
+      const who = String(fromAddr).slice(0, 16);
+      let bound = null;
+      // the send's own failure is caught on the send itself: when the bound wins, a later rejection is still a line,
+      // never an unhandled rejection (on the box that is node's unhandledRejection)
+      const answer = Promise.resolve(sendPeer(fromAddr, {
         type:    'p2p-chat',
         subtype: 'group-redeem-response',
         requestId,
         ...reply,
         sentAt:  Date.now(),
+      })).catch((err) => {
+        logger.warn?.(`[group-redeem] the answer to ${who}… failed: ${err?.message ?? err}`);
+        return { failed: true };
       });
+      const sent = await Promise.race([
+        answer,
+        new Promise((resolve) => { bound = setTimeout(() => resolve({ stuck: true }), replyBoundMs); }),
+      ]).finally(() => clearTimeout(bound));
+      if (sent?.stuck) logger.warn?.(`[group-redeem] the answer to ${who}… did not settle within ${Math.round(replyBoundMs / 1000)} s`);
+      else if (sent && typeof sent === 'object' && sent.delivered === false) logger.warn?.(`[group-redeem] the answer to ${who}… was not delivered: ${sent.reason ?? (sent.held ? 'held' : 'unknown')}`);
       publishEvent?.({
         app: 'pinboard', type: 'notification',
         payload: {
@@ -237,7 +268,8 @@ export function makeSendGroupRedeemRequest({
   // () => string|null — the WebID this device's pod session signs in as. Sent only on a redeem for a pod-backed
   // circle, and only to the admin the request goes to: their pod's read grant has to name it.
   podWebId = null,
-  sendPeer, isPeerConnected, pendingMap, circleAddressFor, signCircleAddress, timeoutMs = 30_000, logger = console,
+  sendPeer, isPeerConnected, pendingMap, circleAddressFor, signCircleAddress, timeoutMs = REDEEM_WAIT_MS, logger = console,
+  retryMs = REDEEM_RETRY_MS,
   // The agent's invite-exchange registrations (`agent.inviteExchange`): the request to the invite's address may leave on
   // the person key for this redeem's lifetime (the send gate's person-key allowlist), released on answer/timeout/error.
   inviteExchange = null,
@@ -307,15 +339,28 @@ export function makeSendGroupRedeemRequest({
     const requestId = `gr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     let release = () => {};
     try { release = inviteExchange?.expectFromInviter?.(adminPeerAddr) ?? release; } catch { /* the gate then records 'none' */ }
+    // THE REDEEM NEVER OUTLIVES THE JOINER'S WAIT. It is sent `now`, never held by the agent (a held redeem flushed a
+    // minute later would admit a joiner whose screen already said it failed); with no route that carries this self's
+    // address yet, the joiner tries again itself, within the wait, and stops when the wait does.
+    let noOwnRoute = false;   // the last try found no route that carries this self's address
+    let over = false;         // answered, refused or timed out: no further try
+    const who = String(adminPeerAddr).slice(0, 16);
     const promise = new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
+        over = true;
         pendingMap.delete(requestId);
-        reject(new Error('Admin did not respond within 30 s. They may be offline — try again later.'));
+        if (noOwnRoute) {
+          logger.warn?.(`[group-redeem] no route that carries this self's address to ${who}… within the wait: the redeem never left`);
+          reject(Object.assign(new Error('no-own-route'), { reason: 'no-own-route' }));
+          return;
+        }
+        reject(new Error(`Admin did not respond within ${Math.round(timeoutMs / 1000)} s. They may be offline — try again later.`));
       }, timeoutMs);
       pendingMap.set(requestId, { resolve, reject, timer });
     });
     // the exchange is open while the redeem is: its answer, its timeout and its error all close it
     promise.then(release, release);
+    promise.then(() => { over = true; }, () => { over = true; });
     try {
       const request = {
         type:    'p2p-chat',
@@ -336,9 +381,38 @@ export function makeSendGroupRedeemRequest({
         sentAt: Date.now(),
       };
       const as = asPersona ? { sendAs: asPersona } : {};
-      if (typeof relayUrl === 'string' && relayUrl) await sendPeer(adminPeerAddr, request, { scope: { points: [relayUrl] }, ...as });
-      else if (asPersona) await sendPeer(adminPeerAddr, request, as);
-      else await sendPeer(adminPeerAddr, request);
+      // A redeem leaves AS the self that joins, or not at all: only over a route that carries that address. A route
+      // that cannot (NKN: its sender is its own native address) would make the admin admit an address of this device
+      // that nobody can reach, and its answer would go nowhere. No such route now → not sent, tried again below.
+      const points = typeof relayUrl === 'string' && relayUrl ? { points: [relayUrl] } : {};
+      const sendOpts = { guarantee: 'now', scope: { ...points, requireAliasCapable: true }, ...as };
+      // one try: true when the request left; false when it did not leave (tried again within the wait), and
+      // `noOwnRoute` says whether that was for want of a route carrying this self's address; a thrown failure other
+      // than "no route" throws, as a send failure always did
+      const attempt = async () => {
+        try {
+          const sent = await sendPeer(adminPeerAddr, request, sendOpts);
+          const notSent = !!sent && typeof sent === 'object' && (sent.held === true || sent.delivered === false);
+          noOwnRoute = notSent && sent.reason === 'no-eligible-route';
+          return !notSent;
+        } catch (err) {
+          // no route now: tried again within the wait. The send path says WHICH (`scopedOut`): the admin is reachable,
+          // but only over a route that cannot carry this self's address (no-own-route), or not reachable at all (it
+          // ends as "no admin online")
+          if (isNoRouteError(err)) { noOwnRoute = err?.scopedOut === true; return false; }
+          throw err;
+        }
+      };
+      if (!(await attempt())) {
+        logger.warn?.(`[group-redeem] no route that carries this self's address to ${who}… yet: trying again within the wait`);
+        (async () => {
+          while (!over) {
+            await new Promise((r) => setTimeout(r, retryMs));
+            if (over) return;
+            try { if (await attempt()) return; } catch (err) { logger.warn?.(`[group-redeem] a later try to ${who}… failed: ${err?.message ?? err}`); }
+          }
+        })();
+      }
     } catch (err) {
       const entry = pendingMap.get(requestId);
       if (entry) {
@@ -347,7 +421,7 @@ export function makeSendGroupRedeemRequest({
       }
       release();
       logger.warn?.('[group-redeem] send failed', adminPeerAddr, err);
-      throw new Error(`Failed to reach admin over NKN: ${err?.message ?? err}`);
+      throw new Error(`Failed to reach admin: ${err?.message ?? err}`);
     }
     return promise;
   };

@@ -1546,8 +1546,8 @@ function circleOnJoined({ circleId, invite = null }) {
     // Rule 1 — the joined circle's connection point(s), from what the invite carried (its pod and/or its relay),
     // recorded FIRST so presence and the pull below aim at the circle's relay. Best-effort: never blocks a join.
     recordPoints: ({ invite: inv, circleId: cid }) => recordJoinedCirclePoints({ store: getConnectionPoints(), invite: inv, circleId: cid }),
-    // The new circle is not in `circlesCache` yet, so pass it explicitly rather than waiting for a refresh.
-    registerCirclePresence: () => registerCirclePresence(_peerAgent, [circleId]),
+    // The new circle is not in `circlesCache` yet: the shared step hands it over (`[circleId]`) and it is unioned in.
+    registerCirclePresence: (ids) => registerCirclePresence(_peerAgent, ids),
     pullLanes: (cid) => pullCircleLanes({ membership: memCatchUpShell, gov: govCatchUpShell, key: keyCatchUpShell, task: itemsCatchUpShell, chat: chatCatchUpShell }, cid, { callSkill: rawCallSkill }),
     // its posture is not known until its policy arrives (the policy lane's write clears the mark)
     markPolicyPending: (cid) => policyStore.markPending(cid),

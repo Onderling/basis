@@ -53,7 +53,7 @@ import { createCirclePodCustody } from '../../../basis/src/v2/circlePodCustody.j
 import { createCircleCacheMedium } from '../../../basis/src/v2/circleCacheMedium.js';
 import { circleStoreMode } from '../../../basis/src/v2/circleDataPolicy.js';
 import { buildHouseholdDataSource } from '../../../basis/src/household/persist.js';
-// objective L follow-up — the mobile per-circle policy store (AsyncStorage-backed, `cc.circlePolicy.<id>`
+// objective L follow-up — the mobile per-circle policy store (AsyncStorage-backed, `basis.circlePolicy.<id>`
 // keys). Mirror of web circleApp.js's module-level `policyStore`: the composition-root's `policyOf` reads the
 // LIVE per-circle `sharePosture` from here instead of the deny-by-default `{}`.
 import { makeCirclePolicyStoreRN } from './circleStoresRN.js';
@@ -500,7 +500,7 @@ export async function getCircleShareEnforcement(circleId, policy) {
 
 // objective L follow-up — the composition-root's per-circle policy SOURCE, mirroring web circleApp.js's
 // module-level `policyStore` + `_circlePolicy`. Lazily built from the AsyncStorage wired via `initCirclePods`;
-// reads the SAME `cc.circlePolicy.<id>` keys the launcher's store writes, so the initiator gate sees the LIVE
+// reads the SAME `basis.circlePolicy.<id>` keys the launcher's store writes, so the initiator gate sees the LIVE
 // per-circle `sharePosture` (normalized via normalizeCirclePolicy inside the store's `.get`). Null until a
 // store is wired (no AsyncStorage) — then `policyOf` falls back to {} (deny-by-default), unchanged + safe.
 let _circlePolicyStore = null;

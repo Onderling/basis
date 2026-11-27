@@ -407,7 +407,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // (shopping/errand/repair/schedule items + tasks + contacts).
   //
   // OBJ-2 S1e — restart-survival: when the shell passes `householdPersistDb`
-  // (web → `{ dbName: 'cc-household-state' }` IndexedDB; mobile →
+  // (web → `{ dbName: 'basis.household' }` IndexedDB; mobile →
   // `{ dbName, asyncStorage }` AsyncStorage; node → `{ path }`), back the
   // store with a persistent `CachingDataSource` so items survive a reload.
   // Default (undefined) → in-memory `MemorySource`, unchanged.  The actual
@@ -618,7 +618,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // - bus: shared with hostAgent so chatAgent.invoke(hostAgent.address)
   //        works in-process via InternalBus
   // - vault: opt.chatVault wins (tests inject VaultMemory); otherwise
-  //   picker chooses VaultLocalStorage by prefix 'cc-chat-id:'
+  //   picker chooses VaultLocalStorage by prefix 'basis.chat-id:'
   // - auditLog: persistent under 'cc-audit'; autoLogs identity.rotate /
   //   mute / claim.sign / caps.issue / peer.connect
   // - muteListVaultKey: persistent peer mute across reloads
@@ -929,7 +929,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // device-revocation ceremony rotates that vault's secret, and every previously written trust entry
     // becomes undecryptable — safe (an unreadable tier falls closed to the lowest) but lossy, and it
     // surfaced as a decryption error the moment a walk did a ceremony and a grant in one account.
-    // Mirrors the host gate, which already keeps `cc-host-trust:` separate.
+    // Mirrors the host gate, which already keeps `basis.host-trust:` separate.
     // SEALED like the key vaults: who is trusted at which tier is metadata about people, and it is read after the key
     trustRegistry: { vault: await sealedVault(opts.peerTrustVault ?? pickVault(storageName('vaultPeerTrust'))) },
     // RATE LIMIT ON (the R1 go-live line, 2026-08-21) — the flood defence at the receive boundary,
@@ -6169,11 +6169,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     },
     // Mirrors `opts.pinboardPersistDb` below.  Browser passes
     // `{dbName:'cc-tasks-state', storeName:'items'}` (IDB); mobile
-    // gets `{dbName:'cc-tasks-cache', asyncStorage}` (AsyncStorage)
+    // gets `{dbName:'basis.tasks', asyncStorage}` (AsyncStorage)
     // synthesised by basis-mobile/agentBundle.js.  Without it,
     // the tasks cache stays Map-only and every reload re-seeds the
     // 4 demo tasks (the data-loss bug behind the
-    // `cc.firstBootSeeded.v1` workaround in App.js).
+    // `basis.firstBootSeeded.v1` workaround in App.js).
     persistDb: opts.tasksPersistDb,
     contentSeal,                       // its list is content too — sealed on the way to disk
     label: 'TasksCircle(cc)',
@@ -6334,7 +6334,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * in-process.  Boots 110 real pinboard skills; ~6 surface via chat
    * ops today, the rest reachable via agent.callSkill('pinboard', …).
    *
-   * Separate identity vault prefix (`cc-pinboard-id:`) so pinboard's per-
+   * Separate identity vault prefix (`basis.pinboard-id:`) so pinboard's per-
    * circle identity is isolated from chat + tasks (decision #2).
    * IndexedDBPersist via opts.persistDb keeps the local cache alive
    * across page reloads.
@@ -10413,7 +10413,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     get transportMode() { return sa.transportMode; },
     setTransportMode:    sa.setTransportMode,
 
-    // The slash handlers persist the relay URL here (key: cc-relay-url).
+    // The slash handlers persist the relay URL here (key: basis.relay-url).
     // The transport MODE moved to the parameter register (device scope) —
     // boot applies it and the set-param hook applies a live flip.
     vault: sa.identity?.vault ?? sa.vault ?? null,

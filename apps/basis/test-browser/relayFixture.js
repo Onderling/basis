@@ -8,7 +8,7 @@
  *   PEER_TEST_RELAY=ws://127.0.0.1:8787 npx playwright test --project=relay
  * The harness (peerHarness.js) reads the SAME `PEER_TEST_RELAY` (inherited by the
  * worker processes from the CLI env) and seeds it into each relay/both-mode client
- * (localStorage `cc.relayUrl` + the `?relay=` boot param). globalTeardown kills it.
+ * (localStorage `basis.relayUrl` + the `?relay=` boot param). globalTeardown kills it.
  *
  * If the port is ALREADY listening (a relay you started by hand, or a reused one),
  * globalSetup attaches to it instead of spawning — and teardown leaves it alone.

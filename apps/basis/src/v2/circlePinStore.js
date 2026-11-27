@@ -10,7 +10,7 @@
  * Storage is intentionally NOT keyed per-circle — pinning is a per-user
  * preference across the whole circle list, so the IO matches the
  * "keyless" availability store rather than the per-circle policy store.
- * Web wires localStorage at `cc.circlePinned`; mobile wires AsyncStorage
+ * Web wires localStorage at `basis.circlePinned`; mobile wires AsyncStorage
  * at the same key (see circleStoresRN.js + circleApp.js).
  *
  * The factory accepts `{ load, save }` directly (no `io` wrapper) to
@@ -57,7 +57,7 @@ export function createCirclePinStore({ load, save } = {}) {
   };
 }
 
-/** localStorage-backed IO (web).  Single key: `cc.circlePinned`. */
+/** localStorage-backed IO (web).  Single key: `basis.circlePinned`. */
 export function localStoragePinIo(storage = globalThis.localStorage) {
   const KEY = storageName('circlePinned');
   // SEALED at rest (ledger L1083: which circles the person pinned), on web and phone alike. A read before the content

@@ -19,6 +19,7 @@
 import { Bootstrap, derivePassphraseKey } from '@onderling/core';
 import { RootKeyStoreVault, RootKeyStoreWebCrypto } from '@onderling/vault';
 import { KeyUnreadable } from './keyUnreadable.js';
+import { storageName } from '../../v2/storageRegister.js';   // every storage name from the one register
 
 /** The vault key the PRE-CUTOVER cleartext phrase lived under (migration source only). */
 export const LEGACY_OWNER_PHRASE_KEY = 'owner-phrase';
@@ -40,7 +41,7 @@ export function pickRootKeyStore({ fallbackVault } = {}) {
   if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined'
     && typeof crypto !== 'undefined' && crypto.subtle) {
     // the slow derivation for the person's lock (the backup's Argon2id; the door's slot carries its own cost)
-    try { return new RootKeyStoreWebCrypto({ kdf: { name: 'argon2id', derive: derivePassphraseKey } }); } catch { /* fall through */ }
+    try { return new RootKeyStoreWebCrypto({ dbName: storageName('rootKeyDb'), kdf: { name: 'argon2id', derive: derivePassphraseKey } }); } catch { /* fall through */ }
   }
   return new RootKeyStoreVault({ vault: fallbackVault });
 }

@@ -1,6 +1,6 @@
 /**
  * The plain wraps of the ids-and-metadata stores are sealed at rest (ledger L1083 c): which ask posts the person
- * skipped for whom (`cc.askMatchSkips`) and the contacts' peer graph (`cc-peers:*`). One shared io / backend each; the
+ * skipped for whom (`basis.askMatchSkips`) and the contacts' peer graph (`basis.peers:*`). One shared io / backend each; the
  * shell chooses only the storage. What lands in storage is not readable; it opens with the key through the store.
  */
 import { describe, it, expect, afterEach } from 'vitest';
@@ -23,7 +23,7 @@ function phoneStorage() {
 }
 const raw = (s) => [...s._m.values()].join('\n');
 
-describe.each([['web', webStorage, localStorageAskMatchSkipsIo], ['phone', phoneStorage, asyncStorageAskMatchSkipsIo]])('cc.askMatchSkips on the %s', (_n, make, io) => {
+describe.each([['web', webStorage, localStorageAskMatchSkipsIo], ['phone', phoneStorage, asyncStorageAskMatchSkipsIo]])('basis.askMatchSkips on the %s', (_n, make, io) => {
   it('what is stored is not readable, and it opens with the key', async () => {
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY }));
     const s = make();
@@ -34,7 +34,7 @@ describe.each([['web', webStorage, localStorageAskMatchSkipsIo], ['phone', phone
   });
 });
 
-describe.each([['web', webStorage], ['phone', phoneStorage]])('cc-peers:* on the %s', (_n, make) => {
+describe.each([['web', webStorage], ['phone', phoneStorage]])('basis.peers:* on the %s', (_n, make) => {
   it('what is stored is not readable, it opens with the key, and the keys still list', async () => {
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY }));
     const s = make();

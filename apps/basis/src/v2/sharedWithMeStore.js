@@ -58,7 +58,7 @@ export function createSharedWithMeStore({ load, save } = {}) {
   };
 }
 
-/** localStorage-backed IO (web). Single key: `cc.sharedWithMe`. */
+/** localStorage-backed IO (web). Single key: `basis.sharedWithMe`. */
 export function localStorageSharedWithMeIo(storage = globalThis.localStorage) {
   const KEY = storageName('sharedWithMe');
   // SEALED at rest (ledger L1083: what others shared with the person), on web and phone alike

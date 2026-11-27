@@ -155,13 +155,13 @@ describe('#222 basis-mobile portable-core boot', () => {
     const bundle = await bootAgentBundle({ asyncStorage: mockAS });
     expect(bundle.agent).toBeTruthy();
     // The factory's identity-bootstrap path wrote the chat-side
-    // agent's seed to its vault under the 'cc-chat-id:' prefix.
+    // agent's seed to its vault under the 'basis.chat-id:' prefix.
     // We verify by inspecting the mock store directly — if the
     // wiring is broken, the store stays empty.
     const writtenKeys = [...store.keys()];
-    expect(writtenKeys.some((k) => k.startsWith('cc-chat-id:'))).toBe(true);
+    expect(writtenKeys.some((k) => k.startsWith('basis.chat-id:'))).toBe(true);
     // Host side too.
-    expect(writtenKeys.some((k) => k.startsWith('cc-host-id:'))).toBe(true);
+    expect(writtenKeys.some((k) => k.startsWith('basis.host-id:'))).toBe(true);
     await bundle.dispose();
   });
 

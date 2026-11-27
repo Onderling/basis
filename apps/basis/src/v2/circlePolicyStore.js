@@ -172,11 +172,11 @@ export function createCirclePolicyStore({ load, save, versions, marks = null, on
  */
 export function localCirclePolicyStore(storage = globalThis.localStorage) {
   const sealed = sealedKeyValue(storage, { name: 'the circle policy' });
-  return createCirclePolicyStore({ ...localStoragePolicyIo(sealed), versions: localStorageObjectVersions('policy', sealed), marks: localPolicyPendingMarks(storage) });
+  return createCirclePolicyStore({ ...localStoragePolicyIo(sealed), versions: localStorageObjectVersions('policy', sealed, undefined, { versionsPrefix: storageName('objectVersionKeys') }), marks: localPolicyPendingMarks(storage) });
 }
 
 /**
- * The device-local 'policy pending' marks (key `cc.circlePolicyPending.<circleId>`): never the pod. Errors are NOT
+ * The device-local 'policy pending' marks (key `basis.circlePolicyPending.<circleId>`): never the pod. Errors are NOT
  * swallowed here: the store fails closed on them (an unreadable mark is pending; an unwritten one is said and held).
  * @param {{getItem: Function, setItem: Function}} storage  localStorage, AsyncStorage or the box's file store
  */
@@ -194,7 +194,7 @@ export function localPolicyPendingMarks(storage = globalThis.localStorage) {
   return marks;
 }
 
-/** localStorage-backed load/save (web). Key: `cc.circlePolicy.<circleId>`. */
+/** localStorage-backed load/save (web). Key: `basis.circlePolicy.<circleId>`. */
 export function localStoragePolicyIo(storage) {   // no default: a raw localStorage would write the policy plain
   const key = (id) => `${storageName('circlePolicy')}${id}`;
   const kv = storage ? jsonKv(storage, { name: 'the circle policy', kind: 'settings' }) : null;
@@ -231,7 +231,7 @@ export function createMemberOverrideStore({ load, save } = {}) {
   };
 }
 
-/** localStorage-backed load/save for member overrides. Key: `cc.circleOverride.<circleId>`. */
+/** localStorage-backed load/save for member overrides. Key: `basis.circleOverride.<circleId>`. */
 export function localStorageOverrideIo(storage = globalThis.localStorage) {
   // SEALED at rest (ledger L1083: per-member overrides), on web and phone alike
   const kv = sealedKeyValue(storage, { name: 'the member overrides', kind: 'settings', strict: true, said: true, resealAtStart: [storageName('circleOverride')] });

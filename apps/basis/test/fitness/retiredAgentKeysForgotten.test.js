@@ -19,6 +19,6 @@ describe('the retired agents\' keys', () => {
     expect(await vaultFor('cc-household-agent-id:').list()).toEqual([]);
     expect(await vaultFor('cc-folio-id:').list()).toEqual([]);
     // ...and the agents that remain keep theirs
-    expect((await vaultFor('cc-host-id:').list()).length).toBeGreaterThan(0);
+    expect((await vaultFor('basis.host-id:').list()).length).toBeGreaterThan(0);
   });
 });

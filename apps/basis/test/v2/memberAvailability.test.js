@@ -68,12 +68,12 @@ describe('availability store', () => {
     expect(saved).toEqual(after);
   });
 
-  it('localStorageAvailabilityIo round-trips under cc.availability', async () => {
+  it('localStorageAvailabilityIo round-trips under basis.availability', async () => {
     const map = new Map();
     const storage = { getItem: (k) => (map.has(k) ? map.get(k) : null), setItem: (k, v) => map.set(k, v) };
     const io = localStorageAvailabilityIo(storage);
     await io.save({ quietHours: { enabled: true } });
     expect(await io.load()).toEqual({ quietHours: { enabled: true } });
-    expect(map.has('cc.availability')).toBe(true);
+    expect(map.has('basis.availability')).toBe(true);
   });
 });

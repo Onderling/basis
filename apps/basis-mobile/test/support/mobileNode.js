@@ -176,12 +176,12 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     pinboardControlAgent: pods.circleControlAgentRouter,
     provisionCircleMedium: pods.provisionCircleMedium,
     deviceLog: eventLog,
-    deviceLogIo: backendSnapshotIo(sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-device-log' }))),
+    deviceLogIo: backendSnapshotIo(sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'basis.device-log' }))),
     enrolDeviceName: () => name,
     provisionSettingsMedium: async (strategy) => createSettingsPodMedium({
       fetch: pods.getCirclePodFetch(), podRoot: pods.getActiveRealPodRouting()?.podRoot ?? null, strategy,
     }),
-    registryBackend: createAsBackend({ AsyncStorage, scope: 'cc-agent-registry' }),
+    registryBackend: createAsBackend({ AsyncStorage, scope: 'basis.agent-registry' }),
     provisionRegistryMedium: async (strategy) => createRegistryPodMedium({
       fetch: pods.getCirclePodFetch(), podRoot: pods.getActiveRealPodRouting()?.podRoot ?? null, strategy,
     }),

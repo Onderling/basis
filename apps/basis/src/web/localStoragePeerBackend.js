@@ -18,7 +18,7 @@ import { storageName } from '../v2/storageRegister.js';   // every storage name 
 
 /**
  * @param {object}  [opts]
- * @param {string}  [opts.prefix='cc-peers:']  — localStorage key namespace
+ * @param {string}  [opts.prefix='basis.peers:']  — localStorage key namespace
  * @param {Storage} [opts.storage]             — override (defaults to globalThis.localStorage)
  * @returns {{ get(k:string):Promise<string|null>, set(k:string,v:string):Promise<void>,
  *             delete(k:string):Promise<void>, list():Promise<string[]> }}

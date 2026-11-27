@@ -145,7 +145,7 @@ describe('the export key from the admin\'s screen', () => {
   });
 
   it('the screen keeps no passphrase: its storage holds the grant only', async () => {
-    const storage = new Map([['onderling.screen.BOT', JSON.stringify({ botAddress: 'BOT', relayUrl: 'wss://r', tokens: [{ skill: 'assistant.assistant-export-key-set' }] })]]);
+    const storage = new Map([['basis.screen.BOT', JSON.stringify({ botAddress: 'BOT', relayUrl: 'wss://r', tokens: [{ skill: 'assistant.assistant-export-key-set' }] })]]);
     const view = createScreenView({
       link: `https://basis.example/app${screenAddressFor('BOT')}`,
       storage: { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) },

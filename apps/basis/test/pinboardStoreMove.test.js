@@ -86,9 +86,8 @@ describe('an enrol\'s forget names the old-name twins too', () => {
     const { forgetThrowawaySelf } = await import('../src/v2/enrolForgets.js');
     const dropped = [];
     await forgetThrowawaySelf({ listCircleIds: async () => [], dropStore: async (n) => { dropped.push(n); }, dropKey: async () => {} });
-    expect(dropped).toContain('cc-pinboard-state');
-    expect(dropped).toContain(`cc-${OLD}-state`);
-    expect(dropped).toContain(`cc-${OLD}-cache`);
+    expect(dropped).toContain('basis.pinboard');
+    expect(dropped).toContain(`basis.${OLD}`);   // the twin, under the new prefix: the move is name-based
   });
 });
 

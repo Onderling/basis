@@ -38,7 +38,7 @@ describe.each(shells)('the page blocks cache on the %s', (_name, make) => {
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY }));
     const { s, cache } = make();
     await cache.set('home', BLOCKS);
-    const raw = s._backing.get('cc.screenBlocksCache.home');
+    const raw = s._backing.get('basis.screenBlocksCache.home');
     expect(raw).toBeTruthy();
     expect(raw).not.toContain('Tandarts');
     expect(() => JSON.parse(raw)).toThrow();
@@ -48,7 +48,7 @@ describe.each(shells)('the page blocks cache on the %s', (_name, make) => {
   it('before the content key is published: a write is refused (nothing stored), a read is "no cache"; after it, both work', async () => {
     const { s, cache } = make();
     await cache.set('home', BLOCKS);
-    expect(s._backing.has('cc.screenBlocksCache.home')).toBe(false);
+    expect(s._backing.has('basis.screenBlocksCache.home')).toBe(false);
     // a value sealed earlier, read before this start's key exists: no cache — never sealed text handed on, never a throw
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY }));
     await cache.set('home', BLOCKS);
@@ -60,11 +60,11 @@ describe.each(shells)('the page blocks cache on the %s', (_name, make) => {
 
   it('an old plain value is read once and sealed at the next write', async () => {
     const { s, cache } = make();
-    s._backing.set('cc.screenBlocksCache.home', JSON.stringify(BLOCKS));
+    s._backing.set('basis.screenBlocksCache.home', JSON.stringify(BLOCKS));
     setShellContentSeal(groupKeyStrategy({ groupKey: KEY }));
     expect(await cache.get('home')).toEqual(BLOCKS);
     await cache.set('home', BLOCKS);
-    expect(s._backing.get('cc.screenBlocksCache.home')).not.toContain('Tandarts');
+    expect(s._backing.get('basis.screenBlocksCache.home')).not.toContain('Tandarts');
   });
 });
 
@@ -75,9 +75,9 @@ describe('forgetting after an enrol still removes the sealed blocks', () => {
     const cache = createScreenBlocksCacheLocal(s);
     await cache.set('home', BLOCKS);
     await cache.set('agenda', BLOCKS);
-    expect([...s._backing.keys()].filter((k) => k.startsWith('cc.screenBlocksCache.'))).toHaveLength(2);
+    expect([...s._backing.keys()].filter((k) => k.startsWith('basis.screenBlocksCache.'))).toHaveLength(2);
     const r = await forgetThrowawaySelf({ listCircleIds: () => [], listKeys: () => [...s._backing.keys()], dropStore: () => {}, dropKey: (k) => s.removeItem(k) });
     expect(r.ok).toBe(true);
-    expect([...s._backing.keys()].filter((k) => k.startsWith('cc.screenBlocksCache.'))).toEqual([]);
+    expect([...s._backing.keys()].filter((k) => k.startsWith('basis.screenBlocksCache.'))).toEqual([]);
   });
 });

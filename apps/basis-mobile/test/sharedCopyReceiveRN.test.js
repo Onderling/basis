@@ -65,7 +65,7 @@ describe('mobile shared-copy receiver — handler persists into the RN store; th
     const list = await store.list();
     expect(list.map((e) => e.id)).toEqual(['copy-9']);
     expect(renderedRows?.map((e) => e.id)).toEqual(['copy-9']);
-    expect(storage.map.has('cc.sharedWithMe')).toBe(true);
+    expect(storage.map.has('basis.sharedWithMe')).toBe(true);
 
     // VIEW: the launcher projects with the SHARED selector, then opens with this device's OWN opener.
     const rows = buildSharedWithMe(list);

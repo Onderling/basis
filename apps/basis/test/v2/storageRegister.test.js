@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { STORAGE, storageName, storageNames } from '../../src/v2/storageRegister.js';
 import { THROWAWAY_CONTENT } from '../../src/v2/enrolForgets.js';
-import { isBasisStorageKey, isBasisDatabase, BASIS_DB_NAMES } from '../../src/v2/basisStorageNames.js';
+import { isBasisStorageKey, isBasisDatabase, BASIS_DB_NAMES, BASIS_PREFIX } from '../../src/v2/basisStorageNames.js';
 
 const sorted = (a) => [...a].sort();
 
@@ -16,7 +16,7 @@ describe('the storage register', () => {
   });
 
   it('refuses an id it does not hold', () => {
-    expect(storageName('deviceLog')).toBe('cc-device-log');
+    expect(storageName('deviceLog')).toBe('basis.device-log');
     expect(() => storageName('noSuchStore')).toThrow(/not in the storage register/);
   });
 
@@ -36,6 +36,17 @@ describe('the storage register', () => {
       .map((r) => r.name);
     expect(missed).toEqual([]);
     expect(isBasisStorageKey('onderling-screen:x')).toBe(false);
+  });
+
+  it('holds every name under the one prefix, on every shell, but the two declared kinds outside it', () => {
+    // the vault's own keys (`vault:…`, the vault adds its prefix) and a toolbox screen page's grant (the page's)
+    const outside = Object.values(STORAGE)
+      .filter((r) => !r.name.startsWith(BASIS_PREFIX))
+      .filter((r) => !(r.kind === 'vault' && r.name.startsWith('vault:')))
+      .filter((r) => r.name !== storageName('screenGrant'))
+      .map((r) => r.name);
+    expect(outside).toEqual([]);
+    expect(BASIS_PREFIX).toBe('basis.');
   });
 
   it('knows every database the start-over deletes by name', () => {

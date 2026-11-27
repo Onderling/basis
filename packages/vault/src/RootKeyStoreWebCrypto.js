@@ -24,7 +24,8 @@
  */
 import { RootKeyStore, assertSeed, KeyLocked, ROOT_SEED_LEN } from './RootKeyStore.js';
 
-const DB_NAME     = 'onderling-root-key';
+/** The package's own default database name; an app passes its own (`{ dbName }`). */
+export const DEFAULT_ROOT_KEY_DB = 'onderling-root-key';
 const STORE       = 'keys';
 const K_WRAP      = 'wrap-key';
 const K_SEED      = 'sealed-seed';
@@ -78,8 +79,9 @@ export class RootKeyStoreWebCrypto extends RootKeyStore {
    *   the slow derivation for a passphrase slot (the app passes core's `derivePassphraseKey`, name 'argon2id'); its
    *   parameters default to PASSPHRASE_SLOT_PARAMS (a test passes cheap ones). A lock cannot be set or opened without it
    */
-  constructor({ dbName = DB_NAME, kdf = null } = {}) {
+  constructor({ dbName = DEFAULT_ROOT_KEY_DB, kdf = null } = {}) {
     super();
+    this.#dbName = dbName;
     if (typeof indexedDB === 'undefined' || typeof crypto === 'undefined' || !crypto.subtle) {
       throw new Error('RootKeyStoreWebCrypto requires IndexedDB + WebCrypto (browser only)');
     }

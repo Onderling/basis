@@ -35,21 +35,12 @@ const REGISTER = 'apps/basis/src/v2/storageRegister.js';
 
 /** Rows opened somewhere rule 2 cannot see by id: the place, and why. */
 export const OPENED_ELSEWHERE = Object.freeze({
-  rootKeyDb: 'by its package: @onderling/vault RootKeyStoreWebCrypto opens it under its own default name',
-  pseudoPodDb: 'by its package: @onderling/pseudo-pod IndexedDbBackend opens it under its own default name',
-  podClientDb: 'by its package: @onderling/pod-client IndexedDBTombstones opens it under its own default name',
-  sealingIdentity: 'by its package: @onderling/pod-client sealing/memberIdentity keeps it under its own default name',
-  wakeNudges: 'by its package: @onderling/react-native/push createWakeNudges (agentBundle.js) keeps it',
-  basisDb: 'by nothing today (an earlier build\'s database); listed so the start-over removes it',
   helpCircleStore: "by the per-circle name (circleStorageName) for the help circle, whose id is the literal 'cc-help'",
   helpCircleCache: "by the per-circle cache name (circleStorageName) for the help circle, whose id is the literal 'cc-help'",
   vaultOwnerRootKey: "a key inside the device vault ('owner-root', ownerRootRestore.js / personaRuntime.js); the vault adds the prefix",
   vaultContentKey: "a key inside the device vault ('content-at-rest-key', contentAtRest.js); the vault adds the prefix",
   vaultDelegationSeed: "a key inside the device vault ('device-delegation-seed', personaVault.js); the vault adds the prefix",
   vaultCustodyMode: "a key inside the device vault ('custody-mode', ownerRootCustody.js); the vault adds the prefix",
-  tasksWeb: 'left by an earlier build (the web no longer persists tasks under it); kept so a start-over still removes it',
-  nearbyMineSeenWeb: 'left by an earlier build (nothing reads it now); kept so an enrol and a start-over still remove it',
-  nearbyMineSeenPhone: 'left by an earlier build (nothing reads it now); kept so an enrol still removes it',
 });
 
 /** Hand-written names rule 1 sees that are not a device-level storage name. */
@@ -198,7 +189,7 @@ export async function check(root = ROOT) {
       problems.push(`${rel}:${line} names '${name}' by hand — take it from the register: storageName('<id>') (${REGISTER})`);
     }
   }
-  // 1b: a key BUILT by hand from a prefix row's name (`cc.circlePolicy.${id}` in a key helper), wherever it is written
+  // 1b: a key BUILT by hand from a prefix row's name (`basis.circlePolicy.${id}` in a key helper), wherever it is written
   const prefixes = Object.entries(STORAGE).filter(([, r]) => r.kind === 'prefix').map(([id, r]) => [id, r.name]);
   for (const rel of shellFiles(root)) {
     if (rel === REGISTER) continue;

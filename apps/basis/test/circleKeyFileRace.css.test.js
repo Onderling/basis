@@ -70,7 +70,7 @@ SUITE('the circle key file under two writers on a real pod (CSS)', () => {
     });
     const a = await start(vaultA);
     const vaultB = new VaultMemory();
-    for (const k of [`cc.circle-controller-key:${circleId}`, `cc.circle-groupkey:${circleId}`]) { const v = await vaultA.get(k); if (v != null) await vaultB.set(k, v); }
+    for (const k of [`basis.circle-controller-key:${circleId}`, `basis.circle-groupkey:${circleId}`]) { const v = await vaultA.get(k); if (v != null) await vaultB.set(k, v); }
     const member = generateKeypair();
     await a.controlAgent.addMember({ webId: 'ref:member', publicKey: member.publicKey });
     const b = await start(vaultB);

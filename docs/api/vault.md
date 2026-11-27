@@ -201,7 +201,7 @@ A lock was asked for with no secret at all: a short code is allowed, nothing is 
 
 ```js
 class RootKeyStoreWebCrypto extends RootKeyStore
-new RootKeyStoreWebCrypto({ dbName = DB_NAME, kdf = null } = {})
+new RootKeyStoreWebCrypto({ dbName = DEFAULT_ROOT_KEY_DB, kdf = null } = {})
 ```
 
 The browser's root-key store (see the file header).

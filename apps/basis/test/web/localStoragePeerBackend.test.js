@@ -36,7 +36,7 @@ describe('createLocalStoragePeerBackend', () => {
     await backend.set('peer:abc', JSON.stringify({ pubKey: 'abc' }));
     expect(await backend.get('peer:abc')).toBe(JSON.stringify({ pubKey: 'abc' }));
     // physically namespaced under the prefix in the underlying store
-    expect(storage._map.has('cc-peers:peer:abc')).toBe(true);
+    expect(storage._map.has('basis.peers:peer:abc')).toBe(true);
 
     await backend.delete('peer:abc');
     expect(await backend.get('peer:abc')).toBeNull();

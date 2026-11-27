@@ -35,7 +35,7 @@ describe('the bot nudges its screens', () => {
 describe('the screen hears its bot\'s nudge', () => {
   it('from its bot: the listener is told; from another key: not', async () => {
     let onPeer = null;
-    const storage = new Map([['onderling.screen.BOT', JSON.stringify({ botAddress: 'BOT', relayUrl: 'wss://r', tokens: [] })]]);
+    const storage = new Map([['basis.screen.BOT', JSON.stringify({ botAddress: 'BOT', relayUrl: 'wss://r', tokens: [] })]]);
     const view = createScreenView({
       link: `https://basis.example/app${screenAddressFor('BOT')}`,
       storage: { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) },

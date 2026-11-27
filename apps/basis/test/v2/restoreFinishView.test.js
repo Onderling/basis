@@ -14,7 +14,12 @@ const inst = ({ source, retire, intent, retired } = {}) => ({
 });
 
 describe('restoreFinishOutcome', () => {
-  it('"later" says so', () => { expect(restoreFinishOutcome(inst({ source: 'later' })).messageKey).toBe('circle.restore_finish.later_title'); });
+  // "Not now" closes the flow at once: no last screen to tap away (the phone walk: the card stayed). Loading a file
+  // later is My data's own action ("Load a recovery file"), so nothing needs saying here.
+  it('"later" closes at once, with no last screen', () => {
+    expect(restoreFinishOutcome(inst({ source: 'later' }))).toMatchObject({ closeAtOnce: true, messageKey: null });
+    expect(restoreFinishOutcome(inst({ intent: 'adding' })).closeAtOnce).toBe(false);
+  });
   it('a file that is not yours / unreadable', () => {
     expect(restoreFinishOutcome(inst({ source: 'not-your-file' })).messageKey).toBe('circle.restore_finish.err_not_yours');
     expect(restoreFinishOutcome(inst({ source: 'unreadable-file' })).messageKey).toBe('circle.restore_finish.err_unreadable');

@@ -78,7 +78,7 @@ describe('not known yet, through the projections', () => {
 });
 
 describe('sealed at rest', () => {
-  it('cc.circleSeenAt: not readable as stored; read back with the key', async () => {
+  it('basis.circleSeenAt: not readable as stored; read back with the key', async () => {
     seal();
     const s = storage();
     const marks = createCircleSeenMarks(circleSeenMarksIo(s));
@@ -88,23 +88,23 @@ describe('sealed at rest', () => {
     expect(await createCircleSeenMarks(circleSeenMarksIo(s)).load()).toEqual({ 'circle-of-henk': 1 });
   });
 
-  it('cc.contactSeenAt: not readable as stored; before the key a read is null (not "nothing seen") and a mark waits', async () => {
+  it('basis.contactSeenAt: not readable as stored; before the key a read is null (not "nothing seen") and a mark waits', async () => {
     seal();
     const s = storage();
     await sealedContactSeenStore(s).mark('contact-henk', 5);
-    const before = s._m.get('cc.contactSeenAt');
+    const before = s._m.get('basis.contactSeenAt');
     expect(before).not.toContain('contact-henk');
     setShellContentSeal(null);
     expect(await sealedContactSeenStore(s).read()).toBeNull();
     const m = sealedContactSeenStore(s).mark('contact-piet', 6);
     await new Promise((res) => { setTimeout(res, 20); });
-    expect(s._m.get('cc.contactSeenAt')).toBe(before);   // nothing written before the key
+    expect(s._m.get('basis.contactSeenAt')).toBe(before);   // nothing written before the key
     seal();
     await m;
     expect(await sealedContactSeenStore(s).read()).toEqual({ 'contact-henk': 5, 'contact-piet': 6 });
   });
 
-  it('cc.circlePinned: not readable as stored; a read before the key waits', async () => {
+  it('basis.circlePinned: not readable as stored; a read before the key waits', async () => {
     seal();
     const s = storage();
     await createCirclePinStore(localStoragePinIo(s)).toggle?.('circle-of-henk') ?? createCirclePinStore(localStoragePinIo(s)).set?.('circle-of-henk', true);

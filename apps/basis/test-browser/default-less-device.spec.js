@@ -26,7 +26,7 @@ test('enrolled with Werk only, a device runs Werk alone and speaks as it', async
     // an ADD from an offer (not a restore): the offer is stashed on B first, as the shells do when it is scanned
     const offer = await call(A, 'household', 'buildEnrollOffer', {});
     expect(offer?.ok, JSON.stringify(offer)).toBe(true);
-    const en = await B.evaluate(async ([uri, args]) => { localStorage.setItem('onderling.enrollOffer', uri); return window.onderlingCall('household', 'enrollDevice', args); },
+    const en = await B.evaluate(async ([uri, args]) => { localStorage.setItem('basis.enrollOffer', uri); return window.onderlingCall('household', 'enrollDevice', args); },
       [offer.uri, { mnemonic: phrase, label: 'werklaptop', personas: [made.id], withDefault: false }]);
     expect(en?.ok, JSON.stringify(en)).toBe(true);
     await B.reload({ waitUntil: 'domcontentloaded' });

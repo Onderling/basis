@@ -1,6 +1,6 @@
 # Architecture
 
-> **Last updated: 2026-11-26** — checked against the code on `development` that day. Every change to this file
+> **Last updated: 2026-11-27** — checked against the code on `development` that day. Every change to this file
 > moves this date (`scripts/lint-architecture-date.mjs` is red otherwise), so the date says how fresh the whole
 > file is, not one paragraph.
 
@@ -1001,7 +1001,7 @@ composition (`createScreenView` over a browser agent) without the paint, so no s
 at import. Given the toolbox's name and the bot's screen start link once, it pairs by the paste route (`startPairing`
 gives the line the person pastes into their own chat with the bot and the code the page shows; `waitForGrant` answers
 granted, refused or expired) and later resumes from what the browser kept. It keeps everything under a prefix per
-toolbox (`onderling.screen.<toolbox>.`, `onderling-screen:<toolbox>:`), and sign-out removes exactly those keys. A
+toolbox (`basis.screen.<toolbox>.`, `onderling-screen:<toolbox>:`), and sign-out removes exactly those keys. A
 call never throws: it answers the op's answer or `{ok: false, code}`, the code from one table (`screenClientCode`,
 `SCREEN_CLIENT_CODES`). A grant that ran out and a grant that was taken away (`/schermen los`, a pairing elsewhere)
 are ONE code, `grant-expired`, because the page does the same for both: pair again; the screen is then not paired.

@@ -3,7 +3,7 @@
 //
 // Mirrors `packages/kring-host/test/objectVersionsStorage.test.js`:
 // proves the AsyncStorage adapter produces the same LOGICAL key shape
-// (`cc.versions2.<storeName>/<circleId>/<ts>`, physically under the
+// (`basis.versions.<storeName>/<circleId>/<ts>`, physically under the
 // `ccv:` AsyncStorage scope) and the same legacy `{ts, sha256, value}`
 // list shape, so a future pod-sync sees one shape on both surfaces.
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -34,12 +34,12 @@ describe('γ.2 — objectVersionsStorageRN (@onderling/versioning substrate)', (
   let storage;
   beforeEach(() => { storage = mockAsyncStorage(); });
 
-  it('round-trips one record per version under ccv:cc.versions2.<storeName>/<circleId>/', async () => {
+  it('round-trips one record per version under ccv:basis.versions.<storeName>/<circleId>/', async () => {
     const adapter = asyncStorageObjectVersions('policy', storage);
     await adapter.capture('c1', { features: { tasks: true } });
     const keys = [...storage.map.keys()];
     expect(keys).toHaveLength(1);
-    expect(keys[0].startsWith(scoped('cc.versions2.policy/c1/'))).toBe(true);
+    expect(keys[0].startsWith(scoped('basis.versions.policy/c1/'))).toBe(true);
     const list = await adapter.list('c1');
     expect(list).toHaveLength(1);
     expect(list[0].value).toEqual({ features: { tasks: true } });
@@ -47,12 +47,12 @@ describe('γ.2 — objectVersionsStorageRN (@onderling/versioning substrate)', (
     expect(list[0].sha256).toMatch(/^[0-9a-f]+$/);
   });
 
-  it('mobile + web logical key shape is identical (cc.versions2.<storeName>/<id>/<ts>)', async () => {
+  it('mobile + web logical key shape is identical (basis.versions.<storeName>/<id>/<ts>)', async () => {
     const adapter = asyncStorageObjectVersions('recipe', storage);
     await adapter.capture('circle-42', { recipes: [], activeId: null });
     const keys = [...storage.map.keys()];
     expect(keys).toHaveLength(1);
-    expect(keys[0]).toMatch(/^ccv:cc\.versions2\.recipe\/circle-42\/\d+$/);
+    expect(keys[0]).toMatch(/^basis\.object-versions:basis\.versions\.recipe\/circle-42\/\d+$/);
   });
 
   it('list spans capture sessions (a fresh adapter sees prior history)', async () => {
@@ -91,7 +91,7 @@ describe('γ.2 — objectVersionsStorageRN (@onderling/versioning substrate)', (
   });
 
   it('a corrupt stored record reads as an empty history slot (no throw)', async () => {
-    storage.map.set(scoped('cc.versions2.policy/bad/5'), '{not json');
+    storage.map.set(scoped('basis.versions.policy/bad/5'), '{not json');
     const adapter = asyncStorageObjectVersions('policy', storage);
     expect(await adapter.list('bad')).toEqual([]);
   });

@@ -111,7 +111,6 @@ export const WIRE = Object.freeze({
   'circle-governance-broadcast': row('circle', BROADCAST, { inMap: true }),
   'circle-address-announce': row('circle', { type: 'string?', circleId: 'string?', groupId: 'string?', announcements: 'list?', msgId: 'string?', noWake: 'boolean?', ts: 'number?' }, { inMap: true }),
   'circle-recipe-broadcast': row('circle', { circleId: 'string', msgId: 'string', ts: 'number', recipe: 'object' }, { inMap: true }),   // read from its receiver
-  'circle-rules-broadcast':  row('circle', { circleId: 'string', msgId: 'string', ts: 'number', rulesDoc: 'object' }, { inMap: true }), // read from its receiver
   'circle-chat-catchup-request': row('circle', CATCHUP_REQUEST, { inMap: true, mapKey: 'catchup:request' }),
   'circle-chat-catchup-batch':   row('circle', CATCHUP_BATCH, { inMap: true, mapKey: 'catchup:batch' }),
   'circle-chat-catchup-offer':   row('circle', CATCHUP_OFFER, { inMap: true, mapKey: 'catchup:offer' }),

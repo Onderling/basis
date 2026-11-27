@@ -429,6 +429,10 @@ export const SEAMS = Object.freeze([
   // …and SECRETBOX (core `useSecretbox`, L619): libsodium over JSI on the phone, taken only on tweetnacl's exact bytes.
   // The phone only: node:crypto and WebCrypto offer no XSalsa20-Poly1305, so the box and the web keep tweetnacl.
   { id: 'secretbox', pattern: /install\w*Secretbox\(/, shells: ['mobile'], why: 'a phone that opens its sealed stores in pure JS spends about a second of its start on it' },
+  // THE KEY DOOR IS ASKED BEFORE THE AGENT (the browser lock): a locked door is opened with the person's secret first,
+  // by the shared step, and that same door is handed to the agent. The web only: the phone's key sits in the OS
+  // keystore behind the phone's own screen lock, and the box starts unattended, so neither has a lock to ask.
+  { id: 'key-door-asked-at-start', pattern: /openKeyDoorAtBoot\(/, shells: ['web'], why: 'a web start that builds the agent without asking a locked door reads no identity, and must never make a new one over the locked person' },
   // NEARBY'S CONVERSATION STREAM AND TAB COUNTS: what the Conversation tab holds in what order (chat lines, question and
   // circle cards by arrival) and how much is new on each tab are decided by shared functions; a painter that sorts or
   // counts by itself drifts from the other shell. Both are painted by Nearby's painter, so the web set includes it.

@@ -30,7 +30,7 @@ export const VERSIONS_AS_SCOPE = storageName('objectVersionsPhone');
 /**
  * Compose the shared adapter factory with an AsyncStorage StorageBackend.
  *
- * @param {string} storeName        e.g. 'policy' / 'recipe' / 'rules'
+ * @param {string} storeName        e.g. 'policy' / 'recipe'
  * @param {object} storage          AsyncStorage instance (or a test double
  *                                  with getItem/setItem/removeItem/getAllKeys)
  * @param {object} [retention]      `{perKey?:number}` — defaults to substrate (50)

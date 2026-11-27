@@ -18,13 +18,8 @@
  * `circle-recipe-conflict__*` class root so future styling can hang
  * off the css.
  *
- * γ.4 — the modal is reused for the rules doc and the circle policy:
- * those shapes have no `blocks` array, so detection produces an
- * empty `blockConflicts` and only `metaConflicts`.  The `title` opt
- * lets the host pick a namespace-appropriate heading
- * (`circle.rules.conflict.title`)
- * while every other locale key stays under `circle.recipe.conflict.*`
- * — the picker copy is identical across the three flows.
+ * The `title` opt lets a host pick another heading key for a doc without a `blocks` array (only `metaConflicts`);
+ * every other locale key stays under `circle.recipe.conflict.*`. Today only the recipe editor uses the modal.
  */
 import { BLOCK_DESCRIPTORS } from '../../src/v2/circleRecipe.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';

@@ -1115,6 +1115,30 @@ the substrate for `CloudBackup.test.js`.
 
 ## `src/identity/CloudBackup.js`
 
+### `PROD_ARGON_OPTS`
+
+**Kind:** constant · **Import:** `PROD_ARGON_OPTS` from `'@onderling/core'`
+
+The backup's Argon2id cost (m in KiB = 64 MiB, t 3, p 1), for `derivePassphraseKey`. The browser's key door uses
+a lower cost of its own (`@onderling/vault` PASSPHRASE_SLOT_PARAMS), since it runs at every open of the app.
+
+### `derivePassphraseKey`
+
+**Kind:** function · **Import:** `derivePassphraseKey` from `'@onderling/core'`
+
+```js
+derivePassphraseKey(passphrase, salt, opts)
+```
+
+The repo's one passphrase derivation, public: a 32-byte key from a passphrase by Argon2id (the backup's own
+function). The browser's key door gets it as an option, since `@onderling/vault` sits below core and cannot import it.
+
+**Parameters**
+
+- `passphrase` `string` — @param {Uint8Array} salt @param {{ m: number, t: number, p: number }} opts
+
+**Returns:** `Uint8Array`
+
 ### `CloudBackup`
 
 **Kind:** class · **Import:** `CloudBackup` from `'@onderling/core'`

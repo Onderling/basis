@@ -80,7 +80,26 @@ is that it exists only on paper/in memory; the seed is the machine artifact and 
 the machine's key place. `Bootstrap.toMnemonic()` re-renders the phrase from the seed
 when the user asks to see it — one secret, two encodings, each kept where it belongs.
 
-**Methods:** `getSeed()` · `setSeed()` · `deleteSeed()`
+**Methods:** `getSeed()` · `setSeed()` · `deleteSeed()` · `status()`
+
+### `KEY_LOCKED`
+
+**Kind:** constant · **Import:** `KEY_LOCKED` from `'@onderling/vault'`
+
+The code a `KeyLocked` carries, for a caller that tells it apart by code (also through a wrapping error's `cause`).
+
+### `KeyLocked`
+
+**Kind:** class · **Import:** `KeyLocked` from `'@onderling/vault'`
+
+```js
+class KeyLocked extends Error
+new KeyLocked()
+```
+
+The door holds a seed, but it is locked: the person's secret has not opened it in this page. Never answered as
+null, which means "no identity here" and would let a start make a new person over the locked one. `code` is what a
+caller reads (`KEY_LOCKED`), as for a key that could not be read.
 
 ### `assertSeed`
 
@@ -150,18 +169,44 @@ artifact the product promises exists only in their hands.
 
 ## `src/RootKeyStoreWebCrypto.js`
 
+### `PASSPHRASE_SLOT_PARAMS`
+
+**Kind:** constant · **Import:** `PASSPHRASE_SLOT_PARAMS` from `'@onderling/vault'`
+
+The passphrase slot's Argon2id cost (m in KiB), written INTO each slot so it can be raised later. It runs at every
+open of the app, so it is lower than the backup's 64 MiB / t 3. Measured 2026-11-26 in headless Chromium on the
+builder's laptop, one derivation: 64 MiB t 3 = 2.08 s, 64 MiB t 2 = 1.39 s, 46 MiB t 2 = 0.99 s, 32 MiB t 3 = 1.02 s.
+Chosen: 46 MiB, t 2 (about a second, with room for a slower laptop). Never the vault's PBKDF2.
+
+### `SECRET_EMPTY`
+
+**Kind:** constant · **Import:** `SECRET_EMPTY` from `'@onderling/vault'`
+
+The code a `SecretEmpty` carries.
+
+### `SecretEmpty`
+
+**Kind:** class · **Import:** `SecretEmpty` from `'@onderling/vault'`
+
+```js
+class SecretEmpty extends Error
+new SecretEmpty()
+```
+
+A lock was asked for with no secret at all: a short code is allowed, nothing is not a code.
+
 ### `RootKeyStoreWebCrypto`
 
 **Kind:** class · **Import:** `RootKeyStoreWebCrypto` from `'@onderling/vault'`
 
 ```js
 class RootKeyStoreWebCrypto extends RootKeyStore
-new RootKeyStoreWebCrypto()
+new RootKeyStoreWebCrypto({ dbName = DB_NAME, kdf = null } = {})
 ```
 
-The browser's root-key store: the seed in IndexedDB, AES-GCM-sealed under a non-extractable WebCrypto key (see the file header).
+The browser's root-key store (see the file header).
 
-**Methods:** `getSeed()` · `setSeed()` · `deleteSeed()`
+**Methods:** `status()` · `getSeed()` · `setSeed()` · `deleteSeed()` · `unlock()` · `lock()` · `setLock()` · `clearLock()`
 
 ## `src/Vault.js`
 

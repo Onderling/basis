@@ -12,13 +12,14 @@
 import { execSync, spawn, spawnSync } from 'node:child_process';
 import { untrackedSource } from './untracked-source.mjs';
 import { runPool, selfTestsNeeded, byteCompare, ALWAYS_STEPS } from './guard-run.mjs';
-import { readdirSync } from 'node:fs';
+import { readdirSync, existsSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.dirname(HERE);
+const VITEST = path.join(ROOT, 'apps/basis/node_modules/.bin/vitest');
 
 const lints = readdirSync(HERE).filter((f) => /^lint-.*\.mjs$/.test(f) && !f.endsWith('.test.mjs')).sort(byteCompare);
 
@@ -50,7 +51,12 @@ const plan = selfTestsNeeded({ ci: !!process.env.CI, all: process.argv.includes(
 if (plan.run) {
   // One file at a time: several self-tests write fixture files INTO the tree (a guard scans the real tree), and others
   // run a guard on the tree at the same moment — in parallel that went red now and then, green alone. ~25 s slower.
-  const vt = spawnSync('npx', ['vitest', 'run', 'scripts/', '--reporter=dot', '--no-file-parallelism'], { cwd: ROOT, encoding: 'utf8' });
+  // The INSTALLED vitest (apps/basis's, pinned by its lockfile), never `npx vitest` from the root: the root has no
+  // vitest of its own, so npx fetched whatever the registry served that minute, on every run. On 2026-11-26 that
+  // turned the trunk red (a 404 on a dependency published moments before), and it ran unpinned code in the gate.
+  const vt = existsSync(VITEST)
+    ? spawnSync(VITEST, ['run', 'scripts/', '--root', ROOT, '--reporter=dot', '--no-file-parallelism'], { cwd: ROOT, encoding: 'utf8' })
+    : { status: 1, stdout: '', stderr: `no vitest at ${path.relative(ROOT, VITEST)}: install the workspace first (pnpm install --frozen-lockfile, then node scripts/relink-workspace.mjs)` };
   // On red, say WHICH test failed (the FAIL lines), not only the tail — a flake that names no test cannot be chased.
   const vtOut = (vt.stdout + vt.stderr).split('\n');
   const failed = vtOut.filter((l) => /\bFAIL\b|AssertionError|Error:/.test(l)).slice(0, 12);

@@ -3351,47 +3351,10 @@ export function buildSkills({
     }),
 
     /**
-     * broadcastCircleRules({groupId, rulesDoc, msgId, ts?})
-     *   — γ-next.rules — circle rules document fan-out to every member
-     *   of a circle.  Sibling of `broadcastCircleRecipe`: same fan-out
-     *   plumbing (chat.send, WebID→pubKey resolution, signing,
-     *   transport routing), different subtype + payload.
-     *
-     *   Receivers route the envelope to basis's
-     *   `makeCircleRulesPeerHandler`, which stashes the rules doc in a
-     *   per-circle "pending" cache.  The rules editor reads the cache
-     *   on next open and passes it via γ.4's `incomingRules` opt; the
-     *   resolver pops if the incoming diverges from local.
-     *
-     *   Best-effort + fire-and-forget: per-peer failures land in the
-     *   returned `errors[]` array but never throw.
-     */
-    defineSkill('broadcastCircleRules', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      const _groupId = a.groupId ?? groupId;
-      if (!_groupId)                                                  return { error: 'groupId-required' };
-      if (!a.rulesDoc || typeof a.rulesDoc !== 'object')              return { error: 'rulesDoc-required' };
-      if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
-
-      const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
-
-      // Fan the rules doc out via the ONE shared circle-broadcast core (chat.send
-      // subtype `circle-rules-broadcast`); receivers cache it as pending.
-      return broadcastToCircle({
-        circleId: _groupId, kind: 'circle-rules-broadcast', from,
-        extras: { circleId: _groupId, msgId: a.msgId, ts, rulesDoc: a.rulesDoc, fromActor: a.fromActor ?? from ?? null },
-        metric: 'circle-rules-fanout',
-      });
-    }, {
-      description: 'Fan a circle rules document out to every other member via chat.send subtype:circle-rules-broadcast; receivers cache as pending incomingRules for the γ.4 conflict resolver.',
-      visibility:  'authenticated',
-    }),
-
-    /**
      * broadcastCircleGovernance({groupId, event, msgId, ts?})
      *   — Wave C: fan a governance event (a propose / vote / resolve) out to every member
      *   so the one circle log replicates. Receivers ingest it into their local EventLog
-     *   (deduped by the event's stable id). Sibling of broadcastCircleRules; same plumbing.
+     *   (deduped by the event's stable id). Sibling of broadcastCircleRecipe; same plumbing.
      */
     defineSkill('broadcastCircleGovernance', async ({ parts, from }) => {
       const a = dataArgs(parts);

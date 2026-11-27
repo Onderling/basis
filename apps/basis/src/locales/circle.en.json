@@ -4717,12 +4717,6 @@
         "doc": "Rules summary label (/group-rules): the circle's tags."
       }
     },
-    "conflict": {
-      "title": {
-        "text": "Two of you edited the rules",
-        "doc": "γ.4 — modal heading when an incoming rules doc diverges from local; every other resolver locale string is reused from circle.recipe.conflict.*."
-      }
-    },
     "none": {
       "text": "No rules have been set for this circle yet.",
       "doc": "/group-rules for a circle without rules."
@@ -9813,6 +9807,88 @@
   "stored_value_unreadable_ok": {
     "text": "OK",
     "doc": "Launcher (ledger L1115): dismisses the refused-save notice; it is said once a session."
+  },
+  "lock": {
+    "title": {
+      "text": "Basis is locked",
+      "doc": "Web: the lock screen at an open, when the person locked their Basis in this browser (the browser lock)."
+    },
+    "field": {
+      "text": "Your code or passphrase",
+      "doc": "Web: the lock screen's one field."
+    },
+    "open": {
+      "text": "Open",
+      "doc": "Web: the lock screen's button."
+    },
+    "opening": {
+      "text": "Opening",
+      "doc": "Web: painted before the slow opening of the lock starts (about a second)."
+    },
+    "wrong": {
+      "text": "That is not the code. Try again.",
+      "doc": "Web: the lock screen after a wrong code or passphrase."
+    },
+    "forgot": {
+      "text": "Forgot it? Start this device over with your recovery phrase.",
+      "doc": "Web: the lock screen's way out of a forgotten code: the existing start-over page."
+    },
+    "section_title": {
+      "text": "Lock",
+      "doc": "Settings, the recovery group: the lock section's title (web: the switch; phone: the fact line)."
+    },
+    "state_on": {
+      "text": "On. Basis asks for your code every time it opens in this browser.",
+      "doc": "Web settings: the lock is on."
+    },
+    "state_off": {
+      "text": "Off. Whoever opens this browser opens Basis.",
+      "doc": "Web settings: the lock is off."
+    },
+    "switch_label": {
+      "text": "Lock Basis with a code",
+      "doc": "Web settings: the lock switch."
+    },
+    "field_again": {
+      "text": "The same code again",
+      "doc": "Web settings: the second field when the lock is switched on."
+    },
+    "plain_line": {
+      "text": "A code stops someone at this computer. It does not stop someone who copies this browser's files. If you forget it, you start over with your recovery phrase. Do not let the browser save this code.",
+      "doc": "Web settings: what the lock does and does not stop, shown before it is switched on."
+    },
+    "empty": {
+      "text": "Type a code or a passphrase.",
+      "doc": "Web settings: the lock form with an empty field."
+    },
+    "mismatch": {
+      "text": "The two codes are not the same.",
+      "doc": "Web settings: the lock form when the second code differs."
+    },
+    "confirm_on": {
+      "text": "Switch the lock on",
+      "doc": "Web settings: confirms switching the lock on."
+    },
+    "confirm_off": {
+      "text": "Switch the lock off",
+      "doc": "Web settings: confirms switching the lock off (asks the code once)."
+    },
+    "working": {
+      "text": "One moment",
+      "doc": "Web settings: painted before the slow derivation of the code starts."
+    },
+    "failed": {
+      "text": "That did not work. Nothing was changed.",
+      "doc": "Web settings: the lock could not be switched; the key door is unchanged."
+    },
+    "lock_now": {
+      "text": "Lock now",
+      "doc": "Web settings: locks Basis at once (the lock is on); the page opens on the lock screen."
+    },
+    "phone_fact": {
+      "text": "On this phone your key is protected by the phone's own screen lock. Set one in the phone's settings if you have none.",
+      "doc": "Phone settings: the lock section's fact line (the phone has no code of its own; its screen lock does this job)."
+    }
   },
   "start_over": {
     "lede": {

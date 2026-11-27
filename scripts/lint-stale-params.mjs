@@ -23,7 +23,7 @@
  * the worse failure. Known-unread params are baselined (green day one); a NEW unread param fails.
  *
  *   node scripts/lint-stale-params.mjs            check (exit 1 on anything new)
- *   node scripts/lint-stale-params.mjs --update   rewrite the baseline from what is on disk now
+ *   node scripts/lint-stale-params.mjs --update   remove from the baseline what is paid (it never adds)
  */
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -110,21 +110,36 @@ const unreadParams = params.filter((p) => !isRead(p));
 const unread = unreadParams.map((p) => `${p.file}:${p.name}`).sort();
 const keyOf = new Map(unreadParams.map((p) => [`${p.file}:${p.name}`, p.key]));
 
+let known = new Set();
+try { known = new Set(JSON.parse(readFileSync(BASELINE, 'utf8')).params ?? []); } catch { /* none yet */ }
+
+// `--update` only SHRINKS the baseline: an entry stays while its param is still unread; nothing is ever added (a new
+// unread param is wired or deleted, never baselined).
 if (process.argv.includes('--update')) {
+  const still = new Set(unread);
+  const kept = [...known].filter((k) => still.has(k)).sort();
   writeFileSync(BASELINE, `${JSON.stringify({
     $schema: 'stale-params-baseline/v0',
     description:
-      'CEILING of registered params (`param({…})`) whose value nothing reads. A param here is DEBT: wire it '
-      + '(read its value) or delete it. Removing entries is always allowed; adding one needs a reason in review.',
-    total: unread.length,
-    params: unread,
+      'Registered params (`param({…})`) whose value nothing reads. A param here is DEBT: wire it (read its value) or '
+      + 'delete it. The list only shrinks: `--update` removes what is paid and never adds.',
+    total: kept.length,
+    params: kept,
   }, null, 2)}\n`);
-  console.log(`✓ baseline updated: ${unread.length} unread param(s), ${params.length} declared → ${path.relative(ROOT, BASELINE)}`);
+  console.log(`✓ baseline shrunk: ${known.size} → ${kept.length} unread param(s) (it never grows), ${params.length} declared`);
   process.exit(0);
 }
 
-let known = new Set();
-try { known = new Set(JSON.parse(readFileSync(BASELINE, 'utf8')).params ?? []); } catch { /* none yet */ }
+// A baseline entry whose param is read now, or deleted, is red: left in, it would let the same name go unread again
+// unseen
+const nowUnread = new Set(unread);
+const paid = [...known].filter((k) => !nowUnread.has(k));
+if (paid.length) {
+  console.error(`\n✗ lint:stale-params — the baseline lists ${paid.length} param(s) that are read now or gone:\n`);
+  for (const k of paid) console.error(`   - scripts/stale-params-baseline.json: ${k}`);
+  console.error('     Fix: run node scripts/lint-stale-params.mjs --update (it only removes).\n');
+}
+// both lists in ONE run: a person with a paid entry and a new unread param sees both at once
 const fresh = unread.filter((k) => !known.has(k));
 
 if (fresh.length) {
@@ -132,14 +147,14 @@ if (fresh.length) {
   for (const k of fresh) {
     const [file, name] = [k.slice(0, k.lastIndexOf(':')), k.slice(k.lastIndexOf(':') + 1)];
     console.error(`   - ${file}: ${name} (key '${keyOf.get(k)}') is declared with param({…}) and nothing reads it.`);
-    console.error(`     Fix: in order of preference, 1. READ it: consume its value (${name}, or register.valueOf('${keyOf.get(k)}')). 2. DELETE it: drop the declaration if nothing needs it. 3. Baseline it (node scripts/lint-stale-params.mjs --update, into scripts/stale-params-baseline.json) WITH A REASON in review, if it is a deliberate not-yet-wired declaration.`);
+    console.error(`     Fix: in order of preference, 1. READ it: consume its value (${name}, or register.valueOf('${keyOf.get(k)}')). 2. DELETE it: drop the declaration if nothing needs it. (The baseline only shrinks: --update never adds to it.)`);
   }
   console.error(`
 A param declared with param({…}) but whose value nothing reads is DEAD CONFIG — it reads as a tunable in every
 doc that cites the register, and it does nothing. Reading it is what makes it a param.
 `);
-  process.exit(1);
 }
+if (paid.length || fresh.length) process.exit(1);
 
 if (unread.length) {
   console.warn(`⚠ lint:stale-params — ${unread.length} known unread param(s) carried (declared but unread — wire or delete).`);

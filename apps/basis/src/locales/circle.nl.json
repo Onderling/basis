@@ -4722,12 +4722,6 @@
         "doc": "Rules summary label (/group-rules): the circle's tags."
       }
     },
-    "conflict": {
-      "title": {
-        "text": "Twee van jullie hebben de regels bewerkt",
-        "doc": "γ.4 — modal heading when an incoming rules doc diverges from local; every other resolver locale string is reused from circle.recipe.conflict.*."
-      }
-    },
     "none": {
       "text": "Deze kring heeft nog geen regels.",
       "doc": "/group-rules for a circle without rules."
@@ -9810,6 +9804,88 @@
   "stored_value_unreadable_ok": {
     "text": "Oké",
     "doc": "Launcher (ledger L1115): dismisses the refused-save notice; it is said once a session."
+  },
+  "lock": {
+    "title": {
+      "text": "Basis is op slot",
+      "doc": "Web: the lock screen at an open, when the person locked their Basis in this browser (the browser lock)."
+    },
+    "field": {
+      "text": "Je code of wachtzin",
+      "doc": "Web: the lock screen's one field."
+    },
+    "open": {
+      "text": "Openen",
+      "doc": "Web: the lock screen's button."
+    },
+    "opening": {
+      "text": "Bezig met openen",
+      "doc": "Web: painted before the slow opening of the lock starts (about a second)."
+    },
+    "wrong": {
+      "text": "Dat is niet de code. Probeer het nog eens.",
+      "doc": "Web: the lock screen after a wrong code or passphrase."
+    },
+    "forgot": {
+      "text": "Vergeten? Begin dit apparaat opnieuw met je herstelzin.",
+      "doc": "Web: the lock screen's way out of a forgotten code: the existing start-over page."
+    },
+    "section_title": {
+      "text": "Slot",
+      "doc": "Settings, the recovery group: the lock section's title (web: the switch; phone: the fact line)."
+    },
+    "state_on": {
+      "text": "Aan. Basis vraagt je code elke keer dat het in deze browser opent.",
+      "doc": "Web settings: the lock is on."
+    },
+    "state_off": {
+      "text": "Uit. Wie deze browser opent, opent Basis.",
+      "doc": "Web settings: the lock is off."
+    },
+    "switch_label": {
+      "text": "Basis op slot met een code",
+      "doc": "Web settings: the lock switch."
+    },
+    "field_again": {
+      "text": "Dezelfde code nog eens",
+      "doc": "Web settings: the second field when the lock is switched on."
+    },
+    "plain_line": {
+      "text": "Een code houdt iemand achter deze computer tegen. Iemand die de bestanden van deze browser kopieert, houdt hij niet tegen. Vergeet je hem, dan begin je opnieuw met je herstelzin. Laat de browser deze code niet bewaren.",
+      "doc": "Web settings: what the lock does and does not stop, shown before it is switched on."
+    },
+    "empty": {
+      "text": "Typ een code of een wachtzin.",
+      "doc": "Web settings: the lock form with an empty field."
+    },
+    "mismatch": {
+      "text": "De twee codes zijn niet gelijk.",
+      "doc": "Web settings: the lock form when the second code differs."
+    },
+    "confirm_on": {
+      "text": "Zet het slot aan",
+      "doc": "Web settings: confirms switching the lock on."
+    },
+    "confirm_off": {
+      "text": "Zet het slot uit",
+      "doc": "Web settings: confirms switching the lock off (asks the code once)."
+    },
+    "working": {
+      "text": "Even geduld",
+      "doc": "Web settings: painted before the slow derivation of the code starts."
+    },
+    "failed": {
+      "text": "Dat lukte niet. Er is niets veranderd.",
+      "doc": "Web settings: the lock could not be switched; the key door is unchanged."
+    },
+    "lock_now": {
+      "text": "Nu op slot",
+      "doc": "Web settings: locks Basis at once (the lock is on); the page opens on the lock screen."
+    },
+    "phone_fact": {
+      "text": "Op deze telefoon beschermt de schermvergrendeling van de telefoon je sleutel. Heb je er geen, stel er dan een in bij de instellingen van de telefoon.",
+      "doc": "Phone settings: the lock section's fact line (the phone has no code of its own; its screen lock does this job)."
+    }
   },
   "start_over": {
     "lede": {

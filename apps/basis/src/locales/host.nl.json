@@ -490,6 +490,10 @@
       "text": "Sign-in wordt geopend (issuer: {{issuer}}) … kom terug zodra de redirect klaar is.",
       "doc": "v0.7.P1."
     },
+    "issuer_not_ready": {
+      "text": "De podaanbieder op {{issuer}} antwoordde niet. Kijk het adres na en probeer het opnieuw.",
+      "doc": "Inloggen op de telefoon: de gekozen aanbieder kon niet op tijd bereikt of ingesteld worden (een verkeerd adres, of hij is offline)."
+    },
     "unknown_issuer": {
       "text": "Onbekende issuer „{{issuer}}\". Probeer 'inrupt', 'solidcommunity', 'solidweb' of een volledige URL.",
       "doc": "resolveIssuer returned null."

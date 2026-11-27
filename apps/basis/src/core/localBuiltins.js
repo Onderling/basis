@@ -303,6 +303,19 @@ async function signinFlow(args, { podAuth, externalFlow, t }) {
         return { ok: false, error: t('signin.unknown_issuer', { issuer }) };
       }
       const name = resolved?.name ?? issuer ?? 'default';
+      // A podAuth that COMPLETES IN PLACE (the phone: the system browser comes back to the app) is waited for, so a
+      // provider that could not start reaches the person as one line in their words (the raw reason stays in the log).
+      if (podAuth.completesInPlace === true) {
+        let done;
+        try { done = await podAuth.startSignIn({ issuer }); }
+        catch (err) {
+          console.warn('[signin] could not complete', err?.message ?? err);
+          if (err?.code === 'ISSUER_NOT_READY') return { ok: false, code: err.code, error: t('signin.issuer_not_ready', { issuer: err.issuer ?? resolved?.url ?? issuer ?? name }) };
+          return { ok: false, error: err?.message ?? String(err) };
+        }
+        // back in the app: signed in (the session holds the webid), or the person closed the provider's page
+        return done?.webid ? { ok: true, message: t('signin.completed', { webid: done.webid }) } : { ok: true, message: t('signin.opening', { issuer: name }) };
+      }
       // Fire-and-forget — the browser is about to navigate to the
       // issuer.  Return an opening message that may briefly flash
       // before the redirect.

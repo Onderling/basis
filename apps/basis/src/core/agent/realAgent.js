@@ -3823,6 +3823,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     await writePeerBindings();
     peerBindingsFrozen = true;
   };
+  // the cutover's reseal is over and the process goes on: save again, and save what was learned meanwhile
+  const thawPeerBindings = () => { peerBindingsFrozen = false; savePeerBindings(); };
   try {
     const raw = await chatVault.get(PEER_BINDINGS_VAULT_KEY);
     const kept = raw ? JSON.parse(typeof raw === 'string' ? raw : String(raw)) : [];
@@ -5168,6 +5170,11 @@ export async function createRealHouseholdAgent(opts = {}) {
             }
           }
           if (migrated) selfEnrolledThisSession = true;
+          // The snapshot was frozen before the reseal so no debounced save could land mid-rotation. When the process goes
+          // on (no address introduced, no restart asked) it thaws: every sealed vault now writes under the key the reseal
+          // switched to (the one key holder), so a peer met later in this start is kept. The freeze was first made when
+          // a write after the reseal still went under the old key (2026-09-14); the key holder ended that (2026-11-25).
+          if (migrated && introduced.length === 0) thawPeerBindings();
         } catch (err) { console.warn('[custody] self-enroll migration deferred:', err?.message ?? err); }
       }
       // Every node the person owns (a companion) hears of it too — the root's own tombstone, so the revoked device

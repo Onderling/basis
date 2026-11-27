@@ -221,10 +221,10 @@ describe('the box is revoked while it holds the address', () => {
     // The person who has been writing to the web app is known to it — by the box's hand, since their
     // greeting landed on the box — and stays known across the reload.
     expect(!!web.agent.sa.agent.security.getPeerKey(person.pubKey), 'the web app does not hold the person\'s key before the reload').toBe(true);
-    // A greeting that lands AFTER the ceremony resealed the vaults must not cost the snapshot: this
-    // running agent still writes under the old key, and a write now would replace the carried-over
-    // snapshot with one the next boot cannot open (CI found it: the person's binding saved late, gone
-    // after the reload). The ceremony wrote the snapshot once, just before the reseal, and froze it.
+    // A greeting that lands AFTER the ceremony resealed the vaults must not cost the snapshot (CI found it on
+    // 2026-09-14: the person's binding saved late, gone after the reload, when a write after the reseal still went
+    // under the old key). The ceremony writes the snapshot just before the reseal; every sealed vault now writes
+    // under the key the reseal switched to, so the snapshot thaws after it and a later save is kept too.
     web.agent.sa.agent.emit?.('peer', { address: bea.pubKey, pubKey: bea.pubKey });
     await new Promise((res) => { setTimeout(res, 600); });
     oldWebAddr = web.agent.circleAddressFor(CIRCLE);

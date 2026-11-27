@@ -26,9 +26,12 @@ export function proposeEvent({ proposalId, action, subject = null, by, deadline 
 export function voteEvent({ proposalId, voter, choice, at = 0 }) {
   return { kind: GOVERNANCE_KIND, event: GOV_EVENT.VOTE, proposalId, voter, choice, at };
 }
-/** Record a proposal's close (its final status + who enacted it). */
-export function resolveEvent({ proposalId, status, by = null, at = 0 }) {
-  return { kind: GOVERNANCE_KIND, event: GOV_EVENT.RESOLVE, proposalId, status, by, at };
+/**
+ * Record a proposal's close (its final status + who enacted it). `counted`: the members the closer tallied against,
+ * signed in the closing; a receiver tallies a closed decision against it when an admin closed it (governanceReceiverGate).
+ */
+export function resolveEvent({ proposalId, status, by = null, at = 0, counted = null }) {
+  return { kind: GOVERNANCE_KIND, event: GOV_EVENT.RESOLVE, proposalId, status, by, at, ...(Array.isArray(counted) ? { counted: [...counted].sort() } : {}) };
 }
 
 /**
@@ -47,9 +50,11 @@ export function foldGovernance(events, { policy, members = [], actor = null, now
   // L3: a disputed author (caught equivocating) has their votes discounted — an equivocator
   // must not be able to sway a decision. `disputed` is a Set of author refs (foldDisputes).
   const isDisputed = disputed instanceof Set ? (ref) => disputed.has(ref) : () => false;
+  const adminRefs = new Set((Array.isArray(members) ? members : []).filter((m) => m?.role === 'admin').map((m) => m.ref));
+  const isAdminRef = (ref) => typeof ref === 'string' && adminRefs.has(ref);
   const byId = new Map();
   const get = (id) => {
-    if (!byId.has(id)) byId.set(id, { proposalId: id, action: null, subject: null, by: null, deadline: null, votes: [], closed: false, closedStatus: null, closedBy: null, _proposedAt: 0, _proposeHash: null, _resolveHash: null });
+    if (!byId.has(id)) byId.set(id, { proposalId: id, action: null, subject: null, by: null, deadline: null, votes: [], closed: false, closedStatus: null, closedBy: null, _proposedAt: 0, _proposeHash: null, _resolveHash: null, _resolveRank: 2, counted: null });
     return byId.get(id);
   };
   for (const e of Array.isArray(events) ? events : []) {
@@ -71,10 +76,16 @@ export function foldGovernance(events, { policy, members = [], actor = null, now
         p.votes.push({ voter: e.voter, choice: e.choice, at: e.at ?? 0, hash: e.hash ?? null, parentHash: e.parentHash ?? null });
       }
     } else if (e.event === GOV_EVENT.RESOLVE) {
-      // Competing resolves settle deterministically the same way (smallest hash wins the recorded outcome).
-      const better = !p.closed
-        || (typeof e.hash === 'string' && String(e.hash).localeCompare(String(p._resolveHash ?? '￿')) < 0);
-      if (better) { p.closed = true; p.closedStatus = e.status ?? null; p.closedBy = e.by ?? null; p.closedAt = e.at ?? 0; p._resolveHash = e.hash ?? null; }
+      // Competing resolves settle deterministically: an ADMIN's closing over anyone else's (only an admin enacts, and an
+      // admin's closing is what a receiver tallies a closed decision by), then the smallest hash wins the recorded outcome.
+      const rank = isAdminRef(e.by) ? 0 : 1;
+      const better = !p.closed || rank < p._resolveRank
+        || (rank === p._resolveRank && typeof e.hash === 'string' && String(e.hash).localeCompare(String(p._resolveHash ?? '￿')) < 0);
+      if (better) {
+        p.closed = true; p.closedStatus = e.status ?? null; p.closedBy = e.by ?? null; p.closedAt = e.at ?? 0; p._resolveHash = e.hash ?? null;
+        p._resolveRank = rank;
+        p.counted = Array.isArray(e.counted) ? e.counted.filter((r) => typeof r === 'string') : null;
+      }
     }
   }
 
@@ -86,6 +97,9 @@ export function foldGovernance(events, { policy, members = [], actor = null, now
       proposalId: p.proposalId, action: p.action, subject: p.subject, by: p.by, deadline: p.deadline,
       proposedAt: p._proposedAt, votes: p.votes, closed: p.closed,
       closedAt: p.closed ? (p.closedAt ?? 0) : null,   // the resolve's own signed time (a receiver judges an override by it, never its clock)
+      // who closed it (the rail keeps a resolve only when its `by` is its signer) and the members that closing counted
+      closedBy: p.closed ? (p.closedBy ?? null) : null,
+      counted: p.closed ? (p.counted ?? null) : null,
       seed: p._proposeHash ?? p.proposalId,   // what a drawn sample (`random-sample`) is drawn from
       // a closed proposal keeps its recorded outcome; an open one shows the live decision.
       status: p.closed ? (p.closedStatus ?? DECISION_STATUS.REJECTED) : decision.status,

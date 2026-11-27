@@ -2343,3 +2343,27 @@ starts unattended and has no person to ask. Both doors answer `unlocked` and hav
 **Alternatives:** *a code screen without the wrap*: stops nobody who opens the developer tools. *The backup's 64 MiB at
 t 3*: about two seconds at every open in a browser (measured 2.08 s). *A passkey*, *an idle lock*, *changing the code
 in place*: later, in the full design; the slot format (an array with a `kind`) leaves room for them.
+
+## 2026-11-27 — A closed decision stands on its admin's closing (Fable ruled; Frits to confirm)
+
+**Decision:** a CLOSED decision is tallied against the members its closing counted, when an admin signed that closing
+(an admin on the roster now). The admin who closes a decision names the members it tallied against, signed in the
+closing (`counted` on the resolve). A closing signed by anyone else, or one that names no members, keeps the roster as
+it is now. When two closings compete, an admin's wins over anyone else's. OPEN decisions are unchanged: the
+2026-11-15 entry ("No vote freeze") still holds for them, and the "joined since" line informs only.
+
+**Why:** every device re-tallied every decision against the roster as it is NOW, open or closed. A settings change voted
+1 of 1 needed 2 of 2 after one join, and every device refused it, the deciding admin's own included: one join quietly
+undid the circle's decisions (two phones and a browser walk, 2026-11-27). The join's own time could not mark the line:
+a same-device redeem signs the join as the joiner, with the joiner's clock, so a joiner could backdate itself into
+every closed decision.
+
+**The price:** an admin can close a decision on a roster of their choosing. An admin who admits alone could already
+reach any roster by admitting, so this gives an admin nothing new. Governed admissions (after the alpha) remove both.
+
+**Alternatives:** *the join's signed time against the closing's*: a joiner sets its own join's time. *A device keeps a
+change it kept once*: does not converge (a late joiner never saw the smaller roster). *Leave it*: a circle on
+member-vote loses its decided settings at every join.
+
+Where it lives: `apps/basis/src/v2/governanceReceiverGate.js` (`tallyRosterOf`), `governanceLog.js` (the closing's
+`counted`, an admin's closing first), `governanceOrchestrator.js` (the closer names its roster).

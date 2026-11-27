@@ -27,11 +27,20 @@ export function voteEvent({ proposalId, voter, choice, at = 0 }) {
   return { kind: GOVERNANCE_KIND, event: GOV_EVENT.VOTE, proposalId, voter, choice, at };
 }
 /**
- * Record a proposal's close (its final status + who enacted it). `counted`: the members the closer tallied against,
+ * Record a proposal's close (its final status + who enacted it). `counted`: the members the closer tallied against, each
+ * with the role it had then,
  * signed in the closing; a receiver tallies a closed decision against it when an admin closed it (governanceReceiverGate).
  */
 export function resolveEvent({ proposalId, status, by = null, at = 0, counted = null }) {
-  return { kind: GOVERNANCE_KIND, event: GOV_EVENT.RESOLVE, proposalId, status, by, at, ...(Array.isArray(counted) ? { counted: [...counted].sort() } : {}) };
+  return { kind: GOVERNANCE_KIND, event: GOV_EVENT.RESOLVE, proposalId, status, by, at, ...(Array.isArray(counted) ? { counted: countedMembers(counted) } : {}) };
+}
+
+/** The members a closing counted, each with the role it had then (`{ref, role}`, sorted by ref); anything else dropped. */
+export function countedMembers(list) {
+  return (Array.isArray(list) ? list : [])
+    .filter((m) => typeof m?.ref === 'string' && m.ref && typeof m?.role === 'string' && m.role)
+    .map((m) => ({ ref: m.ref, role: m.role }))
+    .sort((a, b) => (a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0));
 }
 
 /**
@@ -84,7 +93,7 @@ export function foldGovernance(events, { policy, members = [], actor = null, now
       if (better) {
         p.closed = true; p.closedStatus = e.status ?? null; p.closedBy = e.by ?? null; p.closedAt = e.at ?? 0; p._resolveHash = e.hash ?? null;
         p._resolveRank = rank;
-        p.counted = Array.isArray(e.counted) ? e.counted.filter((r) => typeof r === 'string') : null;
+        p.counted = Array.isArray(e.counted) ? countedMembers(e.counted) : null;
       }
     }
   }

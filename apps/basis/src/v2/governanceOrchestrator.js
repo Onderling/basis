@@ -22,9 +22,9 @@ import { proposeEvent, voteEvent, resolveEvent, foldGovernance } from './governa
 import { decisionDeadlineDays } from './circlePolicy.js';
 
 export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, newProposalId, now = () => 0, canEnact = () => true } = {}) {
-  // the members a closing counted (its own tally's roster): signed in the resolve, so a device that joins later tallies the
+  // the members a closing counted (its own tally's roster, each with its role then): signed in the resolve, so a device that joins later tallies the
   // closed decision against them and not against a roster that grew since (governanceReceiverGate)
-  const countedOf = (ctx) => (Array.isArray(ctx?.members) ? ctx.members : []).map((m) => m?.ref).filter((r) => typeof r === 'string');
+  const countedOf = (ctx) => (Array.isArray(ctx?.members) ? ctx.members : []).map((m) => ({ ref: m?.ref, role: m?.role ?? 'member' }));
 
   async function enactAndClose(circleId, proposal, by, counted = null) {
     let ok = true; let result = null;

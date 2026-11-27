@@ -25,7 +25,7 @@ describe('a closed decision is tallied against the members its admin counted', (
     const events = [
       signed(proposeEvent({ proposalId: 'p1', action: 'changePolicy', subject: change, by: ADMIN, at: 10 })),
       signed(voteEvent({ proposalId: 'p1', voter: ADMIN, choice: 'yes', at: 11 })),
-      signed(resolveEvent({ proposalId: 'p1', status: 'approved', by: ADMIN, at: 12, counted: [ADMIN] })),
+      signed(resolveEvent({ proposalId: 'p1', status: 'approved', by: ADMIN, at: 12, counted: [{ ref: ADMIN, role: 'admin' }] })),
     ];
     const now = [{ ref: ADMIN, role: 'admin' }, { ref: LATE, role: 'member' }];
     const skipped = writeSkippedTheVote({ action: 'changePolicy', body: body('p1'), policy, members: now, proposals: proposalsFor(events, now) });
@@ -45,7 +45,7 @@ describe('a closed decision is tallied against the members its admin counted', (
     const events = [
       signed(proposeEvent({ proposalId: 'p3', action: 'changePolicy', subject: change, by: MEMBER, at: 10 })),
       signed(voteEvent({ proposalId: 'p3', voter: MEMBER, choice: 'yes', at: 11 })),
-      signed(resolveEvent({ proposalId: 'p3', status: 'approved', by: MEMBER, at: 1, counted: [MEMBER] })),
+      signed(resolveEvent({ proposalId: 'p3', status: 'approved', by: MEMBER, at: 1, counted: [{ ref: MEMBER, role: 'admin' }] })),
     ];
     const now = [{ ref: ADMIN, role: 'admin' }, { ref: MEMBER, role: 'member' }];
     expect(writeSkippedTheVote({ action: 'changePolicy', body: body('p3'), policy, members: now, proposals: proposalsFor(events, now) })).toBe(true);
@@ -55,12 +55,43 @@ describe('a closed decision is tallied against the members its admin counted', (
     const events = [
       signed(proposeEvent({ proposalId: 'p4', action: 'changePolicy', subject: change, by: ADMIN, at: 10 })),
       signed(voteEvent({ proposalId: 'p4', voter: ADMIN, choice: 'yes', at: 11 })),
-      { ...resolveEvent({ proposalId: 'p4', status: 'rejected', by: MEMBER, at: 13, counted: [ADMIN, MEMBER] }), hash: 'a0000' },
-      { ...resolveEvent({ proposalId: 'p4', status: 'approved', by: ADMIN, at: 12, counted: [ADMIN] }), hash: 'z9999' },
+      { ...resolveEvent({ proposalId: 'p4', status: 'rejected', by: MEMBER, at: 13, counted: [{ ref: ADMIN, role: 'admin' }, { ref: MEMBER, role: 'member' }] }), hash: 'a0000' },
+      { ...resolveEvent({ proposalId: 'p4', status: 'approved', by: ADMIN, at: 12, counted: [{ ref: ADMIN, role: 'admin' }] }), hash: 'z9999' },
     ];
     const now = [{ ref: ADMIN, role: 'admin' }, { ref: MEMBER, role: 'member' }];
     const p = proposalsFor(events, now).find((x) => x.proposalId === 'p4');
-    expect(p).toMatchObject({ closedBy: ADMIN, counted: [ADMIN], status: 'approved' });
+    expect(p).toMatchObject({ closedBy: ADMIN, counted: [{ ref: ADMIN, role: 'admin' }], status: 'approved' });
+  });
+
+  it('closed by 1 admin of 1 under admin-quorum: a second admin promoted after does not reopen it', () => {
+    const quorum = normalizeCirclePolicy({ governance: { changePolicy: 'admin-quorum' } });
+    const events = [
+      signed(proposeEvent({ proposalId: 'q1', action: 'changePolicy', subject: change, by: ADMIN, at: 10 })),
+      signed(voteEvent({ proposalId: 'q1', voter: ADMIN, choice: 'yes', at: 11 })),
+      // LATE was a member when it closed (1 admin of 1 decided), and is promoted after
+      signed(resolveEvent({ proposalId: 'q1', status: 'approved', by: ADMIN, at: 12, counted: [{ ref: ADMIN, role: 'admin' }, { ref: LATE, role: 'member' }] })),
+    ];
+    const now = [{ ref: ADMIN, role: 'admin' }, { ref: LATE, role: 'admin' }];
+    const proposals = foldGovernance(events, { policy: quorum, members: now, now: 0 }).proposals;
+    expect(writeSkippedTheVote({ action: 'changePolicy', body: body('q1'), policy: quorum, members: now, proposals }), 'a later promotion reopened it').toBe(false);
+  });
+
+  it('a counted admin who has left since still counts as the admin they were', () => {
+    // three admins at the closing, two said yes: a quorum. The two who said yes leave; the closer (who said no) remains.
+    const quorum = normalizeCirclePolicy({ governance: { changePolicy: 'admin-quorum' } });
+    const B2 = 'ref-b2'; const B3 = 'ref-b3';
+    const events = [
+      signed(proposeEvent({ proposalId: 'q2', action: 'changePolicy', subject: change, by: B2, at: 10 })),
+      signed(voteEvent({ proposalId: 'q2', voter: B2, choice: 'yes', at: 11 })),
+      signed(voteEvent({ proposalId: 'q2', voter: B3, choice: 'yes', at: 11 })),
+      signed(voteEvent({ proposalId: 'q2', voter: ADMIN, choice: 'no', at: 11 })),
+      signed(resolveEvent({ proposalId: 'q2', status: 'approved', by: ADMIN, at: 12,
+        counted: [{ ref: ADMIN, role: 'admin' }, { ref: B2, role: 'admin' }, { ref: B3, role: 'admin' }] })),
+    ];
+    // today: the closer and an admin promoted since (two admins, so the change does need the vote)
+    const now = [{ ref: ADMIN, role: 'admin' }, { ref: LATE, role: 'admin' }];
+    const proposals = foldGovernance(events, { policy: quorum, members: now, now: 0 }).proposals;
+    expect(writeSkippedTheVote({ action: 'changePolicy', body: body('q2'), policy: quorum, members: now, proposals }), 'the admins who left counted as members').toBe(false);
   });
 
   it('the orchestrator closes with the members it tallied against', async () => {
@@ -75,6 +106,6 @@ describe('a closed decision is tallied against the members its admin counted', (
     await orch.propose({ circleId: 'c', action: 'changePolicy', subject: change, actor: { ref: ADMIN } });
     const resolve = log.find((e) => e.event === 'resolve');
     expect(resolve, 'the decision closed').toBeTruthy();
-    expect(resolve.counted).toEqual([ADMIN]);
+    expect(resolve.counted, 'the members it counted, with the role each had').toEqual([{ ref: ADMIN, role: 'admin' }]);
   });
 });

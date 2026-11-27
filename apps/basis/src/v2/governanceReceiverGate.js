@@ -95,17 +95,18 @@ export function isFoundingWrite(body, members = []) {
 
 /**
  * THE ROSTER A DECISION IS TALLIED AGAINST. An open one: the roster as it is now (decisions.md, "No vote freeze"). A
- * closed one whose closing an ADMIN signed (an admin on the roster now): the members that closing counted, so a join
- * after it does not undo it on every device. The price, stated in decisions.md: an admin can close on a roster of their
- * choosing, which an admin who admits alone could already reach by admitting. A closing signed by anyone else, or one
- * that names no members (written before closings did), keeps the roster as it is now.
+ * closed one whose closing an ADMIN signed (an admin on the roster now): the members that closing counted, with the
+ * roles they had then, so a join, a promotion or a departure after it does not undo it on every device. The price,
+ * stated in decisions.md: an admin can close on a roster of their choosing, which an admin who admits alone could
+ * already reach by admitting. A closing signed by anyone else, or one that names no members (written before closings
+ * did), keeps the roster as it is now; so does a closing whose admin has since left or lost the role.
  */
 export function tallyRosterOf(p, members = []) {
   const roster = Array.isArray(members) ? members : [];
   if (!p?.closed || !Array.isArray(p.counted)) return roster;
   if (!roster.some((m) => m?.ref === p.closedBy && m?.role === 'admin')) return roster;
-  const now = new Map(roster.map((m) => [m?.ref, m]));
-  return p.counted.map((ref) => now.get(ref) ?? { ref, role: 'member' });
+  // each member with the role it had at the closing, never today's: a promotion or a departure since changes nothing
+  return p.counted.map((m) => ({ ref: m.ref, role: m.role }));
 }
 
 /**

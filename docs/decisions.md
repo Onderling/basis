@@ -2347,8 +2347,9 @@ in place*: later, in the full design; the slot format (an array with a `kind`) l
 ## 2026-11-27 — A closed decision stands on its admin's closing (Fable ruled; Frits to confirm)
 
 **Decision:** a CLOSED decision is tallied against the members its closing counted, when an admin signed that closing
-(an admin on the roster now). The admin who closes a decision names the members it tallied against, signed in the
-closing (`counted` on the resolve). A closing signed by anyone else, or one that names no members, keeps the roster as
+(an admin on the roster now). The admin who closes a decision names the members it tallied against AND the role each
+had then, signed in the closing (`counted` on the resolve: ref and role); the tally uses those roles, never today's, so
+a promotion or a departure since changes nothing (admin-quorum counts the full admin set). A closing signed by anyone else, or one that names no members, keeps the roster as
 it is now. When two closings compete, an admin's wins over anyone else's. OPEN decisions are unchanged: the
 2026-11-15 entry ("No vote freeze") still holds for them, and the "joined since" line informs only.
 
@@ -2360,6 +2361,9 @@ every closed decision.
 
 **The price:** an admin can close a decision on a roster of their choosing. An admin who admits alone could already
 reach any roster by admitting, so this gives an admin nothing new. Governed admissions (after the alpha) remove both.
+The closer must be an admin on the roster NOW: when the closing admin leaves or loses the role, their closed decisions
+are counted against today's roster again (open, after the alpha: it needs governed admissions or a provable order of
+roles).
 
 **Alternatives:** *the join's signed time against the closing's*: a joiner sets its own join's time. *A device keeps a
 change it kept once*: does not converge (a late joiner never saw the smaller roster). *Leave it*: a circle on

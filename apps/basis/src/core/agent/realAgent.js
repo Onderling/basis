@@ -548,6 +548,27 @@ export async function createRealHouseholdAgent(opts = {}) {
   // `rotate`, so a vault opened at boot (a trust registry, the grants) keeps working after the reseal in the same session,
   // and no read or write crosses the switch. Nothing inside a rotation may read a sealed vault (it would wait on itself).
   const atRestHolder = createKeyHolder(atRestKey);
+  // The chat vault's backing, named here (it is sealed further down) because the first start after a phrase restore
+  // proves the key in force on it before any vault drops a thing.
+  const chatVaultBacking = opts.chatVault ?? pickVault(storageName('vaultChatId'));
+  // THE PROOF BEFORE A DROP. The sentinel binds to the root's fingerprint, never to the at-rest key, so a passing
+  // migration says nothing about the key. The restore sealed the chat vault's slots under ITS key (derived from the
+  // phrase); everything older was sealed under the previous one. So an entry there that opens under the key in force
+  // was written by the restore, and the key is the restore's. Nothing opens: no proof, nothing is dropped, and the
+  // start says the key could not be read, as it would without this.
+  let restoreKeyProof = null;
+  const restoreKeyProven = () => {
+    restoreKeyProof ??= (async () => {
+      const enc = new VaultEncrypted({ backing: chatVaultBacking, key: atRestHolder.current() });
+      for (const k of await chatVaultBacking.list()) {
+        const raw = await chatVaultBacking.get(k);
+        if (raw == null || !VaultEncrypted.isEncryptedValue(raw)) continue;
+        try { await enc.get(k); return true; } catch { /* sealed under another key */ }
+      }
+      return false;
+    })();
+    return restoreKeyProof;
+  };
   const sealedVault = async (backing) => {
     // the sentinel's read is the boot's first read of a sealed vault: a storage error there is the same "could not read"
     // as a key's, said with the same words (L1115), never the generic failure
@@ -555,8 +576,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     catch (err) { throw new KeyUnreadable('vault-sentinel', err); }
     // the first start after a phrase restore: the same person's phrase keeps the sentinel (same root), but the restore
     // enrolled a new device id and so a new at-rest key; what the previous key sealed opens no more and goes now, before
-    // anything reads it (another person's phrase resets the whole vault above, for the same reason)
+    // anything reads it (another person's phrase resets the whole vault above, for the same reason). A restore starts
+    // this device clean, whoever's phrase: the unsealed content goes by the forget note the restore also leaves.
     if (restorePendingAtBoot) {
+      let proven = false;
+      try { proven = await restoreKeyProven(); } catch (err) { throw new KeyUnreadable('vault-sentinel', err); }
+      if (!proven) throw new KeyUnreadable('vault-sentinel', new Error('the key in force opens nothing the restore wrote'));
       try { await dropUnopenable({ backing, key: atRestHolder.current() }); }
       catch (err) { throw new KeyUnreadable('vault-sentinel', err); }
     }
@@ -618,8 +643,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // silently here). An entry that exists but cannot be read (a plaintext write that
   // slipped past the sealed layer) is unrecoverable either way — re-deriving from the
   // root is the one repair that keeps the person reachable at their roster addresses.
-  const chatVaultBacking = opts.chatVault ?? pickVault(storageName('vaultChatId'));
-  const chatVault = await sealedVault(chatVaultBacking);
+  const chatVault = await sealedVault(chatVaultBacking);   // its backing is named above, by the restore's key proof
 
   // ── CONTENT at rest ────────────────────────────────────────────────────────────────────────────
   // Key material was already sealed here; a person's own words were not. Their lists, messages and

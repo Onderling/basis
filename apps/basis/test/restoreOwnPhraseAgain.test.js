@@ -39,3 +39,37 @@ describe('restoring a device from its own phrase', () => {
     expect(rebooted.sa.agent.identity.pubKey, 'the same person after the restart').toBe(expected);
   });
 });
+
+describe('the first start after a restore deletes nothing on a key it has not proven', () => {
+  it('restore pending, the key door answers a WRONG seed: nothing is deleted and the start says the key could not be read', async () => {
+    const ownerRootVault = new VaultMemory(); const chatVault = new VaultMemory(); const hostVault = new VaultMemory();
+    const a = await createRealHouseholdAgent({ ownerRootVault, chatVault, hostVault });
+    const { mnemonic } = await a.callSkill('household', 'revealOwnerPhrase', {});
+    expect(await a.callSkill('household', 'restoreOwnerPhrase', { mnemonic })).toMatchObject({ ok: true });
+    // the keystore answers differently at the next start (a half-done second restore, a storage fault)
+    await new RootKeyStoreVault({ vault: ownerRootVault }).setSeed(crypto.getRandomValues(new Uint8Array(32)));
+    const hostBefore = (await hostVault.list()).length; const chatBefore = (await chatVault.list()).length;
+    let err = null;
+    try { await createRealHouseholdAgent({ ownerRootVault, chatVault, hostVault }); } catch (e) { err = e; }
+    expect(err?.message ?? '', 'the start went on with a key nothing proved').toMatch(/could not be read/i);
+    expect((await hostVault.list()).length, 'the host vault lost entries').toBe(hostBefore);
+    expect((await chatVault.list()).length, 'the chat vault lost entries').toBe(chatBefore);
+  });
+});
+
+describe('after a restore and a start, the device is clean whoever\'s phrase it was', () => {
+  const afterRestore = async (own) => {
+    const ownerRootVault = new VaultMemory(); const chatVault = new VaultMemory(); const hostVault = new VaultMemory();
+    const a = await createRealHouseholdAgent({ ownerRootVault, chatVault, hostVault });
+    const mnemonic = own ? (await a.callSkill('household', 'revealOwnerPhrase', {})).mnemonic : Bootstrap.create().mnemonic;
+    expect(await a.callSkill('household', 'restoreOwnerPhrase', { mnemonic })).toMatchObject({ ok: true });
+    await createRealHouseholdAgent({ ownerRootVault, chatVault, hostVault });
+    return { host: (await hostVault.list()).sort(), chat: (await chatVault.list()).sort() };
+  };
+  it('its own phrase leaves the same sealed entries as another person\'s phrase (no old key\'s things left behind)', async () => {
+    const own = await afterRestore(true);
+    const other = await afterRestore(false);
+    expect(own.host, 'the host vault after an own-phrase restore').toEqual(other.host);
+    expect(own.chat, 'the chat vault after an own-phrase restore').toEqual(other.chat);
+  });
+});

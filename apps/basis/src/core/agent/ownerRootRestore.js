@@ -148,7 +148,8 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
     //    The SAME phrase on a device that already is this person keeps the sentinel (same root), but this restore enrols a
     //    new device id, so a new at-rest key: what the previous one sealed opens no more. It goes here, before anything
     //    reads a slot (`VaultEncrypted: decryption failed for agent-stable-id` on a phone, 2026-11-27); the other sealed
-    //    vaults drop theirs at the next boot, which finds this restore pending (realAgent).
+    //    vaults drop theirs at the next boot, which finds this restore pending and first proves its key (realAgent). No
+    //    proof is needed here: `atRestKey` was derived just above from the phrase in hand, so it is the restore's key.
     await dropUnopenable({ backing: chatVault, key: atRestKey });
     // 2–3. THE GENERAL PERSONA'S SLOTS (its chat seed, person key and delegation blob — the bare names, as personaVault
     //      names them), only when this device holds it: a device without it has nothing of it, not even an empty slot.

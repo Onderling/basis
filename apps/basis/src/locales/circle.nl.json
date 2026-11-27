@@ -3650,6 +3650,10 @@
       "text": "Er is nu geen beheerder online — probeer het later opnieuw. De uitnodiging blijft geldig.",
       "doc": "The no-admin-online notice at join (J-NP2). Without it this failure is indistinguishable from a broken invite, and nobody retries."
     },
+    "join_no_own_route": {
+      "text": "Je aanmelding kon niet worden verstuurd: dit apparaat heeft geen verbinding die je eigen adres draagt. Stel een verbindingspunt in bij Instellingen, Verbinding, en probeer het opnieuw. De uitnodiging blijft geldig.",
+      "doc": "At join, when the redeem found no route that carries the joiner's own address (no relay, no local network) within the wait: it was withdrawn, never sent another way. Not the admin's absence; the joiner's fix is a connection point."
+    },
     "delivery_section": {
       "text": "Bezorging",
       "doc": "My-data section for the two delivery settings."

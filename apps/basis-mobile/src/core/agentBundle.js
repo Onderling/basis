@@ -634,7 +634,9 @@ export async function bootAgentBundle(opts = {}) {
     // refresh; registration is idempotent), and an explicit list as given — both through the one shared filter that
     // drops a circle the fold says was left or removed.
     const mine = await listMine();
-    const ids = presenceCircleIds(mine, ...(Array.isArray(circleIds) ? [circleIds] : [mine?.circles, _circleIdsForRegistration]));
+    // a given list (the joined circle, a re-keyed set) comes BESIDE what the substrate and the cache hold, never instead
+    // of it: as web and the box do (a list alone would leave the other circles out of this pass)
+    const ids = presenceCircleIds(mine, mine?.circles, _circleIdsForRegistration, Array.isArray(circleIds) ? circleIds : []);
     _circleIdsForRegistration = ids;
     // Decisions 4 + 1 — the per-circle SIGNING identity AND the roster snapshot that authorizes senders,
     // for EVERY circle the substrate knows, before (and independently of) the relay scoping below.

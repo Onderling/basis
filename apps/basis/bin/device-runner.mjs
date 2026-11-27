@@ -817,7 +817,7 @@ if (relayUrl) {
   // catch-up — `registerCirclePresence` is defined below and runs at connect; a join later re-runs it for the one circle.
   pairSeams.onJoined = ({ circleId } = {}) => makeCircleReachable({
     agent, circleId,
-    registerCirclePresence: () => registerCirclePresence([circleId]),
+    registerCirclePresence: (ids) => registerCirclePresence(ids),   // the shared step hands the joined circle over
     pullLanes: (cid) => pullCircleLanes(lanes.catchUps, cid, { callSkill }),
   });
 

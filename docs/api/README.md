@@ -20,8 +20,8 @@ Recorded gaps are allowlisted in `scripts/api-doc-gaps.json`; new undocumented e
 
 | Package | Reference | Public exports | Documented | Coverage | Recorded gaps |
 | --- | --- | ---: | ---: | ---: | --- |
-| `@onderling/sdk` | [sdk.md](sdk.md) | 472 | 472 | 100% | — |
-| `@onderling/core` | [core.md](core.md) | 347 | 347 | 100% | — |
+| `@onderling/sdk` | [sdk.md](sdk.md) | 473 | 473 | 100% | — |
+| `@onderling/core` | [core.md](core.md) | 348 | 348 | 100% | — |
 | `@onderling/transports` | [transports.md](transports.md) | 33 | 33 | 100% | — |
 | `@onderling/vault` | [vault.md](vault.md) | 27 | 27 | 100% | — |
 | `@onderling/pod-client` | [pod-client.md](pod-client.md) | 118 | 118 | 100% | — |

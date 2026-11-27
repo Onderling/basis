@@ -62,6 +62,52 @@ describe('a join from another device is one act', () => {
     expect(store.current?.state === 'failed').toBe(false);
   });
 
+  it('being inside the join travels with its calls, not the clock: other calls meanwhile are judged on their own', async () => {
+    const timers = fakeTimers();
+    const store = createActState({ now: timers.now, setTimer: timers.setTimer, clearTimer: timers.clearTimer });
+    const calls = [];
+    const substrate = async (appOrigin, opId, args, ctx) => { calls.push({ opId, ctx }); return opId === 'redeemMembershipCode' ? { error: 'invalid-or-expired-code' } : { ok: true }; };
+    const callSkill = wrapCallSkillWithActState(substrate, { store, manifestsByOrigin: MANIFESTS });
+    const seen = [];
+    store.subscribe((c) => seen.push(c ? { state: c.state, opId: c.opId } : null));
+    const state = JG.initialState();
+    state.invite = { kind: 'membershipCode', groupId: 'b1', code: 'c1', adminPeerAddr: 'ADMIN' };
+    state.handle = 'S';
+    let answer;
+    const answered = new Promise((r) => { answer = r; });
+    const sendPeerRedeem = () => answered;   // the admin has not answered yet: the join stays open
+    store.noteInteraction();
+    const join = JG.finalSubmit({ state, callSkill, sendPeerRedeem });
+    await new Promise((r) => setTimeout(r, 0));
+
+    // (1) the person taps something else while the join hangs: that act paints its own pending and done
+    timers.advance(ACT_INTERACTION_WINDOW_MS + 500);
+    store.noteInteraction();
+    const other = callSkill('pinboard', 'setMyHandle', { groupId: 'b9', handle: 'x' });
+    timers.advance(500);   // past the pending delay
+    await other;
+    expect(seen.some((c) => c?.opId === 'setMyHandle' && c.state === 'pending'), `no pending for the other act: ${JSON.stringify(seen)}`).toBe(true);
+    expect(seen.some((c) => c?.opId === 'setMyHandle' && c.state === 'done'), `no done for the other act: ${JSON.stringify(seen)}`).toBe(true);
+    expect(calls.find((c) => c.opId === 'setMyHandle' && c.ctx?.door === 'tap'), 'a real tap is a tap').toBeTruthy();
+
+    // (2) a write with no tap in the window (a turn, a background step), still during the join: its own door, no line
+    timers.advance(ACT_INTERACTION_WINDOW_MS + 500);
+    const before = seen.length;
+    await callSkill('pinboard', 'setMyHandle', { groupId: 'b8', handle: 'y' }, { door: 'slash' });
+    await callSkill('pinboard', 'setMyHandle', { groupId: 'b7', handle: 'z' });
+    expect(seen.length, `a call with no tap painted: ${JSON.stringify(seen.slice(before))}`).toBe(before);
+    const b8 = calls.find((c) => c.opId === 'setMyHandle' && c.ctx?.door === 'slash');
+    expect(b8, 'a turn keeps its own door').toBeTruthy();
+    const untapped = calls.filter((c) => c.opId === 'setMyHandle').at(-1);
+    expect(untapped.ctx?.door, 'a background write is not recorded as the person\'s tap').not.toBe('tap');
+
+    answer({ ok: true, codeId: 'k1', validUntil: 0 });
+    const { result } = await join;
+    expect(result?.ok, 'the join itself worked').toBe(true);
+    // the join's own calls went down as the person's tap
+    expect(calls.find((c) => c.opId === 'recordRemoteRedemption')?.ctx?.door, 'the join\'s own write is the person\'s tap').toBe('tap');
+  });
+
   it('a join that really fails still says so: the admin\'s refusal is the act\'s end', async () => {
     const timers = fakeTimers();
     const store = createActState({ now: timers.now, setTimer: timers.setTimer, clearTimer: timers.clearTimer });

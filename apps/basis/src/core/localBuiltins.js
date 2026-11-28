@@ -311,6 +311,8 @@ async function signinFlow(args, { podAuth, externalFlow, t, callSkill = null }) 
         catch (err) {
           console.warn('[signin] could not complete', err?.message ?? err);
           // a provider that answered with a refusal (its registration said no) is not one that did not answer
+          // the person closed the provider's page (or it never handed back): said as that, never the raw library line
+          if (err?.code === 'AUTH_DISMISSED') return { ok: false, code: err.code, error: t('signin.dismissed', { issuer: resolved?.url ?? issuer ?? name }) };
           if (err?.code === 'ISSUER_REFUSED') return { ok: false, code: err.code, error: t('signin.issuer_refused', { issuer: err.issuer ?? resolved?.url ?? issuer ?? name }) };
           if (err?.code === 'ISSUER_NOT_READY') return { ok: false, code: err.code, error: t('signin.issuer_not_ready', { issuer: err.issuer ?? resolved?.url ?? issuer ?? name }) };
           return { ok: false, error: err?.message ?? String(err) };

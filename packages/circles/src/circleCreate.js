@@ -40,7 +40,8 @@ export async function createGroupWithRules({ store, simulateSync, emitSpine = nu
     [{
       type:       'group-rules',
       text:       a.name,
-      source:     { groupId: a.groupId, rules: a.rules, version: 1 },
+      // the circle's name lives in its rules doc (circleName.js): a rules change keeps it, a rename is a rules change
+      source:     { groupId: a.groupId, rules: { ...a.rules, name: a.name }, version: 1 },
       visibility: 'household',
     }],
     { actor: from },
@@ -111,6 +112,8 @@ export async function createGroupV2({
 
   const rulesWithRotation = {
     ...a.rules, keyRotationMode, rotationDays, inviteExpiresInHours, inviteMaxRedemptions, storage, version: 1,
+    // the circle's name lives in its rules doc (circleName.js): a rules change keeps it, a rename is a rules change
+    name: a.name,
   };
   const [rulesItem] = await store.addItems(
     [{

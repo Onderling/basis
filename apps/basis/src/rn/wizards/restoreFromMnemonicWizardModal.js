@@ -13,7 +13,7 @@ import React, { useState, useCallback } from 'react';
 import { Modal, View, ScrollView, StyleSheet, Pressable, Text } from 'react-native';
 import {
   initialState, mnemonicWordCount, isMnemonicValid,
-  canAdvanceFromConfirm, submitRestore,
+  canAdvanceFromConfirm, submitRestore, checkPhrase,
 } from '../../core/wizards/restoreFromMnemonicState.js';
 import {
   Steps, Body, Textarea, Checkbox, Actions, ErrorBanner, Submitting, WizardTheme, wizardPalette, Warn,
@@ -70,6 +70,8 @@ export default function RestoreFromMnemonicWizardModal({
                     <Text style={styles.count}>
                       {mnemonicWordCount(state.mnemonic)} word(s)
                     </Text>
+                    {/* the phrase this device already is: nothing to restore, said before the confirm step (web twin) */}
+                    {state.alreadyYou ? <Text style={styles.count} testID="restore-already-you">{t('circle.wizard.restore.already_you')}</Text> : null}
                   </Body>
                 )}
                 {state.step === 2 && (
@@ -102,7 +104,7 @@ export default function RestoreFromMnemonicWizardModal({
               <Actions buttons={(() => {
                 if (state.step === 1) return [
                   { label: t('common.cancel'), onPress: onClose, kind: 'secondary' },
-                  { label: t('common.next'),   onPress: () => setStep(2), kind: 'primary',
+                  { label: t('common.next'),   onPress: async () => { const next = await checkPhrase({ state: { ...state }, callSkill }); setState({ ...next }); }, kind: 'primary',
                     disabled: !isMnemonicValid(state.mnemonic) },
                 ];
                 if (state.step === 2) return [

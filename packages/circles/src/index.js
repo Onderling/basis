@@ -60,3 +60,4 @@ export {
   emitMemberProps, MEMBER_PROPS_FIELDS,
 } from './circleMembershipWriters.js';
 export { hasHumanRules } from './circleRulesDoc.js';
+export { circleNamesFromRules } from './circleName.js';

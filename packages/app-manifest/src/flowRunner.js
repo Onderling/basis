@@ -180,10 +180,13 @@ export function createFlowRunner({ callSkill, saveInstance, genId, isSecretKind,
       instance.at = flow.steps?.[0]?.id ?? null;
       delete instance.awaiting;
       delete instance.reason;
-      return execute(flow, instance, { transient });
+      return { ...(await execute(flow, instance, { transient })) };
     }
     if (instance.status === 'awaiting-input') instance.status = 'running';
-    return execute(flow, instance, { transient, input });
+    // a NEW object back (the one passed in is moved on as well): a shell that keeps the instance as state, React's
+    // setState, sees a change only by reference; handed the same object it painted the step before (the phone's
+    // restore-finish modal stayed on "Your circles are not here" after a load that had gone on to the question)
+    return { ...(await execute(flow, instance, { transient, input })) };
   }
 
   function cancel(instance) { instance.status = 'cancelled'; instance.at = null; return save(instance), instance; }

@@ -46,6 +46,16 @@ describe('signin, completing in place', () => {
     expect(asked).toContain('household.podSessionReady');
   });
 
+  it('a person who closed the sign-in page hears that, in words, not the raw "prompt did not succeed (dismiss)"', async () => {
+    const podAuth = {
+      completesInPlace: true,
+      resolveIssuer: (i) => ({ id: 'custom', url: i, name: i }),
+      startSignIn: async () => { throw Object.assign(new Error('completeSignIn: prompt did not succeed (dismiss)'), { code: 'AUTH_DISMISSED', resultType: 'dismiss' }); },
+    };
+    const r = await builtinsWith(podAuth).signin({ issuer: 'http://localhost:3000' });
+    expect(r).toMatchObject({ ok: false, code: 'AUTH_DISMISSED', error: 'signin.dismissed:http://localhost:3000' });
+  });
+
   it('a sign-in that completes says so only after it did', async () => {
     let done = false;
     const podAuth = {

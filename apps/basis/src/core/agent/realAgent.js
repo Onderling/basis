@@ -5651,9 +5651,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   hostAgent.register('listRecoveryCircles', async () => {
     try {
       const memberships = await readSelfCircleMemberships().catch(() => ({}));
-      let rows = [];
-      try { rows = (await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []; } catch { rows = []; }
-      const nameOf = new Map(rows.map((c) => [typeof c === 'string' ? c : (c?.groupId ?? c?.id), typeof c === 'string' ? null : (c?.name ?? null)]));
+      // a circle's NAME from the one name read (listMyCircles' `names`: circleNamesFromRules), never its key: the
+      // circles list holds bare ids, and reading a name off them named every circle by its key on the file screen
+      let names = {};
+      try { names = (await callSkill('pinboard', 'listMyCircles', {}))?.names ?? {}; } catch { names = {}; }
+      const nameOf = new Map(Object.entries(names && typeof names === 'object' ? names : {}));
       const circles = Object.keys(memberships)
         .filter((id) => id && id !== tasksPrimaryCircleId && id !== 'household')
         .map((id) => ({ id, name: nameOf.get(id) ?? null }));
@@ -6047,6 +6049,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     let root;
     try { root = Bootstrap.fromMnemonic(mnemonic); }
     catch { return [DataPart({ ok: false, error: 'invalid-phrase' })]; }
+    // THE PHRASE THIS DEVICE ALREADY IS changes nothing: it derives the authority this device speaks as, so a restore
+    // would only forget the running self (the phone walk: the person's circle and name were gone). Said, not done.
+    let alreadyYou = false;
+    try { alreadyYou = Boolean(persona.authorityPubKeyB64) && authorityPubKeyB64Of(root.deriveProfileAuthority(primaryId)) === persona.authorityPubKeyB64; }
+    catch { alreadyYou = false; }
+    if (alreadyYou) return [DataPart({ ok: true, alreadyYou: true })];
+    // a CHECK (the wizard, before its confirm step) restores nothing: it only says whether this phrase is already you
+    if (parts?.[0]?.data?.checkOnly === true) return [DataPart({ ok: true, alreadyYou: false, checked: true })];
     try {
       // ONE implementation, shared with the first-run door (`ownerRootRestore.js`) — which used to have
       // its own, and restored nothing. The live chatAgent keeps its current identity until an app RELOAD

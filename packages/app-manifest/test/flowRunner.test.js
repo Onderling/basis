@@ -63,6 +63,17 @@ describe('the flow runner', () => {
     expect(JSON.stringify(inst.needs ?? {})).not.toContain('geheime');
   });
 
+  it('resume hands back a NEW instance object, so a shell that keeps it as state repaints; the one passed in is moved on too', async () => {
+    // the phone walk: after "Load a recovery file" the restore-finish modal's setInst got the SAME object the runner had
+    // moved on in place, React saw no change, and the screen stayed on the step before (and "Not now" seemed dead)
+    const { runner } = harness({ unlock: { ok: true }, probe: { ok: true, outcome: 'openable' }, merge: { ok: true } });
+    const inst = await runner.start(FLOW, { needs: { phrase: 'x' } });
+    const done = await runner.resume(FLOW, inst, { transient: { phrase: 'x' }, input: { choices: { keep: 'theirs' } } });
+    expect(done, 'a new object: a React shell sees the change').not.toBe(inst);
+    expect(done.status).toBe('done');
+    expect(inst.status, 'a caller that ignores the return still reads the moved-on instance').toBe('done');
+  });
+
   it('awaiting-input pauses at the unsatisfied required param; resume with input finishes', async () => {
     const { runner } = harness({
       unlock: { ok: true },

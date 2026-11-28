@@ -14,12 +14,17 @@
 export const HAND_BACK_BROWSER = 'com.android.chrome';
 
 /**
- * @param {{browserPackages?: string[], defaultBrowserPackage?: string, preferredBrowserPackage?: string}|null} found
+ * @param {{browserPackages?: string[], servicePackages?: string[], defaultBrowserPackage?: string, preferredBrowserPackage?: string}|null} found
  * @returns {string|undefined}  the package to pass as `browserPackage`, or undefined to let the library choose
  */
 export function authBrowserPackage(found) {
   const f = found && typeof found === 'object' ? found : {};
-  const listed = Array.isArray(f.browserPackages) ? f.browserPackages : [];
+  // EITHER list: the custom-tabs SERVICE list is the one that says "can open a custom tab"; on a walked Samsung the
+  // VIEW-http list held only the default browser while the service list held Chrome too
+  const listed = [
+    ...(Array.isArray(f.browserPackages) ? f.browserPackages : []),
+    ...(Array.isArray(f.servicePackages) ? f.servicePackages : []),
+  ];
   if (listed.includes(HAND_BACK_BROWSER)) return HAND_BACK_BROWSER;
   return f.preferredBrowserPackage || f.defaultBrowserPackage || undefined;
 }

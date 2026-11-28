@@ -16,6 +16,15 @@ describe('the sign-in\'s browser on Android', () => {
       preferredBrowserPackage: 'com.duckduckgo.mobile.android',
     })).toBe(HAND_BACK_BROWSER);
   });
+  it('the walked Samsung\'s real shape: Chrome only in the custom-tabs SERVICE list still counts', () => {
+    // the VIEW-http query answered only the default (DuckDuckGo); the custom-tabs service query answered both
+    expect(authBrowserPackage({
+      browserPackages: ['com.duckduckgo.mobile.android'],
+      servicePackages: ['com.android.chrome', 'com.duckduckgo.mobile.android'],
+      defaultBrowserPackage: 'com.duckduckgo.mobile.android',
+      preferredBrowserPackage: 'com.duckduckgo.mobile.android',
+    })).toBe(HAND_BACK_BROWSER);
+  });
   it('without Chrome: the phone\'s preferred custom-tabs browser, then its default', () => {
     expect(authBrowserPackage({ browserPackages: ['org.mozilla.firefox'], preferredBrowserPackage: 'org.mozilla.firefox' })).toBe('org.mozilla.firefox');
     expect(authBrowserPackage({ browserPackages: [], defaultBrowserPackage: 'x.y' })).toBe('x.y');

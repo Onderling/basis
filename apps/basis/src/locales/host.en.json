@@ -498,6 +498,10 @@
       "text": "The pod provider at {{issuer}} refused the sign-in from this app.",
       "doc": "Phone sign-in: the provider answered, but refused to register the app (its registration said no). Not: did not answer."
     },
+    "dismissed": {
+      "text": "The sign-in at {{issuer}} was closed before it finished. Nothing changed; you can try again.",
+      "doc": "Phone sign-in: the provider's page was closed (or did not hand back to the app) before the sign-in finished. Not an error of the provider."
+    },
     "unknown_issuer": {
       "text": "Unknown issuer \"{{issuer}}\". Try 'inrupt', 'solidcommunity', 'solidweb' or a full URL.",
       "doc": "When resolveIssuer returns null."

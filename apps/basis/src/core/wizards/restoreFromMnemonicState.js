@@ -18,6 +18,7 @@ export function initialState() {
     submitting:       false,
     submitError:      null,
     successResult:    null,
+    alreadyYou:       false,        // the phrase is the one this device already is (checkPhrase): nothing to restore
   };
 }
 
@@ -67,5 +68,23 @@ export async function submitRestore({ state, callSkill }) {
     state.submitError = err?.message ?? String(err);
     state.submitting  = false;
   }
+  return state;
+}
+
+/**
+ * Step 1's "Next": ask whether this phrase is the one this device already is, BEFORE the confirm step (a check that
+ * restores nothing: `restoreOwnerPhrase` with `checkOnly`). The device's own phrase stops here with `alreadyYou`, and
+ * the person never reaches "will be lost" for a restore that would only forget the running self; another phrase goes
+ * on to step 2. A check that fails is not a stop: the confirm step and the restore itself still decide.
+ * @param {{state: object, callSkill: function}} args
+ * @returns {Promise<object>} the mutated state
+ */
+export async function checkPhrase({ state, callSkill }) {
+  state.alreadyYou = false;
+  try {
+    const r = await callSkill('household', 'restoreOwnerPhrase', { mnemonic: state.mnemonic.trim(), checkOnly: true });
+    state.alreadyYou = r?.ok === true && r.alreadyYou === true;
+  } catch { state.alreadyYou = false; }
+  if (!state.alreadyYou) state.step = 2;
   return state;
 }

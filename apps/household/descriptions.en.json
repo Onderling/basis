@@ -137,7 +137,7 @@
   },
   "restoreOwnerPhrase": {
     "what": "Restore who you are with your recovery phrase.",
-    "params": {"mnemonic": "your recovery phrase"}
+    "params": {"mnemonic": "your recovery phrase", "checkOnly": "only check whether this is already you"}
   },
   "restoreFromMnemonicWizard": {
     "what": "Restore everything with your recovery phrase; what is here is replaced.",

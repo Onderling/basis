@@ -9676,6 +9676,10 @@
         "text": "Words separated by single spaces.",
         "doc": "Restore wizard (web): under the phrase field."
       },
+      "already_you": {
+        "text": "This is already you on this device. Nothing needs restoring, and nothing was changed.",
+        "doc": "Restore wizard, step 1: the phrase typed is the one this device already is (checkPhrase); a restore would only forget the running self, so it stops here, before the confirm step."
+      },
       "button": {
         "text": "Restore now",
         "doc": "Restore wizard, both shells: the button that restores."

@@ -9672,6 +9672,10 @@
         "text": "Woorden gescheiden door één spatie.",
         "doc": "Restore wizard (web): under the phrase field."
       },
+      "already_you": {
+        "text": "Dit ben je al op dit apparaat. Er hoeft niets hersteld te worden, en er is niets veranderd.",
+        "doc": "Restore wizard, step 1: the phrase typed is the one this device already is (checkPhrase); a restore would only forget the running self, so it stops here, before the confirm step."
+      },
       "button": {
         "text": "Nu herstellen",
         "doc": "Restore wizard, both shells: the button that restores."

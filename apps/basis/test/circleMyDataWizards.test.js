@@ -22,6 +22,9 @@ describe('My-data key-management wizards (reused renderers)', () => {
     const input = container.querySelector('input');
     input.value = phrase; input.dispatchEvent(new Event('input'));
     container.querySelector('.cc-wizard-btn-primary').click();
+    // Next first CHECKS the phrase (restores nothing): another person's goes on to the confirm step
+    await vi.waitFor(() => expect(container.querySelectorAll('input[type="checkbox"]').length).toBeGreaterThan(0));
+    expect(callSkill).toHaveBeenCalledWith('household', 'restoreOwnerPhrase', { mnemonic: phrase, checkOnly: true });
 
     // step 2 — tick both destructive confirms, then Next →
     container.querySelectorAll('input[type="checkbox"]').forEach((c) => { c.checked = true; c.dispatchEvent(new Event('change')); });

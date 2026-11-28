@@ -84,6 +84,7 @@ import {
   leaveGroup as leaveGroupCore,
   acceptGroupRules as acceptGroupRulesCore,
   removeMember as removeMemberCore,
+  circleNamesFromRules,
 } from '@onderling/circles';
 import { validatePinboardItem, intentToCanonicalDraft } from '../lib/canonicalAdapter.js';
 
@@ -2952,15 +2953,12 @@ export function buildSkills({
        * Collected from EVERY rules row for the circle, not only the ones this device authored: a joiner
        * holds the circle's rules without having written them, and they are owed its name just as much.
        */
-      const names = new Map();
+      // THE ONE NAME READ (circleNamesFromRules): the highest-version head that carries a name, never the key, never a
+      // joiner's placeholder (a shell shows no name rather than a key)
+      const names = circleNamesFromRules(rules, { isPlaceholder: (label, gid) => label === mirroredRulesPlaceholder(gid) });
       for (const it of rules) {
         const gid = it?.source?.groupId;
         if (typeof gid !== 'string' || !gid) continue;
-        const label = typeof it.text === 'string' ? it.text.trim() : '';
-        // a joiner's copy made from an invite that carried no name holds a placeholder with the circle's key in it:
-        // not a name (a shell shows no name rather than a key)
-        if (label === mirroredRulesPlaceholder(gid)) continue;
-        if (label && !names.has(gid)) names.set(gid, label);
         if (it?.addedBy !== from) continue;
         ids.add(gid);
       }
@@ -3628,6 +3626,12 @@ export function buildSkills({
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
       if (typeof a.rules !== 'object' || a.rules === null) return { error: 'rules object required' };
+      // A RULES CHANGE KEEPS THE CIRCLE'S NAME (it lives in the doc, circleName.js): a doc saved without one carries the
+      // current name on, so the new head and its statement are named, never keyed (measured: v2's text was the key)
+      if (!(typeof a.rules.name === 'string' && a.rules.name.trim())) {
+        const current = circleNamesFromRules(await store.listOpen({ type: 'group-rules' }), { isPlaceholder: (label, gid) => label === mirroredRulesPlaceholder(gid) }).get(a.groupId);
+        if (current) a.rules = { ...a.rules, name: current };
+      }
       // THE CIRCLE'S ADMIN GATE, asked of the circle (Frits, 2026-08-23 — local ops DO gate).
       //
       // The binding gate is still the receiver's: `applyRulesUpdates` refuses a member-authored

@@ -1,6 +1,6 @@
 # Architecture
 
-> **Last updated: 2026-11-27** — checked against the code on `development` that day. Every change to this file
+> **Last updated: 2026-11-28** — checked against the code on `development` that day. Every change to this file
 > moves this date (`scripts/lint-architecture-date.mjs` is red otherwise), so the date says how fresh the whole
 > file is, not one paragraph.
 
@@ -1456,8 +1456,9 @@ see the Pod home), the **recovery file** (the registry sealed to the phrase, exp
 data), or an offer from another device they still hold; a recovery screen that promises more than that is
 promising the wrong thing.
 
-**The recovery file also carries each circle's member list** (2026-09-13). The list of circles alone
-gave a restored device a circle's name and nobody to reach: its own roster is empty because the trail lived on
+**The recovery file also carries each circle's member list** (2026-09-13). The list of circles alone gave a
+restored device a circle (not its name: a circle's name lives in its rules doc, and the registry's membership record
+never carried one) and nobody to reach: its own roster is empty because the trail lived on
 the lost phone, and before the circle root its per-circle addresses were fresh, so no roster named them either. So the export offers, per circle and on by default, to carry that circle's
 roster — the trail rows and the member rows, the same a sibling would serve as a seed — together with
 the device's own proven address announcement, minted while it still holds the key. The person chooses

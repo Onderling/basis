@@ -41,5 +41,6 @@ export function restoreFinishOutcome(inst) {
 export function restoreFinishCameFrom(inst) {
   const source = inst?.steps?.source;
   if (source?.outcome === 'ok' && source?.out?.source === 'file') return 'circle.restore_finish.status_file';
+  if (source?.outcome === 'ok' && source?.out?.source === 'pod') return 'circle.restore_finish.status_pod';
   return inst?.steps?.status?.out?.carrier === 'pod' ? 'circle.restore_finish.status_pod' : 'circle.restore_finish.status_local';
 }

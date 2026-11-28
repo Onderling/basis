@@ -78,6 +78,8 @@ export default function RestoreFinishModal({ visible, callSkill, onClose }) {
         <View style={styles.row}>
           <Btn label={t('circle.wizard.recovery.pick')} onPress={pickFile} testID="restore-finish-pick" />
           {fileText ? <Btn label={t('circle.restore_finish.source_file')} primary onPress={() => submit({ source: 'file', file: fileText })} testID="restore-finish-load" /> : null}
+          {/* the pod the screen names: the shared sign-in, through the flow's own source step (web twin: circleApp) */}
+          <Btn label={t('circle.restore_finish.source_pod')} onPress={() => submit({ source: 'pod' })} testID="restore-finish-pod" />
           <Btn label={t('circle.restore_finish.source_later')} onPress={() => submit({ source: 'later' })} testID="restore-finish-later" />
         </View>
       </View>

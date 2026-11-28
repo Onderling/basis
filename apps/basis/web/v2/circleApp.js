@@ -6953,6 +6953,8 @@ function showRestoreFinishFlow() {
         });
         card.appendChild(input);
         card.appendChild(button(t('circle.restore_finish.source_file'), () => { if (fileText) submit({ source: 'file', file: fileText }); }, true));
+        // the pod the screen names: the shared sign-in, through the flow's own source step (phone twin: RestoreFinishModal)
+        card.appendChild(button(t('circle.restore_finish.source_pod'), () => submit({ source: 'pod' })));
         card.appendChild(button(t('circle.restore_finish.source_later'), () => submit({ source: 'later' })));
         return;
       }

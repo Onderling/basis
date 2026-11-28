@@ -9006,6 +9006,7 @@
     "empty_title": "Je bent weer jezelf. Je kringen zijn hier niet.",
     "empty_body": "De herstelzin brengt terug wie je bent, niet de lijst van kringen waar je in zat. Die lijst staat op je pod, of in een herstelbestand dat je bewaarde. Heb je geen van beide, dan kan iemand uit elke kring je opnieuw uitnodigen; je komt terug als hetzelfde lid.",
     "source_file": "Herstelbestand laden",
+    "source_pod": "Log in op mijn pod",
     "source_later": "Nu niet",
     "intent_question": "Zou iemand anders je oude telefoon nog kunnen gebruiken?",
     "intent_broken": "Nee, hij is kapot of gewist",
@@ -9019,6 +9020,8 @@
     "done_devices": "Ingetrokken apparaten:",
     "err_not_yours": "Dat bestand is niet gemaakt met jouw herstelzin.",
     "err_unreadable": "Dat is geen herstelbestand.",
+    "err_pod_empty": "Je pod heeft nog geen kringen voor je. Laad een herstelbestand, of vraag iemand in elke kring je opnieuw uit te nodigen.",
+    "err_pod_failed": "Het inloggen op je pod is niet afgerond. Er is niets veranderd; je kunt het opnieuw proberen onder Mijn gegevens.",
     "err_failed": "Dat is niet gelukt. Je kunt het opnieuw proberen onder Mijn gegevens."
   },
   "replace": {

@@ -12,7 +12,7 @@ import { createAgentRegistry } from '../src/AgentRegistry.js';
 import {
   exportProfileRegistry, importProfileRegistry, restoreProfilesInto,
   createProfile, profilePubKey,
-  setCircleMembership, removeCircleMembership, circleMembershipsOf, circleMembershipOf, circleKeyRefOf, circleMembershipsFromProperties,
+  setCircleMembership, removeCircleMembership, circleLeavesOf, circleMembershipsOf, circleMembershipOf, circleKeyRefOf, circleMembershipsFromProperties,
   isKeyRef, isCircleMembershipRecord, normaliseCircleMembership,
 } from '../index.js';
 
@@ -115,13 +115,15 @@ describe('the circle-membership record vocabulary', () => {
 
 describe('removeCircleMembership — leaving a circle takes its record off the profile (2026-09-22)', () => {
   // The record stayed after a leave until today, so a restored device re-opened a circle the person had left.
-  it('drops exactly that circle; the others stay; a circle not there is a no-op', () => {
+  it('drops exactly that circle; the others stay; a circle not there keeps the memberships as they are', () => {
     let props = {};
     props = setCircleMembership(props, 'k1', { handle: 'a', address: 'a@k1' });
     props = setCircleMembership(props, 'k2', { address: 'a@k2' });
-    const after = removeCircleMembership(props, 'k1');
+    const after = removeCircleMembership(props, 'k1', { at: '2026-11-28T10:00:00.000Z' });
     expect(Object.keys(circleMembershipsOf({ properties: after }))).toEqual(['k2']);
-    expect(removeCircleMembership(after, 'k9')).toEqual(after);
+    // a leave leaves a dated tombstone (2026-11-28: a registry merge honours it), also for a circle not on the record
+    expect(circleLeavesOf({ properties: after })).toEqual({ k1: '2026-11-28T10:00:00.000Z' });
+    expect(circleMembershipsOf({ properties: removeCircleMembership(after, 'k9') })).toEqual(circleMembershipsOf({ properties: after }));
     expect(circleMembershipsOf({ properties: removeCircleMembership(after, 'k2') })).toEqual({});
     expect(() => removeCircleMembership(props, '')).toThrow(/circleId/);
   });

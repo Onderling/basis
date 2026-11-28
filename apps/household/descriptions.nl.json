@@ -115,6 +115,10 @@
     "what": "Kies waar je kringen vandaan komen als er niets terugkwam.",
     "params": {"source": "een bestand, of later", "file": "het herstelbestand"}
   },
+  "podSessionReady": {
+    "what": "Haal je kringenlijst nu van je pod.",
+    "params": {}
+  },
   "restoreIntent": {
     "what": "Zeg wat er met je oude apparaat is: kapot, kwijt, of je voegt er een toe.",
     "params": {"intent": "kapot, kwijt of erbij"}

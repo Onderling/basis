@@ -33,6 +33,19 @@ describe('signin, completing in place', () => {
     expect(r).toMatchObject({ ok: false, code: 'ISSUER_REFUSED', error: 'signin.issuer_refused:http://localhost:3000' });
   });
 
+  it('a sign-in that completes in place attaches the registry\'s pod mirror, in this start (the phone needs no restart)', async () => {
+    const asked = [];
+    const callSkill = async (app, op, args) => { asked.push(`${app}.${op}`); return { ok: true }; };
+    const podAuth = {
+      completesInPlace: true,
+      resolveIssuer: (i) => ({ id: 'custom', url: i, name: i }),
+      startSignIn: async () => ({ webid: 'https://pod.example/me#me' }),
+    };
+    const r = await createLocalBuiltins({ catalogue: { ops: [] }, t, podAuth, callSkill }).signin({ issuer: 'https://pod.example' });
+    expect(r.ok).toBe(true);
+    expect(asked).toContain('household.podSessionReady');
+  });
+
   it('a person who closed the sign-in page hears that, in words, not the raw "prompt did not succeed (dismiss)"', async () => {
     const podAuth = {
       completesInPlace: true,

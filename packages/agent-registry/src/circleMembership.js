@@ -30,6 +30,8 @@ import { setOwn, resolveProperty } from './profileProperties.js';
 
 /** The canonical property key holding the `{ [circleId]: record }` map. */
 export const CIRCLE_MEMBERSHIPS_KEY = 'circleMemberships';
+/** The circles the person LEFT, `{ [circleId]: at }`: a dated tombstone a registry merge honours (a leave is not a plain removal). */
+export const CIRCLE_LEFT_KEY = 'circleMembershipsLeft';
 
 /** The four sealing postures resolveCircleStorage recognises (only p2/p3 carry key material). */
 const POSTURES = Object.freeze(['p0', 'p1', 'p2', 'p3']);
@@ -69,6 +71,7 @@ export function isCircleMembershipRecord(v) {
   if (v.relays != null && (!Array.isArray(v.relays) || v.relays.some((r) => typeof r !== 'string'))) return false;
   if (v.key != null && !isKeyRef(v.key)) return false;
   if (v.sight != null && !isSight(v.sight)) return false;
+  if (v.at != null && typeof v.at !== 'string') return false;
   return true;
 }
 
@@ -90,6 +93,8 @@ export function normaliseCircleMembership(v) {
   if (Array.isArray(v.relays)) rec.relays = Object.freeze([...v.relays]);
   if (v.key != null) rec.key = Object.freeze({ ref: v.key.ref, ...(v.key.posture ? { posture: v.key.posture } : {}) });
   if (v.sight != null) rec.sight = Object.freeze({ putAway: v.sight.putAway, at: v.sight.at });
+  // when this record was last written: a registry merge keeps it over an older leave of the same circle, not a newer one
+  if (typeof v.at === 'string' && v.at) rec.at = v.at;
   return Object.freeze(rec);
 }
 
@@ -130,15 +135,25 @@ export function circleMembershipsFromProperties(getProfile, profileId, opts = {}
  * device re-opened a circle the person had left (found 2026-09-22 while making a leave follow the siblings).
  * A circle not on the record is a no-op; the other records stay.
  */
-export function removeCircleMembership(properties, circleId) {
+export function removeCircleMembership(properties, circleId, { at = new Date().toISOString() } = {}) {
   if (typeof circleId !== 'string' || !circleId) throw new TypeError('removeCircleMembership: circleId required');
   const cur = properties?.[CIRCLE_MEMBERSHIPS_KEY];
   const curMap = (cur?.mode === 'own' && cur.value && typeof cur.value === 'object' && !Array.isArray(cur.value))
     ? cur.value
     : {};
-  if (!(circleId in curMap)) return properties;
+  // A LEAVE LEAVES A DATED TOMBSTONE: a registry merge of a copy this device has not read (registryCarrier.js) unions
+  // the circles, and a plain removal would let a device still holding the circle put it back
+  const left = { ...circleLeavesOf({ properties }), [circleId]: at };
+  const withTomb = setOwn(properties, CIRCLE_LEFT_KEY, left);
+  if (!(circleId in curMap)) return withTomb;
   const { [circleId]: _gone, ...rest } = curMap;
-  return setOwn(properties, CIRCLE_MEMBERSHIPS_KEY, rest);
+  return setOwn(withTomb, CIRCLE_MEMBERSHIPS_KEY, rest);
+}
+
+/** The person's dated leaves off one registry entry, `{ [circleId]: at }` (own, no inherit chain). */
+export function circleLeavesOf(entry) {
+  const cur = entry?.properties?.[CIRCLE_LEFT_KEY];
+  return (cur?.mode === 'own' && cur.value && typeof cur.value === 'object' && !Array.isArray(cur.value)) ? { ...cur.value } : {};
 }
 
 /**
@@ -170,6 +185,8 @@ export function setCircleMembership(properties, circleId, patch) {
   if (Array.isArray(patch.relays)) merged.relays = patch.relays;
   if (patch.key != null) merged.key = patch.key;
   if (patch.sight != null) merged.sight = patch.sight;
+  // dated, so a registry merge can weigh it against a leave of the same circle (removeCircleMembership)
+  merged.at = typeof patch.at === 'string' && patch.at ? patch.at : new Date().toISOString();
   const rec = normaliseCircleMembership(merged);
   if (!rec) throw new TypeError('setCircleMembership: invalid membership record (an address is required)');
   return setOwn(properties, CIRCLE_MEMBERSHIPS_KEY, { ...curMap, [circleId]: rec });

@@ -10110,6 +10110,10 @@ async function boot() {
     });
     agent._circleGroupsIndex = circleGroupsIndex;   // the roster feed fills it (householdRosterPairing)
     circleHouseholdAgent = agent;   // OBJ-2 — expose to showSettings (sibling fn) for the paired-devices panel
+    // THE POD SESSION IS READY (phone twin: App.js, when its pod writer is ready): the web restores its session BEFORE
+    // the agent boots (handleRedirect above), so the boot attached every mirror and this call finds them attached; it
+    // is the same moment, said through the same op, so a session that ever comes after the boot still attaches them
+    if (podSession) Promise.resolve(agent.callSkill?.('household', 'podSessionReady', {})).catch(() => {});
     // Reconcile the three boot-cached device prefs FROM the register (the authority; the caches
     // only exist because the pre-paint hook, i18n init, and the transport connect all run before
     // this line). Register wins; each apply routes through the pref's own live door, whose

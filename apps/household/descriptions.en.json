@@ -115,6 +115,10 @@
     "what": "Choose where your circles come from when nothing came back.",
     "params": {"source": "a file, or later", "file": "the recovery file"}
   },
+  "podSessionReady": {
+    "what": "Bring your circle list from your pod now.",
+    "params": {}
+  },
   "restoreIntent": {
     "what": "Say what happened to your old device: broken, lost, or you are adding one.",
     "params": {"intent": "broken, lost or adding"}

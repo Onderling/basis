@@ -31,7 +31,7 @@
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
 import { createSealedPodDataSource } from '@onderling/pod-client';
 import { parseUntrustedJson, hashHex } from '@onderling/core';
-import { registryResourceUri, withRegistryWriteLock } from '@onderling/agent-registry';
+import { registryResourceUri, withRegistryWriteLock, circleLeavesOf, CIRCLE_LEFT_KEY } from '@onderling/agent-registry';
 import { probeSettingsMediumDetailed } from './settingsRestoreGate.js';
 
 const NAME_DOMAIN = 'onderling-registry-name-v1';
@@ -62,6 +62,50 @@ const updatedAtOf = (body) => {
   const t = Date.parse(body?.updatedAt ?? '');
   return Number.isFinite(t) ? t : 0;
 };
+
+const CIRCLES = 'circleMemberships';
+
+/**
+ * MERGE a pod copy this device has NOT read into its own copy — never a clock deciding whose list survives (a restored
+ * phone's first start writes a newer one-device list; last-write-wins then kept that over the pod's circles and pushed it
+ * up). Every agent on either side is kept; for an agent on both, its circles are the union, and a circle on both sides
+ * takes the record of the newer body; a revoked agent stays revoked; device tombstones union as everywhere
+ * (`unionTombstones`). Pure.
+ * @param {object} local   this device's registry body
+ * @param {object} pod     the pod's
+ * @returns {object} the merged body (`updatedAt` the later of the two)
+ */
+export function mergeUnreadPodCopy(local, pod) {
+  if (!pod || !Array.isArray(pod.agents)) return local;
+  if (!local || !Array.isArray(local.agents)) return pod;
+  const podNewer = updatedAtOf(pod) > updatedAtOf(local);
+  const byId = new Map(local.agents.map((a) => [a?.agentId, a]));
+  const agents = local.agents.map((a) => {
+    const other = pod.agents.find((p) => p?.agentId === a?.agentId);
+    if (!other) return a;
+    const mine = a?.properties?.[CIRCLES]?.mode === 'own' ? (a.properties[CIRCLES].value ?? {}) : null;
+    const theirs = other?.properties?.[CIRCLES]?.mode === 'own' ? (other.properties[CIRCLES].value ?? {}) : null;
+    let next = a;
+    if (theirs && typeof theirs === 'object') {
+      const circles = podNewer ? { ...(mine ?? {}), ...theirs } : { ...theirs, ...(mine ?? {}) };
+      next = { ...next, properties: { ...(next.properties ?? {}), [CIRCLES]: { mode: 'own', value: circles } } };
+    }
+    // A LEAVE IS HONOURED: the dated tombstones of both sides union (the later leave per circle), and a circle whose
+    // leave is newer than its record goes; a circle joined again after its leave stays
+    const leaves = { ...circleLeavesOf(other) };
+    for (const [cid, at] of Object.entries(circleLeavesOf(a))) if (!leaves[cid] || String(at) > String(leaves[cid])) leaves[cid] = at;
+    if (Object.keys(leaves).length) {
+      const circles = { ...(next.properties?.[CIRCLES]?.value ?? {}) };
+      for (const [cid, at] of Object.entries(leaves)) if (circles[cid] && String(circles[cid].at ?? '') < String(at)) delete circles[cid];
+      next = { ...next, properties: { ...(next.properties ?? {}), [CIRCLES]: { mode: 'own', value: circles }, [CIRCLE_LEFT_KEY]: { mode: 'own', value: leaves } } };
+    }
+    if (other?.revokedAt && !next.revokedAt) next = { ...next, revokedAt: other.revokedAt };
+    return next;
+  });
+  for (const p of pod.agents) if (p?.agentId && !byId.has(p.agentId)) agents.push(p);
+  const merged = { ...local, agents, updatedAt: podNewer ? pod.updatedAt : local.updatedAt };
+  return unionTombstones(unionTombstones(merged, pod), local);
+}
 
 /**
  * Build the registry's carrier: a pseudo-pod the agent registry is composed over, plus `attach()`.
@@ -111,12 +155,18 @@ export function unionTombstones(into, from) {
   return changed ? { ...into, agents } : into;
 }
 
-export function createRegistryCarrier({ backend, deviceId, medium = null, name = null, onKeyMismatch = null, warn = null } = {}) {
+export function createRegistryCarrier({ backend, deviceId, medium: initialMedium = null, name: initialName = null, onKeyMismatch = null, warn = null } = {}) {
   if (typeof deviceId !== 'string' || !deviceId) throw new Error('createRegistryCarrier: deviceId is required');
-  if (medium && !name) throw new Error('createRegistryCarrier: a pod name is required with a medium');
+  if (initialMedium && !initialName) throw new Error('createRegistryCarrier: a pod name is required with a medium');
+  // the medium may come LATER than the boot (`attachMedium`): a sign-in in place, or a session ready after a cold boot
+  let medium = initialMedium;
+  let name = initialName;
   const local = backend ?? createMemoryBackend();
   const resourceUri = registryResourceUri({ deviceId });
-  const state = { mode: 'local', probe: null, pulled: false, pushed: false };
+  // WHICH POD COPY THIS DEVICE HAS READ: a local marker naming the pod resource it last pulled from or pushed to. A pod
+  // copy it has never read is merged in at the first attach (`mergeUnreadPodCopy`), never written over by a clock.
+  const seenUri = `${resourceUri}#pod-seen`;
+  const state = { mode: 'local', probe: null, pulled: false, pushed: false, merged: false };
 
   const pseudoPod = createPseudoPod({
     backend: local,
@@ -152,13 +202,22 @@ export function createRegistryCarrier({ backend, deviceId, medium = null, name =
       return { ...state };
     }
     // the read-then-write runs in the registry's own mutation queue, so a register in flight cannot interleave with it
+    let seen = false;
+    try { seen = (await pseudoPod.read(seenUri))?.bytes?.pod === name; } catch { seen = false; }
     const localRec = await withRegistryWriteLock(pseudoPod, resourceUri, async () => {
       const localRec = await pseudoPod.read(resourceUri);
       if (status === 'openable') {
         let podBody = null;
         try { podBody = typeof value === 'string' ? parseUntrustedJson(value) : value; } catch { podBody = null; }
-        // Resource-level last-write-wins: the pod copy is newer (another device wrote it, or this device
-        // was wiped) → it becomes the local copy. Otherwise the local copy is pushed up below.
+        if (podBody && localRec && !seen) {
+          // A POD COPY THIS DEVICE HAS NOT READ (a restored or new device, signed in after its first start): its circles
+          // are taken in, then the merged list goes up. Never pushed over by a newer local clock.
+          await pseudoPod.write(resourceUri, mergeUnreadPodCopy(localRec.bytes, podBody));
+          state.merged = true;
+          return { ...localRec, merged: true };
+        }
+        // Resource-level last-write-wins, for a pod copy whose predecessor this device has read: the pod copy is newer
+        // (another device wrote it, or this device was wiped) → it becomes the local copy. Otherwise pushed up below.
         if (podBody && (!localRec || updatedAtOf(podBody) >= updatedAtOf(localRec.bytes))) {
           // the pulled copy keeps this device's tombstones too
           await pseudoPod.write(resourceUri, unionTombstones(podBody, localRec?.bytes ?? null));
@@ -178,10 +237,23 @@ export function createRegistryCarrier({ backend, deviceId, medium = null, name =
       state.pushed = true;
     }
     try { await pseudoPod.drainWriteThroughQueue(); } catch { /* parked writes drain on a later boot */ }
+    // this device has now read (and written) this pod copy: from here on, last-write-wins between the two is right
+    try { await pseudoPod.write(seenUri, { pod: name }); } catch { /* the next attach merges again: harmless */ }
     return { ...state };
   }
 
-  return { pseudoPod, resourceUri, attach, status: () => ({ ...state }) };
+  /**
+   * Attach a medium that came after the boot (a sign-in in place, a pod session ready after a cold start): once.
+   * A carrier already mirroring, or one without a medium yet, answers its state unchanged.
+   */
+  async function attachMedium(nextMedium, nextName) {
+    if (state.mode === 'cache' || !nextMedium || !nextName) return { ...state };
+    medium = nextMedium;
+    name = nextName;
+    return attach();
+  }
+
+  return { pseudoPod, resourceUri, attach, attachMedium, status: () => ({ ...state }) };
 }
 
 // ── THE RECOVERY FILE — the pod-less carrier of the same fact ───────────────────────────────────────

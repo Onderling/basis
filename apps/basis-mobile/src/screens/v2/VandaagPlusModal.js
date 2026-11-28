@@ -11,7 +11,7 @@ import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { conversationSelf } from '../../../../basis/src/assistant/plusDoor.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
-import { ASSISTANT_TABS, assistantTabFor, assistantSectionsOf, assistantAsksSelf } from '../../../../basis/src/v2/assistantTabs.js';   // the two tabs, shared (web twin)
+import { ASSISTANT_TABS, assistantTabFor, assistantSectionsOf, assistantAsksSelf, assistantLineAfterRead } from '../../../../basis/src/v2/assistantTabs.js';   // the two tabs, shared (web twin)
 import { t, lang } from '../../core/localisation.js';
 import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardWords, plusMomentNeedsTime, plusAskTime, plusAnswerLineShown } from '../../../../basis/src/v2/vandaagPlus.js';
 import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';   // the card's cap in window pixels, the scroll may shrink to it
@@ -129,6 +129,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
     // a slow model is said while the person waits ("even geduld"); its answer replaces it (web twin: circleApp.js)
     const r = await onRead?.(line, asSelf, { onSlow: () => { setDone(t('circle.bot.slow')); setError(null); } });
     setCard(r?.card && Array.isArray(r.card.to) && r.card.to.length ? r.card : null);
+    // the question gives way once the thread holds its answer (shared rule; the web repaints its line empty)
+    setLine((cur) => assistantLineAfterRead(cur, r));
     if (r?.card) setError(null);
     else if (r && 'done' in r) { setDone(r.done ?? null); setError(null); }
     else if (r?.actId) { setActId(r.actId); setValues((cur) => ({ ...cur, ...r.values })); setError(null); }

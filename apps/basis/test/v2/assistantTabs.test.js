@@ -1,6 +1,7 @@
+// @reads-source: both shells are checked as text for the shared rules, so rung 1 runs it (docs/conventions/verification-ladder.md).
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { ASSISTANT_TABS, assistantTabFor, assistantSectionsOf, assistantAsksSelf } from '../../src/v2/assistantTabs.js';
+import { ASSISTANT_TABS, assistantTabFor, assistantSectionsOf, assistantAsksSelf, assistantLineAfterRead } from '../../src/v2/assistantTabs.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
 
 describe('the assistant panel: two tabs over the "+" sheet\'s declared sections', () => {
@@ -54,5 +55,21 @@ describe('"As whom?" is asked above the tabs, on either tab (the phone walk: Ges
     }
     // on the phone the question has its own testID outside the sections, not inside plus-own (shown on Maken only)
     expect(phone).toMatch(/testID="vandaag-plus-ask-self"/);
+  });
+});
+
+describe('the line after an answer (the phone walk: the question stayed in the line after the answer)', () => {
+  it('empties when the thread holds the answer: a done line or a circle card', () => {
+    expect(assistantLineAfterRead('wat staat er vandaag', { done: 'Niets vandaag.' })).toBe('');
+    expect(assistantLineAfterRead('zet melk op de lijst', { card: { to: [{ circleId: 'c1' }] } })).toBe('');
+  });
+  it('stays when a form opened from it (the form shows what was said) or the read failed (to fix it)', () => {
+    expect(assistantLineAfterRead('notitie: melk', { actId: 'household.note' })).toBe('notitie: melk');
+    expect(assistantLineAfterRead('iets', { error: 'nope' })).toBe('iets');
+    expect(assistantLineAfterRead('iets', null)).toBe('iets');
+  });
+  it('the phone takes it from here', () => {
+    const phone = readFileSync(new URL('../../../basis-mobile/src/screens/v2/VandaagPlusModal.js', import.meta.url), 'utf8');
+    expect(phone).toMatch(/assistantLineAfterRead\(/);
   });
 });

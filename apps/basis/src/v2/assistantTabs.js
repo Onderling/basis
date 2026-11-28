@@ -44,3 +44,15 @@ export function assistantTabFor({ chosen = null, actId = null, editing = false }
 export function assistantAsksSelf({ selves = [], asSelf = null } = {}) {
   return Array.isArray(selves) && selves.length > 1 && !asSelf;
 }
+
+/**
+ * What the line holds after a read: empty once the thread holds the answer (a done line, or a circle's card to pick
+ * from), so the question does not stay standing over it (the phone walk); kept when a form opened from it (the form
+ * shows what was said) or the read failed (to fix it). The web repaints its card with an empty line on every answer.
+ * @param {string} line   what was typed
+ * @param {object|null} r the read's answer (`onRead`): `{done}` · `{card}` · `{actId}` · `{error}` · null
+ */
+export function assistantLineAfterRead(line, r) {
+  if (r && (('done' in r) || r.card)) return '';
+  return line;
+}

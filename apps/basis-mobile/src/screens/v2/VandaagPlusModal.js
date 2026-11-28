@@ -6,11 +6,12 @@
  * is typed in words ("morgen om 14:00"), read by the shared bounded reader.
  */
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Modal, View, Text, Pressable, ScrollView, StyleSheet, Keyboard, useWindowDimensions } from 'react-native';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { conversationSelf } from '../../../../basis/src/assistant/plusDoor.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
+import { ASSISTANT_TABS, assistantTabFor, assistantSectionsOf, assistantAsksSelf, assistantLineAfterRead } from '../../../../basis/src/v2/assistantTabs.js';   // the two tabs, shared (web twin)
 import { t, lang } from '../../core/localisation.js';
 import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardWords, plusMomentNeedsTime, plusAskTime, plusAnswerLineShown } from '../../../../basis/src/v2/vandaagPlus.js';
 import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';   // the card's cap in window pixels, the scroll may shrink to it
@@ -44,10 +45,23 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   // the line naming the route that answers (`plusRouteLine`, shared): painted above the conversation
   routeLine = null,
   // what can be typed here: `suggestFor(line)` → the lines to offer (shared `plusSuggest` over the sheet's pool)
-  suggestFor = null }) {
+  suggestFor = null,
+  // the assistant panel's two tabs (`assistantTabs.js`): the one the person last chose, and what a tap on a tab does
+  tab = null, onTab = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const sheetCap = useSheetCap(0.92);
+  // THE ASSISTANT PANEL is a floating card (web twin: .cc-assistant-panel): inset, tall, ending above the tab bar so the
+  // bar stays in sight; while the keyboard is open it takes the full height (the line and its answers need the room)
+  const { height: winH } = useWindowDimensions();
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  useEffect(() => {
+    const on = Keyboard.addListener('keyboardDidShow', () => setKeyboardOpen(true));
+    const off = Keyboard.addListener('keyboardDidHide', () => setKeyboardOpen(false));
+    return () => { on.remove(); off.remove(); };
+  }, []);
+  const aboveBar = keyboardOpen ? 8 : 76;   // the tab bar (6 + 48 + 10) and a gap
+  const panelHeight = Math.min(sheetCap.maxHeight, winH - aboveBar - 24);
   const [actId, setActId] = useState(null);
   // the sheet scrolls (a long thread, the "/" list): the line is brought into view whenever its place changes, so on
   // open and after each turn the person sees the line, not old turns (web twin: scrollIntoView on the line)
@@ -81,6 +95,11 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   }, [visible, writeAsSelf, edit]);
   if (!visible) return null;
   const act = PLUS_ACTS.find((a) => a.id === actId) ?? null;
+  // which tab shows: the chosen one; an open form shows on Maken, where it is painted (web twin: the same call)
+  const shown = assistantTabFor({ chosen: tab, actId, editing: !!edit });
+  const inShown = new Set(assistantSectionsOf(shown));
+  // several selves ticked and none chosen: "As whom?" comes first, above the tabs, on either tab (shared rule, web twin)
+  const asking = assistantAsksSelf({ selves, asSelf });
   // closing tells the host which self and which form were open: a form the "+" opened from a line, closed unsaved, is
   // refused, and the host has the conversation say so (the shared door's `settled`)
   const closeSheet = () => onClose?.({ asSelf, actId, editing: Boolean(edit?.act) });
@@ -110,6 +129,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
     // a slow model is said while the person waits ("even geduld"); its answer replaces it (web twin: circleApp.js)
     const r = await onRead?.(line, asSelf, { onSlow: () => { setDone(t('circle.bot.slow')); setError(null); } });
     setCard(r?.card && Array.isArray(r.card.to) && r.card.to.length ? r.card : null);
+    // the question gives way once the thread holds its answer (shared rule; the web repaints its line empty)
+    setLine((cur) => assistantLineAfterRead(cur, r));
     if (r?.card) setError(null);
     else if (r && 'done' in r) { setDone(r.done ?? null); setError(null); }
     else if (r?.actId) { setActId(r.actId); setValues((cur) => ({ ...cur, ...r.values })); setError(null); }
@@ -124,18 +145,41 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
     if (r?.error) setError(r.error); else { setDone(r?.done ?? null); setError(null); }
   };
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={closeSheet}>
-      <View style={styles.backdrop}>
-        <View style={[styles.card, sheetCap]} testID="vandaag-plus">
+    <Modal visible transparent animationType="fade" onRequestClose={closeSheet}>
+      {/* a touch outside the card leaves as "Klaar" does (closeSheet: an unsaved form the line opened is settled) */}
+      <Pressable style={[styles.backdrop, { paddingBottom: aboveBar }]} onPress={closeSheet} testID="vandaag-plus-backdrop" accessible={false}>
+        <Pressable style={[styles.card, { height: panelHeight, maxHeight: panelHeight }]} onPress={() => {}} testID="vandaag-plus" accessible={false}>
           {/* the sheet scrolls: a long thread or the "/" list must never push the line and the first lines off the screen */}
           <ScrollView ref={scrollRef} style={SHEET_SCROLL} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.cardBody} testID="vandaag-plus-scroll">
           <Text style={styles.title}>{t(edit ? 'circle.vandaag.plus_edit' : 'circle.vandaag.plus')}</Text>
+          {/* the two tabs under the title (web twin: circle-vandaag-plus__tabs); none when opened on an own row */}
+          {!edit ? (
+            <View style={styles.tabs} accessibilityRole="tablist">
+              {ASSISTANT_TABS.map((x) => (
+                <Pressable key={x.id} onPress={() => onTab?.(x.id)} accessibilityRole="tab" accessibilityState={{ selected: x.id === shown }}
+                  testID={`vandaag-plus-tab-${x.id}`} style={[styles.tab, x.id === shown ? styles.tabOn : null]}>
+                  <Text style={[styles.tabText, x.id === shown ? styles.tabTextOn : null]}>{t(x.labelKey)}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
           {/* which route answers this conversation, and whether it is confidential (web twin: circle-vandaag-plus__route) */}
-          {!edit && routeLine ? <Text style={styles.route} testID="vandaag-plus-route">{routeLine}</Text> : null}
+          {!edit && routeLine && shown === 'gesprek' && !asking ? <Text style={styles.route} testID="vandaag-plus-route">{routeLine}</Text> : null}
+          {/* "As whom?": nothing below can be used before it is answered, so it is asked here, on either tab (web twin) */}
+          {asking ? (
+            <View testID="vandaag-plus-ask-self">
+              <Text style={styles.label}>{t('circle.vandaag.plus_as')}</Text>
+              {selves.map((p) => (
+                <Btn key={p.id} style={styles.btnAt} onPress={() => setAsSelf(p.id)} testID={`vandaag-plus-self-${p.id}`}
+                  label={p.id === 'default' ? t('circle.switcher.you') : (p.name || p.id)} />
+              ))}
+            </View>
+          ) : null}
           {/* the sheet's DECLARED sections (`screenSections.js` plusSheet), in order, each by its id (= the web data-section) */}
           {sectionsOf('plusSheet').map((d) => {
+            if (!inShown.has(d.id)) return null;   // a section of the other tab
             const piece = {
-              'plus-thread': () => (!edit && (opening?.intro || opening?.news || (Array.isArray(shownTurns) && shownTurns.length)) ? (
+              'plus-thread': () => (!edit && !asking && (opening?.intro || opening?.news || (Array.isArray(shownTurns) && shownTurns.length)) ? (
             <View testID="vandaag-plus-thread" accessibilityLabel={t('circle.vandaag.plus_thread')}>
               {/* what the "+" says as it opens: what it is, with examples from what the person has; or, once, what is new */}
               {opening?.news ? <Text style={styles.turn} testID="vandaag-plus-news">{opening.news}</Text> : null}
@@ -156,7 +200,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               {onForget ? <Btn variant="ghost" style={styles.btnAt} onPress={() => onForget(turnsSelf)} testID="vandaag-plus-forget" label={t('circle.vandaag.plus_forget')} /> : null}
             </View>
           ) : null),
-              'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (<>
+              'plus-line': () => (!edit && onRead && !asking ? (<>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {/* with a form open the line shows what was said but takes no typing or focus: the form below has them */}
               <ThemedTextInput style={[styles.input, { flex: 1 }]} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1} editable={!act}
@@ -169,15 +213,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               <Btn key={s} variant="ghost" style={styles.btnAt} onPress={() => setLine(s)} testID="vandaag-plus-suggestion" label={s} />
             )) : null}
           </>) : null),
-              'plus-own': () => (selves.length > 1 && !asSelf ? (
-            <View>
-              <Text style={styles.label}>{t('circle.vandaag.plus_as')}</Text>
-              {selves.map((p) => (
-                <Btn key={p.id} style={styles.btnAt} onPress={() => setAsSelf(p.id)} testID={`vandaag-plus-self-${p.id}`}
-                  label={p.id === 'default' ? t('circle.switcher.you') : (p.name || p.id)} />
-              ))}
-            </View>
-          ) : !act ? acts.map((a) => (
+              'plus-own': () => (asking ? null : !act ? acts.map((a) => (
             <View key={a.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Btn style={styles.btnAt} onPress={() => (actRunsAtOnce(a) && typeof onRunAct === 'function' ? onRunAct(a) : setActId(a.id))} testID={`vandaag-plus-${a.id}`} label={plusLabel(t, a)} />
               {onTogglePin ? (
@@ -217,7 +253,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
             </View>
           )),
               // Vastgezet — on a fresh sheet: an own pin picks its act here; a bookmark OPENS its circle (never runs the op)
-              'plus-pinned': () => (!edit && !act && !(selves.length > 1 && !asSelf) && pinned.length ? pinned.map((p) => (
+              'plus-pinned': () => (!edit && !act && !asking && pinned.length ? pinned.map((p) => (
                 <View key={p.key} style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Btn label={p.label} testID={`vandaag-plus-pinned-${p.key}`} style={styles.btnAt} onPress={async () => {
                     const r = await onOpenPin?.(p);
@@ -257,20 +293,25 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
           {/* the way out, not one of the acts */}
           <Btn variant="ghost" onPress={closeSheet} testID="vandaag-plus-close" label={t('circle.vandaag.done')} style={styles.btnAt} />
           </ScrollView>
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
 
 const makeStyles = (theme) => StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  card: { backgroundColor: theme.color.card, borderTopLeftRadius: 12, borderTopRightRadius: 12, padding: 16 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end', paddingHorizontal: 12 },
+  card: { backgroundColor: theme.color.card, borderRadius: 16, padding: 16, elevation: 8 },
   cardBody: { gap: 8 },
   title: { fontSize: 17, fontWeight: '700', color: theme.color.ink, marginBottom: 4 },
   field: { gap: 4, marginBottom: 8 },
   label: { fontSize: 13, color: theme.color.inkSoft },
   route: { fontSize: 13, color: theme.color.inkSoft, marginBottom: 6 },
+  tabs: { flexDirection: 'row', gap: 4, borderBottomWidth: 1, borderBottomColor: theme.color.line, marginBottom: 6 },
+  tab: { paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabOn: { borderBottomColor: theme.color.accent },
+  tabText: { fontSize: 14, color: theme.color.inkSoft },
+  tabTextOn: { color: theme.color.accent, fontWeight: '600' },
   // a turn of the kept conversation: the assistant's on the left, the person's own to the right
   turn: { fontSize: 14, color: theme.color.ink, marginVertical: 2, alignSelf: 'flex-start' },
   turnYou: { alignSelf: 'flex-end', color: theme.color.inkSoft },

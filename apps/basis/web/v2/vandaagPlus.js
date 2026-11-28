@@ -7,6 +7,7 @@
 import { PLUS_ACTS, plusLabel, plusCardWords, plusMomentNeedsTime, plusAskTime, plusAnswerLineShown } from '../../src/v2/vandaagPlus.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
+import { ASSISTANT_TABS, assistantTabFor, assistantSectionsOf, assistantAsksSelf } from '../../src/v2/assistantTabs.js';
 
 export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null, actId = null, values = {}, line = '', editing = false, error = null, onPick, onSave, onRead, onRemove, onClose,
   // opened on an own row whose act shares ("Delen met…"): the contacts it can go to, and what a pick does
@@ -27,7 +28,9 @@ export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null,
   // once for the circles joined since, else nothing. A tap on an example puts it in the line; it does not send.
   opening = null,
   // what can be typed here: `suggestFor(value)` → the lines to offer (shared `plusSuggest` over the sheet's pool)
-  suggestFor = null } = {}) {
+  suggestFor = null,
+  // the assistant panel's two tabs (`assistantTabs.js`): the one the person last chose, and what a tap on a tab does
+  tab = null, onTab } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'vandaagPlus.js');
   container.innerHTML = '';
@@ -35,6 +38,26 @@ export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null,
   const title = document.createElement('h3');
   title.textContent = tr(editing ? 'circle.vandaag.plus_edit' : 'circle.vandaag.plus');
   container.appendChild(title);
+  // which tab shows (an open form shows on Maken, where it is painted), and the two tabs under the title
+  const shown = assistantTabFor({ chosen: tab, actId, editing });
+  if (!editing) {
+    const strip = document.createElement('div');
+    strip.className = 'circle-vandaag-plus__tabs';
+    strip.setAttribute('role', 'tablist');
+    for (const x of ASSISTANT_TABS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'cc-btn cc-btn--ghost circle-vandaag-plus__tab';
+      b.dataset.tab = x.id;
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', String(x.id === shown));
+      b.textContent = tr(x.labelKey);
+      b.addEventListener('click', () => onTab?.(x.id));
+      strip.appendChild(b);
+    }
+    container.appendChild(strip);
+  }
+  const inShown = new Set(assistantSectionsOf(shown));
   // the sheet's DECLARED sections (`screenSections.js` plusSheet), in order, each by its id (= `data-section`)
   const sec = {};
   for (const d of sectionsOf('plusSheet')) {
@@ -46,7 +69,7 @@ export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null,
     sec[d.id] = el;
   }
   const act = PLUS_ACTS.find((a) => a.id === actId) ?? null;
-  const asking = Array.isArray(selves) && selves.length > 1 && !asSelf;
+  const asking = assistantAsksSelf({ selves, asSelf });
   if (asking) {
     const ask = document.createElement('p');
     ask.textContent = tr('circle.vandaag.plus_as');
@@ -62,7 +85,7 @@ export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null,
     }
   } else {
     // which route answers this conversation, and whether it is confidential (the shared line, `plusRouteLine`)
-    if (!editing && routeLine) {
+    if (!editing && routeLine && shown === 'gesprek') {
       const route = document.createElement('p');
       route.className = 'circle-vandaag-plus__route';
       route.textContent = routeLine;
@@ -284,6 +307,8 @@ export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null,
   }
   // a section with nothing in it is not shown (its heading over nothing would be noise)
   for (const el of Object.values(sec)) if (!el.querySelector('button, form, input')) el.hidden = true;
+  // a section of the other tab is not shown
+  for (const [id, el] of Object.entries(sec)) if (!inShown.has(id)) el.hidden = true;
   if (circleCard && Array.isArray(circleCard.to) && circleCard.to.length) {
     const box = document.createElement('div');
     box.className = 'circle-vandaag-plus__card';
@@ -332,7 +357,7 @@ export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null,
   // not leave the person looking at old turns with the line below the fold (phone twin: VandaagPlusModal's scrollTo).
   // Guarded: a layout-less DOM (tests) has no scrollIntoView, and the sheet may not be attached yet on this frame.
   const lineEl = container.querySelector('.circle-vandaag-plus__line');
-  if (lineEl && !editing && typeof lineEl.scrollIntoView === 'function') {
+  if (lineEl && !editing && shown === 'gesprek' && typeof lineEl.scrollIntoView === 'function') {
     const bring = () => { try { lineEl.scrollIntoView({ block: 'nearest' }); } catch { /* layout-less DOM */ } };
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(bring); else bring();
   }

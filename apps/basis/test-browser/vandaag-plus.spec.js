@@ -17,6 +17,7 @@ test('the "+" makes an own note and an own appointment, both on Vandaag as mine'
   await expect(page.locator('.circle-vandaag__head'), 'the app opens on Vandaag').toBeVisible({ timeout: 20_000 });
 
   await page.locator('.circle-vandaag__plus').dblclick();
+  await page.locator('.circle-vandaag-plus__tab[data-tab="maken"]').click();   // the own acts are on the assistant's Maken tab
   await page.locator('.circle-vandaag-plus__act[data-act="household.note"]').click();
   await page.locator('.circle-vandaag-plus__body').fill('sleutel bij de buren');
   await page.locator('.circle-vandaag-plus__save').click();
@@ -29,6 +30,7 @@ test('the "+" makes an own note and an own appointment, both on Vandaag as mine'
   await expect(page.locator('.circle-screen__block--empty').filter({ hasText: /^items/i })).toHaveCount(0);
 
   await page.locator('.circle-vandaag__plus').dblclick();
+  await page.locator('.circle-vandaag-plus__tab[data-tab="maken"]').click();   // the own acts are on the assistant's Maken tab
   await page.locator('.circle-vandaag-plus__act[data-act="calendar.calendar-event"]').click();
   await page.locator('.circle-vandaag-plus__title').fill('tandarts');
   const when = await page.evaluate(() => { const d = new Date(Date.now() + 86_400_000); d.setHours(14, 0, 0, 0); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T14:00`; });
@@ -42,6 +44,7 @@ test('the "+" makes an own note and an own appointment, both on Vandaag as mine'
 
   // an empty save says so and makes nothing
   await page.locator('.circle-vandaag__plus').dblclick();
+  await page.locator('.circle-vandaag-plus__tab[data-tab="maken"]').click();   // the own acts are on the assistant's Maken tab
   await page.locator('.circle-vandaag-plus__act[data-act="household.note"]').click();
   await page.locator('.circle-vandaag-plus__save').click();
   await expect(page.locator('.circle-vandaag-plus__error')).toBeVisible();
@@ -133,8 +136,10 @@ test('the "+" is on every tab — its sheet makes things; Share my card and Scan
   await page.locator('[data-tab="circles"]').first().click();
   await expect(page.locator('.cc-fab'), 'the floating "+" on the Circles tab').toHaveCount(1);
   await page.locator('.cc-fab').dblclick();
+  await page.locator('.circle-vandaag-plus__tab[data-tab="maken"]').click();   // the own acts are on the assistant's Maken tab
   await expect(page.locator('[data-section="plus-own"] .circle-vandaag-plus__act').first()).toBeVisible();
   await expect(page.locator('[data-section="plus-me"]'), 'no Me actions in the "+"').toHaveCount(0);
+  await page.locator('.circle-vandaag-plus__tab[data-tab="gesprek"]').click();
   await expect(page.locator('.circle-vandaag-plus__read'), 'a button reads the free line').toBeVisible();
 });
 
@@ -156,6 +161,7 @@ test('Vastgezet: a pinned own act is one tap; a pinned circle op OPENS its circl
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
   // pin an own act from the sheet (☆ → ★), and it shows under Vastgezet
   await page.locator('.cc-fab').dblclick();
+  await page.locator('.circle-vandaag-plus__tab[data-tab="maken"]').click();   // the own acts are on the assistant's Maken tab
   await page.locator('.circle-vandaag-plus__pin[data-act="household.note"]').click();
   await expect(page.locator('.circle-vandaag-plus__pin[data-act="household.note"]')).toHaveAttribute('data-pinned', 'true');
   const pinned = page.locator('[data-section="plus-pinned"] .circle-vandaag-plus__pinned-open');

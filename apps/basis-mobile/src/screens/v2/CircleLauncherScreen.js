@@ -843,9 +843,12 @@ export default function CircleLauncherScreen({
   // Vandaag: a block of the page opened whole ("meer"), or null; the customise sheet open or not
   const [expandedBlockId, setExpandedBlockId] = useState(null);
   const [customiseOpen, setCustomiseOpen] = useState(false);
-  const [plusOpen, setPlusOpen] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false);   // Vandaag's "+": the person's own acts
+  // the assistant panel's tab last chosen (Gesprek / Maken), remembered on this device (web twin: showVandaagPlus)
+  const [assistantTab, setAssistantTab] = useState(null);
+  useEffect(() => { AsyncStorage.getItem(storageName('assistantTab')).then((v) => { if (v) setAssistantTab(v); }).catch(() => {}); }, []);
   // a screen's connect code scanned on Me: handed to 'connect a screen' on Apparaten once (web twin: showMyData screenOffer)
-  const [scannedScreenOffer, setScannedScreenOffer] = useState(null);   // Vandaag's "+": the person's own acts
+  const [scannedScreenOffer, setScannedScreenOffer] = useState(null);
   const [plusDialOpen, setPlusDialOpen] = useState(false);   // THE "+" in the bar, opened into its round buttons
   const [plusEdit, setPlusEdit] = useState(null);     // …opened on an own row: `{ act, id, values, asSelf }` (shared `plusEditFor`)
   // …and, when its act shares, the contacts it can go to (the shared `plusShareTargets`; read when the sheet opens on it)
@@ -2429,6 +2432,7 @@ export default function CircleLauncherScreen({
   // frame paints wherever it is (`WithTabBar` plusSheet), opened by the floating "+" there or by an own row on Vandaag
   const plusSheet = (
       <VandaagPlusModal acts={orderedPlusActs(PLUS_ACTS, actionFrequency)}
+        tab={assistantTab} onTab={(id) => { setAssistantTab(id); AsyncStorage.setItem(storageName('assistantTab'), id).catch(() => {}); }}
         // an act that makes nothing and asks nothing (feedback) runs at once — the sheet closes, the op opens its thread
         onRunAct={(a) => {
           setPlusOpen(false);

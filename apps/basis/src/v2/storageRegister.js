@@ -138,6 +138,8 @@ export const STORAGE = Object.freeze({
   firstOpenSeen:          row('basis.firstOpenSeen', 'key', [W, M], 'keep', 'not content: a first-run flag', k('flag')),
   introCardSeen:          row('basis.introCardSeen', 'key', [W, M], 'keep', 'not content: a first-run flag', k('flag')),
   lastTab:                row('basis.lastTab', 'key', [W, M], 'keep', 'not content: view state', k('string')),
+  // which tab of the assistant panel was last chosen (Gesprek / Maken)
+  assistantTab:           row('basis.assistantTab', 'key', [W, M], 'keep', 'not content: which assistant panel tab was last chosen (view state)', k('string')),
   nativeCalendarIds:      row('basis.nativeCalendar.eventIdMap', 'key', [M], 'throwaway', 'sealed', k('json')),
   inFlightFlows:          row('basis.in-flight-flows', 'key', [W, M], 'throwaway', 'unwritten: an exported constant nothing writes under', OPAQUE),
   startOverPage:          row('basis.startOverPage', 'key', [W], 'keep', 'not content: a one-load flag that opens the start-over page (web sessionStorage)', k('flag')),

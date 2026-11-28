@@ -7,6 +7,7 @@
     "agentRequestQueue": {"v":"none","value":"json"},
     "agentRequests": "opaque",
     "askMatchSkips": {"v":"none","value":"json"},
+    "assistantTab": {"v":"none","value":"string"},
     "attachmentBlobs": {"v":"none","value":"rows"},
     "availability": {"v":"none","value":"json"},
     "circleControllerKey": "opaque",

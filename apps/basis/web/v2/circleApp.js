@@ -4861,7 +4861,17 @@ function plusThreadNow() {
 }
 
 function showVandaagPlus({ edit = null } = {}) {
-  const { card, close } = _restoreOverlay();
+  // THE ASSISTANT PANEL: a floating card over the current tab, the tab bar still visible below it. A touch outside it and
+  // Escape leave the way "Klaar" does (`leave`: a form the line opened and nobody saved is settled in the conversation)
+  const { wrap, card, close: closeWrap } = _restoreOverlay();
+  wrap.classList.add('cc-assistant-backdrop');
+  card.classList.add('cc-assistant-panel');
+  const onKey = (e) => { if (e.key === 'Escape') leave(); };
+  document.addEventListener('keydown', onKey);
+  wrap.addEventListener('click', (e) => { if (e.target === wrap) leave(); });
+  const close = () => { document.removeEventListener('keydown', onKey); closeWrap(); };
+  // the tab the person last chose (Gesprek / Maken: `assistantTabs.js`), remembered on this device
+  let tab = (() => { try { return localStorage.getItem(storageName('assistantTab')); } catch { return null; } })();
   // opened on an own row: its act, its words, its id — Save changes it, Remove takes it away
   let actId = edit?.act?.id ?? null;
   let values = edit?.values ?? {};
@@ -4930,8 +4940,8 @@ function showVandaagPlus({ edit = null } = {}) {
   };
   // the person's own "+" door, composed for this open: their own model as it is set now, these circles; the conversation
   // follows the self the "+" writes as (its thread, its memory, what it reads, its Forget: `selfKeyOf`, `readAs`)
-  // EVERY way out of the sheet but a save (Klaar, a bookmark that opens its circle, an act that runs at once; the overlay
-  // has no Escape or backdrop close): a form the "+" opened from a line still unsaved is refused, nothing is stored, and
+  // EVERY way out of the panel but a save (Klaar, a touch outside, Escape, a bookmark that opens its circle, an act that
+  // runs at once): a form the "+" opened from a line still unsaved is refused, nothing is stored, and
   // the conversation says so (the shared door's `settled`; phone twin: VandaagPlusModal closeSheet)
   const leave = () => { if (actId && !editId) plusDoorNow().settled({ asSelf }, { saved: false }).catch(() => null); close(); };
   let _door = null;
@@ -4968,6 +4978,8 @@ function showVandaagPlus({ edit = null } = {}) {
     // forgetting the conversation is the door's own op (`assistant-forget`), as in a private Telegram chat
     onForget: async () => { await plusDoorNow().forget({ asSelf: conversationSelf(asSelf, selves.length) }); paint(); },
     acts: orderedPlusActs(PLUS_ACTS, actionFrequency),
+    tab,
+    onTab: (id) => { tab = id; try { localStorage.setItem(storageName('assistantTab'), id); } catch { /* the default stands */ } paint(); },
     pinned: pinnedView,
     pinnedActIds: pinsOf(_screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId),
     onTogglePin: (actId) => {

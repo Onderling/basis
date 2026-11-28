@@ -321,7 +321,7 @@ async function signinFlow(args, { podAuth, externalFlow, t, callSkill = null }) 
           try { await callSkill('household', 'podSessionReady', {}); } catch (err) { console.warn('[signin] the registry\'s pod mirror did not attach', err?.message ?? err); }
         }
         // back in the app: signed in (the session holds the webid), or the person closed the provider's page
-        return done?.webid ? { ok: true, message: t('signin.completed', { webid: done.webid }) } : { ok: true, message: t('signin.opening', { issuer: name }) };
+        return done?.webid ? { ok: true, signedIn: true, message: t('signin.completed', { webid: done.webid }) } : { ok: true, opening: true, message: t('signin.opening', { issuer: name }) };
       }
       // Fire-and-forget — the browser is about to navigate to the
       // issuer.  Return an opening message that may briefly flash
@@ -329,7 +329,7 @@ async function signinFlow(args, { podAuth, externalFlow, t, callSkill = null }) 
       podAuth.startSignIn({ issuer }).catch((err) => {
         console.error('[signin] redirect failed', err);
       });
-      return { ok: true, message: t('signin.opening', { issuer: name }) };
+      return { ok: true, opening: true, message: t('signin.opening', { issuer: name }) };
     } catch (err) {
       return { ok: false, error: err?.message ?? String(err) };
     }

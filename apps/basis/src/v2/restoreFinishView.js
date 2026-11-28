@@ -16,8 +16,12 @@ export function restoreFinishOutcome(inst) {
   let messageKey;
   // "Not now": the flow closes at once, no last screen (the file can be loaded any time from My data's own action)
   if (sourceOutcome === 'later') return { messageKey: null, retry: false, retiredCount: 0, closeAtOnce: true };
+  // the web's sign-in navigates away: nothing to say here, the start after it takes the restore on
+  if (sourceOutcome === 'pod-opening') return { messageKey: null, retry: false, retiredCount: 0, closeAtOnce: true };
   if (sourceOutcome === 'not-your-file') messageKey = 'circle.restore_finish.err_not_yours';
   else if (sourceOutcome === 'unreadable-file') messageKey = 'circle.restore_finish.err_unreadable';
+  else if (sourceOutcome === 'pod-empty') messageKey = 'circle.restore_finish.err_pod_empty';
+  else if (sourceOutcome === 'pod-failed') messageKey = 'circle.restore_finish.err_pod_failed';
   else if (produces.intent === 'adding') messageKey = 'circle.restore_finish.done_adding';
   else if (retireOutcome === 'ok') messageKey = produces.intent === 'lost' ? 'circle.restore_finish.done_loud' : 'circle.restore_finish.done_quiet';
   else if (retireOutcome === 'wrong-phrase' || retireOutcome === 'invalid-phrase') messageKey = 'circle.enroll.invalid_phrase';

@@ -508,7 +508,7 @@ export const householdManifest = {
       // When nothing came back: load a recovery file now, or later (the honest "your circles are not
       // here" screen). Never "ask an admin" — that is the fallback of last resort, not an offered route.
       params: [
-        { name: 'source', kind: 'enum', of: ['file', 'later'], required: true },
+        { name: 'source', kind: 'enum', of: ['file', 'pod', 'later'], required: true },
         { name: 'file',   kind: 'string' },
       ],
       surfaces: {},
@@ -715,7 +715,7 @@ export const householdManifest = {
         { id: 'status', op: 'restoreStatus', labelKey: 'circle.restore_finish.step_status',
           next: { ready: 'intent', empty: 'source' } },
         { id: 'source', op: 'restoreSource', labelKey: 'circle.restore_finish.step_source',
-          next: { ok: 'intent', later: null, 'not-your-file': null, 'unreadable-file': null, error: null } },
+          next: { ok: 'intent', later: null, 'not-your-file': null, 'unreadable-file': null, 'pod-empty': null, 'pod-failed': null, 'pod-opening': null, error: null } },
         { id: 'intent', op: 'restoreIntent', labelKey: 'circle.restore_finish.step_intent',
           next: { broken: 'retire', lost: 'retire', adding: null, error: null } },
         { id: 'retire', op: 'replaceDevice', labelKey: 'circle.replace.ceremony' },

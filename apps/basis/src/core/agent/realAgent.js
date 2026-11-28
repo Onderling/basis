@@ -5767,6 +5767,18 @@ export async function createRealHouseholdAgent(opts = {}) {
   hostAgent.register('restoreSource', async ({ parts }) => {
     const source = String(parts?.[0]?.data?.source ?? '');
     if (source === 'later') return [DataPart({ ok: true, outcome: 'later', source })];
+    // FROM THE POD (the screen names it): the shared sign-in op runs; on the phone it completes in place and its
+    // pod-session door brings the circle list in; on the web it navigates away and the boot after it pulls the list
+    if (source === 'pod') {
+      let signed = null;
+      try { signed = await callSkill('basis', 'signin', {}); } catch (e) { signed = { ok: false, error: e?.message ?? String(e) }; }
+      if (signed?.ok === false) return [DataPart({ ok: false, outcome: 'pod-failed', error: signed.error ?? 'signin-failed', source })];
+      if (signed?.opening) return [DataPart({ ok: true, outcome: 'pod-opening', source })];
+      const circleIds = Object.keys(await readSelfCircleMemberships().catch(() => ({})))
+        .filter((id) => id && id !== tasksPrimaryCircleId && id !== 'household');
+      if (!circleIds.length) return [DataPart({ ok: false, outcome: 'pod-empty', error: 'pod-empty', source })];
+      return [DataPart({ ok: true, outcome: 'ok', source, circles: circleIds.length, circleIds })];
+    }
     if (source !== 'file') return [DataPart({ ok: false, outcome: 'error', error: 'source-required' })];
     const r = await importRecoveryFileText(parts?.[0]?.data?.file);
     if (!r.ok) return [DataPart({ ok: false, outcome: r.error, error: r.error, source })];

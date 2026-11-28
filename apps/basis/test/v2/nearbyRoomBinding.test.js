@@ -9,6 +9,7 @@ import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
 import { createAsk, answerAsk } from '../../src/v2/nearbyAsks.js';
 import { createCard, createChatMessage, roomAllows } from '../../src/v2/nearbyRoom.js';
 import { prepareBroadcastInvite } from '../../src/v2/nearbyInvites.js';
+import { makeReceiptSender } from '../../src/v2/deliverySettings.js';
 
 const T0 = 1_700_000_000_000;
 const INVITE_URI = `onderling-invite://${globalThis.btoa(JSON.stringify({ groupId: 'c1', code: 'abc', expiresAt: T0 + 60_000, adminPeerAddr: 'a', relayUrl: 'wss://relay.example' }))}`;
@@ -302,7 +303,7 @@ describe('heard, not sent — the room rides the app\'s delivery receipts', () =
     await nodes.a.askChannel.broadcast(ask);
     expect(wire[0].payload.msgId).toBe(ask.id);                       // stamped with the object's own id
     expect(map.get(ask.id)).toBe('maybe-received');                   // the shell's map knows the send
-    expect(receipts).toEqual([{ msgId: ask.id, fromPeerAddr: 'a', source: 'receiver' }]);   // b's shell would now send the receipt
+    expect(receipts).toEqual([{ msgId: ask.id, fromPeerAddr: 'a', source: 'receiver', via: expect.any(Function) }]);   // b's shell would now send the receipt
 
     // …and when that receipt reaches a's shell, its handler feeds the binding:
     expect(nodes.a.onReceipt('b', { subtype: 'delivery-receipt', messageId: ask.id })).toBe(true);
@@ -320,6 +321,27 @@ describe('heard, not sent — the room rides the app\'s delivery receipts', () =
     b.onPeerMessage('a', { subtype: 'nearby-card', msgId: 'c1', card: { id: 'c1', label: 'L'.repeat(5000), line: '', tags: [] } });
     b.onPeerMessage('z', { subtype: 'nearby-ask', msgId: 'x', ask: createAsk({ text: 'hi', from: 'z', now }).ask });
     expect(receipts).toEqual([]);
+  });
+
+  // The receipt goes to a stranger in the room, so it speaks as the room key like every other room send: composed the
+  // way the web shell composes it (circleApp.js: the person's receipt sender over the agent's sendPeerMessage, handed to
+  // setLandedHook), a receipt that left unscoped would sign as the person's own identity and hand over their address.
+  it('the receipt to a room peer speaks as the room key, never as the person', async () => {
+    const wire = [];
+    let roomKey = 'room-b';
+    const agentSend = async (to, payload, opts = {}) => { wire.push({ to, subtype: payload?.subtype, opts }); return { delivered: true }; };
+    const b = createNearbyRoomBinding({ sendPeerMessage: agentSend, listPeers: () => [{ pubKey: 'room-a' }], myAddress: () => roomKey, now });
+    b.setLandedHook(makeReceiptSender({ getSettings: () => ({ sendReceipts: true }), sendTo: agentSend }));
+    b.onPeerMessage('room-a', { subtype: 'nearby-ask', msgId: 'q1', ask: createAsk({ text: 'ladder?', from: 'room-a', now }).ask });
+    await vi.waitFor(() => expect(wire.filter((w) => w.subtype === 'delivery-receipt')).toHaveLength(1));
+    expect(wire.find((w) => w.subtype === 'delivery-receipt'))
+      .toEqual({ to: 'room-a', subtype: 'delivery-receipt', opts: { sendAs: 'room-b', requireSendAs: true, guarantee: 'now' } });
+
+    // out of the room (the key already gone): no receipt at all, not one in the person's own name
+    roomKey = null;
+    b.onPeerMessage('room-a', { subtype: 'nearby-ask', msgId: 'q2', ask: createAsk({ text: 'still?', from: 'room-a', now }).ask });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(wire.filter((w) => w.subtype === 'delivery-receipt')).toHaveLength(1);
   });
 });
 

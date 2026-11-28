@@ -27,7 +27,7 @@ describe('a sealed row is bound to its id and its store', () => {
   for (const [label, strat] of [['a key minted now', keyed('A', { plainRefused: true })], ['an older key', keyed('A', { plainRefused: false })]]) {
     it(`a row's body copied under another id does not open there (${label})`, async () => {
       const inner = createMemoryBackend();
-      const b = createSealingBackend({ backend: inner, getStrategy: async () => strat, onWarn: quiet, markScope: 'cc-circle-c1' });
+      const b = createSealingBackend({ backend: inner, getStrategy: async () => strat, onWarn: quiet, markScope: 'basis.circle-c1' });
       await b.put('items/mine', { text: 'mine' });
       await inner.put('items/theirs', await raw(inner, 'items/mine'));
       expect(await b.get('items/theirs')).toBeNull();
@@ -37,9 +37,9 @@ describe('a sealed row is bound to its id and its store', () => {
     it(`a row from another store does not open here (${label})`, async () => {
       const inner = createMemoryBackend();
       const other = createMemoryBackend();
-      await createSealingBackend({ backend: other, getStrategy: async () => strat, onWarn: quiet, markScope: 'cc-circle-c2' }).put('items/x', { text: 'c2' });
+      await createSealingBackend({ backend: other, getStrategy: async () => strat, onWarn: quiet, markScope: 'basis.circle-c2' }).put('items/x', { text: 'c2' });
       await inner.put('items/x', await raw(other, 'items/x'));
-      const b = createSealingBackend({ backend: inner, getStrategy: async () => strat, onWarn: quiet, markScope: 'cc-circle-c1' });
+      const b = createSealingBackend({ backend: inner, getStrategy: async () => strat, onWarn: quiet, markScope: 'basis.circle-c1' });
       expect(await b.get('items/x')).toBeNull();
     });
   }

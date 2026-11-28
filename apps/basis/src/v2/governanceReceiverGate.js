@@ -94,6 +94,22 @@ export function isFoundingWrite(body, members = []) {
 }
 
 /**
+ * THE ROSTER A DECISION IS TALLIED AGAINST. An open one: the roster as it is now (decisions.md, "No vote freeze"). A
+ * closed one whose closing an ADMIN signed (an admin on the roster now): the members that closing counted, with the
+ * roles they had then, so a join, a promotion or a departure after it does not undo it on every device. The price,
+ * stated in decisions.md: an admin can close on a roster of their choosing, which an admin who admits alone could
+ * already reach by admitting. A closing signed by anyone else, or one that names no members (written before closings
+ * did), keeps the roster as it is now; so does a closing whose admin has since left or lost the role.
+ */
+export function tallyRosterOf(p, members = []) {
+  const roster = Array.isArray(members) ? members : [];
+  if (!p?.closed || !Array.isArray(p.counted)) return roster;
+  if (!roster.some((m) => m?.ref === p.closedBy && m?.role === 'admin')) return roster;
+  // each member with the role it had at the closing, never today's: a promotion or a departure since changes nothing
+  return p.counted.map((m) => ({ ref: m.ref, role: m.role }));
+}
+
+/**
  * Was this carried write made without the vote its circle's rule requires, judged by `policy` (the rule in force
  * before it)? The proposal is TALLIED HERE under that rule (never a recorded "resolve" alone: a lone admin can write
  * one); the one recorded approval that counts without the votes is the admin's past-deadline override, where this
@@ -121,7 +137,7 @@ export function writeSkippedTheVote({ action, body, policy, members = [], propos
   // NO DEVICE CLOCK (Opus): an open proposal is judged by its votes alone; a closed one at its resolve's own signed
   // time (the override's deadline test), so every device judges the same statement the same way
   const d = resolveGovernance({
-    action, policy, members, votes: p.votes ?? [], deadline: p.deadline ?? null, now: p.closed ? (p.closedAt ?? 0) : 0,
+    action, policy, members: tallyRosterOf(p, members), votes: p.votes ?? [], deadline: p.deadline ?? null, now: p.closed ? (p.closedAt ?? 0) : 0,
     seed: p.seed ?? p.proposalId, subject: p.subject, by: p.by,
   });
   const approved = d.status === DECISION_STATUS.APPROVED
@@ -306,7 +322,7 @@ export function membershipGateFor({ chain, currentPolicy = {}, members = [], pro
       ? p.subject === s.subject
       : p.subject?.member === s.subject && p.subject?.role === payload.role;
     if (!about) return false;
-    const d = resolveGovernance({ action, policy, members, votes: p.votes ?? [], deadline: p.deadline ?? null, now: p.closed ? (p.closedAt ?? 0) : 0, seed: p.seed ?? p.proposalId, subject: p.subject, by: p.by });
+    const d = resolveGovernance({ action, policy, members: tallyRosterOf(p, members), votes: p.votes ?? [], deadline: p.deadline ?? null, now: p.closed ? (p.closedAt ?? 0) : 0, seed: p.seed ?? p.proposalId, subject: p.subject, by: p.by });
     return d.status === DECISION_STATUS.APPROVED
       || (p.closed === true && p.status === DECISION_STATUS.APPROVED && d.overrideAvailable === true);
   };

@@ -22,7 +22,7 @@ const raw = (s) => [...s._m.values()].join('\n');
 const seal = () => setShellContentSeal(groupKeyStrategy({ groupKey: Buffer.from(new Uint8Array(32).fill(5)).toString('base64url') }));
 
 describe('the phone seals its ids-and-metadata stores', () => {
-  it('cc.connectionPoints: not readable as stored, read back through the shared logic', async () => {
+  it('basis.connectionPoints: not readable as stored, read back through the shared logic', async () => {
     seal();
     const s = asyncStorage();
     const io = phoneConnectionPointsIo(s);
@@ -33,7 +33,7 @@ describe('the phone seals its ids-and-metadata stores', () => {
     expect(JSON.stringify(await phoneConnectionPointsIo(s).load())).toContain('relay.of-the-circle');
   });
 
-  it('cc.nativeCalendar.eventIdMap: not readable as stored, read back with the key', async () => {
+  it('basis.nativeCalendar.eventIdMap: not readable as stored, read back with the key', async () => {
     seal();
     const s = asyncStorage();
     const Calendar = { createEventAsync: async () => 'evt-tandarts', updateEventAsync: async () => true, deleteEventAsync: async () => true };
@@ -42,7 +42,7 @@ describe('the phone seals its ids-and-metadata stores', () => {
     expect((await loadEventIdMap({ storage: s }))['appt-1']).toBe('evt-tandarts');
   });
 
-  it('cc.askMatchSkips: not readable as stored on the phone', async () => {
+  it('basis.askMatchSkips: not readable as stored on the phone', async () => {
     seal();
     const s = asyncStorage();
     await createAskMatchSkips(asyncStorageAskMatchSkipsIo(s)).add('post-1', 'webid-henk');
@@ -51,7 +51,7 @@ describe('the phone seals its ids-and-metadata stores', () => {
   });
 });
 
-describe('the phone seals its pins (cc.circlePinned) through the shared io', () => {
+describe('the phone seals its pins (basis.circlePinned) through the shared io', () => {
   it('not readable as stored; read back with the key', async () => {
     seal();
     const s = asyncStorage();

@@ -490,6 +490,10 @@
       "text": "Opening sign-in (issuer: {{issuer}}) … come back when the redirect lands.",
       "doc": "v0.7.P1."
     },
+    "issuer_not_ready": {
+      "text": "The pod provider at {{issuer}} did not answer. Check the address and try again.",
+      "doc": "Phone sign-in: the chosen provider could not be reached or set up in time (a mistyped address, or it is offline)."
+    },
     "unknown_issuer": {
       "text": "Unknown issuer \"{{issuer}}\". Try 'inrupt', 'solidcommunity', 'solidweb' or a full URL.",
       "doc": "When resolveIssuer returns null."

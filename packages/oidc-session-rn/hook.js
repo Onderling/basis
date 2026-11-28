@@ -25,6 +25,7 @@ import {
   _resolveDiscoveryFn,
   _resolveExchangeFn,
 } from './src/completeSignIn.js';
+import { forIssuer, issuerReady } from './src/issuerState.js';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -106,8 +107,13 @@ export function useOidcSignIn({
   }
   const effectiveClientName = clientName ?? `${scheme} (mobile)`;
 
-  const [discovery, setDiscovery]   = useState(null);
-  const [resolvedClientId, setResolvedClientId] = useState(clientId);
+  // PER ISSUER (src/issuerState.js): each is `{ issuer, value }` and counts only while `issuer` is still the one handed
+  // in. A provider picked later gets its own discovery and its own client, never the previous provider's.
+  const [discovered, setDiscovered] = useState(null);
+  const [client, setClient] = useState(null);
+  const discovery = forIssuer(discovered, issuer);
+  const resolvedClientId = clientId || forIssuer(client, issuer);
+  const setResolvedClientId = (id) => setClient(id ? { issuer, value: id } : null);
   const [lastError, setLastError]   = useState(null);
 
   // Whether the active client_id came from the write-once SecureStore
@@ -129,7 +135,7 @@ export function useOidcSignIn({
   useEffect(() => {
     let cancelled = false;
     discoverIssuer(issuer)
-      .then((d) => { if (!cancelled) setDiscovery(d); })
+      .then((d) => { if (!cancelled) setDiscovered({ issuer, value: d }); })
       .catch((err) => {
         if (!cancelled) {
           setLastError(err);
@@ -156,7 +162,7 @@ export function useOidcSignIn({
       onResolve: ({ fromCache }) => { clientFromCacheRef.current = !!fromCache; },
     })
       .then((id) => {
-        if (!cancelled) setResolvedClientId(id);
+        if (!cancelled) setClient({ issuer, value: id });
       })
       .catch((err) => {
         if (!cancelled) {
@@ -264,7 +270,9 @@ export function useOidcSignIn({
   }, [issuer, onWarning, scheme]);
 
   return {
-    ready: !!(discovery && request && resolvedClientId),
+    ready: issuerReady({ issuer, discovered, client, request, fixedClientId: clientId }),
+    // the issuer this state is for: a caller that changed the prop waits until this is the new one AND `ready`
+    issuer,
     discovery,
     clientId: resolvedClientId,
     request,

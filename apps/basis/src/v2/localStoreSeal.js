@@ -171,8 +171,8 @@ export function sealedLocalBackend(backend, { scope = null, name = null } = {}) 
  * twice at a call site.
  */
 export const circleStorageName = Object.freeze({
-  store: (circleId) => `cc-circle-${circleId}`,
-  cache: (circleId) => `cc-circle-cache-${circleId}`,
+  store: (circleId) => `basis.circle-${circleId}`,
+  cache: (circleId) => `basis.circle-cache-${circleId}`,
 });
 
 /**
@@ -367,14 +367,14 @@ async function resealOwnKeys(storage, kv, owned) {
  * Wrap the per-circle KEY vault so what it holds is sealed at rest.
  *
  * ── What was found, 2026-09-10 ──────────────────────────────────────────────────────────────────
- * The vault at `cc-circle-pod` holds, in its own comment's words, "per-circle sealing identities +
+ * The vault at `basis.circle-pod` holds, in its own comment's words, "per-circle sealing identities +
  * controller keys + the persisted group-key resource". It was created in the SHELLS — `VaultIndexedDB`
  * on web, `VaultAsyncStorage` on mobile — and so never passed through `realAgent`'s `sealedVault()`,
  * which is what seals every vault that agent owns. Nothing sealed it. Read back raw, its rows are:
  *
  *     cc.circle-sealing-id:<circle>     {"publicKey":"MCowBQ…","privateKey":"MC4CAQAw…"}
- *     cc.circle-controller-key:<circle> {"publicKey":"MCowBQ…","privateKey":"MC4CAQAw…"}
- *     cc.circle-groupkey:<circle>       {"v":1,"members":2,"recipients":[…]}
+ *     basis.circle-controller-key:<circle> {"publicKey":"MCowBQ…","privateKey":"MC4CAQAw…"}
+ *     basis.circle-groupkey:<circle>       {"v":1,"members":2,"recipients":[…]}
  *
  * Two PRIVATE KEYS per circle, in the clear, next to the group key they unwrap.
  *

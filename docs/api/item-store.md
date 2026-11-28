@@ -1111,6 +1111,35 @@ entries age, and this table names the statements in it that never drop. A circle
 small (settings, version, author, proposal id, the content lanes' tips; no content). Rules changes and votes keep
 compacting.
 
+### `RECORD_DECISION_KINDS`
+
+**Kind:** constant · **Import:** `RECORD_DECISION_KINDS` from `'@onderling/item-store'`
+
+THE DECISIONS A KEPT SETTINGS CHANGE NAMES are kept with it: a settings change names the proposal that decided it
+(`payload.proposalId`), and every device that receives the change tallies that proposal itself, from its propose,
+votes and closing (never from a recorded outcome alone). Compacted, those leave a joiner after the audit window with
+a change it must refuse. Statements on the same lane whose subject is a named proposal id, in the same circle.
+
+### `keptDecisionKeys`
+
+**Kind:** function · **Import:** `keptDecisionKeys` from `'@onderling/item-store'`
+
+```js
+keptDecisionKeys(entries = [])
+```
+
+`${circleId}|${proposalId}` for every proposal a kept statement in `entries` names (the prune's lookup).
+
+### `isKeptDecision`
+
+**Kind:** function · **Import:** `isKeptDecision` from `'@onderling/item-store'`
+
+```js
+isKeptDecision(entry, keys)
+```
+
+Is this entry part of a decision a kept settings change names (`keptDecisionKeys`)?
+
 ### `retentionOfEntry`
 
 **Kind:** function · **Import:** `retentionOfEntry` from `'@onderling/item-store'`

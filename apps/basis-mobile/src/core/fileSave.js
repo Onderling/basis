@@ -66,12 +66,14 @@ export async function saveBase64File({ dataB64, name }) {
  * no answer for a file a person wants to keep or open, they cannot reach it. A closed picker is `not-chosen`; a
  * platform without the picker is `no-picker` (said, never thrown).
  *
- * @param {{dataB64: string, name?: string, mime?: string}} file
+ * @param {{dataB64?: string, text?: string, name?: string, mime?: string}} file  bytes as base64, or `text` written as UTF-8
  * @param {{fs?: object}} [opts]  `fs`: expo-file-system (injectable for tests)
  * @returns {Promise<{ok: true, uri: string, name: string} | {ok: false, error: string}>}
  */
-export async function saveFileToChosenPlace({ dataB64, name, mime } = {}, { fs = FileSystem } = {}) {
-  if (!dataB64 || typeof dataB64 !== 'string') return { ok: false, error: 'no-data' };
+export async function saveFileToChosenPlace({ dataB64, text, name, mime } = {}, { fs = FileSystem } = {}) {
+  // bytes as base64, or TEXT (the recovery file) written as UTF-8 as it is
+  const asText = typeof text === 'string' && text.length > 0;
+  if (!asText && (!dataB64 || typeof dataB64 !== 'string')) return { ok: false, error: 'no-data' };
   const saf = fs?.StorageAccessFramework;
   if (typeof saf?.requestDirectoryPermissionsAsync !== 'function' || typeof saf?.createFileAsync !== 'function') return { ok: false, error: 'no-picker' };
   const type = typeof mime === 'string' && mime ? mime : 'application/octet-stream';
@@ -83,7 +85,8 @@ export async function saveFileToChosenPlace({ dataB64, name, mime } = {}, { fs =
     const perm = await saf.requestDirectoryPermissionsAsync();
     if (!perm?.granted || !perm.directoryUri) return { ok: false, error: 'not-chosen' };
     const uri = await saf.createFileAsync(perm.directoryUri, finalName, type);
-    await fs.writeAsStringAsync(uri, dataB64, { encoding: fs.EncodingType?.Base64 ?? 'base64' });
+    if (asText) await fs.writeAsStringAsync(uri, text, { encoding: fs.EncodingType?.UTF8 ?? 'utf8' });
+    else await fs.writeAsStringAsync(uri, dataB64, { encoding: fs.EncodingType?.Base64 ?? 'base64' });
     return { ok: true, uri, name: finalName };
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) };

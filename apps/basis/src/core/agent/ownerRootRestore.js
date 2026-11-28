@@ -30,7 +30,7 @@
  */
 
 import { AgentIdentity, Bootstrap, deriveCircleRoot, deriveDeviceSeed, wireDeviceId, deriveVaultAtRestKeyFrom, signDeviceDelegation, deviceDelegationPubKey, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, storePersonKey } from '@onderling/core';
-import { VaultEncrypted, migrateVaultToEncrypted, seedToString } from '@onderling/vault';
+import { VaultEncrypted, migrateVaultToEncrypted, dropUnopenable, seedToString } from '@onderling/vault';
 import { loadProfile } from '@onderling/agent-registry';
 import { cutoverToDelegation } from './ownerRootCustody.js';
 import { markForgetPending } from '../../v2/enrolForgets.js';
@@ -46,6 +46,13 @@ export const DEFAULT_PROFILE = 'default';
  */
 /** The unsealed-vault note a phrase ceremony leaves for the next boot (see the restore-finish flow). */
 export const RESTORE_PENDING_KEY = 'restore-pending';
+/**
+ * The restore's KEY CHECK: one small entry sealed into the chat vault under the restore's at-rest key, by name. The first
+ * start after a restore opens it before any vault drops what no longer opens (realAgent): it opens only under the key
+ * this restore sealed with, and it is there whichever selves the device runs (a device without the general persona
+ * has none of its slots to prove the key on).
+ */
+export const RESTORE_KEY_CHECK = 'restore-key-check';
 // The delegation blob's slot is one of a persona's vault slots (personaVault.js); re-exported for the callers that
 // import it from here.
 export { DEVICE_DELEGATION_VAULT_KEY } from './personaVault.js';
@@ -87,7 +94,7 @@ export function newDeviceId({ crypto: c = globalThis.crypto } = {}) {
  * @param {object} a.rootKeyStore     the platform key door the root SEED lives behind (the phrase
  *                                    itself is never persisted — it stays in the user's hands)
  * @param {object} a.chatVault        the BACKING vault for the default profile's chat identity
- *                                    (`cc-chat-id:`, unsealed) — this function seals it to the
+ *                                    (`basis.chat-id:`, unsealed) — this function seals it to the
  *                                    restored root and writes through the sealed layer, so the
  *                                    seed never sits in it as plaintext
  * @param {{label?: string}} [a.enrollDevice]
@@ -145,6 +152,13 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
     //    chat key is a CHILD of the root (`deriveAgentSeed`), never the mnemonic's raw entropy.
     const atRestKey = delegationCustody ? deriveVaultAtRestKeyFrom(delegationSeed) : root.deriveVaultAtRestKey();
     await migrateVaultToEncrypted({ backing: chatVault, key: atRestKey, fingerprint: root.fingerprint() });
+    //    The SAME phrase on a device that already is this person keeps the sentinel (same root), but this restore enrols a
+    //    new device id, so a new at-rest key: what the previous one sealed opens no more. It goes here, before anything
+    //    reads a slot (`VaultEncrypted: decryption failed for agent-stable-id` on a phone, 2026-11-27); the other sealed
+    //    vaults drop theirs at the next boot, which finds this restore pending and first proves its key (realAgent). No
+    //    proof is needed here: `atRestKey` was derived just above from the phrase in hand, so it is the restore's key.
+    await dropUnopenable({ backing: chatVault, key: atRestKey });
+    await new VaultEncrypted({ backing: chatVault, key: atRestKey }).set(RESTORE_KEY_CHECK, JSON.stringify({ at: new Date().toISOString() }));
     // 2–3. THE GENERAL PERSONA'S SLOTS (its chat seed, person key and delegation blob — the bare names, as personaVault
     //      names them), only when this device holds it: a device without it has nothing of it, not even an empty slot.
     let identity = null;

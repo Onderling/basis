@@ -62,7 +62,7 @@ test('a rename on one device and a disclosure on the other, each its first state
     expect(offer?.ok, JSON.stringify(offer)).toBe(true);
     const phrase = (await call(A1.page, 'household', 'revealOwnerPhrase', {}))?.mnemonic;
     const enrolled = await A2.page.evaluate(async ([uri, words]) => {
-      localStorage.setItem('onderling.enrollOffer', uri);
+      localStorage.setItem('basis.enrollOffer', uri);
       return window.onderlingCall('household', 'enrollDevice', { mnemonic: words, label: 'walk-two-devices' });
     }, [offer.uri, phrase]);
     expect(enrolled?.ok, JSON.stringify(enrolled)).toBe(true);

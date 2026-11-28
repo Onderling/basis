@@ -49,12 +49,12 @@ describe("the phone's circle store, rebuilt", () => {
 
     const uri = `pseudo-pod://circle-${circleId}/circle/items/note.json`;
     await first.podClient.write(uri, JSON.stringify({ text: 'kept' }), { contentType: 'application/json' });
-    const scopePrefix = `cc-circle-${circleId}:`;
+    const scopePrefix = `basis.circle-${circleId}:`;
     const rowKey = [...storage.raw.keys()].find((k) => k.startsWith(scopePrefix) && k.includes('note.json') && !k.includes('__dirty__') && !k.includes('versions/'));
     expect(rowKey, 'the row did not reach the circle scope').toBeTruthy();
     // The row on the disk now sealed with ANOTHER content key: on this device it does not open (a key that changed,
     // a restored backup). Written beside the app, straight onto the same AsyncStorage scope.
-    const otherKey = createSealingBackend({ backend: createAsBackend({ AsyncStorage: storage, scope: `cc-circle-${circleId}` }), getStrategy: async () => groupKeyStrategy({ groupKey: 'B'.repeat(43) }) });
+    const otherKey = createSealingBackend({ backend: createAsBackend({ AsyncStorage: storage, scope: `basis.circle-${circleId}` }), getStrategy: async () => groupKeyStrategy({ groupKey: 'B'.repeat(43) }) });
     await otherKey.put(rowKey.slice(scopePrefix.length), new TextEncoder().encode(JSON.stringify({ text: 'kept' })));
     const before = storage.raw.get(rowKey);
 
@@ -88,9 +88,9 @@ describe("the phone's circle store, rebuilt", () => {
     await makeCirclePolicyStoreRN(storage).update(circleId, { storagePosture: 'p2', pod: 'shared' });
 
     const ref = `pseudo-pod://circle-cache-${circleId}/circle/items/note.json`;
-    const otherKey = createSealingBackend({ backend: createAsBackend({ AsyncStorage: storage, scope: `cc-circle-cache-${circleId}` }), getStrategy: async () => groupKeyStrategy({ groupKey: 'B'.repeat(43) }) });
+    const otherKey = createSealingBackend({ backend: createAsBackend({ AsyncStorage: storage, scope: `basis.circle-cache-${circleId}` }), getStrategy: async () => groupKeyStrategy({ groupKey: 'B'.repeat(43) }) });
     await otherKey.put(ref, new TextEncoder().encode(JSON.stringify({ text: 'kept' })));
-    const rowKey = `cc-circle-cache-${circleId}:${ref}`;
+    const rowKey = `basis.circle-cache-${circleId}:${ref}`;
     const before = storage.raw.get(rowKey);
     expect(before, 'the row is not where the cache reads').toBeTruthy();
 
@@ -110,7 +110,7 @@ describe("the phone's circle store, rebuilt", () => {
   it('neither shell types a circle storage name itself', () => {
     for (const f of ['../src/core/circlePods.js', '../../basis/web/v2/circleApp.js']) {
       const src = readFileSync(fileURLToPath(new URL(f, import.meta.url)), 'utf8');
-      expect(src, f).not.toMatch(/`cc-circle-(cache-)?\$\{/);
+      expect(src, f).not.toMatch(/`basis.circle-(cache-)?\$\{/);
       expect(src, f).toContain('sealedNamedBackend(circleStorageName.store(circleId)');
       expect(src, f).toContain('sealedNamedBackend(circleStorageName.cache(circleId)');
     }

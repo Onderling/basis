@@ -23,8 +23,8 @@ function fakeViews({ grant = 'granted', answers = {} } = {}) {
       link,
       ops: () => ['tools.useTool', 'lists.listEntries'],
       async connect({ label, toolbox }) { v.offered = { label, toolbox }; return { code: 'AB12', offer: 'onderling-connect://OFFER' }; },
-      granted: () => (grant === 'granted' ? Promise.resolve({ tokens: [] }).then((g) => { storage.setItem('onderling.screen.BOTKEY', JSON.stringify({ botAddress: 'BOTKEY' })); return g; }) : Promise.reject(new Error(grant))),
-      async resume() { return storage.getItem('onderling.screen.BOTKEY') != null; },
+      granted: () => (grant === 'granted' ? Promise.resolve({ tokens: [] }).then((g) => { storage.setItem('basis.screen.BOTKEY', JSON.stringify({ botAddress: 'BOTKEY' })); return g; }) : Promise.reject(new Error(grant))),
+      async resume() { return storage.getItem('basis.screen.BOTKEY') != null; },
       async call(op, input) { const a = answers[op]; if (typeof a === 'function') return a(input); if (a instanceof Error) throw a; return a ?? { ok: true, op }; },
       onNudge: (fn) => { v.nudge = fn; return () => {}; },
       async stop() { v.stopped = true; },
@@ -69,12 +69,12 @@ describe('the screen client', () => {
 
   it('storage under a name per toolbox; no stored grant → not-paired ("pair again"); sign-out wipes exactly this toolbox', async () => {
     const storage = memoryStorage();
-    storage.setItem('onderling.screen.recepten.onderling.screen.BOTKEY', '{"other":true}');
+    storage.setItem('basis.screen.recepten.basis.screen.BOTKEY', '{"other":true}');
     const { createView } = fakeViews();
     const c = createScreenClient({ toolbox: 'boodschappen', bot: BOT, storage, createView });
     expect(await c.resume()).toEqual({ ok: false, code: 'not-paired' });
     await c.startPairing(); await c.waitForGrant();
-    expect(storage.getItem('onderling.screen.boodschappen.onderling.screen.BOTKEY')).not.toBeNull();
+    expect(storage.getItem('basis.screen.boodschappen.basis.screen.BOTKEY')).not.toBeNull();
     storage.setItem('onderling-screen:boodschappen:key', 'secret');
     // a fresh page: resumes from what this browser kept
     const again = createScreenClient({ toolbox: 'boodschappen', bot: BOT, storage, createView });
@@ -82,9 +82,9 @@ describe('the screen client', () => {
     expect(again.state()).toBe('connected');
     await again.signOut();
     expect(again.state()).toBe('not-paired');
-    expect(storage.getItem('onderling.screen.boodschappen.onderling.screen.BOTKEY')).toBeNull();
+    expect(storage.getItem('basis.screen.boodschappen.basis.screen.BOTKEY')).toBeNull();
     expect(storage.getItem('onderling-screen:boodschappen:key')).toBeNull();
-    expect(storage.getItem('onderling.screen.recepten.onderling.screen.BOTKEY'), 'another toolbox keeps its own').not.toBeNull();
+    expect(storage.getItem('basis.screen.recepten.basis.screen.BOTKEY'), 'another toolbox keeps its own').not.toBeNull();
   });
 
   it('a call: not paired, not allowed, busy while it runs, time-out and abort, a refusal as its code; never a throw', async () => {
@@ -185,13 +185,13 @@ describe('a page opened again without the link', () => {
     const c = createScreenClient({ toolbox: 'boodschappen', bot: withTicket, storage, createView });
     await c.startPairing(); await c.waitForGrant();
     expect([...storage.map].map(([k, v]) => `${k}=${v}`).join('\n')).not.toMatch(/ONE-USE/);
-    expect([...storage.map.keys()]).toEqual(['onderling.screen.boodschappen.onderling.screen.BOTKEY']);
+    expect([...storage.map.keys()]).toEqual(['basis.screen.boodschappen.basis.screen.BOTKEY']);
   });
 
   it('grants kept for two bots: none is guessed', async () => {
     const storage = memoryStorage();
-    storage.setItem('onderling.screen.boodschappen.onderling.screen.BOT-A', '{}');
-    storage.setItem('onderling.screen.boodschappen.onderling.screen.BOT-B', '{}');
+    storage.setItem('basis.screen.boodschappen.basis.screen.BOT-A', '{}');
+    storage.setItem('basis.screen.boodschappen.basis.screen.BOT-B', '{}');
     const c = createScreenClient({ toolbox: 'boodschappen', bot: 'https://basis.example/app', storage, createView: fakeViews().createView });
     expect((await c.resume()).ok).toBe(false);
   });

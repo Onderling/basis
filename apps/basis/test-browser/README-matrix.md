@@ -47,9 +47,9 @@ the title.
 
 | key | purpose | discovered in |
 |---|---|---|
-| `circle.app.lang` | force locale (headless Chromium is en-US) | existing |
-| `cc.relayUrl` | the relay pref, read at boot | `src/v2/relayPref.js` (`STORAGE_KEY`) → `web/v2/circleApp.js` (`localStorageRelayIo().load()`) |
-| `cc-chat-id:cc-transport-mode` | the `/transport-mode` vault value under the chat-identity `VaultLocalStorage` prefix | `src/core/localBuiltins.js` (`cc-transport-mode`) + `realAgent.js` (`cc-chat-id:` prefix) |
+| `basis.app.lang` | force locale (headless Chromium is en-US) | existing |
+| `basis.relayUrl` | the relay pref, read at boot | `src/v2/relayPref.js` (`STORAGE_KEY`) → `web/v2/circleApp.js` (`localStorageRelayIo().load()`) |
+| `basis.chat-id:cc-transport-mode` | the `/transport-mode` vault value under the chat-identity `VaultLocalStorage` prefix | `src/core/localBuiltins.js` (`cc-transport-mode`) + `realAgent.js` (`basis.chat-id:` prefix) |
 
 A `relay`/`both` peer also gets the relay URL as the **`?relay=<wss>` boot param** (belt to the
 localStorage braces — `web/v2/circleApp.js` applies it at boot).
@@ -57,7 +57,7 @@ localStorage braces — `web/v2/circleApp.js` applies it at boot).
 > **Honest note on transport mode:** the app also **derives** the effective mode from which transports
 > actually connect (`realAgent.connectPeerTransport`: relay present → `relay`/`both`, else `nkn`). So the
 > load-bearing knob is whether a `relayUrl` is seeded (+ whether NKN's CDN lib loads); seeding
-> `cc-chat-id:cc-transport-mode` is a best-effort hint, not the sole lever.
+> `basis.chat-id:cc-transport-mode` is a best-effort hint, not the sole lever.
 
 ## Running a named setup / project
 
@@ -81,7 +81,7 @@ npx playwright test test-browser/matrix.spec.js --list
 `PEER_TEST_RELAY` unset ⇒ the fixture does nothing and default/`nkn` runs are untouched (no process
 leaks). When it's set, `VITE_CIRCLE_RELAY_URL` is *also* forwarded to the dev server as a build-time
 default — but only if Playwright starts the server (a reused `:5173` keeps its env; the per-client
-`cc.relayUrl` seed wins regardless).
+`basis.relayUrl` seed wins regardless).
 
 ## Current honest coverage
 

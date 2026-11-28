@@ -108,10 +108,10 @@ export function createScreenClient({ toolbox, bot, label = null, storage = globa
   const store = prefixed(storage, keyPrefix);
   // THE BOT, FROM THE KEPT GRANT (L1179): the link's fragment is cleared at once (its ticket is one use), so a reload, a
   // bookmark or a browser restart opens the page without it. The grant a pairing kept is stored under the bot's ADDRESS
-  // (`onderling.screen.<botAddress>`, this toolbox's prefix), and resuming needs only that address: a page without the
+  // (`basis.screen.<botAddress>`, this toolbox's prefix), and resuming needs only that address: a page without the
   // link reads it back from the key's name. Nothing new is written; the ticket is never kept. A link, when there is one,
   // always wins; pairing still needs the link (the ticket is its alone). Kept grants for two bots: none is guessed.
-  const GRANT_HEAD = `${keyPrefix}onderling.screen.`;
+  const GRANT_HEAD = `${keyPrefix}${storageName('screenClient')}`;
   const keptBot = () => {
     try {
       const found = [];

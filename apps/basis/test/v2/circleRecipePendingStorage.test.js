@@ -1,7 +1,7 @@
 /**
  * basis v2 — γ-next.recipe localStorage adapter tests.
  *
- * Verifies the wire-level keys (`cc.circleRecipePending.<id>`), JSON
+ * Verifies the wire-level keys (`basis.circleRecipePending.<id>`), JSON
  * round-trip, and the missing-key / clear semantics.  Uses a vi-mock
  * `storage` rather than jsdom so the test is fast + node-portable.
  */
@@ -27,11 +27,11 @@ function memStorage() {
 }
 
 describe('localStorageCircleRecipePendingIo · γ-next.recipe', () => {
-  it('writes to cc.circleRecipePending.<id> as JSON', async () => {
+  it('writes to basis.circleRecipePending.<id> as JSON', async () => {
     const s = memStorage();
     const io = localStorageCircleRecipePendingIo(s);
     await io.save('g1', { id: 'r1', name: 'Circle', blocks: [] });
-    expect(openStoredValue(SEAL, 'cc.circleRecipePending.g1', s._backing.get('cc.circleRecipePending.g1'))).toBe(JSON.stringify({ id: 'r1', name: 'Circle', blocks: [] }),
+    expect(openStoredValue(SEAL, 'basis.circleRecipePending.g1', s._backing.get('basis.circleRecipePending.g1'))).toBe(JSON.stringify({ id: 'r1', name: 'Circle', blocks: [] }),
     );
   });
 
@@ -51,7 +51,7 @@ describe('localStorageCircleRecipePendingIo · γ-next.recipe', () => {
 
   it('returns null when stored JSON is corrupt', async () => {
     const s = memStorage();
-    s.setItem('cc.circleRecipePending.g3', 'not json');
+    s.setItem('basis.circleRecipePending.g3', 'not json');
     const io = localStorageCircleRecipePendingIo(s);
     expect(await io.load('g3')).toBeNull();
   });
@@ -61,7 +61,7 @@ describe('localStorageCircleRecipePendingIo · γ-next.recipe', () => {
     const io = localStorageCircleRecipePendingIo(s);
     await io.save('g4', { id: 'r' });
     await io.remove('g4');
-    expect(s._backing.has('cc.circleRecipePending.g4')).toBe(false);
+    expect(s._backing.has('basis.circleRecipePending.g4')).toBe(false);
     expect(await io.load('g4')).toBeNull();
   });
 

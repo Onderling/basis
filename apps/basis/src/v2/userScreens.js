@@ -21,7 +21,7 @@
  *                    (the new task block lands in α.4)
  *
  * Per-user storage (per):
- *   One ScreenBook per user; key `cc.userScreens` (NOT per-circle).
+ *   One ScreenBook per user; key `basis.userScreens` (NOT per-circle).
  *   Mirrors createCircleRecipeStore's injectable {load, save} shape so
  *   the host can swap localStorage → pod io later without changing
  *   any callers.
@@ -231,13 +231,17 @@ export function createUserScreenStore({ io = {}, versions = null } = {}) {
   const { load, save } = io;
   const hasVersions = Boolean(versions && typeof versions.capture === 'function' && typeof versions.list === 'function');
   const newestTs = async () => (hasVersions ? ((await versions.list(SCREEN_VERSIONS_KEY))[0]?.ts ?? null) : null);
+  // DIAGNOSTIC (the phone's no-such-page after a restore, L1259 b): how the last load ended. Comes out in the PR that fixes it.
+  let lastLoad = 'none';
   return {
     async get() {
       let raw = null;
-      try { raw = typeof load === 'function' ? await load() : null; }
-      catch { raw = null; }
+      try { raw = typeof load === 'function' ? await load() : null; lastLoad = raw == null ? 'null' : 'book'; }
+      catch (err) { raw = null; lastLoad = `threw: ${err?.message ?? err}`; }
       return normalizeScreenBook(raw);
     },
+    /** DIAGNOSTIC: 'book' · 'null' · 'threw: …' · 'none' (not loaded yet). */
+    lastLoad: () => lastLoad,
     async set(book) {
       const next = normalizeScreenBook(book);
       if (typeof save === 'function') await save(next);
@@ -302,12 +306,12 @@ export const SCREEN_VERSIONS_KEY = 'device';
 /** A device's own screen book with its versions (each change kept, so it can be undone) — what the web shell composes. */
 export function localUserScreenStore(storage = globalThis.localStorage) {
   // the versions sealed too (they hold earlier books)
-  return createUserScreenStore({ io: localStorageScreenIo(storage), versions: localStorageObjectVersions('screens', sealedKeyValue(storage, { name: 'the page book versions', strict: true })) });
+  return createUserScreenStore({ io: localStorageScreenIo(storage), versions: localStorageObjectVersions('screens', sealedKeyValue(storage, { name: 'the page book versions', strict: true }), undefined, { versionsPrefix: storageName('objectVersionKeys') }) });
 }
 
 /**
  * localStorage-backed io.  Single key (no per-circle splitting).
- *   key: `cc.userScreens`
+ *   key: `basis.userScreens`
  */
 export function localStorageScreenIo(storage = globalThis.localStorage) {
   const KEY = storageName('userScreens');
@@ -322,7 +326,8 @@ export function localStorageScreenIo(storage = globalThis.localStorage) {
       } catch { return null; }
     },
     save: async (book) => {
-      try { await kv.setItem(KEY, JSON.stringify(book)); } catch { /* quota / disabled / no content key yet */ }
+      // quota / disabled / no content key yet: said, never silent (a seed that did not land is not painted: ensureVandaagBook)
+      try { await kv.setItem(KEY, JSON.stringify(book)); } catch (err) { console.warn(`[at-rest] the page book: a save did not land: ${err?.message ?? err}`); }
     },
   };
 }

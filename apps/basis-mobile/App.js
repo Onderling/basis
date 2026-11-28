@@ -33,6 +33,7 @@ import CircleLauncherScreen from './src/screens/v2/CircleLauncherScreen.js';
 import RestoreFlowModal from './src/screens/v2/RestoreFlowModal.js';
 import { pendingEnrollOffer, restoreFinishApplies } from '../basis/src/v2/enrollOffer.js';
 import RestoreFinishModal from './src/screens/v2/RestoreFinishModal.js';
+import RestartRequiredScreen from './src/screens/v2/RestartRequiredScreen.js';
 import ActStateBar from './src/rn/ActStateBar.js';
 // Delivery honesty (2026-07-28) — the ONE per-message delivery map, lifted here so ChatScreen's
 // peer-router (inbound receipts) and CircleLauncherScreen's bubbles (rendering) share an instance.
@@ -147,6 +148,10 @@ export default function App() {
   const [restoreFlowPending, setRestoreFlowPending] = useState(false);
   // A phrase ceremony ran on this device and the restore-finish flow has not asked yet (web parity).
   const [restoreFinishPending, setRestoreFinishPending] = useState(false);
+  // An op's result asked for a restart: this process is the device's former self and writes nothing (restartRequired.js).
+  // The agent holds the state, so a remount inside the same process paints the stop again.
+  const [restartStop, setRestartStop] = useState(false);
+  useEffect(() => bundle?.agent?.onRestartRequired?.(() => setRestartStop(true)), [bundle]);
   const [bootError, setBootError] = useState(null);
   // the boot's error itself (the launcher reads its kind: `bootFailureNotice`), a counter "try again" bumps to run the
   // boot once more, and a save refused because the value it would replace could not be opened (L1115)
@@ -480,6 +485,9 @@ export default function App() {
         // this is where it is read, before any store is touched. The note carries the throwaway self's circle
         // ids, captured while its registry was still readable. Removed only when every drop succeeded, so a
         // storage that refuses simply tries again on the next launch.
+        // DIAGNOSTIC (no-such-page after a restore, L1259 b): which of the page book's keys this forget removed; the
+        // line's time places it against the launcher's seeding line. Comes out in the PR that fixes it.
+        const droppedNames = [];
         try {
           const forgot = await runPendingForget({
             markerVault: markerVaultOver(AsyncStorage),
@@ -489,12 +497,17 @@ export default function App() {
                 const all = await AsyncStorage.getAllKeys().catch(() => []);
                 // `…<name>::state` is how a pinboard-style cache keys its one record (prefix + db name), so it is the store too
                 const mine = all.filter((k) => k === name || k.startsWith(`${name}:`) || k.startsWith(`${name}/`) || k.endsWith(`${name}::state`));
-                if (mine.length) await AsyncStorage.multiRemove(mine);
+                if (mine.length) { await AsyncStorage.multiRemove(mine); droppedNames.push(...mine); }
               },
-              dropKey: async (key) => { await AsyncStorage.removeItem(key); },
+              dropKey: async (key) => { await AsyncStorage.removeItem(key); droppedNames.push(key); },
             },
           });
           if (forgot.ran) console.info(`[enrol] forgot the throwaway self: ${forgot.stores} store(s), ${forgot.keys} key(s)`);
+          if (forgot.ran) {
+            const book = storageName('userScreens');
+            const pageBookKeys = droppedNames.filter((k) => k.includes(book) || k.includes('screens'));
+            console.info(`[enrol] the page book: ${pageBookKeys.length ? `removed [${pageBookKeys.join(', ')}]` : 'not among what was removed'} (the content key is published in memory from the agent's vault, not a stored key)`);
+          }
         } catch { /* a clear that cannot run never blocks a launch */ }
 
         const deviceLogIo = backendSnapshotIo(
@@ -786,6 +799,8 @@ export default function App() {
           callSkill={bundle?.callSkill}
           onClose={() => setRestoreFinishPending(false)}
         />
+        {/* last, over everything: the stop after a restart-required result — no close, no input */}
+        <RestartRequiredScreen visible={restartStop} />
       </View>
       </ThemeProvider>
     </SafeAreaProvider>

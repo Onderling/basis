@@ -77,8 +77,8 @@ describe('VaultAsyncStorage — round-trip', () => {
 describe('VaultAsyncStorage — prefix isolation', () => {
   it('two vaults with different prefixes do not see each other', async () => {
     const storage = makeMockAsyncStorage();
-    const v1 = new VaultAsyncStorage({ prefix: 'cc-chat-id:', asyncStorage: storage });
-    const v2 = new VaultAsyncStorage({ prefix: 'cc-host-id:', asyncStorage: storage });
+    const v1 = new VaultAsyncStorage({ prefix: 'basis.chat-id:', asyncStorage: storage });
+    const v2 = new VaultAsyncStorage({ prefix: 'basis.host-id:', asyncStorage: storage });
 
     await v1.set('agent-privkey', 'chat-secret');
     await v2.set('agent-privkey', 'host-secret');

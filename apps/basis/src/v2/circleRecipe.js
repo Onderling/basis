@@ -316,10 +316,10 @@ export function createCircleRecipeStore({ io = {}, versions } = {}) {
 /** A device's own circle-recipe store, SEALED at rest (the recipe and its versions) — what the web shell composes. */
 export function localCircleRecipeStore(storage = globalThis.localStorage) {
   const sealed = sealedKeyValue(storage, { name: 'the circle recipe' });
-  return createCircleRecipeStore({ io: localStorageRecipeIo(sealed), versions: localStorageObjectVersions('recipe', sealed) });
+  return createCircleRecipeStore({ io: localStorageRecipeIo(sealed), versions: localStorageObjectVersions('recipe', sealed, undefined, { versionsPrefix: storageName('objectVersionKeys') }) });
 }
 
-/** localStorage-backed io.  Key: `cc.circleRecipe.<circleId>`. */
+/** localStorage-backed io.  Key: `basis.circleRecipe.<circleId>`. */
 export function localStorageRecipeIo(storage) {   // no default: a raw localStorage would write the recipe plain
   const key = (id) => `${storageName('circleRecipe')}${id}`;
   const kv = storage ? jsonKv(storage, { name: 'the circle recipe', kind: 'settings' }) : null;

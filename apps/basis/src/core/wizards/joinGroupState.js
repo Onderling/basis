@@ -937,6 +937,9 @@ export async function finalSubmit({
     // device's address across every circle it is in and re-read the roster — work that grows with how
     // many circles you have and says nothing about whether the join worked. The stage lives here, where
     // the chain is; both wizards render it (`joinSubmitLabelKey`), neither decides it.
+    // "Connecting" waits for this device's address on the relay and the members' addresses bound, NOT for the
+    // circle's lanes: `makeCircleReachable` starts that pull and settles without it (an open circle repaints when
+    // the answer lands, however late the other members answer).
     state.submitStage = 'connecting';
     if (typeof onStage === 'function') { try { onStage(state.submitStage); } catch { /* cosmetic */ } }
     if (result && result.groupId && typeof onJoined === 'function') {

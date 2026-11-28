@@ -43,7 +43,7 @@ describe('the persona slash commands', () => {
     const w = (await a.callSkill('agents', 'createProfile', { name: 'Werk' })).id;
     const p = await typed(a, '/pauze Werk');
     expect(p.route, 'the name resolved to the id').toMatchObject({ kind: 'ready', opId: 'pausePersona', args: { personaId: w } });
-    expect(p.reply).toMatchObject({ ok: true, reloadRequired: true, personaId: w, name: 'Werk' });
+    expect(p.reply).toMatchObject({ ok: true, takesEffectNextStart: true, personaId: w, name: 'Werk' });
     expect(p.text).toBe(t('circle.receive_personas.done_pause_reload', { name: 'Werk' }));
     expect((await a.callSkill('household', 'listPersonasHere', {})).personas.find((x) => x.id === w)?.paused).toBe(true);
     const h = await typed(a, '/hier');

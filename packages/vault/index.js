@@ -28,6 +28,7 @@ export {
   VaultEncrypted,
   migrateVaultToEncrypted,
   resealVault,
+  dropUnopenable,
   VAULT_ENC_SENTINEL_KEY,
   VAULT_ENC_VERSION,
 } from './src/VaultEncrypted.js';

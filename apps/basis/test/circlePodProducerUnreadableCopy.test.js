@@ -12,9 +12,9 @@ import { VaultMemory } from '@onderling/vault';
 import { createCirclePodProducer } from '../src/v2/circlePodProducer.js';
 
 const CIRCLE = 'unreadable-copy';
-const COPY = `cc.circle-groupkey:${CIRCLE}`;
-const HOLDERS = `cc.circle-groupkey:key-holders:${CIRCLE}`;
-const POD_AGENTS = `cc.circle-groupkey:pod-agents:${CIRCLE}`;
+const COPY = `basis.circle-groupkey:${CIRCLE}`;
+const HOLDERS = `basis.circle-groupkey:key-holders:${CIRCLE}`;
+const POD_AGENTS = `basis.circle-groupkey:pod-agents:${CIRCLE}`;
 const freshPod = () => {
   const pseudoPod = createPseudoPod({ backend: createMemoryBackend(), mode: 'standalone', deviceId: 'x' });
   return new PodClient({ podRoot: 'pseudo-pod://x/', auth: { getAuthHeaders: async () => ({}) }, pseudoPod });

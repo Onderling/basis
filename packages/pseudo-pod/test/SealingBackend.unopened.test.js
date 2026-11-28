@@ -59,10 +59,10 @@ describe('SealingBackend: what it could not open (L1115)', () => {
   it('a store rebuilt over the same storage (a new backend object, the same name) still refuses', async () => {
     const shared = createMemoryBackend();
     const over = (b) => ({ get: (...a) => shared.get(...a), put: (...a) => shared.put(...a), delete: (...a) => shared.delete(...a), list: (...a) => shared.list(...a) });
-    await createSealingBackend({ backend: over(), getStrategy: async () => keyed('A'), onWarn: quiet, markScope: 'cc-circle-x' }).put('row', { v: 1 });
-    const b1 = createSealingBackend({ backend: over(), getStrategy: async () => keyed('B'), onWarn: quiet, markScope: 'cc-circle-x' });
+    await createSealingBackend({ backend: over(), getStrategy: async () => keyed('A'), onWarn: quiet, markScope: 'basis.circle-x' }).put('row', { v: 1 });
+    const b1 = createSealingBackend({ backend: over(), getStrategy: async () => keyed('B'), onWarn: quiet, markScope: 'basis.circle-x' });
     expect(await b1.get('row')).toBe(null);
-    const b2 = createSealingBackend({ backend: over(), getStrategy: async () => keyed('B'), onWarn: quiet, markScope: 'cc-circle-x' });
+    const b2 = createSealingBackend({ backend: over(), getStrategy: async () => keyed('B'), onWarn: quiet, markScope: 'basis.circle-x' });
     await expect(b2.put('row', { v: 2 })).rejects.toMatchObject({ code: 'stored-value-unreadable' });
   });
 });

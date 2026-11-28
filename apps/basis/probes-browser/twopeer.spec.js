@@ -28,7 +28,7 @@ test.setTimeout(420_000);
 async function bootPeer(browser, label) {
   const context = await browser.newContext();
   await context.addInitScript(() => {
-    try { localStorage.setItem('circle.app.lang', 'nl'); } catch { /* */ }
+    try { localStorage.setItem('basis.app.lang', 'nl'); } catch { /* */ }
   });
   const page = await context.newPage();
   page.on('console', (m) => {

@@ -68,8 +68,8 @@ describe('on a device whose key was minted now', () => {
 
   it('a planted plain value is refused in the default mode too', async () => {
     await newKeyDevice();
-    const kv = sealedKeyValue(memStorage({ 'cc.circlePolicy.c1': '{"admins":["me"]}' }), { name: 'the circle policy' });
-    await expect(kv.getItem('cc.circlePolicy.c1')).rejects.toThrow();
+    const kv = sealedKeyValue(memStorage({ 'basis.circlePolicy.c1': '{"admins":["me"]}' }), { name: 'the circle policy' });
+    await expect(kv.getItem('basis.circlePolicy.c1')).rejects.toThrow();
   });
 
   it('an UNBOUND sealed value (sealed without its key) is refused', async () => {
@@ -92,10 +92,10 @@ describe('a sealed value opens only under its own key', () => {
       await device();
       const s = memStorage();
       const kv = sealedKeyValue(s, { name: 'x', strict: true });
-      await kv.setItem('cc.circlePolicy.mine', '{"admins":["me"]}');
-      s._m.set('cc.circlePolicy.theirs', s._m.get('cc.circlePolicy.mine'));
-      expect(await kv.getItem('cc.circlePolicy.theirs')).toBeNull();
-      expect(await kv.getItem('cc.circlePolicy.mine')).toBe('{"admins":["me"]}');
+      await kv.setItem('basis.circlePolicy.mine', '{"admins":["me"]}');
+      s._m.set('basis.circlePolicy.theirs', s._m.get('basis.circlePolicy.mine'));
+      expect(await kv.getItem('basis.circlePolicy.theirs')).toBeNull();
+      expect(await kv.getItem('basis.circlePolicy.mine')).toBe('{"admins":["me"]}');
     });
   }
 

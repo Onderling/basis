@@ -47,28 +47,28 @@ describe('the per-circle key vault seals what it holds', () => {
   it('…and comes back exactly as it went in', async () => {
     const inner = inspectableVault();
     const vault = sealedLocalVault(inner);
-    await vault.set('cc.circle-groupkey:c1', SECRET);
-    expect(await vault.get('cc.circle-groupkey:c1')).toBe(SECRET);
+    await vault.set('basis.circle-groupkey:c1', SECRET);
+    expect(await vault.get('basis.circle-groupkey:c1')).toBe(SECRET);
   });
 
   it('a key row written BEFORE sealing is readable, and is resealed on the way past', async () => {
     const inner = inspectableVault();
     // What an existing install has today: the row in the clear, put there before any of this existed.
-    inner.raw.set('cc.circle-controller-key:c1', SECRET);
+    inner.raw.set('basis.circle-controller-key:c1', SECRET);
     const vault = sealedLocalVault(inner);
 
     // It still reads — the person does not lose the circle.
-    expect(await vault.get('cc.circle-controller-key:c1'), 'an existing key row must stay readable').toBe(SECRET);
+    expect(await vault.get('basis.circle-controller-key:c1'), 'an existing key row must stay readable').toBe(SECRET);
 
     // …and it is no longer in the clear behind it. This is the migration, and it is the whole argument
     // for treating key material differently from content: it converges without a boot pass, because a
     // key nobody reads is a key nobody is using.
-    const after = inner.raw.get('cc.circle-controller-key:c1');
+    const after = inner.raw.get('basis.circle-controller-key:c1');
     expect(after.startsWith('fp1:'), 'the plaintext key row should have been resealed on read').toBe(true);
     expect(after, 'and the private key should be gone from the store').not.toContain('MC4CAQAw');
 
     // Reading it again still returns the same thing, now through the seal.
-    expect(await vault.get('cc.circle-controller-key:c1')).toBe(SECRET);
+    expect(await vault.get('basis.circle-controller-key:c1')).toBe(SECRET);
   });
 
   it('a reseal that fails leaves the readable value alone — it can never lose a key', async () => {

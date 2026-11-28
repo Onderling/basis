@@ -75,6 +75,13 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
       // only what this device can still vouch for (checked here, now), then what this requester may hold of them
       // (the lane's own rule — the governance lane narrows its report kinds)
       const vouched = sendOnOnlyChecked(statements, circleId, rail);
+      // said, not swallowed: a joiner that refuses a settings change because its decision never came needs this line
+      // on the SERVING device to tell "withheld here" from "never held here" (a phone walk, 2026-11-27)
+      if (vouched.length < statements.length && typeof console !== 'undefined') {
+        const kept = new Set(vouched);
+        const kinds = statements.filter((s) => !kept.has(s)).map((s) => s?.body?.kind ?? (s?.tombstone ? 'tombstone' : '?'));
+        console.warn(`[${REQ}] ${circleId}: withheld ${kinds.length} of ${statements.length} statements this device cannot vouch for (${kinds.join(', ')})`);
+      }
       const served = typeof narrowServe === 'function' ? await narrowServe(vouched, { fromPeerAddr, circleId }) : vouched;
       if (served.length === 0) return;   // nothing to serve — silence, not an empty batch
       await sendToPeer(fromPeerAddr, { subtype: BATCH, circleId, statements: served }, { circleId });

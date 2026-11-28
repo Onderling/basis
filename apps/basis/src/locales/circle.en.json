@@ -8926,6 +8926,12 @@
       "doc": "Fallback notice body."
     }
   },
+  "restart_required": {
+    "title": "Basis has to start again",
+    "body": "Basis has to start again to finish this. Close Basis completely and open it again. Until then nothing is saved here.",
+    "how": "How: open the list of recent apps, swipe Basis away, then open Basis again.",
+    "reload": "Start again"
+  },
   "receive_personas": {
     "close": "Close",
     "remove_rekey_failed": "That did not fully work: the persona was taken off this device, but the device's key could not move over. The next start asks for your recovery phrase.",
@@ -9003,7 +9009,6 @@
     "empty_body": "The phrase brings back who you are, not the list of circles you were in. That list lives on your pod, or in a recovery file you saved. If you have neither, someone in each circle can invite you again; you come back as the same member.",
     "source_file": "Load a recovery file",
     "source_later": "Not now",
-    "later_title": "Fine. You can load a file later under My data.",
     "intent_question": "Could anyone else still use your old phone?",
     "intent_broken": "No, it broke or I wiped it",
     "intent_lost": "Maybe, it is lost or stolen",
@@ -9587,10 +9592,6 @@
       "other_url": {
         "text": "Other (enter URL)",
         "doc": "Mobile settings wizard: the custom-relay option."
-      },
-      "provider_inrupt": {
-        "text": "Inrupt Pod Spaces",
-        "doc": "Settings wizard (phone): a pod provider (a product name)."
       },
       "handle_placeholder": {
         "text": "e.g. alice",

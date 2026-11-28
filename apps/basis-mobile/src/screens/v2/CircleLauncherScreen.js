@@ -1340,7 +1340,11 @@ export default function CircleLauncherScreen({
     try { book = await userScreenStore.get(); }
     catch { book = { screens: [], activeId: null }; }
     // First run: the one Vandaag page (the coming week, my tasks, the circles with news), seeded once — shared with web
+    const hadPages = (book?.screens?.length ?? 0) > 0;
     try { book = await ensureVandaagBook({ store: userScreenStore, t }); } catch { /* the book as read stands */ }
+    // DIAGNOSTIC (no-such-page after a restore, L1259 b): when this start seeded the first page, and which. Comes out in
+    // the PR that fixes it.
+    if (!hadPages && (book?.screens?.length ?? 0) > 0) console.info(`[screens] seeded the first page ${book.screens[0].id} (the store's load before it: ${userScreenStore.lastLoad?.() ?? 'unknown'})`);
     setScreensBook(book);
     setScreensBookLoaded(true);
   }, [userScreenStore]);
@@ -3915,7 +3919,7 @@ function CircleDetail({
     tabMembers, mandateViewer]);
 
   // Chat ↔ Screen pill state (v2 §4 "De mode switch").
-  // Per-circle preference persists in AsyncStorage at cc.circleViewMode.
+  // Per-circle preference persists in AsyncStorage at basis.circleViewMode.
   // §4 — until the member has flipped the pill for this circle, the
   // landing surface is the admin's policy.view front door
   // (defaultViewModeFromPolicy): 'screen' → screen, else → chat.
@@ -4558,7 +4562,7 @@ function CircleDetail({
     return () => { alive = false; off(); };
   }, []);
 
-  // B (per-circle policy) — THIS circle's llmTool is authoritative (same cc.circlePolicy.<id> store the
+  // B (per-circle policy) — THIS circle's llmTool is authoritative (same basis.circlePolicy.<id> store the
   // settings screen writes). Unset → the deployment default CIRCLE_LLM_POLICY. Reloads per circle.
   const [circleLlmPolicy, setCircleLlmPolicy] = useState(CIRCLE_LLM_POLICY);
   // This circle's app scope for the LLM tool list (the S6.C per-circle apps). Empty → fall back to the

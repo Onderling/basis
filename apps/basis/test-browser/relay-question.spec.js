@@ -46,7 +46,7 @@ test('no relay known: the invite asks for one, refuses a non-relay, saves a rela
   await dialog.locator('.cc-relay-question__save').click();
   await expect(dialog).toHaveCount(0, { timeout: LONG });
   expect(await expectInviteCode(page), 'the invite carries the relay to the person joining').toContain(`relay=${encodeURIComponent(RELAY)}`);
-  expect(await page.evaluate(() => localStorage.getItem('cc.relayUrl')), 'saved as the relay setting').toBe(RELAY);
+  expect(await page.evaluate(() => localStorage.getItem('basis.relayUrl')), 'saved as the relay setting').toBe(RELAY);
 
   // Known now: the next invite goes straight to its code.
   expect(await openMore(page, 'invite')).toBe(true);
@@ -62,7 +62,7 @@ test('"Later": the invite still opens (without a relay), and the question waits 
   await dialog.locator('.cc-relay-question__later').click();
   await expect(dialog).toHaveCount(0, { timeout: LONG });
   expect(await expectInviteCode(page), 'no relay to carry').not.toContain('relay=');
-  expect(await page.evaluate(() => localStorage.getItem('cc.relayUrl'))).toBeFalsy();
+  expect(await page.evaluate(() => localStorage.getItem('basis.relayUrl'))).toBeFalsy();
 
   expect(await openMore(page, 'invite')).toBe(true);
   await expect(page.locator('.cc-relay-question'), 'not again this session').toHaveCount(0);

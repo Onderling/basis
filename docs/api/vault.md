@@ -201,7 +201,7 @@ A lock was asked for with no secret at all: a short code is allowed, nothing is 
 
 ```js
 class RootKeyStoreWebCrypto extends RootKeyStore
-new RootKeyStoreWebCrypto({ dbName = DB_NAME, kdf = null } = {})
+new RootKeyStoreWebCrypto({ dbName = DEFAULT_ROOT_KEY_DB, kdf = null } = {})
 ```
 
 The browser's root-key store (see the file header).
@@ -302,6 +302,29 @@ over to the restored person. Without a fingerprint the sentinel is bare `v1` (no
 - `[o.fingerprint]` `string` — root identifier to bind the sentinel to (see above).
 
 **Returns:** `Promise<{migrated: boolean, sealed: number, dropped: number, reset?: true}>` — `migrated: false` when the sentinel already matched (nothing touched); `reset: true` when a root switch wiped the vault.
+
+### `dropUnopenable`
+
+**Kind:** function · **Import:** `dropUnopenable` from `'@onderling/vault'`
+
+```js
+async dropUnopenable({ backing, key } = {})
+```
+
+DROP what no longer opens: every sealed entry that does not open under `key` is deleted; what opens stays.
+
+For a phrase restore on a device that already is this person: the sentinel is bound to the ROOT's fingerprint, so
+the same phrase keeps it, but the restore enrols a new device id and seals under a new at-rest key. Entries sealed
+under the previous key are unreadable to every later read (another person's phrase resets the whole vault for the
+same reason, `migrateVaultToEncrypted`); here only those go.
+
+**Parameters**
+
+- `o` `object`
+- `o.backing` `Vault` — the encrypted vault (sentinel present).
+- `o.key` `Uint8Array|{current: () => Uint8Array}` — the key every later read uses.
+
+**Returns:** `Promise<{dropped: number, kept: number}>`
 
 ### `resealVault`
 

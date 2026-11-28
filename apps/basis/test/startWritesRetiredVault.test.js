@@ -1,6 +1,6 @@
 /**
  * A START WRITES NOTHING TO THE RETIRED TASKS VAULT WHEN IT IS EMPTY (ledger L1103 part 2, counted on the seeded Samsung
- * 2026-11-22). Every start sealed the retired tasks key's prefix (`cc-tasks-id:`) to read a key that had long been
+ * 2026-11-22). Every start sealed the retired tasks key's prefix (`basis.tasks-id:`) to read a key that had long been
  * forgotten: the seal step wrote its sentinel into the empty prefix, and the forgetting step removed it again, two
  * storage writes per start for nothing. An empty prefix holds no key to read: nothing is sealed, nothing is written.
  */

@@ -11,6 +11,7 @@ import Btn from './Btn.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Modal, Alert, Share, Switch } from 'react-native';
 import { t, lang, setLang } from '../../core/localisation.js';
+import { saveFileToChosenPlace, fileSaveWords } from '../../core/fileSave.js';   // the recovery file, kept where the person chooses
 import { useTheme, useThemePref } from './themeContext.js';
 import { FAB_CLEARANCE } from './fab.js';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -45,6 +46,7 @@ import { loadCircles } from '../../../../basis/src/v2/circleModel.js';
 import { circleSourcesFromAgent } from '../../../../basis/src/v2/circleSources.js';
 import UserLlmSettings from './UserLlmSettings.js';
 import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
+import { KNOWN_ISSUERS, DEFAULT_ISSUER } from '@onderling/oidc-session-rn';   // the one provider list (the settings wizard reads it too)
 import RecoveryFileWizardModal from '../../../../basis/src/rn/wizards/recoveryFileWizardModal.js';
 import { historyStatusLine } from '../../../../basis/src/v2/historyMirror.js';
 import { START_SCREEN_CHOICES } from '../../../../basis/src/v2/startScreen.js';
@@ -115,7 +117,7 @@ export default function CircleMyDataScreen({ screenOffer = null, onScreenOfferTa
   // capability at all, which is what used to be read off the presence of a `podAuth` prop.
   const [session, setSession] = useState(null);
   // cluster J — pod sign-in entry (the v2 UI had none; sign-in was stranded in the hidden ChatScreen).
-  const [issuer, setIssuer] = useState('https://login.inrupt.com');
+  const [issuer, setIssuer] = useState(DEFAULT_ISSUER.url);
   const [signingIn, setSigningIn] = useState(false);
   const [signInErr, setSignInErr] = useState('');
   const [privacy, setPrivacy] = useState([]);
@@ -1261,6 +1263,17 @@ export default function CircleMyDataScreen({ screenOffer = null, onScreenOfferTa
           {/* cluster J — pod sign-in entry (the v2 UI had none). When signed out: pod provider + Connect. */}
           {podCapable && !podSignedIn && (
             <View style={styles.signin}>
+              {/* the providers the sign-in package knows (the settings wizard offers the same list); a tap fills the
+                  address, which stays free for a provider of your own */}
+              <View style={styles.signinProviders} accessibilityRole="radiogroup">
+                {KNOWN_ISSUERS.map((p) => (
+                  <Pressable key={p.id} onPress={() => setIssuer(p.url)} accessibilityRole="radio"
+                    accessibilityState={{ selected: issuer.trim() === p.url }}
+                    style={[styles.signinProvider, issuer.trim() === p.url && styles.signinProviderOn]} testID={`mydata-pod-provider-${p.id}`}>
+                    <Text style={styles.signinProviderText}>{p.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
               <ThemedTextInput
                 style={styles.signinInput}
                 value={issuer}
@@ -1296,7 +1309,12 @@ export default function CircleMyDataScreen({ screenOffer = null, onScreenOfferTa
           <RecoveryFileWizardModal
             visible mode={wizard === 'recovery-export' ? 'export' : 'import'} callSkill={callSkill} t={t} theme={theme}
             onClose={() => setWizard(null)} onDispatched={() => {}}
-            onSaveFile={async (text, name) => { await Share.share({ message: text, title: name }); }}
+            // kept WHERE THE PERSON CHOOSES (Android's folder picker), never the share sheet: the share sheet offered chat
+            // apps and "Copy text", and nothing stayed on the phone to load after a wipe (a walk, 2026-11-27)
+            onSaveFile={async (text, name) => {
+              const w = fileSaveWords(await saveFileToChosenPlace({ text, name, mime: 'application/json' }));
+              return w ? t(w.key, w.params) : null;
+            }}
             onPickFile={async () => {
               const r = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'text/plain', '*/*'], copyToCacheDirectory: true });
               const asset = r?.assets?.[0];
@@ -1384,6 +1402,10 @@ const makeStyles = (theme) => StyleSheet.create({
   relayNote: { marginTop: 6, fontSize: 12, color: theme.color.ink },
   relayHint: { marginTop: 4, fontSize: 12, color: theme.color.inkSoft },
   signin: { marginTop: 10, gap: 8 },
+  signinProviders: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  signinProvider: { paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md },
+  signinProviderOn: { borderColor: theme.color.ink },
+  signinProviderText: { fontSize: 13, color: theme.color.ink },
   signinInput: { fontSize: 14, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, color: theme.color.ink, backgroundColor: theme.color.white },
   signinErr: { fontSize: 12, color: '#b3261e' },
   // Display-theme pill toggle (mono, ink-outlined; active inverts to ink) —

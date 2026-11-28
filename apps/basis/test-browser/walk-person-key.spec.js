@@ -47,7 +47,7 @@ test('B revokes a device: A\'s next message to B is sealed to the new version â€
     expect(offer?.ok, JSON.stringify(offer)).toBe(true);
     const phrase = (await call(B1.page, 'household', 'revealOwnerPhrase', {}))?.mnemonic;
     const enrolled = await B2.page.evaluate(async ([uri, words]) => {
-      localStorage.setItem('onderling.enrollOffer', uri);
+      localStorage.setItem('basis.enrollOffer', uri);
       return window.onderlingCall('household', 'enrollDevice', { mnemonic: words, label: 'walk-person-key' });
     }, [offer.uri, phrase]);
     expect(enrolled?.ok && enrolled.deviceId, JSON.stringify(enrolled)).toBeTruthy();

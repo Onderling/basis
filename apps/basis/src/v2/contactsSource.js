@@ -527,7 +527,7 @@ export function markRenames(rows = [], { lastSeenNames = {} } = {}) {
   });
 }
 
-/** Where the last-painted names live (device-local, like the seen-marks: `cc.contactNames`). */
+/** Where the last-painted names live (device-local, like the seen-marks: `basis.contactNames`). */
 export const CONTACT_NAMES_KEY = storageName('contactNames');
 
 /**

@@ -124,6 +124,7 @@ import { backfillContactPersonas } from '../../v2/contactPersona.js';   // conta
 import { bookRowsOf } from '../../v2/contactsSource.js';   // a listContacts reply's rows, whole
 import { KEEP_DAYS_KEY, roomRetentionMs, makeRoomKeeper, earlierInTheRoom } from '../../v2/nearbyKept.js';
 import { recordOwnAction, ownRetentionMs, OWN_RECORD_KEY, OWN_KEEP_WEEKS_KEY, ownActionRows, ownActionsExport, OWN_ACTION_KIND, noteOwnOutcome } from '../../ownActions.js';   // the person's own acts, at the outer waist
+import { createRestartState, restartRefusal, asksRestart } from '../../v2/restartRequired.js';   // after a reloadRequired result the waist refuses writes until a new start
 import { circleActRefusal, writeIntoRefusal, gateRefusalKey } from '../../v2/circleActGate.js';   // a person's write in a circle asks that circle's capability set, at the outer waist
 import { keptPolicyChangesOf, requestKeptPolicyChanges } from '../../v2/keptPolicyChanges.js';   // a write into another circle judged as its receivers judge it
 import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
@@ -156,7 +157,7 @@ import { SURFACE_NUDGE_SUBTYPE } from '../../v2/surfaceNudge.js'; // the reading
 import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';
 import { COMPANION_GRANT_OUTCOMES } from '../../v2/companionGrant.js';   // the words a grant to a node's agent ends on   // pairing: how the grant reaches the view that asked for it
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
-import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, seedFromString, seedToString, createKeyHolder } from '@onderling/vault';
+import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, dropUnopenable, seedFromString, seedToString, createKeyHolder } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
 import { createSecureMeshAgent, samePoint } from '@onderling/secure-agent';
 import { createBrowserMultiCircleTasksAgent } from '@onderling-app/tasks/browser';
@@ -282,7 +283,7 @@ async function giveFreshSeedIfShared(vault, forbiddenPubKeys, healed) {
   } catch { /* an unreadable vault is restoreOrGenerate's case, not this one */ }
 }
 
-import { restoreOwnerRoot, handPersonasInto, personaWireAt, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
+import { restoreOwnerRoot, handPersonasInto, personaWireAt, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY, RESTORE_KEY_CHECK } from './ownerRootRestore.js';
 import { createPersonaRuntime } from './personaRuntime.js';
 import { personaVault, PERSONA_SLOT_KEYS, HELD_PERSONAS_VAULT_KEY, PAUSED_PERSONAS_VAULT_KEY, RECOVERY_SEAL_VAULT_KEY, RECOVERY_SEAL_LABEL } from './personaVault.js';
 import { circleIdsFrom } from '../../v2/enrolForgets.js';
@@ -407,7 +408,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // (shopping/errand/repair/schedule items + tasks + contacts).
   //
   // OBJ-2 S1e — restart-survival: when the shell passes `householdPersistDb`
-  // (web → `{ dbName: 'cc-household-state' }` IndexedDB; mobile →
+  // (web → `{ dbName: 'basis.household' }` IndexedDB; mobile →
   // `{ dbName, asyncStorage }` AsyncStorage; node → `{ path }`), back the
   // store with a persistent `CachingDataSource` so items survive a reload.
   // Default (undefined) → in-memory `MemorySource`, unchanged.  The actual
@@ -548,11 +549,37 @@ export async function createRealHouseholdAgent(opts = {}) {
   // `rotate`, so a vault opened at boot (a trust registry, the grants) keeps working after the reseal in the same session,
   // and no read or write crosses the switch. Nothing inside a rotation may read a sealed vault (it would wait on itself).
   const atRestHolder = createKeyHolder(atRestKey);
+  // The chat vault's backing, named here (it is sealed further down) because the first start after a phrase restore
+  // proves the key in force on it before any vault drops a thing.
+  const chatVaultBacking = opts.chatVault ?? pickVault(storageName('vaultChatId'));
+  // THE PROOF BEFORE A DROP. The sentinel binds to the root's fingerprint, never to the at-rest key, so a passing
+  // migration says nothing about the key. The restore sealed its KEY CHECK (`RESTORE_KEY_CHECK`) into the chat vault
+  // under its own key: it opens under the key in force only when that key is the restore's. Absent or unopenable: no
+  // proof, nothing is dropped, and the start says the key could not be read, as it would without this.
+  let restoreKeyProof = null;
+  const restoreKeyProven = () => {
+    restoreKeyProof ??= (async () => {
+      try { return (await new VaultEncrypted({ backing: chatVaultBacking, key: atRestHolder.current() }).get(RESTORE_KEY_CHECK)) != null; }
+      catch { return false; }   // sealed under another key
+    })();
+    return restoreKeyProof;
+  };
   const sealedVault = async (backing) => {
     // the sentinel's read is the boot's first read of a sealed vault: a storage error there is the same "could not read"
     // as a key's, said with the same words (L1115), never the generic failure
     try { await migrateVaultToEncrypted({ backing, key: atRestHolder.current(), fingerprint: rootFingerprint }); }
     catch (err) { throw new KeyUnreadable('vault-sentinel', err); }
+    // the first start after a phrase restore: the same person's phrase keeps the sentinel (same root), but the restore
+    // enrolled a new device id and so a new at-rest key; what the previous key sealed opens no more and goes now, before
+    // anything reads it (another person's phrase resets the whole vault above, for the same reason). A restore starts
+    // this device clean, whoever's phrase: the unsealed content goes by the forget note the restore also leaves.
+    if (restorePendingAtBoot) {
+      let proven = false;
+      try { proven = await restoreKeyProven(); } catch (err) { throw new KeyUnreadable('vault-sentinel', err); }
+      if (!proven) throw new KeyUnreadable('vault-sentinel', new Error('the key in force opens nothing the restore wrote'));
+      try { await dropUnopenable({ backing, key: atRestHolder.current() }); }
+      catch (err) { throw new KeyUnreadable('vault-sentinel', err); }
+    }
     sealedBackings.push(backing);
     return new VaultEncrypted({ backing, key: atRestHolder });
   };
@@ -592,7 +619,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // - bus: shared with hostAgent so chatAgent.invoke(hostAgent.address)
   //        works in-process via InternalBus
   // - vault: opt.chatVault wins (tests inject VaultMemory); otherwise
-  //   picker chooses VaultLocalStorage by prefix 'cc-chat-id:'
+  //   picker chooses VaultLocalStorage by prefix 'basis.chat-id:'
   // - auditLog: persistent under 'cc-audit'; autoLogs identity.rotate /
   //   mute / claim.sign / caps.issue / peer.connect
   // - muteListVaultKey: persistent peer mute across reloads
@@ -611,8 +638,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // silently here). An entry that exists but cannot be read (a plaintext write that
   // slipped past the sealed layer) is unrecoverable either way — re-deriving from the
   // root is the one repair that keeps the person reachable at their roster addresses.
-  const chatVaultBacking = opts.chatVault ?? pickVault(storageName('vaultChatId'));
-  const chatVault = await sealedVault(chatVaultBacking);
+  const chatVault = await sealedVault(chatVaultBacking);   // its backing is named above, by the restore's key proof
 
   // ── CONTENT at rest ────────────────────────────────────────────────────────────────────────────
   // Key material was already sealed here; a person's own words were not. Their lists, messages and
@@ -904,7 +930,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // device-revocation ceremony rotates that vault's secret, and every previously written trust entry
     // becomes undecryptable — safe (an unreadable tier falls closed to the lowest) but lossy, and it
     // surfaced as a decryption error the moment a walk did a ceremony and a grant in one account.
-    // Mirrors the host gate, which already keeps `cc-host-trust:` separate.
+    // Mirrors the host gate, which already keeps `basis.host-trust:` separate.
     // SEALED like the key vaults: who is trusted at which tier is metadata about people, and it is read after the key
     trustRegistry: { vault: await sealedVault(opts.peerTrustVault ?? pickVault(storageName('vaultPeerTrust'))) },
     // RATE LIMIT ON (the R1 go-live line, 2026-08-21) — the flood defence at the receive boundary,
@@ -3822,6 +3848,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     await writePeerBindings();
     peerBindingsFrozen = true;
   };
+  // the cutover's reseal is over and the process goes on: save again, and save what was learned meanwhile
+  const thawPeerBindings = () => { peerBindingsFrozen = false; savePeerBindings(); };
   try {
     const raw = await chatVault.get(PEER_BINDINGS_VAULT_KEY);
     const kept = raw ? JSON.parse(typeof raw === 'string' ? raw : String(raw)) : [];
@@ -5087,8 +5115,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       // THE SELF-ENROLL MIGRATION (the per-ceremony custody cutover): a ROOT-custody device that
       // just proved the phrase migrates itself — reseal EVERY sealed vault from the root-derived
       // key to its own delegation-derived one, write the delegation blob (pre-signed record
-      // included), and flip the key door + marker. The running agent still holds the old key in
-      // its wrappers, so the reply asks for a reload; the next boot is a delegation boot.
+      // included), and flip the key door + marker. Every sealed vault reads the one key holder the
+      // reseal switches, so the running agent goes on under the new key; it asks for a restart only
+      // when the cutover introduced addresses (see the reply below). The next boot is a delegation boot.
       let migrated = false;
       const introduced = [];
       // Once per session: the migration leaves this running agent waiting for its reload (the vaults
@@ -5166,6 +5195,11 @@ export async function createRealHouseholdAgent(opts = {}) {
             }
           }
           if (migrated) selfEnrolledThisSession = true;
+          // The snapshot was frozen before the reseal so no debounced save could land mid-rotation. When the process goes
+          // on (no address introduced, no restart asked) it thaws: every sealed vault now writes under the key the reseal
+          // switched to (the one key holder), so a peer met later in this start is kept. The freeze was first made when
+          // a write after the reseal still went under the old key (2026-09-14); the key holder ended that (2026-11-25).
+          if (migrated && introduced.length === 0) thawPeerBindings();
         } catch (err) { console.warn('[custody] self-enroll migration deferred:', err?.message ?? err); }
       }
       // Every node the person owns (a companion) hears of it too — the root's own tombstone, so the revoked device
@@ -5187,7 +5221,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         ...(Object.keys(personaKeyVersions).length ? { personaKeyVersions } : {}),
         ...(personaKeysAlone.length ? { personaKeysAlone } : {}),
         ...(personaKeysUndone.length ? { personaKeysUndone } : {}),
-        ...(migrated ? { migrated: true, reloadRequired: true, introduced } : {}),
+        // a restart only when the cutover INTRODUCED addresses (an old device): that process is a former self from here
+        // (restartRequired.js). A device enrolled from its first boot moves nothing, so the person goes on in this start;
+        // only the root stays in this process's memory until its next start.
+        ...(migrated ? { migrated: true, introduced, ...(introduced.length ? { reloadRequired: true } : {}) } : {}),
       })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'revoke-failed' })]; }
   }, { visibility: 'private' });   // retires a device's keys everywhere: owner-only, phrase-proven
@@ -5738,7 +5775,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // the name rides back, so a typed `/pauze Werk` is answered in the screen's own words
     let name = null;
     try { name = (await agentsRegistryRef?.lookup?.(pid))?.name ?? null; } catch { /* nameless */ }
-    return { ok: true, paused: on, reloadRequired: true, personaId: pid, name };
+    // NOT reloadRequired: a pause or a resume changes what the NEXT start runs; this process is still the same selves
+    // until then and loses nothing written in it, so the restart stop does not stand (restartRequired.js)
+    return { ok: true, paused: on, takesEffectNextStart: true, personaId: pid, name };
   };
   hostAgent.register('pausePersona', async ({ parts }) => {
     return [DataPart(await setPaused(parts?.[0]?.data?.personaId, true))];
@@ -5966,7 +6005,10 @@ export async function createRealHouseholdAgent(opts = {}) {
           bootstrap = { ...made, stashed };
         }
       } catch { bootstrap = null; }
-      return [DataPart({ ok: true, held, reloadRequired: true, ...(bootstrap ? { bootstrap } : {}) })];
+      // NOT reloadRequired: like a pause, a receive changes what the NEXT start runs (the persona's slots, the stashed
+      // bootstrap); this process stays the default self at the same addresses, so nothing written after is lost and
+      // the restart stop does not stand (receiveTakesEffectNextStart.test.js). The screens still say to start again.
+      return [DataPart({ ok: true, held, takesEffectNextStart: true, ...(bootstrap ? { bootstrap } : {}) })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'hand-over-failed' })]; }
   }, { visibility: 'private' });
   hostAgent.register('restoreOwnerPhrase', async ({ parts }) => {
@@ -6144,11 +6186,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     },
     // Mirrors `opts.pinboardPersistDb` below.  Browser passes
     // `{dbName:'cc-tasks-state', storeName:'items'}` (IDB); mobile
-    // gets `{dbName:'cc-tasks-cache', asyncStorage}` (AsyncStorage)
+    // gets `{dbName:'basis.tasks', asyncStorage}` (AsyncStorage)
     // synthesised by basis-mobile/agentBundle.js.  Without it,
     // the tasks cache stays Map-only and every reload re-seeds the
     // 4 demo tasks (the data-loss bug behind the
-    // `cc.firstBootSeeded.v1` workaround in App.js).
+    // `basis.firstBootSeeded.v1` workaround in App.js).
     persistDb: opts.tasksPersistDb,
     contentSeal,                       // its list is content too — sealed on the way to disk
     label: 'TasksCircle(cc)',
@@ -6309,7 +6351,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * in-process.  Boots 110 real pinboard skills; ~6 surface via chat
    * ops today, the rest reachable via agent.callSkill('pinboard', …).
    *
-   * Separate identity vault prefix (`cc-pinboard-id:`) so pinboard's per-
+   * Separate identity vault prefix (`basis.pinboard-id:`) so pinboard's per-
    * circle identity is isolated from chat + tasks (decision #2).
    * IndexedDBPersist via opts.persistDb keeps the local cache alive
    * across page reloads.
@@ -7855,6 +7897,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   const TASK_BY_ID_OPS = new Set(['claimTask', 'completeTask', 'reassignTask', 'removeTask', 'editTask', 'unclaimTask']);
   /** The reads a door's person sees people in: the chores' open and own reads, and the agenda. */
   const READER_READS = new Set(['tasks.listOpen', 'tasks.listMine', 'calendar.listEvents']);
+  // Set by the outer waist when an op's result says `reloadRequired`; this process then writes nothing (restartRequired.js).
+  const restartState = createRestartState();
   const callSkill = async (appOrigin, opId, args, ctx = {}) => {
     // this call's words: the language it carries (a door's `/taal`), else the bot's own
     const tr = translatorFor(ctx?.lang);
@@ -10016,6 +10060,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         deviceLog: opts.deviceLog, enabled: paramsService.register.valueOf(OWN_RECORD_KEY) !== false,
         app: appOrigin, op: opId, args, ctx, result, threw, error, manifests: allManifests(),
       });
+      // after a restart-required result nothing writes as the former self, whichever surface asks (restartRequired.js)
+      const stopped = restartRefusal(restartState, allManifests(), appOrigin, opId);
+      if (stopped) { record(stopped, false); return stopped; }
       // a person's act that writes in a circle asks that circle's capability set HERE, where no tap can walk around it
       // (L1042; the shell hands in only its stores, `circleCapabilityInputs`); refused, it is recorded as refused
       const refusal = await circleActRefusal({
@@ -10026,8 +10073,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       let result;
       try { result = await callSkill(appOrigin, opId, args, ctx); } catch (err) { record(null, true, err); throw err; }
       record(result, false);
+      // this process is now the device's former self: the shells stop (restartRequired.js)
+      if (asksRestart(result)) restartState.set(`${appOrigin}.${opId}`);
       return result;
     },
+    /** Has an op's result asked for a restart in this process? (restartRequired.js) A screen mounted later asks this. */
+    restartRequired: () => restartState.required,
+    /** The shell's stop: `fn` is called once when a restart is required (at once if it already is). Returns an unsubscribe. */
+    onRestartRequired: (fn) => restartState.on(fn),
     // The person's own record, for My data (ownActions.js): the rows, one file to save, and the wipe (this kind only).
     ownActionRows: () => ownActionRows(opts.deviceLog),
     exportOwnActions: () => ownActionsExport(ownActionRows(opts.deviceLog)),
@@ -10388,7 +10441,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     get transportMode() { return sa.transportMode; },
     setTransportMode:    sa.setTransportMode,
 
-    // The slash handlers persist the relay URL here (key: cc-relay-url).
+    // The slash handlers persist the relay URL here (key: basis.relay-url).
     // The transport MODE moved to the parameter register (device scope) —
     // boot applies it and the set-param hook applies a live flip.
     vault: sa.identity?.vault ?? sa.vault ?? null,

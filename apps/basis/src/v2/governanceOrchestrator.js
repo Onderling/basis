@@ -22,13 +22,17 @@ import { proposeEvent, voteEvent, resolveEvent, foldGovernance } from './governa
 import { decisionDeadlineDays } from './circlePolicy.js';
 
 export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, newProposalId, now = () => 0, canEnact = () => true } = {}) {
-  async function enactAndClose(circleId, proposal, by) {
+  // the members a closing counted (its own tally's roster, each with its role then): signed in the resolve, so a device that joins later tallies the
+  // closed decision against them and not against a roster that grew since (governanceReceiverGate)
+  const countedOf = (ctx) => (Array.isArray(ctx?.members) ? ctx.members : []).map((m) => ({ ref: m?.ref, role: m?.role ?? 'member' }));
+
+  async function enactAndClose(circleId, proposal, by, counted = null) {
     let ok = true; let result = null;
     // an op REFUSES by `{ok:false}` or by `{error}` (pinboard's skills answer the second): either is not enacted
     try { result = await enact(circleId, proposal.action, proposal.subject, proposal.proposalId); ok = result?.ok !== false && !result?.error; }
     catch { ok = false; }
     await appendEvent(circleId, resolveEvent({
-      proposalId: proposal.proposalId, status: ok ? DECISION_STATUS.APPROVED : DECISION_STATUS.REJECTED, by, at: now(),
+      proposalId: proposal.proposalId, status: ok ? DECISION_STATUS.APPROVED : DECISION_STATUS.REJECTED, by, at: now(), counted,
     }));
     // the op's own answer rides back: what a screen says can depend on it (a role change handed to the main device)
     return { ok, result };
@@ -47,12 +51,12 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
     const mayEnact = canEnact(ctx);
     if (p.status === DECISION_STATUS.APPROVED) {
       if (!mayEnact) return { ok: true, status: DECISION_STATUS.APPROVED, proposalId, awaitingEnactment: true, tally: p.decision.tally };
-      const { ok, result } = await enactAndClose(circleId, p, enactor);
+      const { ok, result } = await enactAndClose(circleId, p, enactor, countedOf(ctx));
       return { ok, status: DECISION_STATUS.APPROVED, proposalId, enacted: ok, result, tally: p.decision.tally };
     }
     if (p.status === DECISION_STATUS.REJECTED) {
       if (!mayEnact) return { ok: true, status: DECISION_STATUS.REJECTED, proposalId, awaitingClose: true, tally: p.decision.tally };
-      await appendEvent(circleId, resolveEvent({ proposalId, status: DECISION_STATUS.REJECTED, by: enactor, at: now() }));
+      await appendEvent(circleId, resolveEvent({ proposalId, status: DECISION_STATUS.REJECTED, by: enactor, at: now(), counted: countedOf(ctx) }));
       return { ok: true, status: DECISION_STATUS.REJECTED, proposalId, closed: true, tally: p.decision.tally };
     }
     return { ok: true, status: DECISION_STATUS.PENDING, proposalId, tally: p.decision.tally, deadline: p.deadline };
@@ -70,7 +74,7 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
       if (immediate.status !== DECISION_STATUS.APPROVED) return { ok: false, status: immediate.status, reason: immediate.reason };
       const proposalId = newProposalId();
       await appendEvent(circleId, proposeEvent({ proposalId, action, subject, by: actor?.ref, deadline: null, at: t }));
-      const { ok, result } = await enactAndClose(circleId, { proposalId, action, subject }, actor?.ref);
+      const { ok, result } = await enactAndClose(circleId, { proposalId, action, subject }, actor?.ref, countedOf(ctx));
       return { ok, status: ok ? DECISION_STATUS.APPROVED : DECISION_STATUS.REJECTED, proposalId, enacted: ok, result };
     }
 
@@ -106,7 +110,7 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
       deadline: p.deadline, now: now(), override: true, seed: p.seed, subject: p.subject, by: p.by,
     });
     if (d.status !== DECISION_STATUS.APPROVED) return { ok: false, status: d.status, reason: d.reason };
-    const { ok, result } = await enactAndClose(circleId, p, actor?.ref);
+    const { ok, result } = await enactAndClose(circleId, p, actor?.ref, countedOf(ctx));
     return { ok, status: ok ? DECISION_STATUS.APPROVED : DECISION_STATUS.REJECTED, proposalId, reason: 'admin-override', result };
   }
 

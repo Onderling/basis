@@ -23,7 +23,7 @@ test('a paused persona leaves this device, a resumed one comes back — no phras
   await page.reload(); await ready(page);
   await expect.poll(() => running(page), { timeout: 20_000, message: 'Werk runs here' }).toContain(made.id);
 
-  expect(await call(page, 'household', 'pausePersona', { personaId: made.id })).toMatchObject({ ok: true, reloadRequired: true });
+  expect(await call(page, 'household', 'pausePersona', { personaId: made.id })).toMatchObject({ ok: true, takesEffectNextStart: true });
   await page.reload(); await ready(page);
   await expect.poll(() => running(page), { timeout: 20_000, message: 'paused: Werk does not run here now' }).not.toContain(made.id);
   // …and it is gone from the SWITCHER (whose rows are what the host passes as held), reached from the persona panel:

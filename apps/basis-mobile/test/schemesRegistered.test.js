@@ -89,3 +89,23 @@ describe('FITNESS: something actually RECEIVES an incoming link', () => {
     expect(chat).toMatch(/const r = routeScan\([^;]*;[\s\S]{0,600}?onQrScanResult\(\{ kind: r\.kind, payload: r\.payload \}\)/);
   });
 });
+
+describe('FITNESS: the pod sign-in redirect is one a Solid server accepts', () => {
+  // The phone walk with a Community Solid Server: registration refused `basis://auth/callback` with 400
+  // invalid_redirect_uri ("redirect_uris for native clients using Custom URI scheme should use reverse domain name
+  // based scheme"). Inrupt took it, so the refusal stayed hidden until a pod of our own was used.
+  const hook = readFileSync(path.join(here, '..', 'src', 'auth', 'basisAuthHook.js'), 'utf-8');
+  const scheme = hook.match(/scheme:\s*'([^']+)'/)?.[1] ?? null;
+  const declared = [].concat(appJson.expo.scheme ?? []);
+
+  it('the redirect\'s scheme is reverse-domain: the app\'s own package name', () => {
+    expect(scheme).toBe(appJson.expo.android.package);
+    expect(scheme).toMatch(/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$/);
+  });
+
+  it('…and the app claims it, in app.json and in the Android manifest', () => {
+    expect(declared).toContain(scheme);
+    const manifest = readFileSync(path.join(here, '..', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'), 'utf-8');
+    expect(manifest).toContain(`android:scheme="${scheme}"`);
+  });
+});

@@ -746,11 +746,11 @@ export function createNearbyScreen({
       const built = createChatMessage({ text, from: safeCall(myRoomAddress, null), allows, now });
       if (!built.ok) return built;
       if (!askChannel?.broadcastKind) return { ok: false, reason: 'no-channel' };
+      // Mine appears locally, AT ONCE: the room does not echo it back, a message that vanishes on send reads as a
+      // failure, and one that appears only when the whole fan has settled waits on the slowest peer in the room
+      chat.add(built.message);
       try {
         const result = await askChannel.broadcastKind(CHAT_MESSAGE, { message: built.message });
-        // Mine appears locally: the room does not echo it back, and a message that vanishes on send reads
-        // as a failure.
-        chat.add(built.message);
         return { ok: true, message: built.message, ...result };
       } catch (err) {
         try { onError?.(err, 'say'); } catch { /* */ }

@@ -1,5 +1,6 @@
 import { isAtom, isWritingVerb } from '@onderling/app-manifest';
 import { replyLine } from './replyLine.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /**
  * ACT STATE — every act a person takes paints pending · done · failed, once, for every op.
@@ -20,7 +21,9 @@ import { replyLine } from './replyLine.js';
  * landing inside that window would paint; the window is short so it rarely does.
  *
  * Timing, shared so the shells cannot differ: `pending` paints only after `ACT_PENDING_DELAY_MS` (a fast act never
- * flickers); `done` stays `ACT_DONE_SHOWN_MS` and clears; `failed` stays until the next act. One act at a time: the
+ * flickers); `done` stays `ACT_DONE_SHOWN_MS` and clears; `failed` stays until the next act, or until the person's next touch once it has shown `ACT_FAILED_HELD_MS` (a
+ * failure belongs where it happened: a tap on Settings is the person moving on, and the line must not follow them
+ * there; the phone walk saw a failed note's line over Settings and Recovery). One act at a time: the
  * newest replaces the one before.
  *
  * Words (`actStateLine`): pending → the generic line; done → the op's reply-family line when it has one (the words the
@@ -30,6 +33,8 @@ import { replyLine } from './replyLine.js';
 export const ACT_PENDING_DELAY_MS = 400;
 export const ACT_DONE_SHOWN_MS = 2500;
 export const ACT_INTERACTION_WINDOW_MS = 1500;
+/** How long a failed line is held against a touch: long enough to be read, so a touch right after it keeps it. */
+export const ACT_FAILED_HELD_MS = param({ key: 'actState.failedHeldMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2000 });
 
 /**
  * An op whose own surface carries its state declares it on its manifest entry — `surfaces.actState: 'bubble'` (the
@@ -90,7 +95,11 @@ export function createActState({ now = () => Date.now(), setTimer = setTimeout, 
     get current() { return current; },
     subscribe(fn) { subs.add(fn); return () => subs.delete(fn); },
     /** The person did something (a pointer, a key, a touch). */
-    noteInteraction() { lastInteraction = now(); },
+    noteInteraction() {
+      lastInteraction = now();
+      // a failed line that has been readable gives way to the person moving on; pending and done keep their own clock
+      if (current?.state === 'failed' && lastInteraction - (current.endedAt ?? lastInteraction) >= ACT_FAILED_HELD_MS) set(null);
+    },
     /** Was the person active just now? */
     recentlyInteracted() { return now() - lastInteraction <= ACT_INTERACTION_WINDOW_MS; },
     /** An act started: returns a token the end is reported with. Pending paints after the delay, not before. */
@@ -109,7 +118,7 @@ export function createActState({ now = () => Date.now(), setTimer = setTimeout, 
       if (timer) { clearTimer(timer); timer = null; }
       const base = newest;
       const failed = error != null || actFailed(result);
-      set({ ...base, state: failed ? 'failed' : 'done', result, error: error == null ? null : (error?.message ?? String(error)) });
+      set({ ...base, state: failed ? 'failed' : 'done', endedAt: now(), result, error: error == null ? null : (error?.message ?? String(error)) });
       if (!failed) later(() => { if (current?.token === token) set(null); }, ACT_DONE_SHOWN_MS);
     },
     /** Clear whatever shows (a tap on the strip). */

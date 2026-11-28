@@ -485,9 +485,6 @@ export default function App() {
         // this is where it is read, before any store is touched. The note carries the throwaway self's circle
         // ids, captured while its registry was still readable. Removed only when every drop succeeded, so a
         // storage that refuses simply tries again on the next launch.
-        // DIAGNOSTIC (no-such-page after a restore, L1259 b): which of the page book's keys this forget removed; the
-        // line's time places it against the launcher's seeding line. Comes out in the PR that fixes it.
-        const droppedNames = [];
         try {
           const forgot = await runPendingForget({
             markerVault: markerVaultOver(AsyncStorage),
@@ -497,17 +494,12 @@ export default function App() {
                 const all = await AsyncStorage.getAllKeys().catch(() => []);
                 // `…<name>::state` is how a pinboard-style cache keys its one record (prefix + db name), so it is the store too
                 const mine = all.filter((k) => k === name || k.startsWith(`${name}:`) || k.startsWith(`${name}/`) || k.endsWith(`${name}::state`));
-                if (mine.length) { await AsyncStorage.multiRemove(mine); droppedNames.push(...mine); }
+                if (mine.length) await AsyncStorage.multiRemove(mine);
               },
-              dropKey: async (key) => { await AsyncStorage.removeItem(key); droppedNames.push(key); },
+              dropKey: async (key) => { await AsyncStorage.removeItem(key); },
             },
           });
           if (forgot.ran) console.info(`[enrol] forgot the throwaway self: ${forgot.stores} store(s), ${forgot.keys} key(s)`);
-          if (forgot.ran) {
-            const book = storageName('userScreens');
-            const pageBookKeys = droppedNames.filter((k) => k.includes(book) || k.includes('screens'));
-            console.info(`[enrol] the page book: ${pageBookKeys.length ? `removed [${pageBookKeys.join(', ')}]` : 'not among what was removed'} (the content key is published in memory from the agent's vault, not a stored key)`);
-          }
         } catch { /* a clear that cannot run never blocks a launch */ }
 
         const deviceLogIo = backendSnapshotIo(

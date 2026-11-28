@@ -152,4 +152,18 @@ describe('Bundle F P6 — buildMobilePodAuth', () => {
     await expect(pa.startSignIn({ issuer: 'solidcommunity' })).rejects.toMatchObject({ code: 'ISSUER_NOT_READY' });
     expect(signedInAt).toEqual([]);
   });
+
+  it('a provider whose registration REFUSED the app says it refused, at once, and signs in nowhere', async () => {
+    // the phone walk with a Community Solid Server: 400 invalid_redirect_uri at registration, said as "did not answer"
+    let state = { issuer: 'https://login.inrupt.com', ready: true, lastError: null };
+    const signedInAt = [];
+    const hookNow = () => ({ ...state, signIn: async () => { signedInAt.push(state.issuer); return null; } });
+    const refused = Object.assign(new Error('registerClient: 400 invalid_redirect_uri'), { code: 'REGISTRATION_REJECTED', status: 400 });
+    const chooseIssuer = (url) => { state = { issuer: url, ready: false, lastError: refused }; };
+    const pa = buildMobilePodAuth({ hook: hookNow(), hookNow, chooseIssuer, session: fakeSession(), readyWithinMs: 5000 });
+    const started = Date.now();
+    await expect(pa.startSignIn({ issuer: 'http://localhost:3000' })).rejects.toMatchObject({ code: 'ISSUER_REFUSED', issuer: 'http://localhost:3000' });
+    expect(Date.now() - started, 'a refusal is not waited out').toBeLessThan(1000);
+    expect(signedInAt).toEqual([]);
+  });
 });

@@ -50,14 +50,9 @@ export function createScreenOps({ store, log = null, actor = 'owner' } = {}) {
   };
   const hasPage = (book, pageId) => book.screens.some((s) => s.id === pageId);
   /** One change: checked against the current book, kept as a version, logged. */
-  const change = async (op, check, mutator, askedPage = null) => {
+  const change = async (op, check, mutator) => {
     const cur = await store.get();
     const refusal = check?.(cur);
-    // DIAGNOSTIC (the phone's no-such-page after a restore, L1259 b): what the waist's own store holds. Comes out in the
-    // PR that fixes it.
-    if (refusal === 'no-such-page') {
-      console.warn(`[screens] ${op}: no-such-page — asked ${String(askedPage ?? '?')}, the waist's store holds [${cur.screens.map((s) => s.id).join(', ')}], its load: ${store.lastLoad?.() ?? 'unknown'}`);
-    }
     if (refusal) return { ok: false, error: refusal };
     const r = await store.updateVersioned(mutator);
     record(op, { previous: r.previous, current: r.current });
@@ -87,7 +82,7 @@ export function createScreenOps({ store, log = null, actor = 'owner' } = {}) {
         : setAllCircles(s)))),
     'screen-add-block': async ({ pageId, type, config } = {}) => change('screen-add-block', (book) => (
       !hasPage(book, pageId) ? 'no-such-page' : (blockTypesFor(PAGE_PLACE).includes(type) ? null : 'block-not-for-pages')
-    ), onPage(pageId, (s) => addBlock(s, type, config && typeof config === 'object' ? config : null)), pageId),
+    ), onPage(pageId, (s) => addBlock(s, type, config && typeof config === 'object' ? config : null))),
     'screen-remove-block': async ({ pageId, blockId } = {}) => change('screen-remove-block', pageCheck(pageId), onPage(pageId, (s) => removeBlock(s, blockId))),
     'screen-move-block': async ({ pageId, blockId, index } = {}) => change('screen-move-block', pageCheck(pageId), onPage(pageId, (s) => moveBlock(s, blockId, Number(index)))),
     'screen-set-block-config': async ({ pageId, blockId, config } = {}) => change('screen-set-block-config', pageCheck(pageId), onPage(pageId, (s) => updateBlock(s, blockId, config && typeof config === 'object' ? config : {}))),

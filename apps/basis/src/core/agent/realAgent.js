@@ -5637,9 +5637,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   hostAgent.register('listRecoveryCircles', async () => {
     try {
       const memberships = await readSelfCircleMemberships().catch(() => ({}));
-      let rows = [];
-      try { rows = (await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []; } catch { rows = []; }
-      const nameOf = new Map(rows.map((c) => [typeof c === 'string' ? c : (c?.groupId ?? c?.id), typeof c === 'string' ? null : (c?.name ?? null)]));
+      // a circle's NAME from the one name read (listMyCircles' `names`: circleNamesFromRules), never its key: the
+      // circles list holds bare ids, and reading a name off them named every circle by its key on the file screen
+      let names = {};
+      try { names = (await callSkill('pinboard', 'listMyCircles', {}))?.names ?? {}; } catch { names = {}; }
+      const nameOf = new Map(Object.entries(names && typeof names === 'object' ? names : {}));
       const circles = Object.keys(memberships)
         .filter((id) => id && id !== tasksPrimaryCircleId && id !== 'household')
         .map((id) => ({ id, name: nameOf.get(id) ?? null }));

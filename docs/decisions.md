@@ -2384,3 +2384,25 @@ member-vote loses its decided settings at every join.
 
 Where it lives: `apps/basis/src/v2/governanceReceiverGate.js` (`tallyRosterOf`), `governanceLog.js` (the closing's
 `counted`, an admin's closing first), `governanceOrchestrator.js` (the closer names its roster).
+
+## 2026-11-28 — A circle's name lives in its rules doc (Fable ruled, on Opus's reading)
+
+**Decision:** a circle's name is `rules.name` in its rules doc. The maker writes it (`createGroupV2`), a rules change
+keeps it (`editGroupRules` carries the current name on when the saved doc has none), and a rename is a rules change under
+the circle's own rules: no second mechanism. A rules head's text follows the name. The ONE name read
+(`circleNamesFromRules`, `@onderling/circles`) is the highest-version rules head that carries a name: `rules.name`, or,
+for a head from before, its text unless that text is the circle's key or a joiner's placeholder. Every place that shows
+a circle's name reads it through that one function (`listMyCircles`' `names`, which the shells, the invite and the
+recovery file's screen read).
+
+**Why:** a name is a fact of the circle that every member must agree on, so it belongs to the item that already travels
+to every member and folds by version. Measured over a real agent: a rules change wrote a newer head whose text was the
+circle's key, and the old read took the FIRST rules row, so a real rename would never have shown, and a nameless newer
+head would have shown the key had the read taken the newest.
+
+**Alternatives:** *the name in the registry's membership record*: it never carried one (`normaliseCircleMembership`
+keeps address, handle, proof, relays, key, sight), and it is one person's record, not the circle's. *A separate name
+item*: a second writer of a governance fact beside the rules doc.
+
+Where it lives: `packages/circles/src/circleName.js`, `packages/circles/src/circleCreate.js`,
+`apps/pinboard/src/skills/index.js` (`listMyCircles`, `editGroupRules`).

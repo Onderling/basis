@@ -31,12 +31,16 @@ export const VANDAAG_DEFAULT_BLOCKS = Object.freeze([
 export async function ensureVandaagBook({ store, t }) {
   const book = await store.get();
   if (book.screens.length > 0) return book;
-  return store.update((cur) => {
+  await store.update((cur) => {
     let next = addScreen(cur, t('circle.screens.vandaag_page'));
     const id = next.screens[next.screens.length - 1].id;
     for (const b of VANDAAG_DEFAULT_BLOCKS) next = updateScreen(next, id, (s) => addBlock(s, b.type, { ...b.config }));
     return setActiveScreen(next, id);
   });
+  // the book as STORED, never the one meant to be: a seed whose save did not land would be painted while the waist's own
+  // store (the screen ops) holds no page, and every page op answers no-such-page (the phone, first start after a
+  // restore). Not stored: nothing painted, and the next look seeds again.
+  return store.get();
 }
 
 /** How many rows a block opened whole shows ("meer"). */

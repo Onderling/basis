@@ -226,6 +226,10 @@ export function sealedKeyValue(storage, { name = 'a store', strict = false, wait
   };
   const kv = {
     async getItem(key) {
+      // a store that waits for the key waits for it EMPTY as well: "nothing stored" before the key is not yet an answer
+      // (a brand-new person's page book read as empty before the key was seeded, its save refused, and the waist's store
+      // then held no page for the first note, the phone walk)
+      if (strict && waitForKey && !shellContentSeal()) await keyArrives();
       const v = await storage.getItem(key);
       if (v == null) return null;
       if (!strict) {

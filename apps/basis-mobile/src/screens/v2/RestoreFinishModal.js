@@ -15,7 +15,7 @@ import { householdManifest } from '../../../../household/manifest.js';
 import { forgetCircleSealStrategies } from '../../core/circlePods.js';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
-import { restoreFinishOutcome } from '../../../../basis/src/v2/restoreFinishView.js';
+import { restoreFinishOutcome, restoreFinishCameFrom } from '../../../../basis/src/v2/restoreFinishView.js';
 import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
 import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
@@ -86,7 +86,7 @@ export default function RestoreFinishModal({ visible, callSkill, onClose }) {
     body = (
       <View>
         <Text style={styles.body}>{t('circle.restore_finish.status_ready')}</Text>
-        <Text style={styles.muted}>{t(status.carrier === 'pod' ? 'circle.restore_finish.status_pod' : 'circle.restore_finish.status_local')}</Text>
+        <Text style={styles.muted}>{t(restoreFinishCameFrom(inst))}</Text>
         <Text style={styles.body}>{t('circle.restore_finish.intent_question')}</Text>
         {['broken', 'lost', 'adding'].map((intent) => (
           <Btn key={intent} label={t(`circle.restore_finish.intent_${intent}`)} onPress={() => submit({ intent })} testID={`restore-finish-${intent}`} />

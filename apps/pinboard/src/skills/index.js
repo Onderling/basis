@@ -3757,6 +3757,10 @@ export function buildSkills({
         // a read through listOpen renders a rules row as `type: 'post'`: known by its rules doc, stored back as group-rules
         && (r.type === 'group-rules' || r.kind === 'group-rules' || (r.source?.rules && typeof r.source.rules === 'object'))
         && r.source?.groupId === a.groupId);
+      // ONLY THE DEVICE'S OWN CALL (the recovery file's import) may land rules rows: a rules head names the circle and is
+      // read for its founder authority, and this op checks only shape. A peer's rules are refused, nothing landed; the
+      // rules a member sends arrive by the rules lane, whose statement is verified (recordGroupRulesUpdate)
+      if (rulesRows.length && from !== localActorIn(a.groupId)) return { error: 'rules-own-only' };
       let rulesIngested = 0;
       if (rulesRows.length && typeof store.ingestItems === 'function') {
         const got = await store.ingestItems(rulesRows.map((r) => ({ ...r, type: 'group-rules' })), { actor: from, reason: 'roster-seed' });

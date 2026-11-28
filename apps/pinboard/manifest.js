@@ -1478,8 +1478,12 @@ export const pinboardManifest = {
       writes: { scope: 'circle', what: 'control' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'rows',    kind: 'object', required: true },
+        // the roster trail rows; not required when only `rules` are given (a circle whose only member is its maker)
+        { name: 'rows',    kind: 'object' },
         { name: 'members', kind: 'object' },
+        // the circle's rules rows (its name lives in them): taken ONLY from the device's own call (the recovery file's
+        // import), refused from a peer ('rules-own-only'); a member's rules arrive by the rules lane, verified
+        { name: 'rules',   kind: 'object' },
       ],
       resolves: [{ field: 'rows', policy: 'content' }],
       surfaces: {

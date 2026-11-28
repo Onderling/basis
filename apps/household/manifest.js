@@ -90,6 +90,7 @@ export const householdManifest = {
     'import-recovery-file': 'write',
     'restore-status': 'write',
     'restore-source': 'write',
+    'attach-registry-pod': 'write',
     'restore-intent': 'write',
     'grant-surface': 'write',
     'revoke-surface': 'write',
@@ -510,6 +511,15 @@ export const householdManifest = {
         { name: 'source', kind: 'enum', of: ['file', 'later'], required: true },
         { name: 'file',   kind: 'string' },
       ],
+      surfaces: {},
+    },
+    {
+      id:   'attachRegistryPod', visibility: 'private', group: 'device',
+      verb: 'attach-registry-pod',
+      writes: { scope: 'device', what: 'control' },
+      // THE REGISTRY'S POD MIRROR, attached when the pod session is ready (not only at boot): the sign-in op calls it on a
+      // sign-in in place; a pod copy this device has not read is merged in, and the circles it brings open in this start
+      params: [],
       surfaces: {},
     },
     {

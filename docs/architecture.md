@@ -1,6 +1,6 @@
 # Architecture
 
-> **Last updated: 2026-11-27** — checked against the code on `development` that day. Every change to this file
+> **Last updated: 2026-11-28** — checked against the code on `development` that day. Every change to this file
 > moves this date (`scripts/lint-architecture-date.mjs` is red otherwise), so the date says how fresh the whole
 > file is, not one paragraph.
 
@@ -1681,7 +1681,11 @@ signed in, mirrored to the pod in cache mode, sealed to self with the settings m
 under an **opaque name** only a holder of the owner's key can compute, so the host learns that a resource
 exists and not what it is. It carries the settings mirror's restore gate too: before the first write-through
 it probes the pod copy, and a copy sealed under another key (a fresh install without the phrase) holds rather
-than being overwritten by a one-device list. Without a pod, the pod-less carrier of the same fact is the
+than being overwritten by a one-device list. A copy under OUR key that this device has not read yet (a restored or new
+device signing in after its first start) is MERGED in, its circles taken in, never written over by a newer local clock;
+last-write-wins holds only between copies this device has read (2026-11-28). The mirror attaches when the pod session is
+ready, not only at boot: the sign-in op asks for it (`attachRegistryPod`), so a phone that signs in in place gets its
+circles in the same start. Without a pod, the pod-less carrier of the same fact is the
 **recovery file** — the registry (and each circle's roster) sealed to the recovery seal, never the root itself, exported and
 imported from My data on both shells. A person with neither loses the list, not the identity.
 

@@ -115,7 +115,7 @@
     "what": "Choose where your circles come from when nothing came back.",
     "params": {"source": "a file, or later", "file": "the recovery file"}
   },
-  "attachRegistryPod": {
+  "podSessionReady": {
     "what": "Bring your circle list from your pod now.",
     "params": {}
   },

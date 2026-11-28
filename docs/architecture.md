@@ -1684,7 +1684,7 @@ it probes the pod copy, and a copy sealed under another key (a fresh install wit
 than being overwritten by a one-device list. A copy under OUR key that this device has not read yet (a restored or new
 device signing in after its first start) is MERGED in, its circles taken in, never written over by a newer local clock;
 last-write-wins holds only between copies this device has read (2026-11-28). The mirror attaches when the pod session is
-ready, not only at boot: the sign-in op asks for it (`attachRegistryPod`), so a phone that signs in in place gets its
+ready, not only at boot: the sign-in op asks for it (`podSessionReady`), so a phone that signs in in place gets its
 circles in the same start. Without a pod, the pod-less carrier of the same fact is the
 **recovery file** — the registry (and each circle's roster) sealed to the recovery seal, never the root itself, exported and
 imported from My data on both shells. A person with neither loses the list, not the identity.

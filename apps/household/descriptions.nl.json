@@ -115,7 +115,7 @@
     "what": "Kies waar je kringen vandaan komen als er niets terugkwam.",
     "params": {"source": "een bestand, of later", "file": "het herstelbestand"}
   },
-  "attachRegistryPod": {
+  "podSessionReady": {
     "what": "Haal je kringenlijst nu van je pod.",
     "params": {}
   },

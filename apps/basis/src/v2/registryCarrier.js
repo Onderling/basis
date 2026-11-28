@@ -31,7 +31,7 @@
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
 import { createSealedPodDataSource } from '@onderling/pod-client';
 import { parseUntrustedJson, hashHex } from '@onderling/core';
-import { registryResourceUri, withRegistryWriteLock } from '@onderling/agent-registry';
+import { registryResourceUri, withRegistryWriteLock, circleLeavesOf, CIRCLE_LEFT_KEY } from '@onderling/agent-registry';
 import { probeSettingsMediumDetailed } from './settingsRestoreGate.js';
 
 const NAME_DOMAIN = 'onderling-registry-name-v1';
@@ -89,6 +89,15 @@ export function mergeUnreadPodCopy(local, pod) {
     if (theirs && typeof theirs === 'object') {
       const circles = podNewer ? { ...(mine ?? {}), ...theirs } : { ...theirs, ...(mine ?? {}) };
       next = { ...next, properties: { ...(next.properties ?? {}), [CIRCLES]: { mode: 'own', value: circles } } };
+    }
+    // A LEAVE IS HONOURED: the dated tombstones of both sides union (the later leave per circle), and a circle whose
+    // leave is newer than its record goes; a circle joined again after its leave stays
+    const leaves = { ...circleLeavesOf(other) };
+    for (const [cid, at] of Object.entries(circleLeavesOf(a))) if (!leaves[cid] || String(at) > String(leaves[cid])) leaves[cid] = at;
+    if (Object.keys(leaves).length) {
+      const circles = { ...(next.properties?.[CIRCLES]?.value ?? {}) };
+      for (const [cid, at] of Object.entries(leaves)) if (circles[cid] && String(circles[cid].at ?? '') < String(at)) delete circles[cid];
+      next = { ...next, properties: { ...(next.properties ?? {}), [CIRCLES]: { mode: 'own', value: circles }, [CIRCLE_LEFT_KEY]: { mode: 'own', value: leaves } } };
     }
     if (other?.revokedAt && !next.revokedAt) next = { ...next, revokedAt: other.revokedAt };
     return next;

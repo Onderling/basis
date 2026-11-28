@@ -389,6 +389,11 @@ export const SEAMS = Object.freeze([
   // strip paints the store (`cc-act-state` on web, `ActStateBar` on mobile). A shell that composes neither has screens whose
   // Save says nothing again. The box has no screen.
   { id: 'acts-paint-their-state', pattern: /wrapCallSkillWithActState\(/, shells: ['web', 'mobile'], why: 'an act with no pending · done · failed is a Save that says nothing and a join that shows nothing for 23 seconds' },
+  // THE POD SESSION IS READY (L1263): a mirror that is pod-backed "when you are signed in" (the registry, the settings, the
+  // history) attaches through `podSessionReady`, called when a shell's pod session is ready. The phone signs in in place
+  // and restores its session after the agent boots; the web restores it before the boot and says the same moment after
+  // it. The box composes no pod mirror (no provisionRegistryMedium / provisionSettingsMedium in device-runner).
+  { id: 'pod-session-ready', pattern: /'podSessionReady'/, shells: ['web', 'mobile'], why: 'a phone that signs in in place, or restores its session after its boot, never mirrors its circle list, settings or history to the pod: a restored device gets nothing back' },
   { id: 'act-state-has-a-strip', pattern: /cc-act-state|<ActStateBar\b/, shells: ['web', 'mobile'], why: 'a wrapped waist with nothing painting the store is feedback computed and never shown' },
   { id: 'dm-landing-answers-with-a-receipt', pattern: /[cC]ontactChannel\??\.setLandedHook(\?\.)?\(/, shells: ['web', 'mobile'], why: 'without the receipt a DM can never reach "their app has it" on the sender\'s side, whatever the sender\'s setting says' },
   // A HEAD HEARS OF A CIRCLE IT DOES NOT KNOW YET: Vandaag re-reads over the shell's circle list, so a change in a circle

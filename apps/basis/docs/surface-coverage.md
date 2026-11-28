@@ -123,7 +123,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `importRecoveryFile` | import-recovery-file | · | · | · | · | · | · |  |
 |  | `restoreStatus` | restore-status | · | · | · | · | · | · |  |
 |  | `restoreSource` | restore-source | · | · | · | · | · | · |  |
-|  | `attachRegistryPod` | attach-registry-pod | · | · | · | · | · | · |  |
+|  | `podSessionReady` | pod-session-ready | · | · | · | · | · | · |  |
 |  | `restoreIntent` | restore-intent | · | · | · | · | · | · |  |
 |  | `replaceDevice` | replace-device | · | · | · | · | · | · |  |
 |  | `enrollDevice` | enroll-device | · | · | · | · | · | · |  |

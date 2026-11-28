@@ -318,7 +318,7 @@ async function signinFlow(args, { podAuth, externalFlow, t, callSkill = null }) 
         // signed in, in place (no reload): the registry's pod mirror attaches NOW, so a restored device gets its circles
         // in this start (the web reloads after its sign-in, and the boot attaches it there)
         if (done?.webid && typeof callSkill === 'function') {
-          try { await callSkill('household', 'attachRegistryPod', {}); } catch (err) { console.warn('[signin] the registry\'s pod mirror did not attach', err?.message ?? err); }
+          try { await callSkill('household', 'podSessionReady', {}); } catch (err) { console.warn('[signin] the registry\'s pod mirror did not attach', err?.message ?? err); }
         }
         // back in the app: signed in (the session holds the webid), or the person closed the provider's page
         return done?.webid ? { ok: true, message: t('signin.completed', { webid: done.webid }) } : { ok: true, message: t('signin.opening', { issuer: name }) };

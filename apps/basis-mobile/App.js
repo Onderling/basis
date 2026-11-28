@@ -346,7 +346,7 @@ export default function App() {
     if (w) dlog.boot('circle pod writer ready @', w.podRoot);
     // the pod session is ready (a cold start's session restored after the agent booted, or a sign-in in place): the
     // registry's pod mirror attaches now, through the same op the sign-in calls (a no-op when it is already attached)
-    if (w) Promise.resolve(bundleRef.current?.callSkill?.('household', 'attachRegistryPod', {})).catch(() => {});
+    if (w) Promise.resolve(bundleRef.current?.callSkill?.('household', 'podSessionReady', {})).catch(() => {});
   }, []);
   const getCirclePodWriter = useCallback(() => circlePodWriterRef.current, []);
 

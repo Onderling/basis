@@ -1120,7 +1120,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // pod the rest of a user's data does — settings stop being a device-local island. Attached BEFORE hydrate so
   // the boot read falls through to the pod (settings paths are deterministic → read-through needs no catch-up).
   // Absent/no-pod/failure → stays local (honest degrade), never a broken boot.
-  if (typeof opts.provisionSettingsMedium === 'function' && typeof settingsDataSource?.attachInner === 'function') {
+  // the settings mirror's attach: at boot, and again when the pod session becomes ready later (`podSessionReady`)
+  const attachSettingsMedium = async () => {
+    if (typeof opts.provisionSettingsMedium !== 'function' || typeof settingsDataSource?.attachInner !== 'function') return false;
+    if (settingsRestoreCtx.attached) return false;
     try {
       // Sealed to the person's RECOVERY SEAL (derived from the root, handed at every phrase ceremony), so it is
       // identical on every device of the user whichever personas it holds → settings sealed here open on the user's
@@ -1172,7 +1175,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         }
       }
     } catch (err) { if (typeof console !== 'undefined') console.warn('[settings-medium] provision failed — local only', err?.message ?? err); }
-  }
+    return settingsRestoreCtx.attached === true;
+  };
+  await attachSettingsMedium();
   const paramsService = createParamsService({
     register:   basisParamRegistry(),
     dataSource: settingsDataSource,
@@ -1727,7 +1732,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // is a write: a fresh install must never overwrite the owner's pod copy with a one-device list.
   let registryCarrierStatus = () => ({ mode: 'local', probe: null });
   // THE MIRROR ATTACHES WHEN THE POD SESSION IS READY, not only at boot: a sign-in in place (the phone) or a session that
-  // becomes ready after a cold start calls `attachRegistryPod` (the sign-in op does), which provisions and attaches it
+  // becomes ready after a cold start calls `podSessionReady` (the sign-in op does), which provisions and attaches it
   let attachRegistryLater = async () => ({ mode: 'local', probe: null });
   const registryPseudoPod = await (async () => {
     try {
@@ -5742,15 +5747,20 @@ export async function createRealHouseholdAgent(opts = {}) {
     })];
   }, { visibility: 'private' });
 
-  // ATTACH THE REGISTRY'S POD MIRROR NOW (the sign-in op calls it on success; the web reloads and finds it attached):
-  // the probe gate runs as at boot, and a pod copy this device has not read is merged in (registryCarrier.js)
-  hostAgent.register('attachRegistryPod', async () => {
+  // THE POD SESSION IS READY (a sign-in in place, a session restored after a cold boot): the ONE door for every mirror
+  // that is pod-backed "when you are signed in" and was attached only at boot. The registry (its probe gate as at boot,
+  // a pod copy this device has not read merged in), the settings (the same gate, then the register read again from the
+  // pod), and the history mirror (its own sync, kicked as a switch change kicks it). Each is a no-op once attached.
+  hostAgent.register('podSessionReady', async () => {
     try {
+      let settings = false;
+      try { settings = await attachSettingsMedium(); if (settings) await paramsService.hydrate(); } catch { settings = false; }
+      try { await historyMirrorSync?.(); } catch { /* the history mirror retries at its next kick */ }
       const st = await attachRegistryLater();
       // circles the pod brought in open now, in this start (as the boot's re-open loop does for a boot-time pull)
       let reopened = [];
       if (st?.merged || st?.pulled) { try { reopened = (await reopenMemberCircles())?.reopened ?? []; } catch { reopened = []; } }
-      return [DataPart({ ok: true, reopened, mode: st?.mode ?? 'local', probe: st?.probe ?? null, merged: Boolean(st?.merged), pulled: Boolean(st?.pulled) })];
+      return [DataPart({ ok: true, settings, reopened, mode: st?.mode ?? 'local', probe: st?.probe ?? null, merged: Boolean(st?.merged), pulled: Boolean(st?.pulled) })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'attach-failed' })]; }
   }, { visibility: 'private' });
 

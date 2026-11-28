@@ -90,7 +90,7 @@ export const householdManifest = {
     'import-recovery-file': 'write',
     'restore-status': 'write',
     'restore-source': 'write',
-    'attach-registry-pod': 'write',
+    'pod-session-ready': 'write',
     'restore-intent': 'write',
     'grant-surface': 'write',
     'revoke-surface': 'write',
@@ -514,8 +514,8 @@ export const householdManifest = {
       surfaces: {},
     },
     {
-      id:   'attachRegistryPod', visibility: 'private', group: 'device',
-      verb: 'attach-registry-pod',
+      id:   'podSessionReady', visibility: 'private', group: 'device',
+      verb: 'pod-session-ready',
       writes: { scope: 'device', what: 'control' },
       // THE REGISTRY'S POD MIRROR, attached when the pod session is ready (not only at boot): the sign-in op calls it on a
       // sign-in in place; a pod copy this device has not read is merged in, and the circles it brings open in this start

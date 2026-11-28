@@ -43,7 +43,7 @@ describe('signin, completing in place', () => {
     };
     const r = await createLocalBuiltins({ catalogue: { ops: [] }, t, podAuth, callSkill }).signin({ issuer: 'https://pod.example' });
     expect(r.ok).toBe(true);
-    expect(asked).toContain('household.attachRegistryPod');
+    expect(asked).toContain('household.podSessionReady');
   });
 
   it('a sign-in that completes says so only after it did', async () => {

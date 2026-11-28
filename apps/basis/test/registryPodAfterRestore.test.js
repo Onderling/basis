@@ -49,9 +49,31 @@ describe('a restored phone gets its circles from the pod, signed in after its fi
     const phone = await boot({ vaults: anna, podSource: pod, backend: createMemoryBackend(), session });
     expect(Object.keys(await memberships(phone)), 'not signed in yet: nothing from the pod').not.toContain(CIRCLE);
     session.on = true;
-    const r = await phone.callSkill('household', 'attachRegistryPod', {});
+    const r = await phone.callSkill('household', 'podSessionReady', {});
     expect(r?.ok, JSON.stringify(r)).toBe(true);
     expect(Object.keys(await memberships(phone)), 'after the sign-in, in the same start').toContain(CIRCLE);
+    await phone.shutdown?.();
+  });
+
+  it('the same door attaches the SETTINGS mirror after an in-place sign-in (it was attached only at boot too)', async () => {
+    const { createSettingsPodMedium } = await import('../src/v2/settingsPodMedium.js');
+    // composed as the shells compose it: a caching settings store the pod inner attaches to (`settingsPersistDb`)
+    const { CachingDataSource } = await import('@onderling/local-store');
+    const anna = { owner: new VaultMemory(), chat: new VaultMemory() };
+    const pod = memoryPodSource();
+    const session = { on: false };
+    const phone = await createRealHouseholdAgent({
+      seedHousehold: false, seedDemoData: false,
+      ownerRootVault: anna.owner, chatVault: anna.chat, registryBackend: createMemoryBackend(),
+      settingsDataSource: new CachingDataSource(),
+      provisionRegistryMedium: async (strategy) => (session.on ? createRegistryPodMedium({ podSource: pod, strategy }) : null),
+      provisionSettingsMedium: async (strategy) => (session.on ? createSettingsPodMedium({ podSource: pod, podRoot: 'mem://pod/', strategy }) : null),
+    });
+    session.on = true;
+    const r = await phone.callSkill('household', 'podSessionReady', {});
+    expect(r).toMatchObject({ ok: true, settings: true, mode: 'cache' });
+    const again = await phone.callSkill('household', 'podSessionReady', {});
+    expect(again.settings, 'once attached, the door is a no-op').toBe(false);
     await phone.shutdown?.();
   });
 

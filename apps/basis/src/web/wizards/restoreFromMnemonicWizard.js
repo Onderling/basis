@@ -21,6 +21,7 @@ import {
   canAdvanceFromConfirm,
   mnemonicWordCount,
   submitRestore,
+  checkPhrase,
 } from '../../core/wizards/restoreFromMnemonicState.js';
 import { t } from '../../localisation.js';
 
@@ -48,10 +49,18 @@ export function renderRestoreFromMnemonicWizard(opts) {
       // [Next] button's disabled state.
       refreshActions(container, { mnemonicOk: () => isMnemonicValid(state.mnemonic) });
     }, { placeholder: t('circle.wizard.restore.phrase_placeholder'), monospace: true, hint: t('circle.wizard.restore.phrase_hint') });
+    // the phrase this device already is: nothing to restore, said here, before the confirm step (checkPhrase)
+    if (state.alreadyYou) {
+      const same = doc.createElement('p');
+      same.className = 'cc-wizard-advice';
+      same.dataset.restore = 'already-you';
+      same.textContent = t('circle.wizard.restore.already_you');
+      body.appendChild(same);
+    }
     container.appendChild(body);
     mkActions(container, doc, [
       { label: t('common.cancel'), onClick: onClose, kind: 'secondary' },
-      { label: t('common.next'), onClick: () => { state.step = 2; rerender(); }, kind: 'primary',
+      { label: t('common.next'), onClick: async () => { await checkPhrase({ state, callSkill }); rerender(); }, kind: 'primary',
         disabled: !isMnemonicValid(state.mnemonic), validate: 'mnemonicOk' },
     ]);
   }

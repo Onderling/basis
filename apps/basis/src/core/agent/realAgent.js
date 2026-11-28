@@ -6073,6 +6073,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     let root;
     try { root = Bootstrap.fromMnemonic(mnemonic); }
     catch { return [DataPart({ ok: false, error: 'invalid-phrase' })]; }
+    // THE PHRASE THIS DEVICE ALREADY IS changes nothing: it derives the authority this device speaks as, so a restore
+    // would only forget the running self (the phone walk: the person's circle and name were gone). Said, not done.
+    let alreadyYou = false;
+    try { alreadyYou = Boolean(persona.authorityPubKeyB64) && authorityPubKeyB64Of(root.deriveProfileAuthority(primaryId)) === persona.authorityPubKeyB64; }
+    catch { alreadyYou = false; }
+    if (alreadyYou) return [DataPart({ ok: true, alreadyYou: true })];
+    // a CHECK (the wizard, before its confirm step) restores nothing: it only says whether this phrase is already you
+    if (parts?.[0]?.data?.checkOnly === true) return [DataPart({ ok: true, alreadyYou: false, checked: true })];
     try {
       // ONE implementation, shared with the first-run door (`ownerRootRestore.js`) — which used to have
       // its own, and restored nothing. The live chatAgent keeps its current identity until an app RELOAD

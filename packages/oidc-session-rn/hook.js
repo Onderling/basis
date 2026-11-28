@@ -16,8 +16,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser  from 'expo-web-browser';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 import { loadOrRegisterClient, clearStoredClient } from './src/dcr.js';
+import { authBrowserPackage } from './src/authBrowser.js';
 import {
   completeSignIn as pureCompleteSignIn,
   DEFAULT_INRUPT_ISSUER,
@@ -219,7 +221,13 @@ export function useOidcSignIn({
       });
     };
 
-    const result = await promptAsync({ showInRecents: false });
+    // ANDROID: the sign-in opens in a custom tab that hands the redirect back to the app (Chrome when installed): a
+    // default browser that loads the custom-scheme redirect as a page left the sign-in stranded (src/authBrowser.js)
+    let browserPackage;
+    if (Platform.OS === 'android' && typeof WebBrowser.getCustomTabsSupportingBrowsersAsync === 'function') {
+      try { browserPackage = authBrowserPackage(await WebBrowser.getCustomTabsSupportingBrowsersAsync()); } catch { browserPackage = undefined; }
+    }
+    const result = await promptAsync({ showInRecents: false, ...(browserPackage ? { browserPackage } : {}) });
 
     // Stale client_id rejected at the /authorize step — explicit
     // OAuth-error form (some IdPs DO redirect back with

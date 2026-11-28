@@ -498,6 +498,10 @@
       "text": "De podaanbieder op {{issuer}} weigerde het inloggen vanuit deze app.",
       "doc": "Inloggen op de telefoon: de aanbieder antwoordde wel, maar weigerde de app aan te melden (de registratie werd afgewezen). Niet: antwoordde niet."
     },
+    "dismissed": {
+      "text": "Het inloggen bij {{issuer}} werd gesloten voordat het klaar was. Er is niets veranderd; je kunt het opnieuw proberen.",
+      "doc": "Inloggen op de telefoon: de pagina van de aanbieder werd gesloten (of gaf niet terug aan de app) voordat het inloggen klaar was. Geen fout van de aanbieder."
+    },
     "unknown_issuer": {
       "text": "Onbekende issuer „{{issuer}}\". Probeer 'inrupt', 'solidcommunity', 'solidweb' of een volledige URL.",
       "doc": "resolveIssuer returned null."

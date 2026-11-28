@@ -69,9 +69,12 @@ export function createAskChannel({ listPeers = () => [], sendTo, now = () => Dat
     async broadcastKind(subtype, body) {
       const peers = listPeers() ?? [];
       let sent = 0; let failed = 0; let reached = 0;
-      for (const peer of peers) {
+      // ALL AT ONCE: each send waits out its own handshake, so a peer that never answers (a device on another version,
+      // one gone from the wifi) costs its own timeout and nobody else's. One after another, a silent peer early in the
+      // fan held a line to the rest of the room for about 38 s (two phones, 2026-11-27).
+      await Promise.all(peers.map(async (peer) => {
         const address = peer?.pubKey ?? peer?.id ?? null;
-        if (!address || typeof sendTo !== 'function') { failed += 1; continue; }
+        if (!address || typeof sendTo !== 'function') { failed += 1; return; }
         try {
           const r = await sendTo(address, { subtype, ...body });
           sent += 1;
@@ -79,7 +82,7 @@ export function createAskChannel({ listPeers = () => [], sendTo, now = () => Dat
           // a send that is HELD for an unreachable peer is a send, not a room that heard.
           if (r?.delivered === true) reached += 1;
         } catch (err) { failed += 1; report(err, `broadcast:${subtype}`); }
-      }
+      }));
       return { sent, failed, reached, peers: peers.length };
     },
 

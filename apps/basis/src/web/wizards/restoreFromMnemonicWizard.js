@@ -52,7 +52,7 @@ export function renderRestoreFromMnemonicWizard(opts) {
     // the phrase this device already is: nothing to restore, said here, before the confirm step (checkPhrase)
     if (state.alreadyYou) {
       const same = doc.createElement('p');
-      same.className = 'cc-wizard-note';
+      same.className = 'cc-wizard-advice';
       same.dataset.restore = 'already-you';
       same.textContent = t('circle.wizard.restore.already_you');
       body.appendChild(same);

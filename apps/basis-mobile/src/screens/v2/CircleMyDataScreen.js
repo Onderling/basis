@@ -46,7 +46,7 @@ import { loadCircles } from '../../../../basis/src/v2/circleModel.js';
 import { circleSourcesFromAgent } from '../../../../basis/src/v2/circleSources.js';
 import UserLlmSettings from './UserLlmSettings.js';
 import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
-import { KNOWN_ISSUERS, DEFAULT_ISSUER } from '@onderling/oidc-session-rn';   // the one provider list (the settings wizard reads it too)
+import { DEFAULT_ISSUER } from '@onderling/oidc-session-rn';   // the one provider list (the settings wizard reads it too)
 import RecoveryFileWizardModal from '../../../../basis/src/rn/wizards/recoveryFileWizardModal.js';
 import { historyStatusLine } from '../../../../basis/src/v2/historyMirror.js';
 import { START_SCREEN_CHOICES } from '../../../../basis/src/v2/startScreen.js';
@@ -67,6 +67,7 @@ import { basisManifest } from '../../../../basis/src/index.js';
 import { personWeekOn, switchPersonWeek } from '../../../../basis/src/v2/personWeekOverview.js';
 import Constants from 'expo-constants';
 import { deviceListWords } from '../../../../basis/src/v2/mijWords.js';   // never the d-… id on screen
+import PodProviderPicker from './PodProviderPicker.js';   // the one provider list + the free address (the restore screen shares it)
 import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
@@ -1264,27 +1265,8 @@ export default function CircleMyDataScreen({ screenOffer = null, onScreenOfferTa
           {/* cluster J — pod sign-in entry (the v2 UI had none). When signed out: pod provider + Connect. */}
           {podCapable && !podSignedIn && (
             <View style={styles.signin}>
-              {/* the providers the sign-in package knows (the settings wizard offers the same list); a tap fills the
-                  address, which stays free for a provider of your own */}
-              <View style={styles.signinProviders} accessibilityRole="radiogroup">
-                {KNOWN_ISSUERS.map((p) => (
-                  <Pressable key={p.id} onPress={() => setIssuer(p.url)} accessibilityRole="radio"
-                    accessibilityState={{ selected: issuer.trim() === p.url }}
-                    style={[styles.signinProvider, issuer.trim() === p.url && styles.signinProviderOn]} testID={`mydata-pod-provider-${p.id}`}>
-                    <Text style={styles.signinProviderText}>{p.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              <ThemedTextInput
-                style={styles.signinInput}
-                value={issuer}
-                onChangeText={setIssuer}
-                placeholder={t('circle.mydata.pod_issuer')}
-                placeholderTextColor={theme.color.inkSoft}
-                autoCapitalize="none"
-                autoCorrect={false}
-                testID="mydata-pod-issuer"
-              />
+              {/* the one provider list + the free address (PodProviderPicker: My data and the restore screen share it) */}
+              <PodProviderPicker value={issuer} onChange={setIssuer} testIDPrefix="mydata-pod" />
               <Pressable style={[styles.action, signingIn && styles.actionMuted]} onPress={doSignIn} disabled={signingIn} testID="mydata-pod-signin">
                 <Text style={styles.actionLabel}>{signingIn ? t('circle.mydata.pod_connecting') : t('circle.mydata.pod_sign_in')}</Text>
               </Pressable>
@@ -1403,11 +1385,6 @@ const makeStyles = (theme) => StyleSheet.create({
   relayNote: { marginTop: 6, fontSize: 12, color: theme.color.ink },
   relayHint: { marginTop: 4, fontSize: 12, color: theme.color.inkSoft },
   signin: { marginTop: 10, gap: 8 },
-  signinProviders: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  signinProvider: { paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md },
-  signinProviderOn: { borderColor: theme.color.ink },
-  signinProviderText: { fontSize: 13, color: theme.color.ink },
-  signinInput: { fontSize: 14, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, color: theme.color.ink, backgroundColor: theme.color.white },
   signinErr: { fontSize: 12, color: '#b3261e' },
   // Display-theme pill toggle (mono, ink-outlined; active inverts to ink) —
   // mirror of web's .cc-mydata__theme-toggle / onderling.org's #theme-toggle.

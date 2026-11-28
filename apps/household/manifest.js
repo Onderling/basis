@@ -90,6 +90,7 @@ export const householdManifest = {
     'import-recovery-file': 'write',
     'restore-status': 'write',
     'restore-source': 'write',
+    'pod-session-ready': 'write',
     'restore-intent': 'write',
     'grant-surface': 'write',
     'revoke-surface': 'write',
@@ -507,9 +508,20 @@ export const householdManifest = {
       // When nothing came back: load a recovery file now, or later (the honest "your circles are not
       // here" screen). Never "ask an admin" — that is the fallback of last resort, not an offered route.
       params: [
-        { name: 'source', kind: 'enum', of: ['file', 'later'], required: true },
+        { name: 'source', kind: 'enum', of: ['file', 'pod', 'later'], required: true },
         { name: 'file',   kind: 'string' },
+        // the pod's provider the person chose on the screen (source 'pod'): required there, never guessed
+        { name: 'issuer', kind: 'string' },
       ],
+      surfaces: {},
+    },
+    {
+      id:   'podSessionReady', visibility: 'private', group: 'device',
+      verb: 'pod-session-ready',
+      writes: { scope: 'device', what: 'control' },
+      // THE REGISTRY'S POD MIRROR, attached when the pod session is ready (not only at boot): the sign-in op calls it on a
+      // sign-in in place; a pod copy this device has not read is merged in, and the circles it brings open in this start
+      params: [],
       surfaces: {},
     },
     {
@@ -707,7 +719,7 @@ export const householdManifest = {
         { id: 'status', op: 'restoreStatus', labelKey: 'circle.restore_finish.step_status',
           next: { ready: 'intent', empty: 'source' } },
         { id: 'source', op: 'restoreSource', labelKey: 'circle.restore_finish.step_source',
-          next: { ok: 'intent', later: null, 'not-your-file': null, 'unreadable-file': null, error: null } },
+          next: { ok: 'intent', later: null, 'not-your-file': null, 'unreadable-file': null, 'pod-empty': null, 'pod-failed': null, 'pod-opening': null, 'issuer-required': null, error: null } },
         { id: 'intent', op: 'restoreIntent', labelKey: 'circle.restore_finish.step_intent',
           next: { broken: 'retire', lost: 'retire', adding: null, error: null } },
         { id: 'retire', op: 'replaceDevice', labelKey: 'circle.replace.ceremony' },

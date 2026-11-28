@@ -113,7 +113,7 @@ export function createLocalBuiltins({
     // v0.7.5 / v0.7.1c — also expose openLogsPanel reachable to
     // handlers (currently only used by /logs but reads well at this
     // layer).
-    signin:    async (args) => signinFlow(args, { podAuth, externalFlow, t }),
+    signin:    async (args) => signinFlow(args, { podAuth, externalFlow, t, callSkill }),
     whoami:    async (args) => whoami(args, { podAuth, t }),
     me:        async (args) => meIdentity(args, { agent, t }),
     'peer-connect':     async (args) => peerConnect(args, { connectPeer, t }),
@@ -291,7 +291,7 @@ async function runBriefBuiltin(args, { briefRunner, t }) {
  * module; tests pass a stub.  When podAuth isn't wired (test or
  * partial build), falls back to the v0.6.2 mock externalFlow.
  */
-async function signinFlow(args, { podAuth, externalFlow, t }) {
+async function signinFlow(args, { podAuth, externalFlow, t, callSkill = null }) {
   const issuer = String(args?.issuer ?? '').trim() || undefined;
 
   // Real OIDC path.
@@ -317,8 +317,13 @@ async function signinFlow(args, { podAuth, externalFlow, t }) {
           if (err?.code === 'ISSUER_NOT_READY') return { ok: false, code: err.code, error: t('signin.issuer_not_ready', { issuer: err.issuer ?? resolved?.url ?? issuer ?? name }) };
           return { ok: false, error: err?.message ?? String(err) };
         }
+        // signed in, in place (no reload): the registry's pod mirror attaches NOW, so a restored device gets its circles
+        // in this start (the web reloads after its sign-in, and the boot attaches it there)
+        if (done?.webid && typeof callSkill === 'function') {
+          try { await callSkill('household', 'podSessionReady', {}); } catch (err) { console.warn('[signin] the registry\'s pod mirror did not attach', err?.message ?? err); }
+        }
         // back in the app: signed in (the session holds the webid), or the person closed the provider's page
-        return done?.webid ? { ok: true, message: t('signin.completed', { webid: done.webid }) } : { ok: true, message: t('signin.opening', { issuer: name }) };
+        return done?.webid ? { ok: true, signedIn: true, message: t('signin.completed', { webid: done.webid }) } : { ok: true, opening: true, message: t('signin.opening', { issuer: name }) };
       }
       // Fire-and-forget — the browser is about to navigate to the
       // issuer.  Return an opening message that may briefly flash
@@ -326,7 +331,7 @@ async function signinFlow(args, { podAuth, externalFlow, t }) {
       podAuth.startSignIn({ issuer }).catch((err) => {
         console.error('[signin] redirect failed', err);
       });
-      return { ok: true, message: t('signin.opening', { issuer: name }) };
+      return { ok: true, opening: true, message: t('signin.opening', { issuer: name }) };
     } catch (err) {
       return { ok: false, error: err?.message ?? String(err) };
     }

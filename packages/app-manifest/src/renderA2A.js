@@ -45,7 +45,7 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
   // (connectionSurfaceAgreement pins that every op of that group is here).
   'household.buildEnrollOffer', 'household.replaceDevice',
   'household.exportRecoveryFile', 'household.importRecoveryFile', 'household.listRecoveryCircles',
-  'household.restoreStatus', 'household.restoreSource', 'household.restoreIntent',
+  'household.restoreStatus', 'household.restoreSource', 'household.restoreIntent', 'household.podSessionReady',
   'household.listReceivablePersonas', 'household.receivePersonas',
   'household.listPersonasHere', 'household.pausePersona', 'household.resumePersona', 'household.removePersonaHere', 'household.setNearbyLevel',
   // what the person read, on their own devices: theirs alone, never a connection's to read or to mark

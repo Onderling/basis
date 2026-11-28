@@ -77,7 +77,7 @@ import { DEFAULT_PERSONA } from '../../src/v2/contactPersona.js';
 import { contactAddSheetModel, addContactAs, contactLensModel, changeContactLens, contactThreadSelfFor } from '../../src/v2/contactLens.js';
 import { renderContactLensPanel } from './contactLensPanel.js';
 import { deleteContact } from '../../src/v2/contactDelete.js';
-import { restoreFinishOutcome } from '../../src/v2/restoreFinishView.js';
+import { restoreFinishOutcome, restoreFinishCameFrom } from '../../src/v2/restoreFinishView.js';
 import { createHistoryPodMedium } from '../../src/v2/historyMirror.js';
 import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
@@ -215,7 +215,7 @@ import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
 import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../src/v2/personaSet.js';
 import { renderPersonaSwitcher } from './personaSwitcher.js';
 import { renderCircleAdminPanel } from './circleAdminPanel.js';
-import { renderCircleMyData } from './circleMyData.js';
+import { renderCircleMyData, podIssuerField } from './circleMyData.js';
 import { renderSettingsHome, renderCircleSettingsChooser } from './circleSettingsHome.js';
 import { settingsGroupFor, settingsGroupForAction, settingsBackFor } from '../../src/v2/settingsHome.js';
 import { connectionRows, connectionOpChoices, connectionSectionChoices, connectionSelfChoice } from '../../src/v2/connections.js';
@@ -6953,12 +6953,17 @@ function showRestoreFinishFlow() {
         });
         card.appendChild(input);
         card.appendChild(button(t('circle.restore_finish.source_file'), () => { if (fileText) submit({ source: 'file', file: fileText }); }, true));
+        // the pod the screen names: the shared sign-in, through the flow's own source step (phone twin: RestoreFinishModal)
+        // the pod the screen names: its provider chosen here (the same field as My data, empty after a wipe), then the
+        // shared sign-in through the flow's own source step (phone twin: RestoreFinishModal)
+        const podIssuer = podIssuerField(card, { tr: t, value: '', issuers: podAuth.KNOWN_ISSUERS });
+        card.appendChild(button(t('circle.restore_finish.source_pod'), () => { const issuer = podIssuer.value.trim(); if (issuer) submit({ source: 'pod', issuer }); }));
         card.appendChild(button(t('circle.restore_finish.source_later'), () => submit({ source: 'later' })));
         return;
       }
       if (view.form.step === 'intent') {
         card.appendChild(para(t('circle.restore_finish.status_ready')));
-        card.appendChild(para(t(status.carrier === 'pod' ? 'circle.restore_finish.status_pod' : 'circle.restore_finish.status_local'), 'muted'));
+        card.appendChild(para(t(restoreFinishCameFrom(inst)), 'muted'));
         card.appendChild(para(t('circle.restore_finish.intent_question')));
         for (const intent of ['broken', 'lost', 'adding']) {
           card.appendChild(button(t(`circle.restore_finish.intent_${intent}`), () => submit({ intent })));
@@ -10110,6 +10115,10 @@ async function boot() {
     });
     agent._circleGroupsIndex = circleGroupsIndex;   // the roster feed fills it (householdRosterPairing)
     circleHouseholdAgent = agent;   // OBJ-2 — expose to showSettings (sibling fn) for the paired-devices panel
+    // THE POD SESSION IS READY (phone twin: App.js, when its pod writer is ready): the web restores its session BEFORE
+    // the agent boots (handleRedirect above), so the boot attached every mirror and this call finds them attached; it
+    // is the same moment, said through the same op, so a session that ever comes after the boot still attaches them
+    if (podSession) Promise.resolve(agent.callSkill?.('household', 'podSessionReady', {})).catch(() => {});
     // Reconcile the three boot-cached device prefs FROM the register (the authority; the caches
     // only exist because the pre-paint hook, i18n init, and the transport connect all run before
     // this line). Register wins; each apply routes through the pref's own live door, whose

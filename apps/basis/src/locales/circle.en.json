@@ -9005,9 +9005,11 @@
     "status_ready": "You are you again, and your circles are here.",
     "status_pod": "They came from your pod.",
     "status_local": "They came from this device.",
+    "status_file": "They came from your recovery file.",
     "empty_title": "You are you again. Your circles are not here.",
     "empty_body": "The phrase brings back who you are, not the list of circles you were in. That list lives on your pod, or in a recovery file you saved. If you have neither, someone in each circle can invite you again; you come back as the same member.",
     "source_file": "Load a recovery file",
+    "source_pod": "Sign in to my pod",
     "source_later": "Not now",
     "intent_question": "Could anyone else still use your old phone?",
     "intent_broken": "No, it broke or I wiped it",
@@ -9021,6 +9023,8 @@
     "done_devices": "Devices retired:",
     "err_not_yours": "That file was not made with your recovery phrase.",
     "err_unreadable": "That is not a recovery file.",
+    "err_pod_empty": "Your pod holds no circles for you yet. Load a recovery file, or ask someone in each circle to invite you again.",
+    "err_pod_failed": "The sign-in to your pod did not finish. Nothing changed; you can try again under My data.",
     "err_failed": "That did not work. You can try again under My data."
   },
   "replace": {
@@ -9120,7 +9124,7 @@
         "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
       },
       "export_intro": {
-        "text": "This file holds the list of your circles and devices, sealed with your recovery phrase. Without the phrase it is useless to anyone. Keep it next to your phrase, not instead of it.",
+        "text": "This file holds the list of your circles, with each circle's name and rules, and your devices, sealed with your recovery phrase. Without the phrase it is useless to anyone. Keep it next to your phrase, not instead of it.",
         "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
       },
       "export_ready": {
@@ -11200,6 +11204,10 @@
       "history_mirror": {
         "text": "Keep your history in your own storage",
         "doc": "A setting's label (projected from the parameter register)."
+      },
+      "pod_carriesMemberLists": {
+        "text": "Your pod also keeps your circles' member lists",
+        "doc": "A setting's label (projected from the parameter register): whether the registry's pod copy also carries each circle's member list (off by default)."
       },
       "history_restore_recencyDays": {
         "text": "When restoring, first the last … days",

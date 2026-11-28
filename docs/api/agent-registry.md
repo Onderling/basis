@@ -209,6 +209,12 @@ createCatalogueSource — a `{ list, get }` source over the endorsement graph.
 
 The canonical property key holding the `{ [circleId]: record }` map.
 
+### `CIRCLE_LEFT_KEY`
+
+**Kind:** constant · **Import:** `CIRCLE_LEFT_KEY` from `'@onderling/agent-registry'`
+
+The circles the person LEFT, `{ [circleId]: at }`: a dated tombstone a registry merge honours (a leave is not a plain removal).
+
 ### `isKeyRef`
 
 **Kind:** function · **Import:** `isKeyRef` from `'@onderling/agent-registry'`
@@ -312,12 +318,22 @@ its memberships from the default profile unless it declares its own). Mirrors dr
 **Kind:** function · **Import:** `removeCircleMembership` from `'@onderling/agent-registry'`
 
 ```js
-removeCircleMembership(properties, circleId)
+removeCircleMembership(properties, circleId, { at = new Date().toISOString() } = {})
 ```
 
 A circle the person LEFT (or was removed from) comes off the profile — with the record still there a restored
 device re-opened a circle the person had left (found 2026-09-22 while making a leave follow the siblings).
 A circle not on the record is a no-op; the other records stay.
+
+### `circleLeavesOf`
+
+**Kind:** function · **Import:** `circleLeavesOf` from `'@onderling/agent-registry'`
+
+```js
+circleLeavesOf(entry)
+```
+
+The person's dated leaves off one registry entry, `{ [circleId]: at }` (own, no inherit chain).
 
 ### `setCircleMembership`
 

@@ -9002,9 +9002,11 @@
     "status_ready": "Je bent weer jezelf, en je kringen zijn er.",
     "status_pod": "Ze kwamen van je pod.",
     "status_local": "Ze kwamen van dit apparaat.",
+    "status_file": "Ze kwamen uit je herstelbestand.",
     "empty_title": "Je bent weer jezelf. Je kringen zijn hier niet.",
     "empty_body": "De herstelzin brengt terug wie je bent, niet de lijst van kringen waar je in zat. Die lijst staat op je pod, of in een herstelbestand dat je bewaarde. Heb je geen van beide, dan kan iemand uit elke kring je opnieuw uitnodigen; je komt terug als hetzelfde lid.",
     "source_file": "Herstelbestand laden",
+    "source_pod": "Log in op mijn pod",
     "source_later": "Nu niet",
     "intent_question": "Zou iemand anders je oude telefoon nog kunnen gebruiken?",
     "intent_broken": "Nee, hij is kapot of gewist",
@@ -9018,6 +9020,8 @@
     "done_devices": "Ingetrokken apparaten:",
     "err_not_yours": "Dat bestand is niet gemaakt met jouw herstelzin.",
     "err_unreadable": "Dat is geen herstelbestand.",
+    "err_pod_empty": "Je pod heeft nog geen kringen voor je. Laad een herstelbestand, of vraag iemand in elke kring je opnieuw uit te nodigen.",
+    "err_pod_failed": "Het inloggen op je pod is niet afgerond. Er is niets veranderd; je kunt het opnieuw proberen onder Mijn gegevens.",
     "err_failed": "Dat is niet gelukt. Je kunt het opnieuw proberen onder Mijn gegevens."
   },
   "replace": {
@@ -9117,7 +9121,7 @@
         "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
       },
       "export_intro": {
-        "text": "Dit bestand bevat de lijst van je kringen en apparaten, verzegeld met je herstelzin. Zonder de zin heeft niemand er iets aan. Bewaar het naast je herstelzin, niet in plaats daarvan.",
+        "text": "Dit bestand bevat de lijst van je kringen, met de naam en de regels van elke kring, en je apparaten, verzegeld met je herstelzin. Zonder de zin heeft niemand er iets aan. Bewaar het naast je herstelzin, niet in plaats daarvan.",
         "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
       },
       "export_ready": {
@@ -11197,6 +11201,10 @@
       "history_mirror": {
         "text": "Je geschiedenis bewaren in je eigen opslag",
         "doc": "A setting's label (projected from the parameter register)."
+      },
+      "pod_carriesMemberLists": {
+        "text": "Je pod bewaart ook de ledenlijsten van je kringen",
+        "doc": "A setting's label (projected from the parameter register): whether the registry's pod copy also carries each circle's member list (off by default)."
       },
       "history_restore_recencyDays": {
         "text": "Bij herstellen eerst de laatste … dagen",

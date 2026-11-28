@@ -61,3 +61,16 @@ until the rest of this page is written.
 
 - `docs/decisions.md` 2026-11-26: a person can lock their own Basis in the browser: optional, a short code allowed, no
   lock on the phone or the box.
+
+## Circles back from the pod
+
+- A restored or new device that signs in to the person's pod gets the list of their circles from it, in the same start:
+  the sign-in asks the agent to attach the registry's pod mirror (`podSessionReady`), and a pod copy this device has
+  not read is merged in (its circles taken in, never written over by a newer local list), then the circles open.
+  Lives in `apps/basis/src/v2/registryCarrier.js` (`mergeUnreadPodCopy`, `attachMedium`) and the sign-in op
+  (`apps/basis/src/core/localBuiltins.js`). Proof: `apps/basis/test/registryPodAfterRestore.test.js` (the phone's order:
+  a first start not signed in, then a sign-in in place; and with a restart).
+
+<!-- catalogue-ops
+household: podSessionReady
+-->

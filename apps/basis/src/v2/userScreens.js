@@ -231,17 +231,13 @@ export function createUserScreenStore({ io = {}, versions = null } = {}) {
   const { load, save } = io;
   const hasVersions = Boolean(versions && typeof versions.capture === 'function' && typeof versions.list === 'function');
   const newestTs = async () => (hasVersions ? ((await versions.list(SCREEN_VERSIONS_KEY))[0]?.ts ?? null) : null);
-  // DIAGNOSTIC (the phone's no-such-page after a restore, L1259 b): how the last load ended. Comes out in the PR that fixes it.
-  let lastLoad = 'none';
   return {
     async get() {
       let raw = null;
-      try { raw = typeof load === 'function' ? await load() : null; lastLoad = raw == null ? 'null' : 'book'; }
-      catch (err) { raw = null; lastLoad = `threw: ${err?.message ?? err}`; }
+      try { raw = typeof load === 'function' ? await load() : null; }
+      catch { raw = null; }
       return normalizeScreenBook(raw);
     },
-    /** DIAGNOSTIC: 'book' · 'null' · 'threw: …' · 'none' (not loaded yet). */
-    lastLoad: () => lastLoad,
     async set(book) {
       const next = normalizeScreenBook(book);
       if (typeof save === 'function') await save(next);

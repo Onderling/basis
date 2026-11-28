@@ -91,6 +91,23 @@ describe('stores read at the first frame wait for the key, and nothing seeds or 
     expect(s._m.get('basis.userScreens')).toBe(before);
   });
 
+  it('a brand-new person: the first page is seeded after the key, it lands, and the waist\'s own store reads it', async () => {
+    // the phone walk: a new person's first own note said "no-such-page". The launcher read an empty store before the key,
+    // seeded a page, the save was refused (no key yet), and the waist's store held no page for the note's block.
+    const s = memStorage();
+    let done = null;
+    const t = (k) => k;
+    const seeding = ensureVandaagBook({ store: localUserScreenStore(s), t }).then((b) => { done = b; });
+    await tick();
+    expect(done, 'not read yet: nothing is seeded before the key').toBeNull();
+    expect(s._m.has('basis.userScreens')).toBe(false);
+    seal();
+    await seeding;
+    expect(done.screens.length).toBeGreaterThan(0);
+    const waist = await localUserScreenStore(s).get();   // a second store over the same storage, as the waist holds
+    expect(waist.screens.map((p) => p.id), 'the page the screen shows is the page the waist finds').toEqual(done.screens.map((p) => p.id));
+  });
+
   it('the availability and the contact names: a read before the key waits, then gives the kept value', async () => {
     const s = memStorage();
     seal();

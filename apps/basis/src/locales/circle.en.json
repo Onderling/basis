@@ -772,11 +772,11 @@
     },
     "failed": {
       "text": "That did not work.",
-      "doc": "The shared act strip: the act failed and nothing said why. Stays until the next act or a tap."
+      "doc": "The shared act strip: the act failed and nothing said why. Stays until the next act, a tap on it, or the next touch once it has shown a moment (actState.js)."
     },
     "failed_with": {
       "text": "That did not work: {{error}}",
-      "doc": "The shared act strip: the act failed with words from the op or the error. Stays until the next act or a tap."
+      "doc": "The shared act strip: the act failed with words from the op or the error. Stays until the next act, a tap on it, or the next touch once it has shown a moment (actState.js)."
     }
   },
   "tabs": {

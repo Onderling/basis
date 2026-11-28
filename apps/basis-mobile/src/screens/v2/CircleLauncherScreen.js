@@ -1337,7 +1337,11 @@ export default function CircleLauncherScreen({
     try { book = await userScreenStore.get(); }
     catch { book = { screens: [], activeId: null }; }
     // First run: the one Vandaag page (the coming week, my tasks, the circles with news), seeded once — shared with web
+    const hadPages = (book?.screens?.length ?? 0) > 0;
     try { book = await ensureVandaagBook({ store: userScreenStore, t }); } catch { /* the book as read stands */ }
+    // DIAGNOSTIC (no-such-page after a restore, L1259 b): when this start seeded the first page, and which. Comes out in
+    // the PR that fixes it.
+    if (!hadPages && (book?.screens?.length ?? 0) > 0) console.info(`[screens] seeded the first page ${book.screens[0].id} (the store's load before it: ${userScreenStore.lastLoad?.() ?? 'unknown'})`);
     setScreensBook(book);
     setScreensBookLoaded(true);
   }, [userScreenStore]);

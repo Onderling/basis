@@ -264,11 +264,13 @@ export function createNearbyRoomBinding({
   };
 
   // ── Inbound ───────────────────────────────────────────────────────────────────────────────────────────
-  let landedHook = null;   // the shell's receipt sender: ({ msgId, fromPeerAddr, source }) => Promise
+  let landedHook = null;   // the shell's receipt sender: ({ msgId, fromPeerAddr, source, via }) => Promise
+  // The shell's sender decides WHETHER a receipt goes (the person's setting); the room decides HOW: `via` is sendAsRoom,
+  // so the receipt to a stranger speaks as the room key like every other room send, and none goes without one.
   const confirm = (from, payload) => {
     const msgId = typeof payload?.msgId === 'string' ? payload.msgId : null;
-    if (!msgId || typeof landedHook !== 'function') return;
-    try { Promise.resolve(landedHook({ msgId, fromPeerAddr: from, source: 'receiver' })).catch((err) => report(err, 'receipt')); }
+    if (!msgId || typeof landedHook !== 'function' || !roomAddressNow()) return;
+    try { Promise.resolve(landedHook({ msgId, fromPeerAddr: from, source: 'receiver', via: sendAsRoom })).catch((err) => report(err, 'receipt')); }
     catch (err) { report(err, 'receipt'); }
   };
   const land = (kind, value, from, payload) => {

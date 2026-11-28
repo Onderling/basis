@@ -124,6 +124,7 @@ import { backfillContactPersonas } from '../../v2/contactPersona.js';   // conta
 import { bookRowsOf } from '../../v2/contactsSource.js';   // a listContacts reply's rows, whole
 import { KEEP_DAYS_KEY, roomRetentionMs, makeRoomKeeper, earlierInTheRoom } from '../../v2/nearbyKept.js';
 import { recordOwnAction, ownRetentionMs, OWN_RECORD_KEY, OWN_KEEP_WEEKS_KEY, ownActionRows, ownActionsExport, OWN_ACTION_KIND, noteOwnOutcome } from '../../ownActions.js';   // the person's own acts, at the outer waist
+import { createRestartState, restartRefusal, asksRestart } from '../../v2/restartRequired.js';   // after a reloadRequired result the waist refuses writes until a new start
 import { circleActRefusal, writeIntoRefusal, gateRefusalKey } from '../../v2/circleActGate.js';   // a person's write in a circle asks that circle's capability set, at the outer waist
 import { keptPolicyChangesOf, requestKeptPolicyChanges } from '../../v2/keptPolicyChanges.js';   // a write into another circle judged as its receivers judge it
 import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
@@ -3847,6 +3848,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     await writePeerBindings();
     peerBindingsFrozen = true;
   };
+  // the cutover's reseal is over and the process goes on: save again, and save what was learned meanwhile
+  const thawPeerBindings = () => { peerBindingsFrozen = false; savePeerBindings(); };
   try {
     const raw = await chatVault.get(PEER_BINDINGS_VAULT_KEY);
     const kept = raw ? JSON.parse(typeof raw === 'string' ? raw : String(raw)) : [];
@@ -5112,8 +5115,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       // THE SELF-ENROLL MIGRATION (the per-ceremony custody cutover): a ROOT-custody device that
       // just proved the phrase migrates itself — reseal EVERY sealed vault from the root-derived
       // key to its own delegation-derived one, write the delegation blob (pre-signed record
-      // included), and flip the key door + marker. The running agent still holds the old key in
-      // its wrappers, so the reply asks for a reload; the next boot is a delegation boot.
+      // included), and flip the key door + marker. Every sealed vault reads the one key holder the
+      // reseal switches, so the running agent goes on under the new key; it asks for a restart only
+      // when the cutover introduced addresses (see the reply below). The next boot is a delegation boot.
       let migrated = false;
       const introduced = [];
       // Once per session: the migration leaves this running agent waiting for its reload (the vaults
@@ -5191,6 +5195,11 @@ export async function createRealHouseholdAgent(opts = {}) {
             }
           }
           if (migrated) selfEnrolledThisSession = true;
+          // The snapshot was frozen before the reseal so no debounced save could land mid-rotation. When the process goes
+          // on (no address introduced, no restart asked) it thaws: every sealed vault now writes under the key the reseal
+          // switched to (the one key holder), so a peer met later in this start is kept. The freeze was first made when
+          // a write after the reseal still went under the old key (2026-09-14); the key holder ended that (2026-11-25).
+          if (migrated && introduced.length === 0) thawPeerBindings();
         } catch (err) { console.warn('[custody] self-enroll migration deferred:', err?.message ?? err); }
       }
       // Every node the person owns (a companion) hears of it too — the root's own tombstone, so the revoked device
@@ -5212,7 +5221,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         ...(Object.keys(personaKeyVersions).length ? { personaKeyVersions } : {}),
         ...(personaKeysAlone.length ? { personaKeysAlone } : {}),
         ...(personaKeysUndone.length ? { personaKeysUndone } : {}),
-        ...(migrated ? { migrated: true, reloadRequired: true, introduced } : {}),
+        // a restart only when the cutover INTRODUCED addresses (an old device): that process is a former self from here
+        // (restartRequired.js). A device enrolled from its first boot moves nothing, so the person goes on in this start;
+        // only the root stays in this process's memory until its next start.
+        ...(migrated ? { migrated: true, introduced, ...(introduced.length ? { reloadRequired: true } : {}) } : {}),
       })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'revoke-failed' })]; }
   }, { visibility: 'private' });   // retires a device's keys everywhere: owner-only, phrase-proven
@@ -5763,7 +5775,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // the name rides back, so a typed `/pauze Werk` is answered in the screen's own words
     let name = null;
     try { name = (await agentsRegistryRef?.lookup?.(pid))?.name ?? null; } catch { /* nameless */ }
-    return { ok: true, paused: on, reloadRequired: true, personaId: pid, name };
+    // NOT reloadRequired: a pause or a resume changes what the NEXT start runs; this process is still the same selves
+    // until then and loses nothing written in it, so the restart stop does not stand (restartRequired.js)
+    return { ok: true, paused: on, takesEffectNextStart: true, personaId: pid, name };
   };
   hostAgent.register('pausePersona', async ({ parts }) => {
     return [DataPart(await setPaused(parts?.[0]?.data?.personaId, true))];
@@ -7880,6 +7894,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   const TASK_BY_ID_OPS = new Set(['claimTask', 'completeTask', 'reassignTask', 'removeTask', 'editTask', 'unclaimTask']);
   /** The reads a door's person sees people in: the chores' open and own reads, and the agenda. */
   const READER_READS = new Set(['tasks.listOpen', 'tasks.listMine', 'calendar.listEvents']);
+  // Set by the outer waist when an op's result says `reloadRequired`; this process then writes nothing (restartRequired.js).
+  const restartState = createRestartState();
   const callSkill = async (appOrigin, opId, args, ctx = {}) => {
     // this call's words: the language it carries (a door's `/taal`), else the bot's own
     const tr = translatorFor(ctx?.lang);
@@ -10041,6 +10057,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         deviceLog: opts.deviceLog, enabled: paramsService.register.valueOf(OWN_RECORD_KEY) !== false,
         app: appOrigin, op: opId, args, ctx, result, threw, error, manifests: allManifests(),
       });
+      // after a restart-required result nothing writes as the former self, whichever surface asks (restartRequired.js)
+      const stopped = restartRefusal(restartState, allManifests(), appOrigin, opId);
+      if (stopped) { record(stopped, false); return stopped; }
       // a person's act that writes in a circle asks that circle's capability set HERE, where no tap can walk around it
       // (L1042; the shell hands in only its stores, `circleCapabilityInputs`); refused, it is recorded as refused
       const refusal = await circleActRefusal({
@@ -10051,8 +10070,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       let result;
       try { result = await callSkill(appOrigin, opId, args, ctx); } catch (err) { record(null, true, err); throw err; }
       record(result, false);
+      // this process is now the device's former self: the shells stop (restartRequired.js)
+      if (asksRestart(result)) restartState.set(`${appOrigin}.${opId}`);
       return result;
     },
+    /** Has an op's result asked for a restart in this process? (restartRequired.js) A screen mounted later asks this. */
+    restartRequired: () => restartState.required,
+    /** The shell's stop: `fn` is called once when a restart is required (at once if it already is). Returns an unsubscribe. */
+    onRestartRequired: (fn) => restartState.on(fn),
     // The person's own record, for My data (ownActions.js): the rows, one file to save, and the wipe (this kind only).
     ownActionRows: () => ownActionRows(opts.deviceLog),
     exportOwnActions: () => ownActionsExport(ownActionRows(opts.deviceLog)),

@@ -1107,6 +1107,8 @@ export async function createSecureAgent(opts = {}) {
 
   /** Does this send opt in to the hold-forward delivery guarantee? */
   function wantsHold(sendOpts) {
+    // a send that may only speak as a room key is never held: a room message does not outlive the visit
+    if (sendOpts?.requireSendAs === true) return false;
     return sendOpts?.hold === true || sendOpts?.guarantee === 'hold-forward';
   }
 
@@ -2985,6 +2987,15 @@ export async function createSecureAgent(opts = {}) {
     // on that transport the person speaks to the person. The payload is untouched — a circle statement
     // inside it is still signed by the circle key and still verified against the roster on landing.
     const aliasBlind = tx.supportsAliases !== true;
+    // A send that may ONLY speak as `sendAs` (a Nearby room key: `requireSendAs`) never takes a transport that cannot
+    // carry it: there it would speak as the canonical identity, and a stranger in the room would learn the person's main
+    // address, the one thing the room key withholds. The address fallback below is the CIRCLE's consent, not a room's.
+    // Refused HERE, in the handshake every send and task call goes through, so no caller can walk around it; the
+    // failover loop moves on to the next transport, and a send with none left is refused (never held).
+    if (opts?.requireSendAs === true && sendAs && aliasBlind) {
+      throw Object.assign(new Error(`secure-agent: refused, "${sel.name}" cannot carry the address this send must speak as`),
+        { code: 'SEND_AS_NOT_CARRIED', transport: sel.name });
+    }
     const speakAs = (sendingIdentity && !aliasBlind) ? sendAs : null;
     if (sendingIdentity && aliasBlind && typeof console !== 'undefined') {
       console.info(`[secure-agent] "${sel.name}" cannot carry per-circle addresses — speaking as the canonical `

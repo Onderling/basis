@@ -8923,6 +8923,12 @@
       "doc": "Fallback-melding tekst."
     }
   },
+  "restart_required": {
+    "title": "Basis moet opnieuw starten",
+    "body": "Basis moet opnieuw starten om dit af te maken. Sluit Basis helemaal af en open het weer. Tot dan wordt hier niets bewaard.",
+    "how": "Zo doe je dat: open de lijst met recente apps, veeg Basis weg en open Basis opnieuw.",
+    "reload": "Opnieuw starten"
+  },
   "receive_personas": {
     "close": "Sluiten",
     "remove_rekey_failed": "Dat lukte niet helemaal: de persona is van dit apparaat gehaald, maar de sleutel van het apparaat kon niet over. De volgende start vraagt je herstelzin.",

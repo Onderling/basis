@@ -2299,6 +2299,12 @@ never takes a recorded outcome alone, so a joiner after the audit window refused
 compacted. Other decisions keep compacting. A governance serve that withholds statements it cannot vouch for now says
 how many and which kinds.
 
+**Addition (2026-11-27, the same rule one lane over):** a voted REMOVAL or ROLE CHANGE names its decision the same way
+(the membership statement's `payload.proposalId`), and the roster fold re-tallies that proposal (`membershipGateFor`).
+The membership statement never expires, so its decision is kept with it (`DECISION_NAMING_STATEMENTS`: the settings
+change in the governance lane, `evict` and `role` in the membership lane). Without it a joiner after the window found
+no proposal, refused the removal, and showed the removed member on its roster.
+
 ## 2026-11-21 — The items lane judges what it applies; each device keeps its own proofs; a served head is taken only when asked (Fable ruled)
 
 **Status:** settled and built (`contentJudge.js`, `contentJudgments.js`, `keptPolicyChanges.js`, `itemsRail.js`,
@@ -2351,7 +2357,7 @@ starts unattended and has no person to ask. Both doors answer `unlocked` and hav
 t 3*: about two seconds at every open in a browser (measured 2.08 s). *A passkey*, *an idle lock*, *changing the code
 in place*: later, in the full design; the slot format (an array with a `kind`) leaves room for them.
 
-## 2026-11-27 — A closed decision stands on its admin's closing (Fable ruled; Frits to confirm)
+## 2026-11-27 — A closed decision stands on its admin's closing (Fable ruled; Frits confirmed)
 
 **Decision:** a CLOSED decision is tallied against the members its closing counted, when an admin signed that closing
 (an admin on the roster now). The admin who closes a decision names the members it tallied against AND the role each

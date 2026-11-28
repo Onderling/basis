@@ -72,4 +72,28 @@ describe('a one-member circle through a recovery file', () => {
     expect(v2.form?.step, 'the load moves on to the question').toBe('intent');
     await fresh.shutdown?.();
   }, 90_000);
+
+  it('the file\'s rules row lands as it was stored (same id, author, statement), and a NEWER head from a member wins', async () => {
+    const me = { owner: new VaultMemory(), chat: new VaultMemory() };
+    const phone = await boot(me);
+    await phone.callSkill('pinboard', 'createGroupV2', { groupId: CIRCLE, name: 'Testkring1128', rules: { text: 'Testkring1128' } });
+    const rulesOf = async (agent) => ((await agent.callSkill('pinboard', 'listOpenRequests', { type: 'group-rules' }))?.items ?? [])
+      .filter((it) => it?.source?.groupId === CIRCLE);
+    const [original] = await rulesOf(phone);
+    expect(original, 'the maker holds a rules row').toBeTruthy();
+    const { file } = await phone.callSkill('household', 'exportRecoveryFile', {});
+    await phone.shutdown?.();
+    const fresh = await boot({ owner: me.owner, chat: me.chat });
+    expect((await fresh.callSkill('household', 'importRecoveryFile', { file })).ok).toBe(true);
+    const [landed] = await rulesOf(fresh);
+    expect(landed?.id, 'id-preserved').toBe(original.id);
+    expect(landed?.addedBy, 'its author as stored').toBe(original.addedBy);
+    expect(JSON.stringify(landed?.source?.statement ?? null), 'its statement as stored, never re-signed').toBe(JSON.stringify(original.source?.statement ?? null));
+    // a member's newer rules arrive after the import (the rules lane's receive half): the newer head is the name
+    const v = Number(original.source?.version ?? 1);
+    const r = await fresh.callSkill('pinboard', 'recordGroupRulesUpdate', { groupId: CIRCLE, rules: { name: 'Nieuwe naam', text: 'x' }, version: v + 1 });
+    expect(r?.applied, JSON.stringify(r)).toBe(true);
+    expect(await mine(fresh), 'the newer head wins over the file\'s').toEqual({ held: true, name: 'Nieuwe naam' });
+    await fresh.shutdown?.();
+  }, 90_000);
 });

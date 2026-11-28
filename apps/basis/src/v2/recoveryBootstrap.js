@@ -54,15 +54,21 @@ export function projectMemberRow(m) {
  * @param {Array<object>} a.rows          the circle's membership-redemption trail rows (`listOpen`)
  * @param {Array<object>} a.members       roster rows (`listGroupMembers`)
  * @param {object|null} [a.ownAnnouncement]   `ownAnnouncementFor(...)` — this device's proven address
- * @returns {{rows: object[], members: object[], own?: object}|null}  null when there is nothing to carry
+ * @param {Array<object>} [a.rules]       the circle's `group-rules` rows as this device holds them (its name)
+ * @returns {{rows: object[], members: object[], rules?: object[], own?: object}|null}  null when there is nothing to carry
  */
-export function rosterSnapshot({ rows, members, ownAnnouncement = null } = {}) {
+export function rosterSnapshot({ rows, members, ownAnnouncement = null, rules = [] } = {}) {
   const r = (Array.isArray(rows) ? rows : []).filter((it) => it && typeof it === 'object');
   const m = (Array.isArray(members) ? members : []).map(projectMemberRow).filter(Boolean);
-  if (r.length === 0 && m.length === 0) return null;
+  // THE CIRCLE'S RULES ROWS as this device holds them (its name is their text): carried as stored, author and
+  // statement untouched, so a circle whose only member is its maker comes back with its name (nobody else holds them)
+  const ru = (Array.isArray(rules) ? rules : []).filter((it) => it && typeof it === 'object' && typeof it.id === 'string' && it.id
+    // the read adapter renders a rules row as `type: 'post'` (as it does the redemption rows): known by its rules doc
+    && (it.type === 'group-rules' || it.kind === 'group-rules' || (it.source?.rules && typeof it.source.rules === 'object')));
+  if (r.length === 0 && m.length === 0 && ru.length === 0) return null;
   const own = (ownAnnouncement && typeof ownAnnouncement === 'object' && typeof ownAnnouncement.circleAddress === 'string')
     ? ownAnnouncement : null;
-  return { rows: r, members: m, ...(own ? { own } : {}) };
+  return { rows: r, members: m, ...(ru.length ? { rules: ru } : {}), ...(own ? { own } : {}) };
 }
 
 /**

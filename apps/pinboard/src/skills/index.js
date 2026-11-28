@@ -3746,6 +3746,19 @@ export function buildSkills({
     defineSkill('recordRosterSeed', async ({ parts, from }) => {
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
+      // THE CIRCLE'S RULES ROWS (its name is their text), from the owner's own recovery file: ingested as stored, id-preserved,
+      // author and statement untouched (nothing re-signed); a newer head the rules lane brings later folds on top by version
+      const rulesRows = (Array.isArray(a.rules) ? a.rules : []).filter((r) => r
+        && typeof r.id === 'string' && r.id
+        // a read through listOpen renders a rules row as `type: 'post'`: known by its rules doc, stored back as group-rules
+        && (r.type === 'group-rules' || r.kind === 'group-rules' || (r.source?.rules && typeof r.source.rules === 'object'))
+        && r.source?.groupId === a.groupId);
+      let rulesIngested = 0;
+      if (rulesRows.length && typeof store.ingestItems === 'function') {
+        const got = await store.ingestItems(rulesRows.map((r) => ({ ...r, type: 'group-rules' })), { actor: from, reason: 'roster-seed' });
+        rulesIngested = got?.ingested ?? 0;
+      }
+      if ((!Array.isArray(a.rows) || a.rows.length === 0) && rulesRows.length) return { ingested: 0, skipped: 0, rulesIngested, membersRecorded: 0 };
       if (!Array.isArray(a.rows) || a.rows.length === 0) return { error: 'rows required' };
       // Redemption-SHAPED rows only: what `projectCircleRoster` consumes is the source facet
       // (groupId + redeemedBy), while the ITEM type is the legacy 'post' with kind

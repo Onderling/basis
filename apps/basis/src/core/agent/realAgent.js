@@ -6005,7 +6005,10 @@ export async function createRealHouseholdAgent(opts = {}) {
           bootstrap = { ...made, stashed };
         }
       } catch { bootstrap = null; }
-      return [DataPart({ ok: true, held, reloadRequired: true, ...(bootstrap ? { bootstrap } : {}) })];
+      // NOT reloadRequired: like a pause, a receive changes what the NEXT start runs (the persona's slots, the stashed
+      // bootstrap); this process stays the default self at the same addresses, so nothing written after is lost and
+      // the restart stop does not stand (receiveTakesEffectNextStart.test.js). The screens still say to start again.
+      return [DataPart({ ok: true, held, takesEffectNextStart: true, ...(bootstrap ? { bootstrap } : {}) })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'hand-over-failed' })]; }
   }, { visibility: 'private' });
   hostAgent.register('restoreOwnerPhrase', async ({ parts }) => {

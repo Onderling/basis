@@ -2,7 +2,7 @@ import { verbKind } from '@onderling/app-manifest';
 
 /**
  * RESTART REQUIRED — after an op whose result says `reloadRequired` (a phrase restore, an enrolment, a persona removed
- * or received here, a custody cutover that introduced addresses), the running process is still the device's FORMER self: its keys, its stores and its lanes were
+ * here, a custody cutover that introduced addresses), the running process is still the device's FORMER self: its keys, its stores and its lanes were
  * composed at boot. The phone walk (2026-11-27) went on as the old person after a restore and lost what was written
  * after it. So the app STOPS until it starts again: one state, set at the outer waist by the op's own result, that
  * every shell composes (`onRestartRequired`, a seam in scripts/shell-seams.mjs):
@@ -16,8 +16,9 @@ import { verbKind } from '@onderling/app-manifest';
  * and a screen remounted inside the SAME process (Android recreating the activity) asks the agent and paints it again.
  * A restore's own after-start work is carried by its vault marker (`RESTORE_PENDING_KEY`), not by this state.
  *
- * An op that only changes what the NEXT start runs (a persona paused or resumed) answers `takesEffectNextStart` instead:
- * this process stays the same selves and loses nothing written in it, so nothing stops (pauseTakesEffectNextStart.test).
+ * An op that only changes what the NEXT start runs (a persona paused, resumed or received) answers `takesEffectNextStart`
+ * instead: this process stays the same selves and loses nothing written in it, so nothing stops
+ * (pauseTakesEffectNextStart.test, receiveTakesEffectNextStart.test).
  */
 
 export const RESTART_REQUIRED_CODE = 'restart-required';

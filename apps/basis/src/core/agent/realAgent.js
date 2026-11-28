@@ -5618,8 +5618,20 @@ export async function createRealHouseholdAgent(opts = {}) {
       const ticked = Array.isArray(parts?.[0]?.data?.rosters) ? new Set(parts[0].data.rosters) : null;
       const rosters = {};
       const carried = {};
+      // the circles' RULES rows (a circle's name is their text): for EVERY circle in the file, ticked for its roster or not
+      let allRules = [];
+      try {
+        const got = await callSkill('pinboard', 'listOpenRequests', { type: 'group-rules' });
+        allRules = Array.isArray(got?.items) ? got.items : (Array.isArray(got) ? got : []);
+      } catch { allRules = []; }
+      const rulesOf = (circleId) => allRules.filter((it) => it?.source?.groupId === circleId);
       for (const circleId of circleIds) {
-        if (ticked && !ticked.has(circleId)) { carried[circleId] = null; continue; }
+        if (ticked && !ticked.has(circleId)) {
+          carried[circleId] = null;
+          const named = rosterSnapshot({ rows: [], members: [], rules: rulesOf(circleId) });
+          if (named) rosters[circleId] = named;
+          continue;
+        }
         let rows = [];
         let members = [];
         try {
@@ -5629,7 +5641,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         } catch { rows = []; }
         try { members = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { members = []; }
         const snap = rosterSnapshot({
-          rows, members,
+          rows, members, rules: rulesOf(circleId),
           // This device's proven address in the circle — the same announcement the seed serve introduces
           // itself back with (`rosterSeed`), minted while this device still holds the key.
           ownAnnouncement: ownCircleAddressAnnouncement({
@@ -5684,7 +5696,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       let landed = 0;
       for (const [circleId, snap] of Object.entries(rostersOf(body))) {
         try {
-          const r = await callSkill('pinboard', 'recordRosterSeed', { groupId: circleId, rows: snap.rows, members: snap.members });
+          const r = await callSkill('pinboard', 'recordRosterSeed', { groupId: circleId, rows: snap.rows, members: snap.members, ...(Array.isArray(snap.rules) ? { rules: snap.rules } : {}) });
           if (r && !r.error) landed += 1;
           // The owner's own proven address from before the wipe — through the announce's receive door,
           // proof re-verified, so what the owner said with it binds on this device too.
@@ -5769,6 +5781,18 @@ export async function createRealHouseholdAgent(opts = {}) {
   hostAgent.register('restoreSource', async ({ parts }) => {
     const source = String(parts?.[0]?.data?.source ?? '');
     if (source === 'later') return [DataPart({ ok: true, outcome: 'later', source })];
+    // FROM THE POD (the screen names it): the shared sign-in op runs; on the phone it completes in place and its
+    // pod-session door brings the circle list in; on the web it navigates away and the boot after it pulls the list
+    if (source === 'pod') {
+      let signed = null;
+      try { signed = await callSkill('basis', 'signin', {}); } catch (e) { signed = { ok: false, error: e?.message ?? String(e) }; }
+      if (signed?.ok === false) return [DataPart({ ok: false, outcome: 'pod-failed', error: signed.error ?? 'signin-failed', source })];
+      if (signed?.opening) return [DataPart({ ok: true, outcome: 'pod-opening', source })];
+      const circleIds = Object.keys(await readSelfCircleMemberships().catch(() => ({})))
+        .filter((id) => id && id !== tasksPrimaryCircleId && id !== 'household');
+      if (!circleIds.length) return [DataPart({ ok: false, outcome: 'pod-empty', error: 'pod-empty', source })];
+      return [DataPart({ ok: true, outcome: 'ok', source, circles: circleIds.length, circleIds })];
+    }
     if (source !== 'file') return [DataPart({ ok: false, outcome: 'error', error: 'source-required' })];
     const r = await importRecoveryFileText(parts?.[0]?.data?.file);
     if (!r.ok) return [DataPart({ ok: false, outcome: r.error, error: r.error, source })];

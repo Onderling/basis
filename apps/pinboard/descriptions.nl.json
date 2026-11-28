@@ -317,7 +317,7 @@
   },
   "recordRosterSeed": {
     "what": "Neem de ledenlijst over van je andere apparaat.",
-    "params": {"groupId": "welke kring", "rows": "de leden", "members": "wie erin staan"}
+    "params": {"groupId": "welke kring", "rows": "de leden", "members": "wie erin staan", "rules": "naam en regels van de kring, je eigen"}
   },
   "getGroupRulesUpdateStatement": {
     "what": "Laat de ondertekende wijziging van de regels zien.",

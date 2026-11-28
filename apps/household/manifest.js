@@ -594,6 +594,8 @@ export const householdManifest = {
       // enrollDevice, which also writes a delegation blob for a device joining an existing account.
       params: [
         { name: 'mnemonic', kind: 'secret', required: true },
+        // a check restores nothing: it says whether the phrase is the one this device already is (`alreadyYou`)
+        { name: 'checkOnly', kind: 'boolean', required: false },
       ],
       surfaces: {},
     },

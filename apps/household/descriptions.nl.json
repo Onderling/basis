@@ -137,7 +137,7 @@
   },
   "restoreOwnerPhrase": {
     "what": "Herstel wie je bent met je herstelzin.",
-    "params": {"mnemonic": "je herstelzin"}
+    "params": {"mnemonic": "je herstelzin", "checkOnly": "alleen nagaan of dit al jij bent"}
   },
   "restoreFromMnemonicWizard": {
     "what": "Herstel alles met je herstelzin; wat hier staat wordt vervangen.",

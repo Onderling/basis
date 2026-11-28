@@ -155,7 +155,7 @@ export function unionTombstones(into, from) {
   return changed ? { ...into, agents } : into;
 }
 
-export function createRegistryCarrier({ backend, deviceId, medium: initialMedium = null, name: initialName = null, onKeyMismatch = null, warn = null } = {}) {
+export function createRegistryCarrier({ backend, deviceId, medium: initialMedium = null, name: initialName = null, onKeyMismatch = null, warn = null, decorateUpload = null } = {}) {
   if (typeof deviceId !== 'string' || !deviceId) throw new Error('createRegistryCarrier: deviceId is required');
   if (initialMedium && !initialName) throw new Error('createRegistryCarrier: a pod name is required with a medium');
   // the medium may come LATER than the boot (`attachMedium`): a sign-in in place, or a session ready after a cold boot
@@ -167,6 +167,8 @@ export function createRegistryCarrier({ backend, deviceId, medium: initialMedium
   // copy it has never read is merged in at the first attach (`mergeUnreadPodCopy`), never written over by a clock.
   const seenUri = `${resourceUri}#pod-seen`;
   const state = { mode: 'local', probe: null, pulled: false, pushed: false, merged: false };
+  // the pod body's circle snapshots, kept from the last pull or merge for the device to land (`podSnapshots`)
+  let lastPodSnapshots = null;
 
   const pseudoPod = createPseudoPod({
     backend: local,
@@ -178,7 +180,11 @@ export function createRegistryCarrier({ backend, deviceId, medium: initialMedium
     podUploader: async (_uri, bytes) => {
       let onPod = null;
       try { const cur = await medium.read(name); onPod = cur == null ? null : parseUntrustedJson(cur); } catch { onPod = null; }
-      await medium.write(name, JSON.stringify(unionTombstones(bytes, onPod)));
+      // THE CIRCLES' OWN ROWS ride in the same sealed body (`decorateUpload`: the recovery file's snapshot, ROSTERS_KEY),
+      // one resource, so the host cannot count circles; a decorator that fails sends the registry as it is
+      let up = bytes;
+      if (typeof decorateUpload === 'function') { try { up = (await decorateUpload(bytes)) ?? bytes; } catch { up = bytes; } }
+      await medium.write(name, JSON.stringify(unionTombstones(up, onPod)));
       return {};
     },
     podFetcher: async () => {
@@ -209,6 +215,7 @@ export function createRegistryCarrier({ backend, deviceId, medium: initialMedium
       if (status === 'openable') {
         let podBody = null;
         try { podBody = typeof value === 'string' ? parseUntrustedJson(value) : value; } catch { podBody = null; }
+        lastPodSnapshots = podBody && podBody.rosters && typeof podBody.rosters === 'object' ? podBody.rosters : null;
         if (podBody && localRec && !seen) {
           // A POD COPY THIS DEVICE HAS NOT READ (a restored or new device, signed in after its first start): its circles
           // are taken in, then the merged list goes up. Never pushed over by a newer local clock.
@@ -253,7 +260,10 @@ export function createRegistryCarrier({ backend, deviceId, medium: initialMedium
     return attach();
   }
 
-  return { pseudoPod, resourceUri, attach, attachMedium, status: () => ({ ...state }) };
+  /** The circle snapshots the pod's copy carried at the last pull or merge, taken once (the device lands them). */
+  const podSnapshots = () => { const s = (state.pulled || state.merged) ? lastPodSnapshots : null; lastPodSnapshots = null; return s; };
+
+  return { pseudoPod, resourceUri, attach, attachMedium, podSnapshots, status: () => ({ ...state }) };
 }
 
 // ── THE RECOVERY FILE — the pod-less carrier of the same fact ───────────────────────────────────────

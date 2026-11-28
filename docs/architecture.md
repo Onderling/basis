@@ -1686,7 +1686,10 @@ than being overwritten by a one-device list. A copy under OUR key that this devi
 device signing in after its first start) is MERGED in, its circles taken in, never written over by a newer local clock;
 last-write-wins holds only between copies this device has read (2026-11-28). The mirror attaches when the pod session is
 ready, not only at boot: the sign-in op asks for it (`podSessionReady`), so a phone that signs in in place gets its
-circles in the same start. Without a pod, the pod-less carrier of the same fact is the
+circles in the same start. The pod copy also carries, per circle, the rows the recovery file carries (one snapshot,
+one landing, sealed in the same single body so the host cannot count circles): the circle's rules rows always (its
+name, so a circle whose only member is its maker is listed again), and its member list and this device's own
+announcement only when the person's `pod.carriesMemberLists` says so (off by default). Without a pod, the pod-less carrier of the same fact is the
 **recovery file** — the registry (and each circle's roster) sealed to the recovery seal, never the root itself, exported and
 imported from My data on both shells. A person with neither loses the list, not the identity.
 

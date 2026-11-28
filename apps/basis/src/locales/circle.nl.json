@@ -11198,6 +11198,10 @@
         "text": "Je geschiedenis bewaren in je eigen opslag",
         "doc": "A setting's label (projected from the parameter register)."
       },
+      "pod_carriesMemberLists": {
+        "text": "Je pod bewaart ook de ledenlijsten van je kringen",
+        "doc": "A setting's label (projected from the parameter register): whether the registry's pod copy also carries each circle's member list (off by default)."
+      },
       "history_restore_recencyDays": {
         "text": "Bij herstellen eerst de laatste … dagen",
         "doc": "A setting's label (projected from the parameter register)."

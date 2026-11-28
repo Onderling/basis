@@ -1734,6 +1734,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   // THE MIRROR ATTACHES WHEN THE POD SESSION IS READY, not only at boot: a sign-in in place (the phone) or a session that
   // becomes ready after a cold start calls `podSessionReady` (the sign-in op does), which provisions and attaches it
   let attachRegistryLater = async () => ({ mode: 'local', probe: null });
+  // the circle snapshots the pod's registry copy carried at its last pull or merge (landed after the circles reopen)
+  let registryPodSnapshots = () => null;
   const registryPseudoPod = await (async () => {
     try {
       const strategy = typeof opts.provisionRegistryMedium === 'function' ? recoverySealStrategy() : null;
@@ -1751,7 +1753,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         medium, name: medium ? registryPodName(recoverySealIdentity) : null,
         onKeyMismatch: () => opts.onRegistryKeyMismatch?.(),
         warn: (m) => { if (typeof console !== 'undefined') console.warn(m); },
+        // THE CIRCLES' OWN ROWS ride the pod copy (one path with the recovery file, circleSnapshotsOf): the rules rows
+        // always, the member list only when the person's `pod.carriesMemberLists` says so (off by default)
+        decorateUpload: async (body) => bodyWithRosters({
+          body,
+          rosters: (await circleSnapshotsOf(body, { carriesMembers: () => paramsService.register.valueOf('pod.carriesMemberLists') === true })).rosters,
+        }),
       });
+      registryPodSnapshots = () => carrier.podSnapshots();
       await carrier.attach();
       registryCarrierStatus = carrier.status;
       attachRegistryLater = async () => {
@@ -5598,62 +5607,76 @@ export async function createRealHouseholdAgent(opts = {}) {
    * so the phrase is the only secret; import opens it with this device's key and upserts every entry
    * through the registry handle, then runs the boot re-open loop. A file sealed by someone else's
    * phrase refuses as `not-your-file`; anything that is not a recovery file as `unreadable-file`. */
+  /**
+   * EACH CIRCLE'S OWN ROWS, as the recovery file and the pod's registry copy carry them (one function, one shape:
+   * rosterSnapshot): the circle's rules rows always, its roster (trail rows, members, this device's own announcement)
+   * where `carriesMembers(circleId)` says so.
+   * @returns {Promise<{circleIds: string[], rosters: object, carried: object}>}
+   */
+  async function circleSnapshotsOf(body, { carriesMembers = () => true } = {}) {
+    // every SELF's circles: the default's and each persona's (a restored device that is handed a persona later finds
+    // that persona's circles' rosters in the same file — read here as that persona, through the waist)
+    const circleIds = [...new Set((body.agents ?? [])
+      .filter((a) => a?.agentId === 'default' || /^p-[0-9a-f]{12}$/.test(String(a?.agentId ?? '')))
+      .flatMap((a) => Object.keys(circleMembershipsOf(a))))];
+    // THE MEMBER LIST, per circle (Frits, 2026-09-13: "why not back up the roster itself?"): the file
+    // carries each ticked circle's roster — the trail rows and the member rows, the same a sibling
+    // would serve as a seed — for every circle the person ticked; all of them unless the caller says
+    // otherwise (`rosters`: the ticked circle ids). Without it a restored device gets the circle's
+    // name and nobody to reach (`recoveryBootstrap.js`). The device's own registry is not changed —
+    // the choice belongs to the file being written.
+    const rosters = {};
+    const carried = {};
+    // the circles' RULES rows (a circle's name is their text): for EVERY circle in the file, ticked for its roster or not
+    let allRules = [];
+    try {
+      const got = await callSkill('pinboard', 'listOpenRequests', { type: 'group-rules' });
+      allRules = Array.isArray(got?.items) ? got.items : (Array.isArray(got) ? got : []);
+    } catch { allRules = []; }
+    const rulesOf = (circleId) => allRules.filter((it) => it?.source?.groupId === circleId);
+    for (const circleId of circleIds) {
+      if (!carriesMembers(circleId)) {
+        carried[circleId] = null;
+        const named = rosterSnapshot({ rows: [], members: [], rules: rulesOf(circleId) });
+        if (named) rosters[circleId] = named;
+        continue;
+      }
+      let rows = [];
+      let members = [];
+      try {
+        const all = await callSkill('pinboard', 'listOpenRequests', { type: 'membership-redemption' });
+        const items = Array.isArray(all?.items) ? all.items : (Array.isArray(all) ? all : []);
+        rows = items.filter((it) => it?.source?.groupId === circleId);
+      } catch { rows = []; }
+      try { members = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { members = []; }
+      const snap = rosterSnapshot({
+        rows, members, rules: rulesOf(circleId),
+        // This device's proven address in the circle — the same announcement the seed serve introduces
+        // itself back with (`rosterSeed`), minted while this device still holds the key.
+        ownAnnouncement: ownCircleAddressAnnouncement({
+          // the circle's OWN self: in a persona's circle the persona — never the default's webid there
+          circleId, memberWebid: circleSelfRef(circleId), circleAddressFor,
+          signCircleAddress: (cid2, address, member) => signCircleLinkFromSeed(circleSeedFor(cid2), cid2, cid2, address, member ?? circleSelfRef(cid2)),
+          ceremonyCommitmentFor, signCeremonyCommitment,
+        }),
+      });
+      rosters[circleId] = snap;
+      carried[circleId] = snap ? snap.members.filter((m) => m.webid !== circleSelfRef(circleId)).length : null;
+    }
+    return { circleIds, rosters, carried };
+  }
+
   hostAgent.register('exportRecoveryFile', async ({ parts }) => {
     try {
       const strategy = recoverySealStrategy();
       if (!strategy) return [DataPart({ ok: false, error: 'no-recovery-seal' })];
       if (!agentsRegistryRef?.reload) return [DataPart({ ok: false, error: 'no-registry' })];
       const { body } = await agentsRegistryRef.reload();
-      // every SELF's circles: the default's and each persona's (a restored device that is handed a persona later finds
-      // that persona's circles' rosters in the same file — read here as that persona, through the waist)
-      const circleIds = [...new Set((body.agents ?? [])
-        .filter((a) => a?.agentId === 'default' || /^p-[0-9a-f]{12}$/.test(String(a?.agentId ?? '')))
-        .flatMap((a) => Object.keys(circleMembershipsOf(a))))];
-      // THE MEMBER LIST, per circle (Frits, 2026-09-13: "why not back up the roster itself?"): the file
-      // carries each ticked circle's roster — the trail rows and the member rows, the same a sibling
-      // would serve as a seed — for every circle the person ticked; all of them unless the caller says
-      // otherwise (`rosters`: the ticked circle ids). Without it a restored device gets the circle's
-      // name and nobody to reach (`recoveryBootstrap.js`). The device's own registry is not changed —
-      // the choice belongs to the file being written.
+      // THE MEMBER LIST, per circle (Frits, 2026-09-13: "why not back up the roster itself?"): every ticked circle's
+      // roster; all of them unless the caller says otherwise (`rosters`: the ticked circle ids). The rules rows go for
+      // every circle. One snapshot function for the file and the pod's registry copy (circleSnapshotsOf).
       const ticked = Array.isArray(parts?.[0]?.data?.rosters) ? new Set(parts[0].data.rosters) : null;
-      const rosters = {};
-      const carried = {};
-      // the circles' RULES rows (a circle's name is their text): for EVERY circle in the file, ticked for its roster or not
-      let allRules = [];
-      try {
-        const got = await callSkill('pinboard', 'listOpenRequests', { type: 'group-rules' });
-        allRules = Array.isArray(got?.items) ? got.items : (Array.isArray(got) ? got : []);
-      } catch { allRules = []; }
-      const rulesOf = (circleId) => allRules.filter((it) => it?.source?.groupId === circleId);
-      for (const circleId of circleIds) {
-        if (ticked && !ticked.has(circleId)) {
-          carried[circleId] = null;
-          const named = rosterSnapshot({ rows: [], members: [], rules: rulesOf(circleId) });
-          if (named) rosters[circleId] = named;
-          continue;
-        }
-        let rows = [];
-        let members = [];
-        try {
-          const all = await callSkill('pinboard', 'listOpenRequests', { type: 'membership-redemption' });
-          const items = Array.isArray(all?.items) ? all.items : (Array.isArray(all) ? all : []);
-          rows = items.filter((it) => it?.source?.groupId === circleId);
-        } catch { rows = []; }
-        try { members = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { members = []; }
-        const snap = rosterSnapshot({
-          rows, members, rules: rulesOf(circleId),
-          // This device's proven address in the circle — the same announcement the seed serve introduces
-          // itself back with (`rosterSeed`), minted while this device still holds the key.
-          ownAnnouncement: ownCircleAddressAnnouncement({
-            // the circle's OWN self: in a persona's circle the persona — never the default's webid there
-            circleId, memberWebid: circleSelfRef(circleId), circleAddressFor,
-            signCircleAddress: (cid2, address, member) => signCircleLinkFromSeed(circleSeedFor(cid2), cid2, cid2, address, member ?? circleSelfRef(cid2)),
-            ceremonyCommitmentFor, signCeremonyCommitment,
-          }),
-        });
-        rosters[circleId] = snap;
-        carried[circleId] = snap ? snap.members.filter((m) => m.webid !== circleSelfRef(circleId)).length : null;
-      }
+      const { circleIds, rosters, carried } = await circleSnapshotsOf(body, { carriesMembers: (id) => !ticked || ticked.has(id) });
       const file = sealRecoveryFile({ strategy, body: bodyWithRosters({ body, rosters }) });
       return [DataPart({ ok: true, file, circles: circleIds.length, rosters: carried })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'export-failed' })]; }
@@ -5675,6 +5698,32 @@ export async function createRealHouseholdAgent(opts = {}) {
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'list-failed' })]; }
   }, { visibility: 'private' });
 
+  /**
+   * LAND EACH CIRCLE'S OWN ROWS (a recovery file's, or the pod registry copy's after a pull or a merge): through the
+   * roster seed's own ingest, the device's own call (id-preserved, first-write-wins for trail rows; rules rows fold by
+   * version), and the owner's own proven address through the announce's door. One landing for the file and the pod.
+   * @returns {Promise<number>} how many circles' rows landed
+   */
+  async function landCircleSnapshots(snapshots) {
+    let landed = 0;
+    for (const [circleId, snap] of Object.entries(snapshots ?? {})) {
+      try {
+        const r = await callSkill('pinboard', 'recordRosterSeed', { groupId: circleId, rows: snap.rows, members: snap.members, ...(Array.isArray(snap.rules) ? { rules: snap.rules } : {}) });
+        if (r && !r.error) landed += 1;
+        // The owner's own proven address from before the wipe — through the announce's receive door,
+        // proof re-verified, so what the owner said with it binds on this device too.
+        if (snap?.own) {
+          await callSkill('pinboard', 'recordCircleAddressAnnouncement', {
+            groupId: circleId, memberWebid: snap.own.memberWebid, circleAddress: snap.own.circleAddress,
+            circleAddressProof: snap.own.circleAddressProof,
+            ...(snap.own.ceremonyCommitment ? { ceremonyCommitment: snap.own.ceremonyCommitment, ceremonyCommitmentProof: snap.own.ceremonyCommitmentProof } : {}),
+          });
+        }
+      } catch (err) { if (typeof console !== 'undefined') console.warn(`[restore] ${String(circleId).slice(0, 12)}…: the file's roster did not land: ${err?.message ?? err}`); }
+    }
+    return landed;
+  }
+
   const importRecoveryFileText = async (file) => {
     if (!String(file ?? '').trim()) return { ok: false, error: 'unreadable-file' };
     const strategy = recoverySealStrategy();
@@ -5693,22 +5742,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const { reopened } = await reopenMemberCircles();
       // THE ROSTERS the file carried land through the seed's own ingest (id-preserved, first-write-wins),
       // so the circles have members before anything is asked of anyone.
-      let landed = 0;
-      for (const [circleId, snap] of Object.entries(rostersOf(body))) {
-        try {
-          const r = await callSkill('pinboard', 'recordRosterSeed', { groupId: circleId, rows: snap.rows, members: snap.members, ...(Array.isArray(snap.rules) ? { rules: snap.rules } : {}) });
-          if (r && !r.error) landed += 1;
-          // The owner's own proven address from before the wipe — through the announce's receive door,
-          // proof re-verified, so what the owner said with it binds on this device too.
-          if (snap.own) {
-            await callSkill('pinboard', 'recordCircleAddressAnnouncement', {
-              groupId: circleId, memberWebid: snap.own.memberWebid, circleAddress: snap.own.circleAddress,
-              circleAddressProof: snap.own.circleAddressProof,
-              ...(snap.own.ceremonyCommitment ? { ceremonyCommitment: snap.own.ceremonyCommitment, ceremonyCommitmentProof: snap.own.ceremonyCommitmentProof } : {}),
-            });
-          }
-        } catch (err) { if (typeof console !== 'undefined') console.warn(`[restore] ${String(circleId).slice(0, 12)}…: the file's roster did not land: ${err?.message ?? err}`); }
-      }
+      const landed = await landCircleSnapshots(rostersOf(body));
       // THE BOOTSTRAP: the members the file named become an enrol offer — the same artefact the
       // add-a-device path consumes (announce this device's fresh address to every member, pull every
       // lane from them; the roster itself is already here, so no seed is asked). Stashed where the
@@ -5773,7 +5807,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       const st = await attachRegistryLater();
       // circles the pod brought in open now, in this start (as the boot's re-open loop does for a boot-time pull)
       let reopened = [];
-      if (st?.merged || st?.pulled) { try { reopened = (await reopenMemberCircles())?.reopened ?? []; } catch { reopened = []; } }
+      if (st?.merged || st?.pulled) {
+        // each circle's own rows from the pod copy (its rules: a one-member circle is then listed and named), then open
+        try { await landCircleSnapshots(registryPodSnapshots()); } catch { /* the rows land at the next pull */ }
+        try { reopened = (await reopenMemberCircles())?.reopened ?? []; } catch { reopened = []; }
+      }
       return [DataPart({ ok: true, settings, reopened, mode: st?.mode ?? 'local', probe: st?.probe ?? null, merged: Boolean(st?.merged), pulled: Boolean(st?.pulled) })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'attach-failed' })]; }
   }, { visibility: 'private' });
@@ -6352,6 +6390,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     return { reopened };
   }
+  // a boot that pulled or merged the pod's registry copy lands each circle's own rows it carried (one path with the file)
+  try { await landCircleSnapshots(registryPodSnapshots()); } catch { /* the rows land at the next pull */ }
   await reopenMemberCircles();
 
   // Pre-seed the demo circle with 4 starter tasks — the demo + journey

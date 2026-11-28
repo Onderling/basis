@@ -66,6 +66,32 @@ const updatedAtOf = (body) => {
 const CIRCLES = 'circleMemberships';
 
 /**
+ * Merge two sets of per-circle snapshots (`{ [circleId]: {rows, members, rules?, own?} }`), mine first: a circle only on
+ * one side is kept; on both, the rows, rules and members are unioned (by id, and by webid for members, mine winning) and
+ * `own` is mine where I have one. Never replaces by absence. Pure.
+ */
+export function mergeSnapshots(mine, theirs) {
+  const out = { ...(theirs && typeof theirs === 'object' ? theirs : {}) };
+  const byKey = (a = [], b = [], key) => {
+    const seen = new Map();
+    for (const x of [...(Array.isArray(b) ? b : []), ...(Array.isArray(a) ? a : [])]) if (x && x[key]) seen.set(x[key], x);
+    return [...seen.values()];
+  };
+  for (const [cid, m] of Object.entries(mine && typeof mine === 'object' ? mine : {})) {
+    const t = out[cid];
+    if (!t || !m) { if (m) out[cid] = m; continue; }
+    const rules = byKey(m.rules, t.rules, 'id');
+    out[cid] = {
+      rows: byKey(m.rows, t.rows, 'id'),
+      members: byKey(m.members, t.members, 'webid'),
+      ...(rules.length ? { rules } : {}),
+      ...((m.own ?? t.own) ? { own: m.own ?? t.own } : {}),
+    };
+  }
+  return out;
+}
+
+/**
  * MERGE a pod copy this device has NOT read into its own copy — never a clock deciding whose list survives (a restored
  * phone's first start writes a newer one-device list; last-write-wins then kept that over the pod's circles and pushed it
  * up). Every agent on either side is kept; for an agent on both, its circles are the union, and a circle on both sides
@@ -184,6 +210,20 @@ export function createRegistryCarrier({ backend, deviceId, medium: initialMedium
       // one resource, so the host cannot count circles; a decorator that fails sends the registry as it is
       let up = bytes;
       if (typeof decorateUpload === 'function') { try { up = (await decorateUpload(bytes)) ?? bytes; } catch { up = bytes; } }
+      // NEVER REPLACED BY ABSENCE: the pod's snapshot stays for every circle this device has nothing (or less) for — a
+      // restored device's first upload comes before its landing, and its own snapshot is empty then
+      if (onPod?.rosters && typeof onPod.rosters === 'object') up = { ...up, rosters: mergeSnapshots(up?.rosters, onPod.rosters) };
+      // …but a circle the person LEFT (its dated tombstone, no record since) takes its snapshot with it
+      if (up?.rosters && Array.isArray(up.agents)) {
+        const held = new Set(); const left = new Set();
+        for (const a of up.agents) {
+          for (const cid of Object.keys(a?.properties?.[CIRCLES]?.value ?? {})) held.add(cid);
+          for (const cid of Object.keys(circleLeavesOf(a))) left.add(cid);
+        }
+        const kept = { ...up.rosters };
+        for (const cid of left) if (!held.has(cid)) delete kept[cid];
+        up = { ...up, rosters: kept };
+      }
       await medium.write(name, JSON.stringify(unionTombstones(up, onPod)));
       return {};
     },

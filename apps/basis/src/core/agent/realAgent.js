@@ -5607,6 +5607,14 @@ export async function createRealHouseholdAgent(opts = {}) {
    * so the phrase is the only secret; import opens it with this device's key and upserts every entry
    * through the registry handle, then runs the boot re-open loop. A file sealed by someone else's
    * phrase refuses as `not-your-file`; anything that is not a recovery file as `unreadable-file`. */
+  /** Every SELF's circles in a registry body: the general persona's and each persona's (one reading for the file,
+   *  the pod's snapshot and the landing). */
+  function selfCircleIdsOf(body) {
+    return [...new Set((body?.agents ?? [])
+      .filter((a) => a?.agentId === 'default' || /^p-[0-9a-f]{12}$/.test(String(a?.agentId ?? '')))
+      .flatMap((a) => Object.keys(circleMembershipsOf(a))))];
+  }
+
   /**
    * EACH CIRCLE'S OWN ROWS, as the recovery file and the pod's registry copy carry them (one function, one shape:
    * rosterSnapshot): the circle's rules rows always, its roster (trail rows, members, this device's own announcement)
@@ -5616,9 +5624,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   async function circleSnapshotsOf(body, { carriesMembers = () => true } = {}) {
     // every SELF's circles: the default's and each persona's (a restored device that is handed a persona later finds
     // that persona's circles' rosters in the same file — read here as that persona, through the waist)
-    const circleIds = [...new Set((body.agents ?? [])
-      .filter((a) => a?.agentId === 'default' || /^p-[0-9a-f]{12}$/.test(String(a?.agentId ?? '')))
-      .flatMap((a) => Object.keys(circleMembershipsOf(a))))];
+    const circleIds = selfCircleIdsOf(body);
     // THE MEMBER LIST, per circle (Frits, 2026-09-13: "why not back up the roster itself?"): the file
     // carries each ticked circle's roster — the trail rows and the member rows, the same a sibling
     // would serve as a seed — for every circle the person ticked; all of them unless the caller says
@@ -5706,7 +5712,16 @@ export async function createRealHouseholdAgent(opts = {}) {
    */
   async function landCircleSnapshots(snapshots) {
     let landed = 0;
+    // only a circle the person is IN lands (the registry, as it now stands, holds its membership): a snapshot is never
+    // the way a left circle comes back
+    // every SELF's circles (the general persona's and each persona's), as the export reads them
+    let memberOf = new Set();
+    try {
+      const { body } = await agentsRegistryRef.reload();
+      memberOf = new Set(selfCircleIdsOf(body));
+    } catch { memberOf = new Set(Object.keys(await readSelfCircleMemberships().catch(() => ({})))); }
     for (const [circleId, snap] of Object.entries(snapshots ?? {})) {
+      if (!memberOf.has(circleId)) continue;
       try {
         const r = await callSkill('pinboard', 'recordRosterSeed', { groupId: circleId, rows: snap.rows, members: snap.members, ...(Array.isArray(snap.rules) ? { rules: snap.rules } : {}) });
         // a circle whose own rows landed CHANGED here: said through the one signal every shell hears (agent.onCircleChanged;

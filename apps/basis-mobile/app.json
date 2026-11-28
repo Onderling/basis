@@ -7,6 +7,7 @@
     "userInterfaceStyle": "automatic",
     "scheme": [
       "basis",
+      "org.onderling.basis",
       "onderling-invite",
       "onderling-contact",
       "onderling-pair",

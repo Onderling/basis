@@ -65,6 +65,11 @@ export function buildMobilePodAuth({ hook, session, hookNow = null, chooseIssuer
         for (;;) {
           const h = current();
           if (h?.issuer === want && h?.ready) break;
+          // the provider ANSWERED and said no (its registration refused this app): not one that did not answer, and
+          // nothing to wait for
+          if (h?.issuer === want && h?.lastError?.code === 'REGISTRATION_REJECTED') {
+            throw Object.assign(new Error(`the sign-in at ${want} was refused: ${h.lastError.message}`), { code: 'ISSUER_REFUSED', issuer: want });
+          }
           if (Date.now() >= until) {
             throw Object.assign(new Error(`the sign-in at ${want} could not start: ${h?.lastError?.message ?? 'the provider did not answer'}`), { code: 'ISSUER_NOT_READY', issuer: want });
           }

@@ -494,6 +494,10 @@
       "text": "The pod provider at {{issuer}} did not answer. Check the address and try again.",
       "doc": "Phone sign-in: the chosen provider could not be reached or set up in time (a mistyped address, or it is offline)."
     },
+    "issuer_refused": {
+      "text": "The pod provider at {{issuer}} refused the sign-in from this app.",
+      "doc": "Phone sign-in: the provider answered, but refused to register the app (its registration said no). Not: did not answer."
+    },
     "unknown_issuer": {
       "text": "Unknown issuer \"{{issuer}}\". Try 'inrupt', 'solidcommunity', 'solidweb' or a full URL.",
       "doc": "When resolveIssuer returns null."

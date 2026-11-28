@@ -390,7 +390,8 @@ export default function CircleMyDataScreen({ screenOffer = null, onScreenOfferTa
   // keeps working on the message the way it always did.
   const runSignIn = useCallback(async () => {
     const r = await callSkill('basis', 'signin', issuer.trim() ? { issuer: issuer.trim() } : {});
-    if (r && r.ok === false) throw new Error(r.error ?? 'sign-in failed');
+    // the op's own refusal is painted by the shared act strip (actState.js); the screen does not say it a second time
+    if (r && r.ok === false) throw Object.assign(new Error(r.error ?? 'sign-in failed'), { code: r.code, saidByStrip: true });
     return r;
   }, [callSkill, issuer]);
 
@@ -406,8 +407,8 @@ export default function CircleMyDataScreen({ screenOffer = null, onScreenOfferTa
       if (['CLIENT_ID_PENDING', 'DISCOVERY_PENDING', 'REQUEST_PENDING'].includes(e?.code) || /not yet complete/i.test(msg)) {
         await new Promise((r) => setTimeout(r, 1500));
         try { await runSignIn(); }
-        catch (e2) { setSignInErr(e2?.message ?? String(e2)); }
-      } else { setSignInErr(msg); }
+        catch (e2) { if (!e2?.saidByStrip) setSignInErr(e2?.message ?? String(e2)); }
+      } else if (!e?.saidByStrip) { setSignInErr(msg); }
     }
     finally { setSigningIn(false); }
     load().catch(() => {});   // refresh pod status separately — its failure must not look like a sign-in error

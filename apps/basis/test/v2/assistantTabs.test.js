@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { ASSISTANT_TABS, assistantTabFor, assistantSectionsOf } from '../../src/v2/assistantTabs.js';
+import { readFileSync } from 'node:fs';
+import { ASSISTANT_TABS, assistantTabFor, assistantSectionsOf, assistantAsksSelf } from '../../src/v2/assistantTabs.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
 
 describe('the assistant panel: two tabs over the "+" sheet\'s declared sections', () => {
@@ -32,5 +33,26 @@ describe('the assistant panel: two tabs over the "+" sheet\'s declared sections'
 
   it('when the form closes, the chosen tab shows again', () => {
     expect(assistantTabFor({ chosen: 'gesprek', actId: null })).toBe('gesprek');
+  });
+});
+
+describe('"As whom?" is asked above the tabs, on either tab (the phone walk: Gesprek stayed empty with two personas)', () => {
+  it('asks when more than one self is ticked and none is chosen', () => {
+    const two = [{ id: 'default' }, { id: 'werk' }];
+    expect(assistantAsksSelf({ selves: two, asSelf: null })).toBe(true);
+    expect(assistantAsksSelf({ selves: two, asSelf: 'werk' })).toBe(false);
+    expect(assistantAsksSelf({ selves: [{ id: 'default' }], asSelf: null })).toBe(false);
+    expect(assistantAsksSelf({})).toBe(false);
+  });
+
+  it('both shells take the question from the one rule and paint it outside the tab sections', () => {
+    const web = readFileSync(new URL('../../web/v2/vandaagPlus.js', import.meta.url), 'utf8');
+    const phone = readFileSync(new URL('../../../basis-mobile/src/screens/v2/VandaagPlusModal.js', import.meta.url), 'utf8');
+    for (const [name, src] of [['web', web], ['phone', phone]]) {
+      expect(src, `${name} calls the shared rule`).toMatch(/assistantAsksSelf\(/);
+      expect(src, `${name} keeps no copy of the rule`).not.toMatch(/selves\.length > 1/);
+    }
+    // on the phone the question has its own testID outside the sections, not inside plus-own (shown on Maken only)
+    expect(phone).toMatch(/testID="vandaag-plus-ask-self"/);
   });
 });

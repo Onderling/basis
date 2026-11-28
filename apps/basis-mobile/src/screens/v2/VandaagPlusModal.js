@@ -11,7 +11,7 @@ import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { conversationSelf } from '../../../../basis/src/assistant/plusDoor.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
-import { ASSISTANT_TABS, assistantTabFor, assistantSectionsOf } from '../../../../basis/src/v2/assistantTabs.js';   // the two tabs, shared (web twin)
+import { ASSISTANT_TABS, assistantTabFor, assistantSectionsOf, assistantAsksSelf } from '../../../../basis/src/v2/assistantTabs.js';   // the two tabs, shared (web twin)
 import { t, lang } from '../../core/localisation.js';
 import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardWords, plusMomentNeedsTime, plusAskTime, plusAnswerLineShown } from '../../../../basis/src/v2/vandaagPlus.js';
 import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';   // the card's cap in window pixels, the scroll may shrink to it
@@ -98,6 +98,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   // which tab shows: the chosen one; an open form shows on Maken, where it is painted (web twin: the same call)
   const shown = assistantTabFor({ chosen: tab, actId, editing: !!edit });
   const inShown = new Set(assistantSectionsOf(shown));
+  // several selves ticked and none chosen: "As whom?" comes first, above the tabs, on either tab (shared rule, web twin)
+  const asking = assistantAsksSelf({ selves, asSelf });
   // closing tells the host which self and which form were open: a form the "+" opened from a line, closed unsaved, is
   // refused, and the host has the conversation say so (the shared door's `settled`)
   const closeSheet = () => onClose?.({ asSelf, actId, editing: Boolean(edit?.act) });
@@ -160,12 +162,22 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
             </View>
           ) : null}
           {/* which route answers this conversation, and whether it is confidential (web twin: circle-vandaag-plus__route) */}
-          {!edit && routeLine && shown === 'gesprek' ? <Text style={styles.route} testID="vandaag-plus-route">{routeLine}</Text> : null}
+          {!edit && routeLine && shown === 'gesprek' && !asking ? <Text style={styles.route} testID="vandaag-plus-route">{routeLine}</Text> : null}
+          {/* "As whom?": nothing below can be used before it is answered, so it is asked here, on either tab (web twin) */}
+          {asking ? (
+            <View testID="vandaag-plus-ask-self">
+              <Text style={styles.label}>{t('circle.vandaag.plus_as')}</Text>
+              {selves.map((p) => (
+                <Btn key={p.id} style={styles.btnAt} onPress={() => setAsSelf(p.id)} testID={`vandaag-plus-self-${p.id}`}
+                  label={p.id === 'default' ? t('circle.switcher.you') : (p.name || p.id)} />
+              ))}
+            </View>
+          ) : null}
           {/* the sheet's DECLARED sections (`screenSections.js` plusSheet), in order, each by its id (= the web data-section) */}
           {sectionsOf('plusSheet').map((d) => {
             if (!inShown.has(d.id)) return null;   // a section of the other tab
             const piece = {
-              'plus-thread': () => (!edit && (opening?.intro || opening?.news || (Array.isArray(shownTurns) && shownTurns.length)) ? (
+              'plus-thread': () => (!edit && !asking && (opening?.intro || opening?.news || (Array.isArray(shownTurns) && shownTurns.length)) ? (
             <View testID="vandaag-plus-thread" accessibilityLabel={t('circle.vandaag.plus_thread')}>
               {/* what the "+" says as it opens: what it is, with examples from what the person has; or, once, what is new */}
               {opening?.news ? <Text style={styles.turn} testID="vandaag-plus-news">{opening.news}</Text> : null}
@@ -186,7 +198,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               {onForget ? <Btn variant="ghost" style={styles.btnAt} onPress={() => onForget(turnsSelf)} testID="vandaag-plus-forget" label={t('circle.vandaag.plus_forget')} /> : null}
             </View>
           ) : null),
-              'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (<>
+              'plus-line': () => (!edit && onRead && !asking ? (<>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {/* with a form open the line shows what was said but takes no typing or focus: the form below has them */}
               <ThemedTextInput style={[styles.input, { flex: 1 }]} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1} editable={!act}
@@ -199,15 +211,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               <Btn key={s} variant="ghost" style={styles.btnAt} onPress={() => setLine(s)} testID="vandaag-plus-suggestion" label={s} />
             )) : null}
           </>) : null),
-              'plus-own': () => (selves.length > 1 && !asSelf ? (
-            <View>
-              <Text style={styles.label}>{t('circle.vandaag.plus_as')}</Text>
-              {selves.map((p) => (
-                <Btn key={p.id} style={styles.btnAt} onPress={() => setAsSelf(p.id)} testID={`vandaag-plus-self-${p.id}`}
-                  label={p.id === 'default' ? t('circle.switcher.you') : (p.name || p.id)} />
-              ))}
-            </View>
-          ) : !act ? acts.map((a) => (
+              'plus-own': () => (asking ? null : !act ? acts.map((a) => (
             <View key={a.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Btn style={styles.btnAt} onPress={() => (actRunsAtOnce(a) && typeof onRunAct === 'function' ? onRunAct(a) : setActId(a.id))} testID={`vandaag-plus-${a.id}`} label={plusLabel(t, a)} />
               {onTogglePin ? (
@@ -247,7 +251,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
             </View>
           )),
               // Vastgezet — on a fresh sheet: an own pin picks its act here; a bookmark OPENS its circle (never runs the op)
-              'plus-pinned': () => (!edit && !act && !(selves.length > 1 && !asSelf) && pinned.length ? pinned.map((p) => (
+              'plus-pinned': () => (!edit && !act && !asking && pinned.length ? pinned.map((p) => (
                 <View key={p.key} style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Btn label={p.label} testID={`vandaag-plus-pinned-${p.key}`} style={styles.btnAt} onPress={async () => {
                     const r = await onOpenPin?.(p);

@@ -7,7 +7,7 @@
 import { PLUS_ACTS, plusLabel, plusCardWords, plusMomentNeedsTime, plusAskTime, plusAnswerLineShown } from '../../src/v2/vandaagPlus.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
-import { ASSISTANT_TABS, assistantTabFor, assistantSectionsOf } from '../../src/v2/assistantTabs.js';
+import { ASSISTANT_TABS, assistantTabFor, assistantSectionsOf, assistantAsksSelf } from '../../src/v2/assistantTabs.js';
 
 export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null, actId = null, values = {}, line = '', editing = false, error = null, onPick, onSave, onRead, onRemove, onClose,
   // opened on an own row whose act shares ("Delen met…"): the contacts it can go to, and what a pick does
@@ -69,7 +69,7 @@ export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null,
     sec[d.id] = el;
   }
   const act = PLUS_ACTS.find((a) => a.id === actId) ?? null;
-  const asking = Array.isArray(selves) && selves.length > 1 && !asSelf;
+  const asking = assistantAsksSelf({ selves, asSelf });
   if (asking) {
     const ask = document.createElement('p');
     ask.textContent = tr('circle.vandaag.plus_as');

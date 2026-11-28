@@ -34,3 +34,13 @@ export function assistantTabFor({ chosen = null, actId = null, editing = false }
   if (actId || editing) return 'maken';
   return ASSISTANT_TABS.some((x) => x.id === chosen) ? chosen : DEFAULT_TAB;
 }
+
+/**
+ * Does the panel ask "As whom?" before anything else: more than one self ticked in the header and none chosen yet. The
+ * question is painted above the tabs, on either tab, because nothing else in the panel can be used until it is answered
+ * (asked inside Maken only, Gesprek stayed empty: the phone walk with two personas).
+ * @param {{selves?: Array<{id: string}>, asSelf?: string|null}} [o]
+ */
+export function assistantAsksSelf({ selves = [], asSelf = null } = {}) {
+  return Array.isArray(selves) && selves.length > 1 && !asSelf;
+}

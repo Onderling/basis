@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   createActState, wrapCallSkillWithActState, isActOp, actStateLine, actFailed,
-  ACT_PENDING_DELAY_MS, ACT_DONE_SHOWN_MS, ACT_INTERACTION_WINDOW_MS, ACT_STATE_NONE,
+  ACT_PENDING_DELAY_MS, ACT_DONE_SHOWN_MS, ACT_INTERACTION_WINDOW_MS, ACT_STATE_NONE, ACT_FAILED_HELD_MS,
 } from '../../src/v2/actState.js';
 import { allManifests } from '../../src/v2/manifestSources.js';
 import { basisManifest } from '../../src/index.js';
@@ -93,6 +93,27 @@ describe('one act on the store', () => {
     expect(store.current, 'a new act takes the strip').toBeNull();
     store.end(b, { result: {} });
     expect(store.current?.state).toBe('done');
+  });
+  it('a failed line gives way at the person\'s next touch once it has been readable; a touch right after keeps it', () => {
+    // the phone walk: a failed note's line stayed on screen over Settings and Recovery, two taps later
+    const tm = fakeTimers();
+    const store = createActState(tm);
+    const a = store.begin({ appOrigin: 'lists', opId: 'addToList' });
+    store.end(a, { result: { ok: false, error: 'kapot' } });
+    tm.advance(ACT_FAILED_HELD_MS - 1);
+    store.noteInteraction();
+    expect(store.current?.state, 'a touch while it is still being read keeps it').toBe('failed');
+    tm.advance(1);
+    store.noteInteraction();
+    expect(store.current, 'the next touch after that (a tap on Settings) clears it').toBeNull();
+  });
+  it('a touch never clears a pending line', () => {
+    const tm = fakeTimers();
+    const store = createActState(tm);
+    store.begin({ appOrigin: 'lists', opId: 'addToList' });
+    tm.advance(ACT_PENDING_DELAY_MS + ACT_FAILED_HELD_MS);
+    store.noteInteraction();
+    expect(store.current?.state).toBe('pending');
   });
   it('only the newest act paints its end', () => {
     const tm = fakeTimers();

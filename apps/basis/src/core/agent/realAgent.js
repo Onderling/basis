@@ -5709,7 +5709,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     for (const [circleId, snap] of Object.entries(snapshots ?? {})) {
       try {
         const r = await callSkill('pinboard', 'recordRosterSeed', { groupId: circleId, rows: snap.rows, members: snap.members, ...(Array.isArray(snap.rules) ? { rules: snap.rules } : {}) });
-        if (r && !r.error) landed += 1;
+        // a circle whose own rows landed CHANGED here: said through the one signal every shell hears (agent.onCircleChanged;
+        // a launcher re-reads its list for a circle it does not hold yet), so a pod or file restore paints in place
+        if (r && !r.error) { landed += 1; circleChanged(circleId, 'landed'); }
         // The owner's own proven address from before the wipe — through the announce's receive door,
         // proof re-verified, so what the owner said with it binds on this device too.
         if (snap?.own) {
@@ -5822,8 +5824,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     // FROM THE POD (the screen names it): the shared sign-in op runs; on the phone it completes in place and its
     // pod-session door brings the circle list in; on the web it navigates away and the boot after it pulls the list
     if (source === 'pod') {
+      // WHICH POD: the person chooses it on the screen (the same picker as My data); after a wipe nothing is known, so
+      // nothing is guessed (the default provider is not this person's pod)
+      const issuer = String(parts?.[0]?.data?.issuer ?? '').trim();
+      if (!issuer) return [DataPart({ ok: false, outcome: 'issuer-required', error: 'issuer-required', source })];
       let signed = null;
-      try { signed = await callSkill('basis', 'signin', {}); } catch (e) { signed = { ok: false, error: e?.message ?? String(e) }; }
+      try { signed = await callSkill('basis', 'signin', { issuer }); } catch (e) { signed = { ok: false, error: e?.message ?? String(e) }; }
       if (signed?.ok === false) return [DataPart({ ok: false, outcome: 'pod-failed', error: signed.error ?? 'signin-failed', source })];
       if (signed?.opening) return [DataPart({ ok: true, outcome: 'pod-opening', source })];
       const circleIds = Object.keys(await readSelfCircleMemberships().catch(() => ({})))

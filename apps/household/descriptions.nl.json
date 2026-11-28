@@ -113,7 +113,7 @@
   },
   "restoreSource": {
     "what": "Kies waar je kringen vandaan komen als er niets terugkwam.",
-    "params": {"source": "een bestand, of later", "file": "het herstelbestand"}
+    "params": {"source": "een bestand, de pod, of later", "file": "het herstelbestand", "issuer": "de podaanbieder"}
   },
   "podSessionReady": {
     "what": "Haal je kringenlijst nu van je pod.",

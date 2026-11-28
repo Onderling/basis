@@ -51,9 +51,13 @@ describe('the pod brings a one-member circle back, listed and named', () => {
     const session = { on: false };
     const phone = await boot({ vaults: anna, pod, session });
     expect((await listed(phone)).held).toBe(false);
+    // the shells' launchers re-read their list when the agent says a circle they do not hold changed (watchCircleChanges)
+    const heard = [];
+    phone.onCircleChanged((cid) => heard.push(cid));
     session.on = true;
     expect((await phone.callSkill('household', 'podSessionReady', {}))?.ok).toBe(true);
     expect(await listed(phone)).toEqual({ held: true, name: 'Solokring' });
+    expect(heard, 'the landed circle is SAID, so a launcher repaints in place (the probe: it did not)').toContain(CIRCLE);
     await phone.shutdown?.();
   });
 

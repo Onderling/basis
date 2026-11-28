@@ -16,6 +16,7 @@ import { forgetCircleSealStrategies } from '../../core/circlePods.js';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import { restoreFinishOutcome, restoreFinishCameFrom } from '../../../../basis/src/v2/restoreFinishView.js';
+import PodProviderPicker from './PodProviderPicker.js';   // the one provider list + the free address (My data shares it)
 import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
 import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
@@ -30,6 +31,8 @@ export default function RestoreFinishModal({ visible, callSkill, onClose }) {
   const [phrase, setPhrase] = useState('');
   const [fileText, setFileText] = useState(null);
   const [fileName, setFileName] = useState(null);
+  // which pod to sign in to: after a wipe nothing is known, so the picker starts empty (no default guessed)
+  const [issuer, setIssuer] = useState('');
   const runnerRef = useRef(null);
 
   useEffect(() => {
@@ -78,8 +81,10 @@ export default function RestoreFinishModal({ visible, callSkill, onClose }) {
         <View style={styles.row}>
           <Btn label={t('circle.wizard.recovery.pick')} onPress={pickFile} testID="restore-finish-pick" />
           {fileText ? <Btn label={t('circle.restore_finish.source_file')} primary onPress={() => submit({ source: 'file', file: fileText })} testID="restore-finish-load" /> : null}
-          {/* the pod the screen names: the shared sign-in, through the flow's own source step (web twin: circleApp) */}
-          <Btn label={t('circle.restore_finish.source_pod')} onPress={() => submit({ source: 'pod' })} testID="restore-finish-pod" />
+          {/* the pod the screen names: its provider chosen here (the same picker as My data), then the shared sign-in
+              through the flow's own source step (web twin: circleApp) */}
+          <PodProviderPicker value={issuer} onChange={setIssuer} testIDPrefix="restore-finish-pod" />
+          {issuer.trim() ? <Btn label={t('circle.restore_finish.source_pod')} onPress={() => submit({ source: 'pod', issuer: issuer.trim() })} testID="restore-finish-pod" /> : null}
           <Btn label={t('circle.restore_finish.source_later')} onPress={() => submit({ source: 'later' })} testID="restore-finish-later" />
         </View>
       </View>

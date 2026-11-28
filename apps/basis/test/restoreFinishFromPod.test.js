@@ -27,8 +27,10 @@ const boot = ({ vaults, pod, session }) => createRealHouseholdAgent({
   provisionRegistryMedium: async (strategy) => (session.on ? createRegistryPodMedium({ podSource: pod, strategy }) : null),
 });
 /** The shell's sign-in, completing in place: the session becomes ready and the op asks the pod-session door, as signinFlow does. */
+const signedInAt = [];
 const mountSignIn = (agent, session, { fails = false } = {}) => agent.mountAppOps('basis', {
-  signin: async () => {
+  signin: async (args) => {
+    signedInAt.push(args?.issuer ?? null);
     if (fails) return { ok: false, error: 'the provider refused' };
     session.on = true;
     await agent.callSkill('household', 'podSessionReady', {});
@@ -46,9 +48,10 @@ describe('the restore finishes from the pod', () => {
     const session = { on: false };
     const phone = await boot({ vaults: anna, pod, session });
     mountSignIn(phone, session);
-    const r = await phone.callSkill('household', 'restoreSource', { source: 'pod' });
+    const r = await phone.callSkill('household', 'restoreSource', { source: 'pod', issuer: 'http://localhost:3000' });
     expect(r, JSON.stringify(r)).toMatchObject({ ok: true, outcome: 'ok', source: 'pod' });
     expect(r.circleIds).toContain(CIRCLE);
+    expect(signedInAt.at(-1), 'the provider the person chose, never a default after a wipe').toBe('http://localhost:3000');
     expect(restoreFinishCameFrom({ steps: { source: { outcome: 'ok', out: r } } })).toBe('circle.restore_finish.status_pod');
     await phone.shutdown?.();
   });
@@ -57,9 +60,10 @@ describe('the restore finishes from the pod', () => {
     const anna = { owner: new VaultMemory(), chat: new VaultMemory() };
     const empty = await boot({ vaults: anna, pod: memoryPodSource(), session: { on: false } });
     mountSignIn(empty, { on: false });
-    expect(await empty.callSkill('household', 'restoreSource', { source: 'pod' })).toMatchObject({ ok: false, outcome: 'pod-empty' });
+    expect(await empty.callSkill('household', 'restoreSource', { source: 'pod' }), 'no provider given: nothing guessed').toMatchObject({ ok: false, outcome: 'issuer-required' });
+    expect(await empty.callSkill('household', 'restoreSource', { source: 'pod', issuer: 'http://localhost:3000' })).toMatchObject({ ok: false, outcome: 'pod-empty' });
     mountSignIn(empty, { on: false }, { fails: true });
-    expect(await empty.callSkill('household', 'restoreSource', { source: 'pod' })).toMatchObject({ ok: false, outcome: 'pod-failed', error: 'the provider refused' });
+    expect(await empty.callSkill('household', 'restoreSource', { source: 'pod', issuer: 'http://localhost:3000' })).toMatchObject({ ok: false, outcome: 'pod-failed', error: 'the provider refused' });
     expect(restoreFinishOutcome({ steps: { source: { outcome: 'pod-empty' } } }).messageKey).toBe('circle.restore_finish.err_pod_empty');
     expect(restoreFinishOutcome({ steps: { source: { outcome: 'pod-failed', out: { error: 'the provider refused' } } } }))
       .toMatchObject({ messageKey: 'circle.restore_finish.err_pod_failed' });

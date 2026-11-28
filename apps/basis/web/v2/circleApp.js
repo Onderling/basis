@@ -215,7 +215,7 @@ import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
 import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../src/v2/personaSet.js';
 import { renderPersonaSwitcher } from './personaSwitcher.js';
 import { renderCircleAdminPanel } from './circleAdminPanel.js';
-import { renderCircleMyData } from './circleMyData.js';
+import { renderCircleMyData, podIssuerField } from './circleMyData.js';
 import { renderSettingsHome, renderCircleSettingsChooser } from './circleSettingsHome.js';
 import { settingsGroupFor, settingsGroupForAction, settingsBackFor } from '../../src/v2/settingsHome.js';
 import { connectionRows, connectionOpChoices, connectionSectionChoices, connectionSelfChoice } from '../../src/v2/connections.js';
@@ -6954,7 +6954,10 @@ function showRestoreFinishFlow() {
         card.appendChild(input);
         card.appendChild(button(t('circle.restore_finish.source_file'), () => { if (fileText) submit({ source: 'file', file: fileText }); }, true));
         // the pod the screen names: the shared sign-in, through the flow's own source step (phone twin: RestoreFinishModal)
-        card.appendChild(button(t('circle.restore_finish.source_pod'), () => submit({ source: 'pod' })));
+        // the pod the screen names: its provider chosen here (the same field as My data, empty after a wipe), then the
+        // shared sign-in through the flow's own source step (phone twin: RestoreFinishModal)
+        const podIssuer = podIssuerField(card, { tr: t, value: '', issuers: podAuth.KNOWN_ISSUERS });
+        card.appendChild(button(t('circle.restore_finish.source_pod'), () => { const issuer = podIssuer.value.trim(); if (issuer) submit({ source: 'pod', issuer }); }));
         card.appendChild(button(t('circle.restore_finish.source_later'), () => submit({ source: 'later' })));
         return;
       }

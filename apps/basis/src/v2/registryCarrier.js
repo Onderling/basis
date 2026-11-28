@@ -66,6 +66,32 @@ const updatedAtOf = (body) => {
 const CIRCLES = 'circleMemberships';
 
 /**
+ * Merge two sets of per-circle snapshots (`{ [circleId]: {rows, members, rules?, own?} }`), mine first: a circle only on
+ * one side is kept; on both, the rows, rules and members are unioned (by id, and by webid for members, mine winning) and
+ * `own` is mine where I have one. Never replaces by absence. Pure.
+ */
+export function mergeSnapshots(mine, theirs) {
+  const out = { ...(theirs && typeof theirs === 'object' ? theirs : {}) };
+  const byKey = (a = [], b = [], key) => {
+    const seen = new Map();
+    for (const x of [...(Array.isArray(b) ? b : []), ...(Array.isArray(a) ? a : [])]) if (x && x[key]) seen.set(x[key], x);
+    return [...seen.values()];
+  };
+  for (const [cid, m] of Object.entries(mine && typeof mine === 'object' ? mine : {})) {
+    const t = out[cid];
+    if (!t || !m) { if (m) out[cid] = m; continue; }
+    const rules = byKey(m.rules, t.rules, 'id');
+    out[cid] = {
+      rows: byKey(m.rows, t.rows, 'id'),
+      members: byKey(m.members, t.members, 'webid'),
+      ...(rules.length ? { rules } : {}),
+      ...((m.own ?? t.own) ? { own: m.own ?? t.own } : {}),
+    };
+  }
+  return out;
+}
+
+/**
  * MERGE a pod copy this device has NOT read into its own copy — never a clock deciding whose list survives (a restored
  * phone's first start writes a newer one-device list; last-write-wins then kept that over the pod's circles and pushed it
  * up). Every agent on either side is kept; for an agent on both, its circles are the union, and a circle on both sides
@@ -155,7 +181,7 @@ export function unionTombstones(into, from) {
   return changed ? { ...into, agents } : into;
 }
 
-export function createRegistryCarrier({ backend, deviceId, medium: initialMedium = null, name: initialName = null, onKeyMismatch = null, warn = null } = {}) {
+export function createRegistryCarrier({ backend, deviceId, medium: initialMedium = null, name: initialName = null, onKeyMismatch = null, warn = null, decorateUpload = null } = {}) {
   if (typeof deviceId !== 'string' || !deviceId) throw new Error('createRegistryCarrier: deviceId is required');
   if (initialMedium && !initialName) throw new Error('createRegistryCarrier: a pod name is required with a medium');
   // the medium may come LATER than the boot (`attachMedium`): a sign-in in place, or a session ready after a cold boot
@@ -167,6 +193,8 @@ export function createRegistryCarrier({ backend, deviceId, medium: initialMedium
   // copy it has never read is merged in at the first attach (`mergeUnreadPodCopy`), never written over by a clock.
   const seenUri = `${resourceUri}#pod-seen`;
   const state = { mode: 'local', probe: null, pulled: false, pushed: false, merged: false };
+  // the pod body's circle snapshots, kept from the last pull or merge for the device to land (`podSnapshots`)
+  let lastPodSnapshots = null;
 
   const pseudoPod = createPseudoPod({
     backend: local,
@@ -178,7 +206,25 @@ export function createRegistryCarrier({ backend, deviceId, medium: initialMedium
     podUploader: async (_uri, bytes) => {
       let onPod = null;
       try { const cur = await medium.read(name); onPod = cur == null ? null : parseUntrustedJson(cur); } catch { onPod = null; }
-      await medium.write(name, JSON.stringify(unionTombstones(bytes, onPod)));
+      // THE CIRCLES' OWN ROWS ride in the same sealed body (`decorateUpload`: the recovery file's snapshot, ROSTERS_KEY),
+      // one resource, so the host cannot count circles; a decorator that fails sends the registry as it is
+      let up = bytes;
+      if (typeof decorateUpload === 'function') { try { up = (await decorateUpload(bytes)) ?? bytes; } catch { up = bytes; } }
+      // NEVER REPLACED BY ABSENCE: the pod's snapshot stays for every circle this device has nothing (or less) for — a
+      // restored device's first upload comes before its landing, and its own snapshot is empty then
+      if (onPod?.rosters && typeof onPod.rosters === 'object') up = { ...up, rosters: mergeSnapshots(up?.rosters, onPod.rosters) };
+      // …but a circle the person LEFT (its dated tombstone, no record since) takes its snapshot with it
+      if (up?.rosters && Array.isArray(up.agents)) {
+        const held = new Set(); const left = new Set();
+        for (const a of up.agents) {
+          for (const cid of Object.keys(a?.properties?.[CIRCLES]?.value ?? {})) held.add(cid);
+          for (const cid of Object.keys(circleLeavesOf(a))) left.add(cid);
+        }
+        const kept = { ...up.rosters };
+        for (const cid of left) if (!held.has(cid)) delete kept[cid];
+        up = { ...up, rosters: kept };
+      }
+      await medium.write(name, JSON.stringify(unionTombstones(up, onPod)));
       return {};
     },
     podFetcher: async () => {
@@ -209,6 +255,7 @@ export function createRegistryCarrier({ backend, deviceId, medium: initialMedium
       if (status === 'openable') {
         let podBody = null;
         try { podBody = typeof value === 'string' ? parseUntrustedJson(value) : value; } catch { podBody = null; }
+        lastPodSnapshots = podBody && podBody.rosters && typeof podBody.rosters === 'object' ? podBody.rosters : null;
         if (podBody && localRec && !seen) {
           // A POD COPY THIS DEVICE HAS NOT READ (a restored or new device, signed in after its first start): its circles
           // are taken in, then the merged list goes up. Never pushed over by a newer local clock.
@@ -253,7 +300,10 @@ export function createRegistryCarrier({ backend, deviceId, medium: initialMedium
     return attach();
   }
 
-  return { pseudoPod, resourceUri, attach, attachMedium, status: () => ({ ...state }) };
+  /** The circle snapshots the pod's copy carried at the last pull or merge, taken once (the device lands them). */
+  const podSnapshots = () => { const s = (state.pulled || state.merged) ? lastPodSnapshots : null; lastPodSnapshots = null; return s; };
+
+  return { pseudoPod, resourceUri, attach, attachMedium, podSnapshots, status: () => ({ ...state }) };
 }
 
 // ── THE RECOVERY FILE — the pod-less carrier of the same fact ───────────────────────────────────────

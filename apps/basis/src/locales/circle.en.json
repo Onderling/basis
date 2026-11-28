@@ -11201,6 +11201,10 @@
         "text": "Keep your history in your own storage",
         "doc": "A setting's label (projected from the parameter register)."
       },
+      "pod_carriesMemberLists": {
+        "text": "Your pod also keeps your circles' member lists",
+        "doc": "A setting's label (projected from the parameter register): whether the registry's pod copy also carries each circle's member list (off by default)."
+      },
       "history_restore_recencyDays": {
         "text": "When restoring, first the last … days",
         "doc": "A setting's label (projected from the parameter register)."

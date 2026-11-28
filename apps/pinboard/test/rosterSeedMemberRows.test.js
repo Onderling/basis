@@ -42,6 +42,37 @@ describe('recordRosterSeed — the member rows', () => {
   });
 });
 
+describe('recordRosterSeed — a circle\'s RULES rows land only from the device\'s own call', () => {
+  // the recovery file's import is this device's own call; a rules head decides a circle's name and is read for its
+  // founder authority, and the seed op checks only shape: a peer must not be able to hand a circle a new head
+  const rulesRow = { id: 'rules-1', type: 'group-rules', text: 'Thuis', addedBy: ME, source: { groupId: CIRCLE, rules: { name: 'Thuis', text: 't' }, version: 7 } };
+  const boot = async () => {
+    const id = await AgentIdentity.generate(new VaultMemory());
+    const bundle = await createNeighbourhoodAgent({
+      identity: id, transport: new InternalTransport(new InternalBus(), id.pubKey),
+      offeringMatch: { group: CIRCLE, localActor: ME, peers: [] }, members: [],
+    });
+    await bundle.offeringMatch.start();
+    return bundle;
+  };
+  const heads = async (bundle) => ((await callSkill(bundle.agent, 'listOpenRequests', { type: 'group-rules' }))?.items ?? [])
+    .filter((it) => it?.source?.groupId === CIRCLE);
+
+  it('the device\'s own call (the recovery file) lands them, id-preserved', async () => {
+    const bundle = await boot();
+    const r = await callSkill(bundle.agent, 'recordRosterSeed', { groupId: CIRCLE, rows: [], rules: [rulesRow] }, ME);
+    expect(r?.error ?? null, JSON.stringify(r)).toBeNull();
+    expect((await heads(bundle)).map((h) => h.id)).toEqual(['rules-1']);
+  });
+
+  it('a PEER\'s call carrying rules lands nothing and says so', async () => {
+    const bundle = await boot();
+    const r = await callSkill(bundle.agent, 'recordRosterSeed', { groupId: CIRCLE, rows: [], rules: [rulesRow] }, VISITOR);
+    expect(r?.error).toBe('rules-own-only');
+    expect(await heads(bundle)).toEqual([]);
+  });
+});
+
 describe('setContactHidden on a sender the book never held (the delete/hide note §6a-3)', () => {
   it('hides on a placeholder row `{ webid, pubKey: webid }`; showing again keeps the row, unnamed until the ladder names it', async () => {
     const id = await AgentIdentity.generate(new VaultMemory());

@@ -317,7 +317,7 @@
   },
   "recordRosterSeed": {
     "what": "Take over the member list from your other device.",
-    "params": {"groupId": "which circle", "rows": "the members", "members": "who is in it"}
+    "params": {"groupId": "which circle", "rows": "the members", "members": "who is in it", "rules": "the circle's name and rules, your own"}
   },
   "getGroupRulesUpdateStatement": {
     "what": "Show the signed change of the rules.",

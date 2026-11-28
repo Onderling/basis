@@ -5618,8 +5618,20 @@ export async function createRealHouseholdAgent(opts = {}) {
       const ticked = Array.isArray(parts?.[0]?.data?.rosters) ? new Set(parts[0].data.rosters) : null;
       const rosters = {};
       const carried = {};
+      // the circles' RULES rows (a circle's name is their text): for EVERY circle in the file, ticked for its roster or not
+      let allRules = [];
+      try {
+        const got = await callSkill('pinboard', 'listOpenRequests', { type: 'group-rules' });
+        allRules = Array.isArray(got?.items) ? got.items : (Array.isArray(got) ? got : []);
+      } catch { allRules = []; }
+      const rulesOf = (circleId) => allRules.filter((it) => it?.source?.groupId === circleId);
       for (const circleId of circleIds) {
-        if (ticked && !ticked.has(circleId)) { carried[circleId] = null; continue; }
+        if (ticked && !ticked.has(circleId)) {
+          carried[circleId] = null;
+          const named = rosterSnapshot({ rows: [], members: [], rules: rulesOf(circleId) });
+          if (named) rosters[circleId] = named;
+          continue;
+        }
         let rows = [];
         let members = [];
         try {
@@ -5629,7 +5641,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         } catch { rows = []; }
         try { members = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { members = []; }
         const snap = rosterSnapshot({
-          rows, members,
+          rows, members, rules: rulesOf(circleId),
           // This device's proven address in the circle — the same announcement the seed serve introduces
           // itself back with (`rosterSeed`), minted while this device still holds the key.
           ownAnnouncement: ownCircleAddressAnnouncement({
@@ -5651,9 +5663,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   hostAgent.register('listRecoveryCircles', async () => {
     try {
       const memberships = await readSelfCircleMemberships().catch(() => ({}));
-      let rows = [];
-      try { rows = (await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []; } catch { rows = []; }
-      const nameOf = new Map(rows.map((c) => [typeof c === 'string' ? c : (c?.groupId ?? c?.id), typeof c === 'string' ? null : (c?.name ?? null)]));
+      // a circle's NAME from the one name read (listMyCircles' `names`: circleNamesFromRules), never its key: the
+      // circles list holds bare ids, and reading a name off them named every circle by its key on the file screen
+      let names = {};
+      try { names = (await callSkill('pinboard', 'listMyCircles', {}))?.names ?? {}; } catch { names = {}; }
+      const nameOf = new Map(Object.entries(names && typeof names === 'object' ? names : {}));
       const circles = Object.keys(memberships)
         .filter((id) => id && id !== tasksPrimaryCircleId && id !== 'household')
         .map((id) => ({ id, name: nameOf.get(id) ?? null }));
@@ -5682,7 +5696,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       let landed = 0;
       for (const [circleId, snap] of Object.entries(rostersOf(body))) {
         try {
-          const r = await callSkill('pinboard', 'recordRosterSeed', { groupId: circleId, rows: snap.rows, members: snap.members });
+          const r = await callSkill('pinboard', 'recordRosterSeed', { groupId: circleId, rows: snap.rows, members: snap.members, ...(Array.isArray(snap.rules) ? { rules: snap.rules } : {}) });
           if (r && !r.error) landed += 1;
           // The owner's own proven address from before the wipe — through the announce's receive door,
           // proof re-verified, so what the owner said with it binds on this device too.

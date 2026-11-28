@@ -77,7 +77,7 @@ import { DEFAULT_PERSONA } from '../../src/v2/contactPersona.js';
 import { contactAddSheetModel, addContactAs, contactLensModel, changeContactLens, contactThreadSelfFor } from '../../src/v2/contactLens.js';
 import { renderContactLensPanel } from './contactLensPanel.js';
 import { deleteContact } from '../../src/v2/contactDelete.js';
-import { restoreFinishOutcome } from '../../src/v2/restoreFinishView.js';
+import { restoreFinishOutcome, restoreFinishCameFrom } from '../../src/v2/restoreFinishView.js';
 import { createHistoryPodMedium } from '../../src/v2/historyMirror.js';
 import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
@@ -6958,7 +6958,7 @@ function showRestoreFinishFlow() {
       }
       if (view.form.step === 'intent') {
         card.appendChild(para(t('circle.restore_finish.status_ready')));
-        card.appendChild(para(t(status.carrier === 'pod' ? 'circle.restore_finish.status_pod' : 'circle.restore_finish.status_local'), 'muted'));
+        card.appendChild(para(t(restoreFinishCameFrom(inst)), 'muted'));
         card.appendChild(para(t('circle.restore_finish.intent_question')));
         for (const intent of ['broken', 'lost', 'adding']) {
           card.appendChild(button(t(`circle.restore_finish.intent_${intent}`), () => submit({ intent })));

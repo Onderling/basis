@@ -21,6 +21,18 @@ describe('signin, completing in place', () => {
     expect(r).toMatchObject({ ok: false, error: 'signin.issuer_not_ready:https://pod.typo.example' });
   });
 
+  it('a provider that ANSWERED with a refusal says it refused, not that it did not answer', async () => {
+    // the phone walk with a Community Solid Server: registration was refused (400 invalid_redirect_uri), and the screen
+    // said the provider "did not answer"
+    const podAuth = {
+      completesInPlace: true,
+      resolveIssuer: (i) => ({ id: 'custom', url: i, name: i }),
+      startSignIn: async ({ issuer }) => { throw Object.assign(new Error('raw: registerClient: 400'), { code: 'ISSUER_REFUSED', issuer }); },
+    };
+    const r = await builtinsWith(podAuth).signin({ issuer: 'http://localhost:3000' });
+    expect(r).toMatchObject({ ok: false, code: 'ISSUER_REFUSED', error: 'signin.issuer_refused:http://localhost:3000' });
+  });
+
   it('a sign-in that completes says so only after it did', async () => {
     let done = false;
     const podAuth = {

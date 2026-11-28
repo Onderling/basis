@@ -494,6 +494,10 @@
       "text": "De podaanbieder op {{issuer}} antwoordde niet. Kijk het adres na en probeer het opnieuw.",
       "doc": "Inloggen op de telefoon: de gekozen aanbieder kon niet op tijd bereikt of ingesteld worden (een verkeerd adres, of hij is offline)."
     },
+    "issuer_refused": {
+      "text": "De podaanbieder op {{issuer}} weigerde het inloggen vanuit deze app.",
+      "doc": "Inloggen op de telefoon: de aanbieder antwoordde wel, maar weigerde de app aan te melden (de registratie werd afgewezen). Niet: antwoordde niet."
+    },
     "unknown_issuer": {
       "text": "Onbekende issuer „{{issuer}}\". Probeer 'inrupt', 'solidcommunity', 'solidweb' of een volledige URL.",
       "doc": "resolveIssuer returned null."
